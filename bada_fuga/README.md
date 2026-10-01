@@ -1585,6 +1585,28 @@ LXI・LXII と同じ録音から、プロの楽曲のトラック 8 の曲調へ
 python3 compose_tablet63.py bank61/bank.json score_tablet63.json && python3 synth.py score_tablet63.json tablet63.wav && python3 video.py score_tablet63.json tablet63.wav tablet63.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions LXIV · Fuga per augmentationem XVI (LXIII の主題を 16 倍に拡大 — 4 分音符を伸ばす技法で洗脳的に, ♩=60, 約 5 分)
+
+**拡大 (augmentatio)**: 主題の音の長さを 16 倍にする — 4 分音符 1 つが 4 分音符 16 個分 (4 小節) になる。
+バッハの拡大カノンと、ペルト「ベンジャミン・ブリテンへの追悼歌」のように同じ旋律を違う速さで同時に鳴らすカノン (メンスーラ・カノン) にならい、
+LXIII の 2 つの主題 (15:16・15:12、`smooth()` でなめらかにしたもの) を 1 倍・4 倍・16 倍で同時に鳴らす。
+
+| 層 | 速さ | 鳴らし方 |
+|:--|:--|:--|
+| テノール | 16 倍 | 伸ばした 4 分音符を **1 拍ごとに打ち直す** (16 倍の 1 音 = 16 回の打鍵)。1 音の中で頭を強く、あとは息をするようにふくらんで静まる |
+| バス | 16 倍 | 同じ旋律を 2 オクターヴ下で、小節の頭だけ (深い鐘) |
+| アルト | 4 倍 | 4 分音符が全音符に。2 回り目から入る |
+| ソプラノ | 1 倍 | もとの速さの主題を 2 小節ごとにくり返す (マントラ) |
+| 分散和音 | — | LXIII の 3 連の分散和音で、主和音だけを鳴らし続ける (和音が動かない — ティンティナブリのように) |
+
+- 洗脳的: ♩=60 (1 秒に 1 打) の止まらない打鍵、何分も動かない和音、同じ主題のくり返し、32 小節かけてゆっくり大きくなり、16 倍の主題の最後の音 (主音) で全員がそろって終わる
+- 形式: Introitus (15:20 の実音) → Canon I ×16 (15:16, イ短調, 32 小節) → Lacrimosa (15:19 の実音) → Canon II ×16 (15:12, ニ短調, 32 小節) → Amen (イ長調)
+- 同じ音階の中だけで重なるので、ぶつかるのは同じ調の 2 度 (半音のぶつかりは 1 倍・4 倍の音の約 1 割)。すべて録音から切り出したピアノの実音
+
+```bash
+python3 compose_tablet64.py bank61/bank.json score_tablet64.json && python3 synth.py score_tablet64.json tablet64.wav && python3 video.py score_tablet64.json tablet64.wav tablet64.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
