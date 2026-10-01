@@ -1673,7 +1673,7 @@ pip install basic-pitch --no-deps && pip install pretty_midi mir_eval resampy on
 # sources.json: 各素材 (src/*.wav) の楽譜の場所、または {"transcribe": true}
 python3 compose_tablet67.py bank61/bank.json src sources.json score_tablet67.json
 # ピアノに直した所だけ (extras に "win" があるもの) を鳴らした wav で、抜粋ごとの大きさをそろえる
-python3 compose_tablet67.py level score_tablet67.json conv.wav
+python3 compose_tablet67.py level score_tablet67.json conv.wav <peak>
 python3 synth.py score_tablet67.json tablet67.wav && python3 video.py score_tablet67.json tablet67.wav tablet67.mp4
 ```
 
@@ -1695,7 +1695,7 @@ LXVII (すべて実音のピアノの交響曲) をもとに、**全音符を 2 
 
 ```bash
 python3 compose_tablet68.py bank61/bank.json src sources.json score_tablet68.json
-python3 compose_tablet67.py level score_tablet68.json conv.wav     # ピアノに直した所だけを鳴らした wav で、抜粋の大きさをそろえる
+python3 compose_tablet67.py level score_tablet68.json conv.wav <peak>     # ピアノに直した所だけを鳴らした wav で、抜粋の大きさをそろえる
 python3 synth.py score_tablet68.json tablet68.wav && python3 video.py score_tablet68.json tablet68.wav tablet68.mp4
 ```
 
@@ -1728,7 +1728,7 @@ python3 compose_tablet69.py bank69/bank.json src score_tablet69.json && python3 
   和声は 1 拍ごとに i・iv・V7・iv・V7・V7・V7・i (`H8`)。録音の実音は Introitus・長い音の中・Lacrimosa で
 - **16 倍の伸び**: I・IV 楽章とも主題の 4 分音符を 16 倍 (4 小節) に — シ♭ 4・ソ♭ 4・ファ 4・ミ♭ 4・ド 12・シ♭ 4 小節。テノールが 4 分音符ごとに打ち直し、深い鐘は 2 全音符ごと
 - **バック (LXIX)**: LXIX はホ短調で三全音離れているので、その音を採譜して (basic-pitch) **6 半音下げ**、速さは変えずにピアノの実音で弾き直す。
-  LXIX の属音シの保続が、この曲の属音ファの保続にそのまま重なる。主題曲の実音より約 3 dB 小さく (`compose_tablet67.py level` でそろえてから)
+  LXIX の属音シの保続が、この曲の属音ファの保続にそのまま重なる。主題曲の実音より約 6 dB 小さく (`compose_tablet67.py level` でそろえてから)
 - **フーガを醸す**: 主音の上で主題 → 5 度上の答え、長いドの保続の上でストレッタ、最後の主音の上で 1 倍と 2 倍 (拡大) の主題を同時に。II 楽章は 08:06 の主題の 4 声フーガ
 
 | ×16 の長い音 | I. Requiem | IV. Finale |
@@ -1744,7 +1744,7 @@ python3 compose_tablet69.py bank69/bank.json src score_tablet69.json && python3 
 python3 build_sampler.py bank70 20260923_080607.mp3 20260923_080918.mp3 20260929_*.mp3 20260925_*.mp3
 # src/ に 20260923_080607.wav と tablet69.wav (LXIX)
 python3 compose_tablet70.py bank70/bank.json src score_tablet70.json
-python3 compose_tablet67.py level score_tablet70.json back.wav     # LXIX を弾き直した所だけを鳴らした wav で大きさをそろえる
+python3 compose_tablet67.py level score_tablet70.json back.wav <peak>     # LXIX を弾き直した所だけを鳴らした wav (と synth.py が表示した peak) で大きさをそろえる
 python3 synth.py score_tablet70.json tablet70.wav && python3 video.py score_tablet70.json tablet70.wav tablet70.mp4
 ```
 
@@ -1756,15 +1756,30 @@ LXX と同じ形で、主題曲を 9/25 12:46 の録音 (ヘ短調) に。
   ヘ短調で **ド・レ♭・ド・シ♭・ラ♭・ファ** (8 拍)。和声は 1 拍ごとに V・iv・V・iv (3 拍)・i
 - **16 倍の伸び**: ド 4・レ♭ 4・ド 4・シ♭ 12・ラ♭ 4・ファ 4 小節。テノールが 4 分音符ごとに打ち直し、深い鐘は 2 全音符ごと
 - **バック (LXX)**: 採譜して **5 半音下げ** (変ロ短調 → ヘ短調)、速さは変えずにピアノの実音で。LXX の長いファ → ミ♭ (属音 → 下属音) が、
-  5 半音下げるとこの曲の長いド → シ♭ にそのまま重なるので、そこに 8 小節ずつ (I・IV 楽章)
+  5 半音下げるとこの曲の長いド → シ♭ にそのまま重なるので、そこに 8 小節ずつ (I・IV 楽章)。主題曲の実音より約 6 dB 小さく
 - **フーガを醸す**: 最初のド (属音) の上で主題 → 5 度上の答え、長いシ♭ の上でストレッタ、最後の主音ファの上で 1 倍と 2 倍 (拡大) の主題を同時に。II 楽章は 12:46 の主題の 4 声フーガ
 - 主題曲の実音はレ♭・シ♭・ラ♭ の長い音の中と、Introitus・Lacrimosa で
 
 ```bash
 # src/ に 20260925_124643.wav と tablet70.wav (LXX)
 python3 compose_tablet71.py bank61/bank.json src score_tablet71.json
-python3 compose_tablet67.py level score_tablet71.json back.wav
+python3 compose_tablet67.py level score_tablet71.json back.wav <peak>
 python3 synth.py score_tablet71.json tablet71.wav && python3 video.py score_tablet71.json tablet71.wav tablet71.mp4
+```
+
+## 🎹🕯 Requiem BADA — Tablet Sessions LXXII · Requiem 12:46 II (12:46 の「上る」線を主題に、16 倍に伸ばし、LXXI をバックに, ヘ短調, ♩=60, 約 6 分 43 秒)
+
+同じ 9/25 12:46 の録音をもう一度主題曲に。LXXI は 3 分 1 秒からの「下りる」線を主題にしたので、今度は 1 分 2 秒からの **「上る」線** を主題に —
+ヘ短調で **ファ・ソ・ファ・ラ♭・シ♭・レ♭・ファ** (8 拍、和声は i・V・V・i・iv・iv・VI・i)。バックの LXXI の下りる主題と向かい合う。
+
+- **16 倍の伸び**: ファ 4・ソ 8・ファ 4・ラ♭ 2・シ♭ 2・レ♭ 6・ファ 6 小節。テノールが 4 分音符ごとに打ち直し、深い鐘は 2 全音符ごと
+- **バック (LXXI)**: 同じヘ短調なので、音をそのまま (すべてピアノの実音) 長い音の中で。LXXI の保続音が合う所へ —
+  長いソ (属和音) ← LXXI の属音ドの所 / ラ♭・シ♭ (下属和音) ← LXXI の長いシ♭ / 長いレ♭ ← LXXI のラ♭ の所。主題曲の実音より約 2〜5 dB 小さく
+- **フーガを醸す**: 最初の主音ファの上で主題 → 5 度上の答え、長いレ♭ の上でストレッタ、最後のファの上で 1 倍と 2 倍 (拡大) の主題を同時に。II 楽章は上る主題の 4 声フーガ
+
+```bash
+# src/ に 20260925_124643.wav と tablet71.wav (LXXI)
+python3 compose_tablet72.py bank61/bank.json src score_tablet72.json && python3 synth.py score_tablet72.json tablet72.wav && python3 video.py score_tablet72.json tablet72.wav tablet72.mp4
 ```
 
 ## 作り方 (再現)
