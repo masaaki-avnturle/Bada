@@ -1875,6 +1875,18 @@ python3 compose_tablet75.py bank74/bank.json score_tablet74.json score_tablet75.
 python3 compose_tablet76.py bank74/bank.json score_tablet76.json && python3 synth.py score_tablet76.json tablet76.wav && python3 video.py score_tablet76.json tablet76.wav tablet76.mp4
 ```
 
+## 🎼🔔 Requiem BADA — Tablet Sessions LXXVII · Symphonia a due (LXXV を真ん中で割って重ね、9/24 の 2 本を主題曲に — 共鳴する重低音と 4 オクターヴ半, ♩=60, 約 7 分 39 秒)
+
+- **真ん中で割って重ねる**: LXXV (13 分 19 秒) を楽章の切れ目 (I・II | III・IV) で割り、前半と後半を同時に鳴らす。そのままでは調がぶつかるので、同じ調にそろえて共鳴させる —
+  第 1 部 = I (ホ短調) + III (ヘ短調 → 1 半音下げ)、第 2 部 = II (変ロ短調 → 5 半音下げ) + IV (ホ短調 → 1 半音上げ) でヘ短調。Amen もヘ長調へ
+- **主題曲 (9/24)**: 第 1 部は 08:53 (ホ短調)、第 2 部は 08:49 (ヘ短調)。録音の実音で各部を始め、その主題を 4 倍の長さで 8 小節に 1 回、重ねた響きの上で歌わせる (旋律とオクターヴ上)
+- **共鳴する重低音**: 和音の根音をミ 1 のあたりからオクターヴと 5 度で、小節ごとに息をするように打ち直す (ピアノのいちばん低い音域)。いちばん上はシ 5 まで (ガラスのような高音は使わない) — **ミ 1〜シ 5 の 4.6 オクターヴ**
+- 大きさ: 重ねた 2 つの半分・主題・重低音がほぼ同じくらいに (第 2 部は鐘の打ち直しが厚いので重ねた半分を少し小さく)。すべてピアノの実音
+
+```bash
+python3 compose_tablet77.py bank74/bank.json score_tablet75.json bank74 score_tablet77.json && python3 synth.py score_tablet77.json tablet77.wav && python3 video.py score_tablet77.json tablet77.wav tablet77.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
