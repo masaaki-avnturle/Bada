@@ -1827,6 +1827,32 @@ python3 build_sampler.py bank74 20260923_080607.mp3 20260923_080918.mp3 20260924
 python3 compose_tablet74.py bank74/bank.json scores.json score_tablet74.json && python3 synth.py score_tablet74.json tablet74.wav && python3 video.py score_tablet74.json tablet74.wav tablet74.mp4
 ```
 
+## 🎼🌀 Requiem BADA — Tablet Sessions LXXV · Symphonia lamentosa (LXXIV を 16 倍に — レクイエムとフーガを矛盾したまま重ねる, 4 楽章, ♩=60, 約 13 分 12 秒)
+
+LXXIV (21 分 36 秒) をまるごと 16 倍にすると 5 時間 45 分になるので、各楽章の **核の 3 小節** (12 秒、フーガの主題が入る所) を選び、
+それを **3 つの速さで同時に** 鳴らす (ペルト「ベンジャミン・ブリテンへの追悼歌」のメンスーラ・カノンのように):
+
+| 層 | 速さ | 鳴らし方 |
+|:--|:--|:--|
+| Requiem | ×16 | 3 小節が 48 小節 (3 分 12 秒) に。和音がほとんど動かないもの哀しいコラール。伸ばした音は 2 拍ごと (低い音は 4 拍ごと) に、息をするようにふくらんで打ち直す |
+| 中の層 | ×4 | 3 小節が 12 小節に。48 小節のあいだに 4 回 |
+| Fuga | ×1 | もとの速さのフーガ。3 小節鳴って 3 小節休む、を 8 回 — 遠くで (×16 より約 5 dB 小さく) |
+
+止まったようなレクイエム (×16) と動き続けるフーガ (×1) が、同じ音楽から同時に鳴る — 矛盾したまま 1 つに合わさり、3 つの層は最後の小節でそろって終わる。
+
+| 楽章 | 核の 3 小節 (LXXIV の時刻) |
+|:--|:--|
+| I. Lamento (ホ短調) | 5:20〜5:32 — 主題曲 9/23 08:09 のフーガの提示 (主題 → 答唱) |
+| II. Requiem (変ロ短調) | 7:00〜7:12 — 主題曲 9/23 08:06 の主題と 5 度上の答え (16 倍の打ち直しの上) |
+| III. Fuga (ヘ短調) | 11:52〜12:04 — 主題曲 9/25 12:46 のフーガの提示 |
+| IV. Finale (ホ短調) | 19:00〜19:12 — 三重フーガの三重結合 (主題 A・B・C を同時に) → Amen (ホ長調の和音が 2 拍ごとの打ち直しで消えていく) |
+
+すべて LXXIV の楽譜の音 (録音から切り出したピアノの実音)。シンセ・ドラムなし。
+
+```bash
+python3 compose_tablet75.py bank74/bank.json score_tablet74.json score_tablet75.json && python3 synth.py score_tablet75.json tablet75.wav && python3 video.py score_tablet75.json tablet75.wav tablet75.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
