@@ -17,7 +17,9 @@
  *   図面      sheet_draw
  *   UI        ui_param ui_check ui_select ui_text ui_set param ui_button ui_output ui_plot ui_hud
  *             ui_chips ui_toast view_set view_fit
- *   対話      chat_reply chat_ref chat_gen chat_stream
+ *   対話      chat_reply chat_ref chat_gen chat_stream chat_code
+ *   要求      ui_request (日本語の要求欄 → Bada の on_request(q))  export_file
+ *   ファイル  file_write file_read file_exists (Bada が書いたプログラムを保存)
  *   Bada      bada_expr (式を評価)
  *
  * 環境 (env) の ui / chat / exporter はタブごとの UI アダプタ。Node ではスタブで動く。
@@ -224,6 +226,15 @@
       chat_gen: (text) => call(chat, "gen", String(text)),
       // prompt から最大 n 文字を生成して流し込む (毎文字 Bada の gen_next(ids) / gen_stop(out) を呼ぶ)
       chat_stream: (prompt, n) => call(chat, "stream", String(prompt), toNum(n) || 100),
+      // Bada が書いた Bada プログラムを表示 (実行・IDE で開くボタン付き)
+      chat_code: (file, src, target, desc) => call(chat, "code", String(file), String(src), String(target || "console"), String(desc || "")),
+      // 要求欄 (日本語の要求・質問 → on_request(q))
+      ui_request: (placeholder) => call(ui, "request", String(placeholder || "")),
+      // 書き出し: "stl" / "obj" / "dxf3" / "png" / "sheet" / "sheetpng" / "sheetdxf" / "params"
+      export_file: (kind) => call(ui, "export", String(kind)),
+      file_write: (name, src) => { const n = String(name); env.files[n] = String(src); if (env.onFileWrite) env.onFileWrite(n); return n; },
+      file_read: (name) => (String(name) in env.files ? env.files[String(name)] : null),
+      file_exists: (name) => String(name) in env.files,
     };
   }
 

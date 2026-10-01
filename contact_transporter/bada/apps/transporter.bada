@@ -6,7 +6,9 @@
 //
 //   build()    パラメータが変わるたびに呼ばれる: 計算 → 部品生成 → 図面注記
 //   frame(t)   アニメーションの毎フレーム呼ばれる: ジンバルの回転 (ω) と歳差 (Ω)
+//   on_request(q)  日本語の要求・質問に応える (「外環を80mに」「図面を作って」「Γは？」…)
 #include lib/blueprint.bada
+#include lib/nlp.bada
 
 say "CONTACT TRANSPORTER — 量子プログラミング言語 Bada で設計"
 
@@ -32,6 +34,7 @@ ui_param("coil51", "Jones 5_1 R", 56.215, 0.001)
 ui_param("coil41", "Jones 4_1 R", 30, 0.1)
 ui_button("設計図書の値に戻す", "reset_params")
 ui_button("図面を作成", "make_sheet")
+ui_request("例: 外環を80mに / 塔を1.5倍 / 図面を作って / STLで保存 / Γは？ / 上から見せて")
 
 // build と frame で共有する状態 (大域配列を書き換える)
 state <- [nil]
@@ -217,4 +220,100 @@ def make_sheet() {
   frame(0)
   sc <- sheet_draw("CONTACT TRANSPORTER 異次元輸送機", "CT-TR-001", "Bada transporter.bada", "blue")
   ui_toast("図面を作成しました (尺度 1:" + str(sc) + ")")
+}
+
+// ---------------------------------------------------------------- 要求・質問に応える
+def param_table() {
+  return [[["質量"], "pod_mass", "ポッド質量 [kg]", 1],
+    [["外環", "外側のリング"], "ring_outer", "外環 R [m]", 1],
+    [["中環"], "ring_mid", "中環 R [m]", 1],
+    [["内環"], "ring_inner", "内環 R [m]", 1],
+    [["管径", "太さ"], "tube", "管径 [m]", 0.1],
+    [["ポッドの半径", "ポッド半径", "ポッド"], "pod_r", "ポッド r [m]", 0.5],
+    [["塔", "高さ"], "tower", "塔高 [m]", 10],
+    [["井戸"], "well", "井戸深さ [m]", 1],
+    [["3_1", "三葉"], "coil31", "Jones 3_1 R [m]", 1],
+    [["5_1", "五葉"], "coil51", "Jones 5_1 R [m]", 1],
+    [["4_1", "8の字"], "coil41", "Jones 4_1 R [m]", 1],
+    [["搭乗者", "時間"], "rider_h", "搭乗者の時間 [h]", 0.001],
+    [["目的地", "光年"], "target_ly", "目的地 [ly]", 0.001],
+    [["θ", "傾き", "角度"], "theta0", "θ₀ [deg]", -360],
+    [["rpm", "回転数"], "rpm", "外環 回転 [rpm]", 0],
+    [["アニメ", "速さ"], "speed", "アニメ速度 ×", 0]]
+}
+
+def on_request(q) {
+  bp <- state[0]
+  msgs <- []
+  // 1) パラメータ変更
+  r <- apply_params(q, param_table())
+  -< len(r[0]) > 0 {
+    build()
+    append(msgs, "設計を変更して再計算しました: " + join(r[0], "、"))
+    bp <- state[0]
+    append(msgs, "Γ = " + str(rget(bp, "Gamma")) + ", φ = " + str(sig(rget(bp, "phi"), 6)) + ", Z(φ) = " + str(sig(rget(bp, "Z"), 6)) + ", Ω = " + str(sig(rget(bp, "Omega"), 5)) + " rad/s")
+  }
+  // 2) 操作
+  -< has_any(q, ["戻", "リセット", "初期"]) {
+    reset_params()
+    append(msgs, "設計図書の値に戻しました")
+  }
+  -< contains(q, "図面") {
+    -< export_kind(q) <-> nil {
+      make_sheet()
+      append(msgs, "三面図 + 等角図の図面を作成しました (右の「図面 SVG / PNG / DXF」で保存できます)")
+    }
+  }
+  k <- export_kind(q)
+  -< k != nil {
+    export_file(k)
+    append(msgs, k + " 形式で書き出しました")
+  }
+  v <- view_kind(q)
+  -< v != nil {
+    view_set(v)
+    append(msgs, "視点: " + v)
+  }
+  // 3) 質問
+  ans <- answer(q, bp)
+  -< ans != nil {
+    append(msgs, ans)
+  }
+  -< len(msgs) <-> 0 {
+    return "わかりませんでした。例: 「外環を80mに」「塔を1.5倍」「搭乗者の時間を24時間」「図面を作って」「STLで保存」「Γは？」「共鳴角は？」「上から見せて」"
+  }
+  return join(msgs, "\n")
+}
+
+def answer(q, bp) {
+  out <- []
+  -< has_any(q, ["Γ", "ローレンツ", "相対論"]) {
+    append(out, "Γ = 搭乗者の時間 / 地球の時間 = " + str(rget(bp, "Gamma")) + "、1 − β = " + sci(rget(bp, "one_minus_beta"), 5))
+  }
+  -< has_any(q, ["φ", "ラピディティ"]) {
+    append(out, "φ = arcosh Γ = " + str(sig(rget(bp, "phi"), 7)))
+  }
+  -< has_any(q, ["Z(", "ゼータ", "ζ"]) {
+    append(out, "θ(φ) = " + str(sig(rget(bp, "rs_theta"), 6)) + "、Z(φ) = e^{iθ(φ)} ζ(½ + iφ) = " + str(sig(rget(bp, "Z"), 6)))
+  }
+  -< has_any(q, ["ω", "角速度"]) {
+    om <- rget(bp, "omega")
+    append(out, "ω(外, 中, 内) = " + str(sig(om[0], 5)) + ", " + str(sig(om[1], 5)) + ", " + str(sig(om[2], 5)) + " rad/s")
+  }
+  -< has_any(q, ["歳差", "Ω"]) {
+    append(out, "歳差 Ω = Mgl/(I₃ω₃) = " + str(sig(rget(bp, "Omega"), 6)) + " rad/s")
+  }
+  -< has_any(q, ["共鳴", "Jones", "jones", "結び目"]) {
+    append(out, "Jones 3_1: V(t*) = " + c_text(rget(bp, "V3_1"), 6) + "、共鳴角 α = " + str(rget(bp, "res")) + "°")
+  }
+  -< has_any(q, ["片道", "何時間", "ベガ", "距離"]) {
+    append(out, "目的地 " + str(param("target_ly")) + " ly → 収縮距離 " + sci(rget(bp, "dist_km"), 4) + " km、片道 " + str(sig(rget(bp, "one_way_h"), 5)) + " h")
+  }
+  -< has_any(q, ["寸法", "大きさ", "サイズ", "部品"]) {
+    append(out, "外環 R " + str(param("ring_outer")) + " / 中環 R " + str(param("ring_mid")) + " / 内環 R " + str(param("ring_inner")) + " / 塔 " + str(param("tower")) + " / 井戸 " + str(param("well")) + " m、部品 " + str(len(cad_parts())) + " 個")
+  }
+  -< len(out) <-> 0 {
+    return nil
+  }
+  return join(out, "\n")
 }

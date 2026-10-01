@@ -5,6 +5,7 @@
 // 部材表の A3 図面を描く。飛行計算は UFO.1–26 の反重力モデル (lib/ufo_flight.bada)。
 #include lib/ufo_flight.bada
 #include lib/jones.bada
+#include lib/nlp.bada
 
 say "UFO 設計図面作成ソフト — 量子プログラミング言語 Bada"
 
@@ -38,6 +39,7 @@ ui_section("飛行モデル (UFO.1–26)")
 ui_param("mass", "質量 m [kg]", 12000, 100)
 ui_param("gain", "反重力ゲイン", 1, 0.05)
 ui_check("fly", "飛行アニメーション (表示 1/20)", false)
+ui_request("例: 直径40mで舷窓12個 / 脚を4本 / コイルを5_1に / リングを外して / 名前は「SKY-1」 / 白い図面で / 飛ばして / 上昇は？")
 
 state <- [0]
 
@@ -291,4 +293,169 @@ def flight() {
     i <- i + 1
   }
   ui_plot("ascent", "上昇シミュレーション h(t) [km]  (半陰的オイラー, dt = 1 s)", [["高度 km", "#ff7043", pts]], [[10, tr[10][1] / 1000, "10 s: " + str(sig(tr[10][1], 4)) + " m"]])
+}
+
+// ---------------------------------------------------------------- 要求・質問に応える
+def param_table() {
+  // 長い言い回しを先に (「ドーム直径」を「直径」より先に、「脚の長さ」を「脚」より先に)
+  return [[["ドーム直径", "ドームの直径", "ドームの大きさ"], "dome_d", "ドーム直径 [m]", 0.2],
+    [["ドーム高さ", "ドームの高さ"], "dome_h", "ドーム高さ [m]", 0.1],
+    [["上殻", "上の高さ", "上側"], "upper", "上殻高さ [m]", 0.1],
+    [["下殻", "下の高さ", "下側"], "lower", "下殻高さ [m]", 0.1],
+    [["縁", "リムの厚さ"], "rim", "縁の厚さ [m]", 0.02],
+    [["脚の長さ", "脚長"], "leg_len", "脚長 [m]", 0.2],
+    [["直径", "大きさ", "全幅", "径"], "diameter", "直径 [m]", 1],
+    [["舷窓", "窓"], "windows", "舷窓数", 0],
+    [["推進", "エンジン", "ポッド"], "engines", "推進ポッド数", 0],
+    [["脚", "足"], "legs", "着陸脚数", 0],
+    [["質量", "重さ"], "mass", "質量 [kg]", 1],
+    [["ゲイン", "反重力"], "gain", "反重力ゲイン", 0]]
+}
+
+def on_request(q) {
+  msgs <- []
+  changed <- false
+  // プリセット
+  -< contains(q, "アダムスキー") {
+    preset_adamski()
+    append(msgs, "アダムスキー型を読み込みました")
+  }
+  -< has_any(q, ["母船", "マザーシップ"]) {
+    preset_mothership()
+    append(msgs, "大型母船を読み込みました")
+  }
+  -< has_any(q, ["コンタクト機"]) {
+    preset_contact()
+    append(msgs, "コンタクト機を読み込みました")
+  }
+  -< has_any(q, ["標準"]) {
+    preset_standard()
+    append(msgs, "標準円盤 01 を読み込みました")
+  }
+  // 名前・図番
+  nm <- quoted(q)
+  -< nm != nil {
+    -< has_any(q, ["図番"]) {
+      ui_set("number", nm)
+      append(msgs, "図番 → " + nm)
+    } >- {
+      ui_set("name", nm)
+      append(msgs, "機体名 → " + nm)
+    }
+    changed <- true
+  }
+  -< has_any(q, ["設計者"]) {
+    -< nm != nil {
+      ui_set("author", nm)
+    }
+  }
+  // 数値パラメータ
+  r <- apply_params(q, param_table())
+  -< len(r[0]) > 0 {
+    i <- 0
+    -> i < len(r[0]) {
+      append(msgs, r[0][i])
+      i <- i + 1
+    }
+    // 個数は整数に
+    ui_set("windows", round(param("windows")))
+    ui_set("engines", round(param("engines")))
+    ui_set("legs", round(param("legs")))
+    changed <- true
+  }
+  // コイル・リング・飛行・図面テーマ
+  knots <- ["3_1", "4_1", "5_1"]
+  i <- 0
+  -> i < 3 {
+    -< contains(q, knots[i]) {
+      ui_set("knot", knots[i])
+      append(msgs, "反重力コイル → Jones " + knots[i] + " (" + knot_name(knots[i]) + ")")
+      changed <- true
+    }
+    i <- i + 1
+  }
+  -< contains(q, "リング") {
+    on <- negative(q) <-> false
+    ui_set("ring", on)
+    -< on {
+      append(msgs, "コンタクト・リングを付けました")
+    } >- {
+      append(msgs, "コンタクト・リングを外しました")
+    }
+    changed <- true
+  }
+  -< has_any(q, ["飛ば", "飛行", "浮上", "離陸"]) {
+    ui_set("fly", negative(q) <-> false)
+    append(msgs, "飛行アニメーション: " + str(param("fly")))
+  }
+  -< has_any(q, ["着陸", "止め"]) {
+    ui_set("fly", false)
+    append(msgs, "着陸しました")
+  }
+  -< has_any(q, ["白", "紙"]) {
+    ui_set("theme", "paper")
+    append(msgs, "図面テーマ → 白紙")
+    changed <- true
+  }
+  -< has_any(q, ["青焼", "青い図面"]) {
+    ui_set("theme", "blue")
+    append(msgs, "図面テーマ → 青焼き")
+    changed <- true
+  }
+  -< changed {
+    build()
+    view_fit()
+  }
+  -< contains(q, "図面") {
+    -< export_kind(q) <-> nil {
+      -< changed <-> false {
+        build()
+      }
+      append(msgs, "図面を更新しました (" + param("name") + ", 図番 " + param("number") + ")")
+    }
+  }
+  k <- export_kind(q)
+  -< k != nil {
+    export_file(k)
+    append(msgs, k + " 形式で書き出しました")
+  }
+  v <- view_kind(q)
+  -< v != nil {
+    view_set(v)
+    append(msgs, "視点: " + v)
+  }
+  ans <- answer(q)
+  -< ans != nil {
+    append(msgs, ans)
+  }
+  -< len(msgs) <-> 0 {
+    return "わかりませんでした。例: 「直径40mで舷窓12個」「脚を4本」「ドーム直径を12m」「コイルを5_1に」「リングを外して」「名前は「SKY-1」」「白い図面で」「図面をPNGで保存」「飛ばして」「上昇は？」"
+  }
+  return join(msgs, "\n")
+}
+
+def answer(q) {
+  out <- []
+  g <- param("gain")
+  -< has_any(q, ["上昇", "高度", "速度", "飛ぶ", "何m"]) {
+    tr <- ascend(10, 1, g)
+    append(out, "10 秒後: 高度 " + str(sig(tr[10][1], 5)) + " m、速度 " + str(sig(tr[10][2], 5)) + " m/s (a = (L−1)·g_eff·ゲイン = " + str(sig(ufo_accel(0, g), 5)) + " m/s²)")
+  }
+  -< has_any(q, ["反重力係数", "L は", "Lは", "cosh"]) {
+    append(out, "L = cosh(x log x) = " + str(sig(ufo_L(0), 6)) + " (地表 x = 2)、1 km で " + str(sig(ufo_L(1000), 6)))
+  }
+  -< has_any(q, ["エネルギー", "E_ag"]) {
+    append(out, "U = GMm/r = " + sci(u_grav(param("mass"), 0), 4) + " J、E_ag = U·L = " + sci(e_ag(param("mass"), 0), 4) + " J")
+  }
+  -< has_any(q, ["寸法", "サイズ", "全高", "大きさは"]) {
+    top <- param("lower") + param("leg_len") + param("upper") + param("dome_h")
+    append(out, "直径 " + str(param("diameter")) + " m、全高 " + fixed(top, 2) + " m、ドーム ⌀" + str(param("dome_d")) + " m、舷窓 " + str(param("windows")) + "、脚 " + str(param("legs")))
+  }
+  -< has_any(q, ["材料", "部材"]) {
+    append(out, "部材: 船体 Fe·Co60·Pt·Al 合金 / ドーム SiO₂ プリズム / 舷窓 Al₂O₃ / コイル Cs・Mg / 推進 Al (heat)・H₂ / リング He 冷却 (設計図書 EXP.156)")
+  }
+  -< len(out) <-> 0 {
+    return nil
+  }
+  return join(out, "\n")
 }

@@ -1,0 +1,156 @@
+// nlp.bada — 日本語の要求文を読むための小さな言語処理 (Bada)
+//   「外環を80mに」「直径 30 m、舷窓 12 個」「塔を1.5倍」「名前は「SKY-1」」などから
+//   キーワードと数値を取り出す。
+
+// どれか 1 語でも含むか
+def has_any(q, words) {
+  i <- 0
+  -> i < len(words) {
+    -< contains(q, words[i]) {
+      return true
+    }
+    i <- i + 1
+  }
+  return false
+}
+
+// s の中で最初に現れる数値 (なければ nil)
+def first_num(s) {
+  m <- regex_find(s, "-?[0-9]+(\\.[0-9]+)?")
+  -< len(m) <-> 0 {
+    return nil
+  }
+  return num(m[0])
+}
+
+// キーワードに付いた数値を [値, 倍率か, キーワードと数値を消した残りの文] で返す (なければ nil)。
+//   前  : 「24時間」「12個の舷窓」「5つのリング」 (直接付いていれば優先)
+//   後ろ: 「外環を80mに」「舷窓12個」「塔を1.5倍」 (間は 6 文字以内・読点をまたがない)
+//   「半分」は 0.5 倍。
+def take(q, words) {
+  i <- 0
+  -> i < len(words) {
+    w <- words[i]
+    p <- find(q, w)
+    -< p >= 0 {
+      // 前に直接付いた数値 (「12個の舷窓」「24時間」)。5_1 のような結び目名の数字は除く
+      b <- regex_find(q, "(^|[^0-9_.])[0-9]+(\\.[0-9]+)?\\s*(m|メートル|個|本|つ|重|時間|秒|光年|ly|基|台|枚)?\\s*(の)?\\s*" + w)
+      -< len(b) > 0 {
+        return [first_num(b[0]), false, replace(q, b[0], " ")]
+      }
+      // 後ろの数値 (「外環を80mに」「舷窓12個」「塔を1.5倍」)
+      rest <- substr(q, p + len(w))
+      head <- substr(rest, 0, 14)
+      m <- regex_find(head, "-?[0-9]+(\\.[0-9]+)?")
+      -< len(m) > 0 {
+        at <- find(head, m[0])
+        gap <- substr(head, 0, at)
+        -< len(gap) <= 6 {
+          -< len(regex_find(gap, "[、。,，;；_]")) <-> 0 {
+            after <- substr(head, at + len(m[0]))
+            -< startswith(after, "_") <-> false {
+              times <- startswith(trim(after), "倍")
+              cut <- substr(q, 0, p) + " " + substr(rest, at + len(m[0]))
+              return [num(m[0]), times, cut]
+            }
+          }
+        }
+      }
+      -< contains(head, "半分") {
+        return [0.5, true, substr(q, 0, p) + " " + rest]
+      }
+    }
+    i <- i + 1
+  }
+  return nil
+}
+
+// 「…」『…』"…" で囲まれた文字列
+def quoted(q) {
+  m <- regex_find(q, "[「『\"][^」』\"]+[」』\"]")
+  -< len(m) <-> 0 {
+    return nil
+  }
+  return substr(m[0], 1, len(m[0]) - 1)
+}
+
+// 否定 (なし / 外す / 無し / いらない / off)
+def negative(q) {
+  return has_any(q, ["なし", "無し", "外", "いらない", "不要", "消", "off", "OFF", "オフ"])
+}
+
+// 書き出し形式の判定 → "stl" / "obj" / "dxf3" / "png" / "sheet" / "sheetpng" / "sheetdxf" / nil
+def export_kind(q) {
+  u <- upper(q)
+  -< has_any(q, ["保存", "書き出", "出力", "エクスポート", "export", "ダウンロード"]) <-> false {
+    return nil
+  }
+  -< contains(q, "図面") {
+    -< contains(u, "DXF") {
+      return "sheetdxf"
+    }
+    -< contains(u, "PNG") {
+      return "sheetpng"
+    }
+    return "sheet"
+  }
+  -< contains(u, "STL") {
+    return "stl"
+  }
+  -< contains(u, "OBJ") {
+    return "obj"
+  }
+  -< contains(u, "DXF") {
+    return "dxf3"
+  }
+  -< contains(u, "PNG") {
+    return "png"
+  }
+  -< has_any(q, ["画像", "スクリーンショット"]) {
+    return "png"
+  }
+  return nil
+}
+
+// 視点の切り替え → "top" / "front" / "side" / "iso" / nil
+def view_kind(q) {
+  -< has_any(q, ["上から", "真上", "平面"]) {
+    return "top"
+  }
+  -< has_any(q, ["正面", "前から"]) {
+    return "front"
+  }
+  -< has_any(q, ["側面", "横から"]) {
+    return "side"
+  }
+  -< has_any(q, ["斜め", "等角", "ISO", "iso"]) {
+    return "iso"
+  }
+  return nil
+}
+
+// 表のキーワードで ui パラメータを書き換える。
+//   table = [[キーワード配列, パラメータ名, 表示名, 最小値], ...]
+//   戻り値 [変更の説明の配列, 残りの文]
+def apply_params(q, table) {
+  done <- []
+  i <- 0
+  -> i < len(table) {
+    t <- take(q, table[i][0])
+    -< t != nil {
+      key <- table[i][1]
+      v <- t[0]
+      -< t[1] {
+        v <- param(key) * v
+      }
+      -< v < table[i][3] {
+        v <- table[i][3]
+      }
+      ui_set(key, v)
+      append(done, table[i][2] + " → " + str(sig(v, 6)))
+      q <- t[2]
+    }
+    i <- i + 1
+  }
+  return [done, q]
+}

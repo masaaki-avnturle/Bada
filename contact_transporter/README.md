@@ -31,6 +31,17 @@
   編集内容はブラウザ (アプリ) 内に保存されます。`examples/my_ship.bada` は Bada で新しい宇宙船 (葉巻型母船) を設計する例、
   `examples/template.bada` は新規アプリのひな形です。
 
+## Bada でプログラミングして、要求に応えてアプリを作る
+
+| アプリ | 要求・質問の例 | Bada の処理 |
+|:--|:--|:--|
+| **ContactGPT** | 「直径40mで舷窓12個のUFOの設計図アプリを作って」「リング5つの異次元輸送機のCADを作って」「4量子ビットのGHZのプログラムを書いて」「ゼータの零点を60まで求めるアプリを作って」 | [`lib/codegen.bada`](bada/lib/codegen.bada) が要求を読み、**Bada のアプリケーションのソースを書いて** `user/` に保存 → 「🛠 作ったアプリ」タブ (3D) / チャット内 (計算・量子回路) で実行、IDE で編集 |
+| **輸送機 3D CAD** | 「外環を80mに」「塔を1.5倍」「24時間の搭乗者にして」「図面を作って」「STLで保存」「Γは？」「共鳴角は？」「上から見せて」 | [`apps/transporter.bada`](bada/apps/transporter.bada) の `on_request(q)` |
+| **UFO 設計図面** | 「直径40mで舷窓12個」「12個の窓と4本の脚」「コイルを5_1に」「リングを外して」「名前は「SKY-1」」「白い図面で」「図面をPNGで保存」「上昇は？」 | [`apps/ufo.bada`](bada/apps/ufo.bada) の `on_request(q)` |
+
+日本語の要求文の解析 (キーワードの前後の数値・倍率・「」の名前・否定・書き出し形式・視点) も Bada で書いています ([`lib/nlp.bada`](bada/lib/nlp.bada))。
+ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じく `ui_*` で画面を宣言し、`build()` / `frame(t)` / `sheet_draw` で 3D と図面を作ります。
+
 ## ダウンロード (GitHub Actions) — 3 つのアプリ
 
 リポジトリの **Actions** → **「Bada 3 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 …)」** →
@@ -125,7 +136,7 @@ cd contact_transporter/dist/ufo/electron && npm install && npm start   # デス�
 ```
 contact_transporter/
   contact_blueprint.pdf        元の設計図書
-  bada/  apps/ (contactgpt · transporter · ufo)  lib/ (complex · zeta · jones · quantum · blueprint · ufo_flight)  examples/
+  bada/  apps/ (contactgpt · transporter · ufo)  lib/ (complex · zeta · jones · quantum · blueprint · ufo_flight · nlp · codegen)  examples/
   data/  equations.json  contactgpt_weights.json  contact_blueprint.txt
   src/   bada.js badalib.js  physics.js gpt.js chat.js cad.js drafting.js viewer.js app.js index.html style.css
   tools/ build.js package-app.js test.js conformance.py badahost.js train.js gradcheck.js extract_equations.py

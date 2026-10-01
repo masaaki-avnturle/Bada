@@ -1,0 +1,539 @@
+// codegen.bada — ContactGPT が要求に応えて Bada のアプリケーションを書く (Bada で書かれた Bada プログラム生成器)
+//
+//   codegen(q) → [ファイル名, Bada ソース, 実行先, 説明]  または nil (アプリ作成の要求でない)
+//
+//   UFO 設計図アプリ    「直径40mで舷窓12個のUFOの設計図アプリを作って」
+//   輸送機 CAD アプリ    「リング5つの異次元輸送機のCADを作って」「外環80m」「5_1コイル」
+//   計算アプリ          「ゼータの零点を50まで求めるアプリ」「24時間のローレンツ計算」「5_1の共鳴」「上昇を30秒」
+//   量子回路アプリ       「4量子ビットのGHZ」「ベル状態」「グローバー探索」
+//
+// 生成したソースは user/ に保存され、そのまま 3D タブやコンソールで実行・IDE で編集できる。
+#include lib/nlp.bada
+
+def is_build_request(q) {
+  return has_any(q, ["作って", "作成", "作る", "生成して", "プログラム", "アプリ", "設計して", "書いて", "組んで", "コード"])
+}
+
+// 要求文から数値を取り出す (なければ既定値)
+def num_or(q, words, def_v) {
+  t <- take(q, words)
+  -< t <-> nil {
+    return def_v
+  }
+  return t[0]
+}
+
+def knot_of(q, def_k) {
+  -< contains(q, "5_1") {
+    return "5_1"
+  }
+  -< contains(q, "4_1") {
+    return "4_1"
+  }
+  -< contains(q, "3_1") {
+    return "3_1"
+  }
+  return def_k
+}
+
+// ファイル名に使える短い識別子
+def slug(s) {
+  out <- ""
+  cs <- chars(s)
+  i <- 0
+  -> i < len(cs) {
+    -< len(regex_find(cs[i], "[A-Za-z0-9_]")) > 0 {
+      out <- out + lower(cs[i])
+    } >- {
+      -< endswith(out, "_") <-> false {
+        out <- out + "_"
+      }
+    }
+    i <- i + 1
+  }
+  -< len(out) <-> 0 {
+    out <- "app"
+  }
+  return out
+}
+
+def stamp() {
+  return str(imod(int(now_ms() / 1000), 100000))
+}
+
+// ---------------------------------------------------------------- 振り分け
+def codegen(q) {
+  -< is_build_request(q) <-> false {
+    return nil
+  }
+  -< has_any(q, ["UFO", "ufo", "円盤", "母船", "飛行物体", "宇宙船"]) {
+    return gen_ufo(q)
+  }
+  -< has_any(q, ["輸送機", "トランスポーター", "ジンバル", "転送", "CAD", "cad", "リング"]) {
+    return gen_transporter(q)
+  }
+  -< has_any(q, ["量子回路", "ベル", "GHZ", "ghz", "グローバー", "Grover", "grover", "量子ビット"]) {
+    return gen_quantum(q)
+  }
+  -< has_any(q, ["零点", "ゼータ", "ζ"]) {
+    return gen_zeta(q)
+  }
+  -< has_any(q, ["ローレンツ", "Γ", "相対論", "時間の遅れ"]) {
+    return gen_lorentz(q)
+  }
+  -< has_any(q, ["Jones", "jones", "結び目", "共鳴"]) {
+    return gen_jones(q)
+  }
+  -< has_any(q, ["上昇", "反重力", "飛行計算"]) {
+    return gen_ascent(q)
+  }
+  return nil
+}
+
+// ---------------------------------------------------------------- UFO 設計図アプリ
+def gen_ufo(q) {
+  d <- num_or(q, ["直径", "全幅", "大きさ"], 24)
+  win <- round(num_or(q, ["舷窓", "窓"], 8))
+  legs <- round(num_or(q, ["脚", "足"], 3))
+  eng <- round(num_or(q, ["推進", "エンジン", "ポッド"], 3))
+  dd <- num_or(q, ["ドーム直径", "ドーム"], sig(d * 0.375, 3))
+  knot <- knot_of(q, "3_1")
+  ring <- true
+  -< contains(q, "リング") {
+    -< negative(q) {
+      ring <- false
+    }
+  }
+  theme <- "blue"
+  -< has_any(q, ["白", "紙"]) {
+    theme <- "paper"
+  }
+  name <- quoted(q)
+  -< name <-> nil {
+    name <- "BADA-UFO D" + str(d)
+  }
+  up <- sig(d * 0.133, 3)
+  lo <- sig(d * 0.092, 3)
+  rim <- sig(d * 0.033, 3)
+  dh <- sig(dd * 0.36, 3)
+  q_knot <- 3
+  -< knot <-> "5_1" {
+    q_knot <- 5
+  }
+  s <- []
+  append(s, '// ' + name + ' — ContactGPT が要求「' + q + '」に応えて Bada で書いた UFO 設計図アプリ')
+  append(s, '#include lib/ufo_flight.bada')
+  append(s, '')
+  append(s, 'say "' + name + ' — Bada で生成された UFO 設計図アプリ"')
+  append(s, 'ui_section("' + name + '")')
+  append(s, 'ui_text("name", "機体名", "' + name + '")')
+  append(s, 'ui_param("diameter", "直径 [m]", ' + str(d) + ', 0.1)')
+  append(s, 'ui_param("upper", "上殻高さ [m]", ' + str(up) + ', 0.05)')
+  append(s, 'ui_param("lower", "下殻高さ [m]", ' + str(lo) + ', 0.05)')
+  append(s, 'ui_param("rim", "縁の厚さ [m]", ' + str(rim) + ', 0.02)')
+  append(s, 'ui_param("dome_d", "ドーム直径 [m]", ' + str(dd) + ', 0.1)')
+  append(s, 'ui_param("dome_h", "ドーム高さ [m]", ' + str(dh) + ', 0.05)')
+  append(s, 'ui_param("windows", "舷窓数", ' + str(win) + ', 1)')
+  append(s, 'ui_param("engines", "推進ポッド数", ' + str(eng) + ', 1)')
+  append(s, 'ui_param("legs", "着陸脚数", ' + str(legs) + ', 1)')
+  append(s, 'ui_param("leg_len", "脚長 [m]", ' + str(sig(lo * 1.4, 3)) + ', 0.1)')
+  append(s, 'ui_check("ring", "コンタクト・リング", ' + str(ring) + ')')
+  append(s, 'ui_param("gain", "反重力ゲイン", 1, 0.05)')
+  append(s, 'ui_button("図面を作成", "make_sheet")')
+  append(s, '')
+  append(s, '// 船体の回転断面 [[半径, z], ...] — 下殻 (べき 2.2 の曲線) → 縁 → 上殻')
+  append(s, 'def hull_profile() {')
+  append(s, '  R <- param("diameter") / 2')
+  append(s, '  rt <- param("dome_d") / 2')
+  append(s, '  rb <- param("diameter") * 0.2')
+  append(s, '  rim <- param("rim")')
+  append(s, '  pr <- [[0, -param("lower")], [rb, -param("lower")]]')
+  append(s, '  k <- 1')
+  append(s, '  -> k <= 16 {')
+  append(s, '    s <- k / 16')
+  append(s, '    append(pr, [rb + (R - rb) * s, -param("lower") + (param("lower") - rim / 2) * pow(s, 2.2)])')
+  append(s, '    k <- k + 1')
+  append(s, '  }')
+  append(s, '  append(pr, [R, rim / 2])')
+  append(s, '  k <- 1')
+  append(s, '  -> k <= 16 {')
+  append(s, '    s <- k / 16')
+  append(s, '    append(pr, [R - (R - rt) * s, rim / 2 + (param("upper") - rim / 2) * (1 - pow(1 - s, 2.2))])')
+  append(s, '    k <- k + 1')
+  append(s, '  }')
+  append(s, '  append(pr, [0, param("upper")])')
+  append(s, '  return pr')
+  append(s, '}')
+  append(s, '')
+  append(s, 'def dome_profile() {')
+  append(s, '  pr <- []')
+  append(s, '  k <- 0')
+  append(s, '  -> k <= 12 {')
+  append(s, '    a <- k / 12 * pi() / 2')
+  append(s, '    r <- param("dome_d") / 2 * cos(a)')
+  append(s, '    -< k <-> 12 {')
+  append(s, '      r <- 0')
+  append(s, '    }')
+  append(s, '    append(pr, [r, param("upper") + param("dome_h") * sin(a)])')
+  append(s, '    k <- k + 1')
+  append(s, '  }')
+  append(s, '  return pr')
+  append(s, '}')
+  append(s, '')
+  append(s, 'def build() {')
+  append(s, '  cad_clear()')
+  append(s, '  R <- param("diameter") / 2')
+  append(s, '  cad_lathe("hull", "船体", "#cfd8dc", hull_profile(), 96)')
+  append(s, '  cad_lathe("dome", "ドーム", "#80deea", dome_profile(), 64)')
+  append(s, '  i <- 0')
+  append(s, '  -> i < param("windows") {')
+  append(s, '    cad_sphere("window" + str(i), "舷窓", "#ff7043", min2(0.45, param("dome_d") * 0.05))')
+  append(s, '    i <- i + 1')
+  append(s, '  }')
+  -< knot <-> "4_1" {
+    append(s, '  cad_fig8("coil", "反重力コイル Jones 4_1", "#ff7043", param("diameter") * 0.2 / 3, 0.18)')
+  } >- {
+    append(s, '  cad_knot("coil", "反重力コイル Jones ' + knot + '", "#ff7043", param("diameter") * 0.17, param("diameter") * 0.03, 2, ' + str(q_knot) + ', 0.18)')
+  }
+  append(s, '  i <- 0')
+  append(s, '  -> i < param("engines") {')
+  append(s, '    cad_lathe("engine" + str(i), "推進ポッド", "#78909c", [[0, 0], [0.9, 0.2], [1.0, 0.9], [0.6, 1.4], [0, 1.5]], 32)')
+  append(s, '    i <- i + 1')
+  append(s, '  }')
+  append(s, '  i <- 0')
+  append(s, '  -> i < param("legs") {')
+  append(s, '    cad_cylinder("leg" + str(i), "着陸脚", "#90a4ae", 0.18, 1)')
+  append(s, '    cad_cylinder("pad" + str(i), "脚パッド", "#90a4ae", 0.7, 0.15)')
+  append(s, '    i <- i + 1')
+  append(s, '  }')
+  append(s, '  -< param("ring") {')
+  append(s, '    cad_torus("ring", "コンタクト・リング", "#4fc3f7", R + 1.2, 0.35)')
+  append(s, '  }')
+  append(s, '  frame(0)')
+  append(s, '  lift <- param("lower") + param("leg_len")')
+  append(s, '  top <- lift + param("upper") + param("dome_h")')
+  append(s, '  cad_dim("top", [-R, 0], [R, 0], -R - 2.5, "⌀" + str(param("diameter")))')
+  append(s, '  cad_dim("front", [R, 0], [R, top], 3, fixed(top, 2))')
+  append(s, '  cad_dim("side", [R + 1, 0], [R + 1, lift - param("lower")], 2, str(param("leg_len")))')
+  append(s, '  cad_bom("1", "船体", "Fe·Co60·Pt·Al 合金", "1")')
+  append(s, '  cad_bom("2", "ドーム", "SiO₂ プリズム", "1")')
+  append(s, '  cad_bom("3", "舷窓", "Al₂O₃", str(param("windows")))')
+  append(s, '  cad_bom("4", "反重力コイル Jones ' + knot + '", "Cs / Mg 巻線", "1")')
+  append(s, '  cad_bom("5", "推進ポッド", "Al (heat) / H₂", str(param("engines")))')
+  append(s, '  cad_bom("6", "着陸脚", "Al 合金", str(param("legs")))')
+  append(s, '  tr <- ascend(10, 1, param("gain"))')
+  append(s, '  cad_note("L = cosh(x log x) = " + str(sig(ufo_L(0), 5)) + ", 10 s 後 " + str(sig(tr[10][1], 5)) + " m")')
+  append(s, '  cad_note("要求「' + q + '」から ContactGPT が Bada で生成")')
+  append(s, '  ui_output("h10", "10 s 後の高度", str(sig(tr[10][1], 5)) + " m")')
+  append(s, '  ui_output("top", "全高", fixed(top, 2) + " m")')
+  append(s, '  make_sheet()')
+  append(s, '}')
+  append(s, '')
+  append(s, 'def frame(t) {')
+  append(s, '  R <- param("diameter") / 2')
+  append(s, '  lift <- param("lower") + param("leg_len")')
+  append(s, '  base <- ["T", 0, 0, lift]')
+  append(s, '  cad_pose("hull", [base])')
+  append(s, '  cad_pose("dome", [base])')
+  append(s, '  i <- 0')
+  append(s, '  -> i < param("windows") {')
+  append(s, '    a <- i / param("windows") * 2 * pi()')
+  append(s, '    rr <- (R + param("dome_d") / 2) / 2')
+  append(s, '    cad_pose("window" + str(i), [base, ["T", rr * cos(a), rr * sin(a), param("rim") / 2 + (param("upper") - param("rim") / 2) * 0.62]])')
+  append(s, '    i <- i + 1')
+  append(s, '  }')
+  append(s, '  cad_pose("coil", [base, ["T", 0, 0, -param("lower") - 0.25], ["R", 0, 0, 1, t * 0.8]])')
+  append(s, '  i <- 0')
+  append(s, '  -> i < param("engines") {')
+  append(s, '    a <- (i + 0.5) / param("engines") * 2 * pi()')
+  append(s, '    rr <- param("diameter") * 0.34')
+  append(s, '    cad_pose("engine" + str(i), [base, ["T", rr * cos(a), rr * sin(a), -param("lower") * 0.7 - 1.3]])')
+  append(s, '    i <- i + 1')
+  append(s, '  }')
+  append(s, '  i <- 0')
+  append(s, '  -> i < param("legs") {')
+  append(s, '    a <- i / param("legs") * 2 * pi()')
+  append(s, '    top <- [param("diameter") * 0.16 * cos(a), param("diameter") * 0.16 * sin(a), lift - param("lower")]')
+  append(s, '    bot <- [param("diameter") * 0.26 * cos(a), param("diameter") * 0.26 * sin(a), 0.15]')
+  append(s, '    d <- [top[0] - bot[0], top[1] - bot[1], top[2] - bot[2]]')
+  append(s, '    cad_pose("leg" + str(i), [["T", bot[0], bot[1], bot[2]], ["A", d[0], d[1], d[2]], ["S", 1, 1, sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])]])')
+  append(s, '    cad_pose("pad" + str(i), [["T", bot[0], bot[1], 0]])')
+  append(s, '    i <- i + 1')
+  append(s, '  }')
+  append(s, '  -< param("ring") {')
+  append(s, '    cad_pose("ring", [base, ["R", 0, 0, 1, t * 0.3]])')
+  append(s, '  }')
+  append(s, '}')
+  append(s, '')
+  append(s, 'def make_sheet() {')
+  append(s, '  frame(0)')
+  append(s, '  sheet_draw(param("name"), "GEN-UFO-' + stamp() + '", "ContactGPT (Bada)", "' + theme + '")')
+  append(s, '}')
+  desc <- "UFO 設計図アプリ: 直径 " + str(d) + " m、舷窓 " + str(win) + "、推進ポッド " + str(eng) + "、脚 " + str(legs) + "、Jones " + knot + " コイル、リング " + str(ring) + "、図面 " + theme
+  return ["user/ufo_" + slug(name) + ".bada", join(s, "\n"), "ufo", desc]
+}
+
+// ---------------------------------------------------------------- 異次元輸送機 CAD アプリ
+def gen_transporter(q) {
+  n <- round(num_or(q, ["リング", "環", "ジンバル", "重"], 3))
+  -< n < 1 {
+    n <- 1
+  }
+  -< n > 9 {
+    n <- 9
+  }
+  R0 <- num_or(q, ["外環", "半径", "大きさ"], 60.088)
+  hours <- num_or(q, ["搭乗者", "時間"], 18)
+  knot <- knot_of(q, "3_1")
+  tower <- num_or(q, ["塔"], sig(R0 * 2.2, 5))
+  name <- quoted(q)
+  -< name <-> nil {
+    name <- "TRANSPORTER " + str(n) + "-RING"
+  }
+  q_knot <- 3
+  -< knot <-> "5_1" {
+    q_knot <- 5
+  }
+  s <- []
+  append(s, '// ' + name + ' — ContactGPT が要求「' + q + '」に応えて Bada で書いた異次元輸送機 CAD アプリ')
+  append(s, '//   Γ = 搭乗者の時間 / 地球の 1 秒,  φ = arcosh Γ,  ω_k = ω_0 (φ/π)^k,  R_k = R_0 / 1.2669^k')
+  append(s, '#include lib/blueprint.bada')
+  append(s, '')
+  append(s, 'say "' + name + ' — Bada で生成された異次元輸送機 CAD"')
+  append(s, 'ui_section("' + name + '")')
+  append(s, 'ui_param("rings", "ジンバル環の数", ' + str(n) + ', 1)')
+  append(s, 'ui_param("R0", "外環 R [m]", ' + str(R0) + ', 0.1)')
+  append(s, 'ui_param("hours", "搭乗者の時間 [h] (地球 1 s あたり)", ' + str(hours) + ', 0.1)')
+  append(s, 'ui_param("tower", "塔高 [m]", ' + str(tower) + ', 0.1)')
+  append(s, 'ui_param("speed", "アニメ速度 ×", 1, 0.1)')
+  append(s, 'ui_button("図面を作成", "make_sheet")')
+  append(s, 'st <- [nil]')
+  append(s, '')
+  append(s, 'def radius(k) {')
+  append(s, '  return param("R0") / pow(1.2669, k)')
+  append(s, '}')
+  append(s, '')
+  append(s, 'def build() {')
+  append(s, '  G <- param("hours") * 3600')
+  append(s, '  phi <- acosh(G)')
+  append(s, '  Z <- rs_z(phi)')
+  append(s, '  st[0] <- [G, phi, Z]')
+  append(s, '  ui_output("G", "Γ", G)')
+  append(s, '  ui_output("phi", "φ = arcosh Γ", sig(phi, 6))')
+  append(s, '  ui_output("Z", "Z(φ)", sig(Z, 6))')
+  append(s, '  ui_output("ratio", "段間比 φ/π", sig(phi / pi(), 6))')
+  append(s, '  cad_clear()')
+  append(s, '  k <- 0')
+  append(s, '  -> k < param("rings") {')
+  append(s, '    cad_torus("ring" + str(k), "ジンバル環 " + str(k + 1) + " R=" + str(sig(radius(k), 5)), "#4fc3f7", radius(k), param("R0") * 0.034)')
+  append(s, '    ui_output("w" + str(k), "ω" + str(k + 1), str(sig(pi() / 30 * pow(phi / pi(), k), 5)) + " rad/s")')
+  append(s, '    k <- k + 1')
+  append(s, '  }')
+  append(s, '  cad_sphere("pod", "ポッド", "#ffd54f", radius(param("rings")) * 0.4)')
+  append(s, '  px <- param("R0") * 1.17 + 12')
+  append(s, '  cad_box("pylon_l", "塔", "#90a4ae", 6, 6, param("tower"))')
+  append(s, '  cad_box("pylon_r", "塔", "#90a4ae", 6, 6, param("tower"))')
+  append(s, '  cad_box("beam", "ガントリー梁", "#90a4ae", px * 2 + 6, 5, 5)')
+  -< knot <-> "4_1" {
+    append(s, '  cad_fig8("coil", "Jones 4_1 コイル", "#66bb6a", param("R0") * 0.39, 1.2)')
+  } >- {
+    append(s, '  cad_knot("coil", "Jones ' + knot + ' コイル", "#ef5350", param("R0") * 1.1, 4, 2, ' + str(q_knot) + ', 1.2)')
+  }
+  append(s, '  cad_lathe("floor", "床版", "#37474f", [[radius(param("rings") - 1) * 0.8, 0], [param("R0") * 1.5, 0]], 96)')
+  append(s, '  frame(0)')
+  append(s, '  H0 <- param("tower") - param("R0") * 1.04')
+  append(s, '  cad_rdim("top", [0, 0], param("R0"), 135, "R" + str(param("R0")))')
+  append(s, '  cad_dim("front", [px, 0], [px, param("tower")], 14, str(param("tower")))')
+  append(s, '  cad_dim("front", [0, 0], [0, H0], -param("R0") - 14, fixed(H0, 3))')
+  append(s, '  k <- 0')
+  append(s, '  -> k < param("rings") {')
+  append(s, '    cad_bom(str(k + 1), "ジンバル環 " + str(k + 1), "R" + str(sig(radius(k), 5)), "1")')
+  append(s, '    k <- k + 1')
+  append(s, '  }')
+  append(s, '  cad_note("Γ = " + str(G) + ", φ = " + str(sig(phi, 6)) + ", Z(φ) = " + str(sig(Z, 6)))')
+  append(s, '  cad_note("要求「' + q + '」から ContactGPT が Bada で生成")')
+  append(s, '}')
+  append(s, '')
+  append(s, '// 環 k は親の環の中で x 軸と y 軸を交互に回転軸にする (ω_k = ω_0 (φ/π)^k)')
+  append(s, 'def frame(t) {')
+  append(s, '  phi <- st[0][1]')
+  append(s, '  tt <- t * param("speed")')
+  append(s, '  H0 <- param("tower") - param("R0") * 1.04')
+  append(s, '  ops <- [["T", 0, 0, H0]]')
+  append(s, '  k <- 0')
+  append(s, '  -> k < param("rings") {')
+  append(s, '    w <- pi() / 30 * pow(phi / pi(), k)')
+  append(s, '    -< k <-> 0 {')
+  append(s, '      append(ops, ["R", 0, 0, 1, w * tt])')
+  append(s, '      cad_pose("ring" + str(k), ops + [["R", 1, 0, 0, pi() / 2]])')
+  append(s, '    } >- {')
+  append(s, '      -< imod(k, 2) <-> 1 {')
+  append(s, '        append(ops, ["R", 1, 0, 0, pi() / 6 + w * tt])')
+  append(s, '      } >- {')
+  append(s, '        append(ops, ["R", 0, 1, 0, w * tt])')
+  append(s, '      }')
+  append(s, '      cad_pose("ring" + str(k), ops)')
+  append(s, '    }')
+  append(s, '    k <- k + 1')
+  append(s, '  }')
+  append(s, '  cad_pose("pod", ops)')
+  append(s, '  px <- param("R0") * 1.17 + 12')
+  append(s, '  cad_pose("pylon_l", [["T", -px, 0, param("tower") / 2]])')
+  append(s, '  cad_pose("pylon_r", [["T", px, 0, param("tower") / 2]])')
+  append(s, '  cad_pose("beam", [["T", 0, 0, param("tower") + 2.5]])')
+  append(s, '  cad_pose("coil", [["T", 0, 0, 4]])')
+  append(s, '  ui_hud("[Bada] ' + name + '\\n地球 t = " + fixed(t, 1) + " s → 搭乗者 " + fixed(t * st[0][0] / 3600, 2) + " h")')
+  append(s, '}')
+  append(s, '')
+  append(s, 'def make_sheet() {')
+  append(s, '  frame(0)')
+  append(s, '  sheet_draw("' + name + '", "GEN-TR-' + stamp() + '", "ContactGPT (Bada)", "blue")')
+  append(s, '}')
+  desc <- "異次元輸送機 CAD アプリ: ジンバル環 " + str(n) + " 本、外環 R " + str(R0) + " m、Γ = " + str(hours) + " h/1 s、Jones " + knot + " コイル、塔 " + str(tower) + " m"
+  return ["user/transporter_" + str(n) + "ring_" + stamp() + ".bada", join(s, "\n"), "cad", desc]
+}
+
+// ---------------------------------------------------------------- 計算アプリ
+def gen_zeta(q) {
+  hi <- first_num(q)
+  -< hi <-> nil {
+    hi <- 50
+  }
+  -< hi > 120 {
+    hi <- 120
+  }
+  s <- []
+  append(s, '// ゼータ関数の非自明零点を探すアプリ — ContactGPT が要求「' + q + '」に応えて Bada で生成')
+  append(s, '#include lib/zeta.bada')
+  append(s, 'say "Z(t) = e^{iθ(t)} ζ(½ + it) の零点 (t < ' + str(hi) + ')"')
+  append(s, 'n <- 0')
+  append(s, 't <- 10.0')
+  append(s, 'prev <- rs_z(t)')
+  append(s, '-> t < ' + str(hi) + ' {')
+  append(s, '  cur <- rs_z(t + 0.2)')
+  append(s, '  -< prev * cur < 0 {')
+  append(s, '    a <- t')
+  append(s, '    b <- t + 0.2')
+  append(s, '    repeat 30 {')
+  append(s, '      m <- (a + b) / 2')
+  append(s, '      -< rs_z(a) * rs_z(m) <= 0 {')
+  append(s, '        b <- m')
+  append(s, '      } >- {')
+  append(s, '        a <- m')
+  append(s, '      }')
+  append(s, '    }')
+  append(s, '    n <- n + 1')
+  append(s, '    say "  零点 " + str(n) + ": t = " + fixed((a + b) / 2, 6)')
+  append(s, '    Omega::DATABASE[zeros] {')
+  append(s, '      push((a + b) / 2)')
+  append(s, '    }')
+  append(s, '  }')
+  append(s, '  prev <- cur')
+  append(s, '  t <- t + 0.2')
+  append(s, '}')
+  append(s, 'say "見つかった零点: " + str(n) + " 個"')
+  return ["user/zeta_zeros_" + str(hi) + ".bada", join(s, "\n"), "console", "ζ の非自明零点を t < " + str(hi) + " で探す計算アプリ"]
+}
+
+def gen_lorentz(q) {
+  h <- num_or(q, ["時間", "搭乗者", "h"], 18)
+  ly <- num_or(q, ["光年", "ly", "目的地"], 25.04)
+  s <- []
+  append(s, '// 特殊相対論 (異次元輸送機 ②) の計算アプリ — ContactGPT が要求「' + q + '」に応えて Bada で生成')
+  append(s, 'hours <- ' + str(h))
+  append(s, 'ly <- ' + str(ly))
+  append(s, 'G <- hours * 3600')
+  append(s, 'say "地球の 1 秒 = 搭乗者の " + str(hours) + " 時間"')
+  append(s, 'say "Γ = " + str(G)')
+  append(s, 'say "1 − β = " + sci(1 - sqrt(1 - 1 / (G * G)), 5)')
+  append(s, 'phi <- acosh(G)')
+  append(s, 'say "ラピディティ φ = arcosh Γ = " + str(sig(phi, 8))')
+  append(s, 'say "輸送計量 T|ψ| = ln Γ / 2π = " + str(sig(ln(G) / (2 * pi()), 6))')
+  append(s, 'say "目的地 " + str(ly) + " ly → 収縮距離 " + sci(ly * 9460730472580.8 / G, 4) + " km"')
+  append(s, 'say "搭乗者の片道 " + str(sig(ly * 365.25 * 24 / G, 6)) + " 時間"')
+  append(s, 'say "ジンバル ω (外→内): " + str([sig(pi() / 30, 5), sig(pi() / 30 * phi / pi(), 5), sig(pi() / 30 * pow(phi / pi(), 2), 5)])')
+  return ["user/lorentz_" + str(h) + "h.bada", join(s, "\n"), "console", "Γ = " + str(h) + " h / 1 s、目的地 " + str(ly) + " ly の相対論計算アプリ"]
+}
+
+def gen_jones(q) {
+  knot <- knot_of(q, "3_1")
+  s <- []
+  append(s, '// Jones 多項式 ' + knot + ' の共鳴計算アプリ — ContactGPT が要求「' + q + '」に応えて Bada で生成')
+  append(s, '#include lib/blueprint.bada')
+  append(s, 'terms <- knot_terms("' + knot + '")')
+  append(s, 'say "結び目 ' + knot + ' (" + knot_name("' + knot + '") + ")"')
+  append(s, 'say "V(t) = " + jones_text(terms)')
+  append(s, 'th <- rs_theta(acosh(64800))')
+  append(s, 'say "t* = e^{iθ(φ)}, θ(φ) = " + str(sig(th, 6))')
+  append(s, 'say "V(t*) = " + c_text(jones_eval(terms, c_expi(th)), 6)')
+  append(s, 'say "扉の共鳴角 (|V(e^{iα})| の極小): " + str(resonance(terms, 1)) + "°"')
+  append(s, 'a <- 0')
+  append(s, '-> a < 360 {')
+  append(s, '  say "  α = " + str(a) + "°  |V| = " + fixed(c_abs(jones_eval(terms, c_expi(a * pi() / 180))), 4)')
+  append(s, '  a <- a + 30')
+  append(s, '}')
+  return ["user/jones_" + knot + ".bada", join(s, "\n"), "console", "Jones " + knot + " の V(t*) と共鳴角を求める計算アプリ"]
+}
+
+def gen_ascent(q) {
+  g <- num_or(q, ["ゲイン"], 1)
+  secs <- round(num_or(q, ["秒"], 30))
+  s <- []
+  append(s, '// UFO 反重力上昇の計算アプリ — ContactGPT が要求「' + q + '」に応えて Bada で生成')
+  append(s, '#include lib/ufo_flight.bada')
+  append(s, 'say "L = cosh(x log x) = " + str(sig(ufo_L(0), 6)) + ",  a = (L − 1)·g_eff·ゲイン"')
+  append(s, 'tr <- ascend(' + str(secs) + ', 1, ' + str(g) + ')')
+  append(s, 'i <- 0')
+  append(s, '-> i < len(tr) {')
+  append(s, '  say "  t = " + str(tr[i][0]) + " s  h = " + fixed(tr[i][1], 1) + " m  v = " + fixed(tr[i][2], 2) + " m/s  L = " + fixed(ufo_L(tr[i][1]), 5)')
+  append(s, '  i <- i + max2(1, round(len(tr) / 15))')
+  append(s, '}')
+  return ["user/ascent_" + str(secs) + "s.bada", join(s, "\n"), "console", str(secs) + " 秒間の反重力上昇 (ゲイン " + str(g) + ") の計算アプリ"]
+}
+
+// ---------------------------------------------------------------- 量子回路アプリ
+def gen_quantum(q) {
+  n <- round(num_or(q, ["量子ビット", "qubit", "ビット"], 3))
+  -< n < 2 {
+    n <- 2
+  }
+  -< n > 8 {
+    n <- 8
+  }
+  s <- []
+  append(s, '// 量子回路アプリ — ContactGPT が要求「' + q + '」に応えて Bada で生成')
+  append(s, '#include lib/quantum.bada')
+  append(s, 'rand_seed(2111)')
+  -< has_any(q, ["グローバー", "Grover", "grover", "探索"]) {
+    append(s, 'say "Grover 探索 (2 量子ビット, 目印 |11⟩)"')
+    append(s, 's <- q_h(q_h(q_register(2), 0), 1)')
+    append(s, 's <- q_h(q_cnot(q_h(s, 1), 0, 1), 1)')
+    append(s, 's <- q_x(q_x(q_h(q_h(s, 0), 1), 0), 1)')
+    append(s, 's <- q_h(q_h(q_x(q_x(q_h(q_cnot(q_h(s, 1), 0, 1), 1), 0), 1), 0), 1)')
+    append(s, 'say "確率 " + str(q_probs(s))')
+    append(s, 'say "測定 → |" + str(q_measure(s)) + "⟩"')
+    return ["user/grover.bada", join(s, "\n"), "console", "2 量子ビットの Grover 探索アプリ"]
+  }
+  -< has_any(q, ["ベル", "Bell", "bell"]) {
+    n <- 2
+  }
+  append(s, 'n <- ' + str(n))
+  append(s, 'say "GHZ 状態 (" + str(n) + " 量子ビット): H(0) → CNOT(0,1) → … → CNOT(n−2, n−1)"')
+  append(s, 'st <- q_h(q_register(n), 0)')
+  append(s, 'k <- 0')
+  append(s, '-> k < n - 1 {')
+  append(s, '  st <- q_cnot(st, k, k + 1)')
+  append(s, '  k <- k + 1')
+  append(s, '}')
+  append(s, 'p <- q_probs(st)')
+  append(s, 'say "|0…0⟩ の確率 " + str(sig(p[0], 6)) + ",  |1…1⟩ の確率 " + str(sig(p[len(p) - 1], 6))')
+  append(s, 'out <- []')
+  append(s, 'repeat 12 {')
+  append(s, '  append(out, q_measure(st))')
+  append(s, '}')
+  append(s, 'say "測定 12 回: " + str(out)')
+  append(s, 'Omega::DATABASE[quantum] {')
+  append(s, '  push(out)')
+  append(s, '}')
+  return ["user/ghz_" + str(n) + "q.bada", join(s, "\n"), "console", str(n) + " 量子ビットの GHZ (もつれ) 状態アプリ"]
+}

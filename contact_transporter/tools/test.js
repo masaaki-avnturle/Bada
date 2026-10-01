@@ -108,6 +108,57 @@ truthy("[Bada] contactgpt.bada 計算 = Bada の式 (Z の第 1 零点 ≈ 0)", 
   }
 }
 
+// ---- 要求に応える (on_request) / ContactGPT が Bada でアプリを書く (codegen)
+{
+  const Lb = require("../src/badalib.js"), B = require("../src/bada.js");
+  const t2 = H.makeApp("apps/transporter.bada");
+  t2.app.call("on_request", ["外環を80mに"]);
+  near("[Bada] 輸送機 on_request「外環を80mに」", t2.ui.vals.ring_outer, 80, 0);
+  t2.app.call("on_request", ["塔を1.5倍"]);
+  near("[Bada] 輸送機 on_request「塔を1.5倍」", t2.ui.vals.tower, 132.194 * 1.5, 1e-9);
+  truthy("[Bada] 輸送機 on_request「Γは？」", String(t2.app.call("on_request", ["Γは？"])).includes("64800"));
+  t2.app.call("on_request", ["STLで保存"]);
+  truthy("[Bada] 輸送機 on_request「STLで保存」→ export_file", t2.ui.log.some((x) => x[0] === "export" && x[1] === "stl"));
+  const u2 = H.makeApp("apps/ufo.bada");
+  u2.app.call("on_request", ["12個の窓と4本の脚、直径40m"]);
+  truthy("[Bada] UFO on_request「12個の窓と4本の脚、直径40m」", u2.ui.vals.windows === 12 && u2.ui.vals.legs === 4 && u2.ui.vals.diameter === 40);
+  u2.app.call("on_request", ["コイルを5_1に、リングを外して、名前は「SKY-1」"]);
+  truthy("[Bada] UFO on_request コイル / リング / 名前", u2.ui.vals.knot === "5_1" && u2.ui.vals.ring === false && u2.ui.vals.name === "SKY-1");
+  truthy("[Bada] UFO on_request で図面が更新", u2.env.lastSheet.svg.includes("SKY-1"));
+  const g = H.makeApp("apps/contactgpt.bada", { model: false });
+  const cases = [
+    ["「SKY-7」という名前で直径30m、12個の窓と4本の脚、5_1コイルのUFOの設計図アプリを作って", "ufo"],
+    ["外環80mで24時間、4_1コイルのリング4つの輸送機を設計して", "cad"],
+    ["4量子ビットのGHZのプログラムを書いて", "console"],
+    ["ゼータの零点を40まで求めるアプリを作って", "console"],
+    ["24時間のローレンツ計算アプリを作って", "console"],
+    ["5_1の共鳴を計算するアプリを作って", "console"],
+    ["20秒の上昇を計算するプログラムを作って", "console"],
+  ];
+  for (const [q, target] of cases) {
+    g.chat.codes.length = 0; g.app.call("on_message", [q]);
+    const c = g.chat.codes[0];
+    truthy(`[Bada] ContactGPT がアプリを書く: ${q}`, c && c.target === target && g.files[c.file] === c.src);
+    if (!c) continue;
+    let ok = false, info = "";
+    try {
+      if (target === "console") {
+        const out = [], vm = new B.BadaVM({ host: Lb.makeHost({ files: g.files, ui: {}, chat: {} }), files: g.files, onPrint: (l) => out.push(l) });
+        vm.load(c.src, c.file); ok = out.length >= 3; info = out[1];
+      } else {
+        const env = { files: g.files, ui: H.stubUI(), chat: {}, scene: new Lb.Scene(), onError: (e) => { throw e; } };
+        const a = new Lb.BadaApp(env); a.start(c.src, c.file); a.call("frame", [1.5]); a.call("make_sheet", []);
+        ok = env.scene.parts.size >= 8 && env.lastSheet != null; info = `部品 ${env.scene.parts.size}`;
+      }
+    } catch (e) { info = e.message; }
+    truthy(`[Bada]   → 生成された ${c.file} が動く (${info})`, ok);
+  }
+  g.chat.codes.length = 0; g.app.call("on_message", ["ゼータの零点を40まで求めるアプリを作って"]);
+  const zsrc = g.chat.codes[0].src, zo = [];
+  new B.BadaVM({ host: Lb.makeHost({ files: g.files, ui: {}, chat: {} }), files: g.files, onPrint: (l) => zo.push(l) }).load(zsrc);
+  truthy("[Bada]   → 生成された零点アプリが 14.134725 … 37.586178 の 6 個を出す", zo.join().includes("14.134725") && zo.join().includes("37.586178") && zo[zo.length - 1].includes("6 個"));
+}
+
 // ---- GPT 勾配チェック + 学習で損失が下がる + 重みの往復
 {
   const G = global.ContactGPT;

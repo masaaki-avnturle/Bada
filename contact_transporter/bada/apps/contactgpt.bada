@@ -1,6 +1,8 @@
 // contactgpt.bada — ContactGPT (アプリ本体・Bada)
 //
-// 1 つの質問 q に対して on_message(q) が
+// 1 つの質問・要求 q に対して on_message(q) が
+//   ⓪ アプリ作成  → 「…のアプリを作って」に応えて Bada のプログラムを書き (lib/codegen.bada)、
+//                   user/ に保存して 3D タブ / コンソールで実行する
 //   ① 「計算 …」   → Bada の式として評価 (この VM 上の関数・定数がそのまま使える)
 //   ② 方程式 ID   → レジストリ参照 (例: UFO.19)
 //   ③ 設計値の即答 → lib/blueprint.bada / lib/ufo_flight.bada で計算
@@ -11,6 +13,7 @@
 #include lib/blueprint.bada
 #include lib/ufo_flight.bada
 #include lib/quantum.bada
+#include lib/codegen.bada
 
 say "ContactGPT — 量子プログラミング言語 Bada で動く対話エンジン"
 
@@ -19,7 +22,7 @@ ui_check("gen", "生成 (Transformer + 量子測定) を表示", true)
 ui_param("temp", "温度", 0.6, 0.05)
 ui_param("topk", "上位 k 文字", 10, 1)
 ui_param("max_new", "最大生成文字数", 120, 10)
-ui_chips(["ローレンツ因子 Γ は？", "Z(φ) とリーマン・ジーゲル", "Jones 結び目の共鳴", "反重力で上昇するには？", "部品の寸法", "UFO.24", "計算 rs_z(14.1347)", "計算 c_text(zeta_c([2, 0]), 8)", "多様体の式を見せて", "量子もつれ"])
+ui_chips(["直径40mで舷窓12個のUFOの設計図アプリを作って", "リング5つの異次元輸送機のCADを作って", "4量子ビットのGHZのプログラムを書いて", "ゼータの零点を60まで求めるアプリを作って", "ローレンツ因子 Γ は？", "Z(φ) とリーマン・ジーゲル", "Jones 結び目の共鳴", "反重力で上昇するには？", "部品の寸法", "UFO.24", "計算 rs_z(14.1347)", "計算 c_text(zeta_c([2, 0]), 8)", "多様体の式を見せて", "量子もつれ"])
 
 BP <- blueprint(18, 1, 25.04, pi() / 6, pi() / 30, 12000, 5.021)
 info <- gpt_info()
@@ -31,6 +34,15 @@ i <- 0
 
 // ---------------------------------------------------------------- 対話
 def on_message(q) {
+  // ⓪ アプリ作成の要求 → Bada のプログラムを書く
+  app <- codegen(q)
+  -< app != nil {
+    file_write(app[0], app[1])
+    lines <- len(split(app[1], "\n"))
+    chat_reply("**Bada でアプリを書きました** — " + app[3] + "\n`" + app[0] + "` (" + str(lines) + " 行)。下のボタンで実行・IDE で編集できます。")
+    chat_code(app[0], app[1], app[2], app[3])
+    return nil
+  }
   -< startswith(q, "計算") {
     expr <- trim(substr(q, 2))
     -< startswith(expr, ":") {
@@ -85,16 +97,6 @@ def on_message(q) {
 }
 
 // ---------------------------------------------------------------- 設計値の即答
-def has_any(q, words) {
-  i <- 0
-  -> i < len(words) {
-    -< contains(q, words[i]) {
-      return true
-    }
-    i <- i + 1
-  }
-  return false
-}
 def quick_answers(q) {
   n <- 0
   bp <- BP

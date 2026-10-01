@@ -33,7 +33,8 @@ function stubUI() {
     get(k) { return k in vals ? vals[k] : null; },
     output(k, l, v) { outputs[k] = [l, v]; return null; },
     plot(k, t, s, m) { plots[k] = { title: t, series: s, marks: m }; return null; },
-    hud(t) { log.push(["hud", t]); }, toast(t) { log.push(["toast", t]); }, chips() {}, section() {}, button() {}, view() {}, fit() {},
+    hud(t) { log.push(["hud", t]); }, toast(t) { log.push(["toast", t]); }, chips() {}, section() {}, button() {}, view(v) { log.push(["view", v]); }, fit() {},
+    request() {}, export(k) { log.push(["export", k]); },
   };
 }
 function makeApp(file, opts) {
@@ -41,6 +42,7 @@ function makeApp(file, opts) {
   const eqs = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "equations.json"), "utf8"));
   const files = badaFiles(), ui = stubUI(), chat = { replies: [], refs: [], gens: [] };
   chat.reply = (m) => { chat.replies.push(m); }; chat.ref = (id) => { chat.refs.push(id); }; chat.gen = (t) => { chat.gens.push(t); };
+  chat.codes = []; chat.code = (file, src, target, desc) => { chat.codes.push({ file, src, target, desc }); };
   // ストリーム生成の同期版: Bada の gen_next / gen_stop を 1 文字ずつ呼ぶ
   chat.stream = (prompt, n) => {
     const G = env.model(); if (!G) return null;

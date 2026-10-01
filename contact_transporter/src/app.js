@@ -31,6 +31,10 @@
   $$("#tabs button").forEach((b) => { if (!HAS(b.dataset.tab)) b.remove(); });
   $$("main > .tab").forEach((t) => { if (!HAS(t.id.replace("tab-", ""))) t.remove(); });
   $$("#ide-target option").forEach((o) => { if (o.value !== "console" && !HAS(o.value)) o.remove(); });
+  for (const [t, label] of Object.entries(APP.labels || {})) {
+    $$(`#tabs [data-tab="${t}"]`).forEach((b) => { b.textContent = label; });
+    $$(`#ide-target option[value="${t}"]`).forEach((o) => { o.textContent = label.replace(/^\S+\s/, "") + " タブ"; });
+  }
   if (APP.tabs.filter((t) => ["chat", "cad", "ufo"].includes(t)).length === 1) $$("#tabs button").forEach((b) => { if (b.dataset.tab === "ide") b.textContent = "⌨ Bada IDE (ソース)"; });
 
   // ------------------------------------------------------------ 共通
@@ -202,7 +206,8 @@
         if (!plots[key]) { const c = document.createElement("canvas"); c.className = "plot"; root.appendChild(c); plots[key] = c; grid = null; kv = null; }
         const ser = series.map((s) => ({ name: String(s[0]), color: String(s[1]), pts: Array.isArray(s[2]) ? s[2] : [] }));
         plots[key]._args = [ser, { title, marks }];
-        requestAnimationFrame(() => plot(plots[key], ser, { title, marks }));
+        const cv = plots[key];
+        requestAnimationFrame(() => { if (cv.isConnected) plot(cv, ser, { title, marks }); });
         return null;
       },
       hud(t) { if (tab.hud) tab.hud.textContent = t; return null; },
@@ -210,6 +215,8 @@
       chips(list) { if (tab.onChips) tab.onChips(list); return null; },
       view(name) { if (tab.viewer) tab.viewer.setView(name); return null; },
       fit() { if (tab.viewer) tab.fit(); return null; },
+      request(placeholder) { tab.mountRequest(placeholder); return null; },
+      export(kind) { setTimeout(() => tab.exportAs(kind), 0); return null; },
     };
   }
 
@@ -228,6 +235,7 @@
       this.t = 0; this.fitted = false;
       this.env = {
         files, ui: this.ui, chat: opts.chat || null, equations: EQS, index: INDEX, scene: this.scene,
+        onFileWrite: (n) => { saveFiles(); if (IDE.refresh) IDE.refresh(); conLine(name, `── ${n} を保存しました`, "sys"); },
         model: () => MODEL.current,
         colorLines: () => { const c = $(`#tab-${name} [data-colorlines]`); return !!(c && c.checked); },
         onSheet: (s) => { const el = $(`[data-sheet="${name}"]`); if (el) el.innerHTML = s.svg; },
@@ -240,12 +248,33 @@
       if (this.viewer) this.bindViewbar();
     }
     get file() { return MAIN[this.name]; }
+    // 日本語の要求欄: 入力 → Bada の on_request(q) → 返答を表示
+    mountRequest(placeholder) {
+      let box = $(`[data-request="${this.name}"]`);
+      if (!box) {
+        box = document.createElement("div"); box.className = "request"; box.dataset.request = this.name;
+        box.innerHTML = `<div class="reqhead">💬 要求・質問 <small>Bada の on_request(q) が答えます</small></div><div class="reqlog"></div><form><input autocomplete="off"><button class="primary">実行</button></form>`;
+        this.uiRoot.parentNode.insertBefore(box, this.uiRoot);
+        const inp = $("input", box), log = $(".reqlog", box);
+        $("form", box).addEventListener("submit", (e) => {
+          e.preventDefault(); const q = inp.value.trim(); if (!q) return; inp.value = "";
+          const u = document.createElement("div"); u.className = "rq"; u.textContent = q; log.appendChild(u);
+          const r = this.invoke("on_request", [q]);
+          const a = document.createElement("div"); a.className = "ra"; a.textContent = r == null ? "(on_request がありません)" : B.toText(r); log.appendChild(a);
+          while (log.children.length > 40) log.firstChild.remove();
+          log.scrollTop = log.scrollHeight;
+        });
+      }
+      box.hidden = false;
+      $("input", box).placeholder = placeholder || "要求や質問を入力";
+    }
     start(file) {
       if (file) { MAIN[this.name] = file; store.set("ct.bada.main", MAIN); }
       const src = files[this.file];
       $(`#${this.name}-src`).textContent = this.file;
       if (src == null) { conLine(this.name, `✖ ${this.file} がありません`, "err"); return; }
       if (this.hud) this.hud.textContent = "";
+      const rq = $(`[data-request="${this.name}"]`); if (rq) rq.hidden = true;
       this.env.lastSheet = null; const sh = $(`[data-sheet="${this.name}"]`); if (sh) sh.innerHTML = "";
       conLine(this.name, `── ${this.file} を実行 (Bada VM)`, "sys");
       const t0 = performance.now();
@@ -361,6 +390,36 @@
       reply: (m) => { bubble.insertAdjacentHTML("beforeend", `<div class="ans">${md(m)}</div>`); return null; },
       ref: (id) => { const e = byId.get(id); if (e) bubble.insertAdjacentHTML("beforeend", eqHtml(e)); return null; },
       gen: (t) => { bubble.insertAdjacentHTML("beforeend", `<div class="gen">${esc(t)}</div>`); return null; },
+      // Bada が書いた Bada プログラム: コード表示 + 実行 / IDE / 保存
+      code: (file, src, target, desc) => {
+        const el = document.createElement("div"); el.className = "codeblock";
+        const where = target === "console" ? "console" : HAS(target) ? target : HAS("cad") ? "cad" : HAS("ufo") ? "ufo" : "console";
+        const label = where === "console" ? "▶ 実行 (結果をここに表示)" : `▶ ${($(`#tabs [data-tab="${where}"]`) || { textContent: where }).textContent.trim()} で実行`;
+        el.innerHTML = `<div class="cbhead"><b>${esc(file)}</b><span>${esc(src.split("\n").length)} 行 · Bada</span></div><pre class="cbsrc"></pre>` +
+          `<div class="btns"><button class="primary" data-a="run">${esc(label)}</button><button data-a="ide">IDE で開く</button><button data-a="save">保存 (.bada)</button><button data-a="fold">全体を表示</button></div><div class="cbout"></div>`;
+        $(".cbsrc", el).innerHTML = IDE.highlightHTML(src);
+        const runIt = () => {
+          if (where === "console") {
+            const out = $(".cbout", el); out.innerHTML = "";
+            const lines = [], env = { files, ui: { toast }, chat: {}, equations: EQS, index: INDEX, scene: new L.Scene(), model: () => MODEL.current, onPrint: (l) => lines.push(l) };
+            const vm = new B.BadaVM({ host: L.makeHost(env), files, onPrint: env.onPrint, maxSteps: 2e8 });
+            const t0 = performance.now();
+            try { vm.load(files[file] || src, file); lines.push(`── 完了 ${(performance.now() - t0).toFixed(0)} ms (Bada VM)`); }
+            catch (e) { lines.push("✖ " + e.message); }
+            out.textContent = lines.join("\n");
+          } else { showTab(where); tabs[where].start(file); toast(`${file} を実行しました`); }
+        };
+        el.addEventListener("click", (e) => {
+          const a = e.target.dataset && e.target.dataset.a; if (!a) return;
+          if (a === "run") runIt();
+          if (a === "ide") { showTab("ide"); IDE.open(file, where === "console" ? "console" : where); }
+          if (a === "save") saveFile(file.split("/").pop(), files[file] || src, "text/plain");
+          if (a === "fold") { el.classList.toggle("open"); e.target.textContent = el.classList.contains("open") ? "折りたたむ" : "全体を表示"; }
+        });
+        bubble.appendChild(el);
+        if (where === "console") runIt();
+        return null;
+      },
       // Bada の gen_next(ids) / gen_stop(out) を 1 文字ずつ呼んで流し込む
       stream: (prompt, n) => {
         const G = MODEL.current; if (!G) return null;
@@ -496,10 +555,7 @@
       store.set("ct.ide.cur", f);
     }
     const KW = new Set(Array.from(B.KEYWORDS)), BI = new Set(Array.from(B.BUILTINS)), HN = new Set(HOST_NAMES);
-    function highlight() {
-      const src = text().value;
-      const lines = src.split("\n").length;
-      $("#ide-gutter").textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
+    function highlightHTML(src) {
       let h = "";
       const re = /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?)|(#include[^\n]*)|(\d+\.?\d*)|([\p{L}_][\p{L}\p{N}_]*)|(<->|<-|-<|->|>-|>>|=>|::)|([\s\S])/gu;
       let m;
@@ -512,7 +568,13 @@
         else if (m[6]) h += `<span class="o">${esc(m[6])}</span>`;
         else h += esc(m[7]);
       }
-      $("#ide-hl").innerHTML = h + "\n";
+      return h;
+    }
+    function highlight() {
+      const src = text().value;
+      const lines = src.split("\n").length;
+      $("#ide-gutter").textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
+      $("#ide-hl").innerHTML = highlightHTML(src) + "\n";
       syncScroll();
     }
     function syncScroll() { const t = text(); $("#ide-hl").scrollTop = t.scrollTop; $("#ide-hl").scrollLeft = t.scrollLeft; $("#ide-gutter").scrollTop = t.scrollTop; }
@@ -585,7 +647,8 @@
       const last = store.get("ct.ide.cur", mainFile);
       open(last in files ? last : mainFile);
     }
-    return { open, init, run };
+    const refresh = () => { if ($("#ide-files") && $("#ide-files").children.length) listFiles(); };
+    return { open, init, run, highlightHTML, refresh };
   })();
   tabInit.ide = IDE.init;
 
