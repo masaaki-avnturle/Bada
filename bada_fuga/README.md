@@ -1887,6 +1887,23 @@ python3 compose_tablet76.py bank74/bank.json score_tablet76.json && python3 synt
 python3 compose_tablet77.py bank74/bank.json score_tablet75.json bank74 score_tablet77.json && python3 synth.py score_tablet77.json tablet77.wav && python3 video.py score_tablet77.json tablet77.wav tablet77.mp4
 ```
 
+## 🎼🔔 Requiem BADA — Tablet Sessions LXXVIII · Symphonia a due XVI-VIII (LXXVII の重低音を主題の 16 倍に、共鳴を 8 倍に, ♩=60, 約 7 分 39 秒)
+
+LXXVII (LXXV を真ん中で割って調をそろえて重ねた交響曲、9/24 の 2 本が主題曲) の重低音と共鳴を、主題曲の主題の拡大に置き換えた:
+
+| 層 | 拡大 | 鳴らし方 |
+|:--|:--|:--|
+| 重低音 | ×16 | 主題の 4 分音符が 4 小節に (32 小節)。ミ 1 からのオクターヴで、小節ごとに息をするように打ち直す。各部 (48 小節) の最初の 16 小節は主音の保続、そこから 16 倍の主題が始まり、部の終わりで主音に着く |
+| 共鳴 | ×8 | 主題の 4 分音符が 2 小節に (16 小節)。中音域 (ミ 3〜ミ 4) で 2 拍ごとに打ち直し、オクターヴ上を小さく重ねて響かせる。各部で 3 回 |
+| 重ねた響き | ×1 | LXXV の前半と後半を調をそろえて同時に (第 2 部は鐘の打ち直しが厚いので小さめに) |
+
+- 第 1 部 (ホ短調) の主題曲は 9/24 08:53 (ミ・ファ#・シ・ミ・ミ)、第 2 部 (ヘ短調) は 9/24 08:49 (ファ・ラ♭・シ♭・レ♭・ファ)。録音の実音で各部を始める
+- 音域: ミ 1〜ソ 5 の 4.2 オクターヴ。3 つの層 (重ねた響き・重低音・共鳴) がほぼ同じ大きさに。すべてピアノの実音
+
+```bash
+python3 compose_tablet78.py bank74/bank.json score_tablet75.json bank74 score_tablet78.json && python3 synth.py score_tablet78.json tablet78.wav && python3 video.py score_tablet78.json tablet78.wav tablet78.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
