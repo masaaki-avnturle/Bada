@@ -7,6 +7,7 @@
  *   dist/<アプリ>/electron/  … Windows 10/11 EXE (NSIS + ポータブル) / Linux AppImage・deb 用
  *                              (app/electron の main.js・preload.js・package.json をアプリ名・ID で書き換え)
  *   dist/<アプリ>/cordova/config.xml … Android APK 用 (app/cordova/config.xml をアプリ名・ID で書き換え)
+ *   dist/<アプリ>/cordova/bada-files/ … ファイル取り込み・保存プラグイン (app/cordova/bada-files)
  *
  * 先に node tools/build.js <アプリ> で dist/<アプリ>/www/index.html を作っておくこと。
  */
@@ -58,4 +59,6 @@ if (A.targetSdk) cfg = cfg.replace('<preference name="android-minSdkVersion" val
 // Claude API モード (BadaClaude): 通信先は api.anthropic.com だけを許可
 if (A.claude) cfg = cfg.replace('<content src="index.html" />', '<content src="index.html" />\n  <access origin="https://api.anthropic.com" />');
 fs.writeFileSync(path.join(C, "config.xml"), cfg);
+// ファイルの取り込み・保存プラグイン (Storage Access Framework / MediaStore) を同梱
+fs.cpSync(path.join(ROOT, "app", "cordova", "bada-files"), path.join(C, "bada-files"), { recursive: true });
 console.log(`${A.name}: dist/${key}/electron (appId ${A.id}) + dist/${key}/cordova/config.xml`);

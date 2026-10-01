@@ -133,6 +133,8 @@ jobs:
           cd runner-build
           cordova platform add android@12.0.1
           cordova plugin add cordova-plugin-file@8.0.1
+          # ファイルの取り込み (フォルダを開いて選ぶ) とダウンロード フォルダへの保存
+          cordova plugin add ../contact_transporter/dist/runner/cordova/bada-files
           cordova build android
           cp platforms/android/app/build/outputs/apk/debug/*.apk ../runner.apk
       - name: Verify — repack a paper app into the runner and check the signature (apksigner)
@@ -278,7 +280,10 @@ jobs:
           cd cordova-build
           cordova platform add android@12.0.1
           cordova plugin add cordova-plugin-file@8.0.1
+          # ファイルの取り込み (フォルダを開いて選ぶ) とダウンロード フォルダへの保存
+          cordova plugin add "../dist/${{ matrix.app }}/cordova/bada-files"
           cordova build android
+          grep -q "BadaFiles" platforms/android/app/src/main/res/xml/config.xml
       - name: Collect APK
         run: |
           mkdir -p out

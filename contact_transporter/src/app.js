@@ -42,7 +42,8 @@
   // ------------------------------------------------------------ 共通
   let toastT;
   // Electron: 保存先 (ダウンロード フォルダのパス) を表示
-  window.addEventListener("ct-saved", (e) => toast("保存しました: " + e.detail));
+  let lastSaved = null;
+  window.addEventListener("ct-saved", (e) => { lastSaved = e.detail; toast("保存しました: " + e.detail); });
   function toast(msg) {
     const t = $("#toast"); t.textContent = msg; t.classList.add("on");
     clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3200);
@@ -62,16 +63,90 @@
       tryDir(0);
     });
   }
+  // ------------------------------------------------------------ ファイルの取り込み・保存 (全アプリ共通)
+  // Android の WebView は <input type="file" accept=".pdf"> の拡張子指定を MIME として渡すため、
+  // ファイル選択画面 (フォルダ) が開かない。そこで
+  //   Android  : 同梱プラグイン BadaFiles (Storage Access Framework / MediaStore)
+  //   Windows・Linux (Electron): OS 標準の「開く」ダイアログ (preload.js の ctNative)
+  //   ブラウザ・論文から作った単体アプリ: <input type="file"> (Android では accept を */* にする)
+  // の順に使う。どれも {name, bytes} を返す (取り消しは null)。
+  const PICK = {
+    pdf: { title: "論文 PDF を開く", name: "PDF", ext: ["pdf"], mime: "application/pdf" },
+    json: { title: "JSON を開く", name: "JSON", ext: ["json"], mime: "application/json" },
+    bada: { title: "Bada ソースを開く", name: "Bada ソース", ext: ["bada", "txt"], mime: "text/plain" },
+  };
+  const IS_ANDROID = /Android/i.test(navigator.userAgent || "");
+  const androidFiles = () => (window.cordova && window.BadaFiles) || null;
+  function b64ToBytes(b) { const s = atob(b), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+  function blobToB64(blob) {
+    return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(",")[1] || ""); r.onerror = () => reject(r.error); r.readAsDataURL(blob); });
+  }
+  let pickInput = null, pickResolve = null;
+  function pickFile(kind) {
+    const k = PICK[kind] || { title: "ファイルを開く", name: "ファイル", ext: [], mime: "*/*" };
+    const N = window.ctNative, A = androidFiles();
+    if (N && N.openFile) {
+      return N.openFile({ title: k.title, name: k.name, extensions: k.ext }).then((r) => (r ? { name: r.name, bytes: new Uint8Array(r.data) } : null));
+    }
+    if (A) {
+      // 拡張子では絞らず (提供元によって MIME が違う)、全ファイルから選んでもらう
+      return A.open("*/*").then((r) => ({ name: r.name, bytes: b64ToBytes(r.data) }), (e) => { if (String(e) !== "cancel") toast("ファイルを開けません: " + e); return null; });
+    }
+    // <input type="file">: クリック操作の中で同期的に開く必要がある (await より前)
+    if (!pickInput) {
+      pickInput = document.createElement("input"); pickInput.type = "file";
+      pickInput.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0";
+      document.body.appendChild(pickInput);
+      pickInput.addEventListener("change", async () => {
+        const f = pickInput.files && pickInput.files[0], res = pickResolve; pickResolve = null;
+        if (!res) return;
+        res(f ? { name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) } : null);
+        pickInput.value = "";
+      });
+    }
+    if (pickResolve) pickResolve(null);
+    pickInput.accept = IS_ANDROID ? "*/*" : k.ext.map((e) => "." + e).concat(k.mime !== "*/*" ? [k.mime] : []).join(",");
+    return new Promise((resolve) => { pickResolve = resolve; pickInput.click(); });
+  }
+  const bytesText = (u) => new TextDecoder().decode(u);
+  // 取り込みボタン: クリックで pickFile → 処理。エラーはトーストに
+  function onPick(el, kind, fn) {
+    if (!el) return;
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      pickFile(kind).then((f) => f && fn(f)).catch((err) => toast("読み込み失敗: " + (err && err.message ? err.message : err)));
+    });
+  }
+  // ダウンロード フォルダを開く (Electron / Android)
+  const canShowDownloads = () => !!((window.ctNative && window.ctNative.showDownloads) || androidFiles());
+  function showDownloads() {
+    if (window.ctNative && window.ctNative.showDownloads) return window.ctNative.showDownloads(lastSaved);
+    const A = androidFiles(); if (A) return A.showDownloads().catch((e) => toast("フォルダを開けません: " + e));
+    toast("ブラウザのダウンロード一覧 (Ctrl+J) から開いてください");
+  }
   async function saveFile(name, data, mime) {
     const blob = data instanceof Blob ? data : new Blob([data], { type: mime || "application/octet-stream" });
+    const A = androidFiles();
+    if (A) {
+      const type = blob.type || mime || "application/octet-stream";
+      try {
+        const b64 = await blobToB64(blob);
+        try { const where = await A.saveDownloads(name, type, b64); toast("保存しました: " + where); return where; }
+        catch (e) {
+          // Android 9 以下など: 保存先を選んでもらう
+          if (String(e) !== "legacy") console.warn(e);
+          const n = await A.saveAs(name, type, b64); toast("保存しました: " + n); return n;
+        }
+      } catch (e) { if (String(e) === "cancel") { toast("保存を取り消しました"); return null; } toast("保存に失敗: " + e); return null; }
+    }
     if (window.cordova && window.resolveLocalFileSystemURL && window.cordova.file) {
-      try { toast("保存しました: " + (await cordovaWrite(name, blob))); } catch (e) { toast("保存に失敗: " + e.message); }
-      return;
+      try { const where = await cordovaWrite(name, blob); toast("保存しました: " + where); return where; } catch (e) { toast("保存に失敗: " + e.message); return null; }
     }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
     toast(`${name} をダウンロード フォルダへ保存しました`);
+    return name;
   }
   function svgToPng(svg, width) {
     return new Promise((resolve, reject) => {
@@ -341,12 +416,10 @@
       on("[data-blue]", (c) => { v.blueprint = c; v.draw(); });
       on("[data-grid]", (c) => { v.showGrid = c; v.draw(); });
       on("[data-colorlines]", () => this.invoke("build"));
-      $$(`[data-export="${this.name}"] button`, T).forEach((b) => b.addEventListener("click", () => this.exportAs(b.dataset.x)));
+      $$(`[data-export="${this.name}"] button[data-x]`, T).forEach((b) => b.addEventListener("click", () => this.exportAs(b.dataset.x)));
       const imp = $(`[data-import="${this.name}"]`);
-      if (imp) imp.addEventListener("change", async (e) => {
-        const f = e.target.files[0]; if (!f) return;
-        try { const j = JSON.parse(await f.text()); for (const [k, val] of Object.entries(j.params || j)) this.ui.set(k, val); this.invoke("build"); this.fit(); toast("設計値を読み込みました"); }
-        catch (err) { toast("読み込み失敗: " + err.message); }
+      onPick(imp, "json", (f) => {
+        const j = JSON.parse(bytesText(f.bytes)); for (const [k, val] of Object.entries(j.params || j)) this.ui.set(k, val); this.invoke("build"); this.fit(); toast(`${f.name} の設計値を読み込みました`);
       });
     }
     async exportAs(x) {
@@ -611,10 +684,7 @@
     $("#train-scratch").addEventListener("click", () => train(true));
     $("#train-stop").addEventListener("click", () => worker && worker.postMessage({ cmd: "stop" }));
     $("#gpt-save").addEventListener("click", () => MODEL.current && saveFile("contactgpt_weights.json", JSON.stringify(MODEL.current.toJSON()), "application/json"));
-    $("#gpt-load").addEventListener("change", async (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      try { MODEL.current = GPTm.GPT.fromJSON(JSON.parse(await f.text())); T.start(); toast("重みを読み込みました"); } catch (err) { toast("読み込み失敗: " + err.message); }
-    });
+    onPick($("#gpt-load"), "json", (f) => { MODEL.current = GPTm.GPT.fromJSON(JSON.parse(bytesText(f.bytes))); T.start(); toast(`${f.name} の重みを読み込みました`); });
   };
 
   // ============================================================ 輸送機 CAD / UFO
@@ -735,9 +805,8 @@
         if (!cur || !confirm(`${cur} を削除しますか？` + (cur in DEFAULT_FILES ? " (既定ファイルは「既定に戻す」で復元できません — 再読み込み時に復元されます)" : ""))) return;
         delete files[cur]; saveFiles(); cur = null; listFiles(); open(Object.keys(files).sort()[0]);
       });
-      $("#ide-load").addEventListener("change", async (e) => {
-        const f = e.target.files[0]; if (!f) return;
-        const name = "user/" + f.name.replace(/[^\w.\-]+/g, "_"); files[name] = await f.text(); saveFiles(); open(name);
+      onPick($("#ide-load"), "bada", (f) => {
+        const name = "user/" + f.name.replace(/[^\w.\-]+/g, "_"); files[name] = bytesText(f.bytes); saveFiles(); open(name); toast(`${f.name} を読み込みました`);
       });
       $("#ide-ref").innerHTML = `<b>予約語</b><br>${Array.from(B.KEYWORDS).join(" ")}<br><b>指示オブジェクト</b><br>${Object.entries(B.DIRECTIVES).map(([k, v]) => `<code>${esc(k)}</code> ${esc(v)}`).join("<br>")}<br><b>組込み関数</b><br>${Array.from(B.BUILTINS).join(" ")}<br><b>アプリ用ライブラリ (${HOST_NAMES.length})</b><br>${HOST_NAMES.join(" ")}`;
       const mainFile = HAS("cad") ? "apps/transporter.bada" : HAS("ufo") ? "apps/ufo.bada" : "apps/contactgpt.bada";
@@ -826,7 +895,11 @@
         if (a === "fold") { $(".codeblock", box).classList.toggle("open"); }
       };
     }
-    $("#paper-file").addEventListener("change", async (e) => { const f = e.target.files[0]; if (f) load(new Uint8Array(await f.arrayBuffer()), f.name); });
+    onPick($("#paper-file"), "pdf", (f) => {
+      // 拡張子ではなく中身 (%PDF) で確かめる (Android では MIME で絞っていないため)
+      if (!(f.bytes[0] === 0x25 && f.bytes[1] === 0x50 && f.bytes[2] === 0x44 && f.bytes[3] === 0x46)) { toast(`${f.name} は PDF ではありません`); return; }
+      load(f.bytes, f.name);
+    });
     const drop = $("#paper-drop");
     drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
     drop.addEventListener("dragleave", () => drop.classList.remove("over"));
@@ -835,6 +908,7 @@
     if (!window.CT_SAMPLE_PDF) $("#paper-sample").remove();
     $$("#paper-make [data-kind]").forEach((b) => b.addEventListener("click", () => { const a = makePaperApp(b.dataset.kind); showApp(a); toast(`${a.file} を Bada で書きました`); }));
     $$("#paper-dl [data-dl]").forEach((b) => b.addEventListener("click", () => download(b.dataset.dl)));
+    if (canShowDownloads()) { $("#dl-folder").hidden = false; $("#dl-folder").addEventListener("click", () => showDownloads()); }
     $("#dl-all").addEventListener("click", async () => { for (const k of ["bada", "html", "exe", "apk", "deb", "report", "paper"]) { await download(k); await new Promise((r) => setTimeout(r, 700)); } });
   };
 

@@ -247,6 +247,24 @@ truthy("図面 DXF", sh.dxf.includes("ENTITIES") && sh.dxf.trim().endsWith("EOF"
 
 // ---- ビルド成果物
 const dist = path.join(__dirname, "..", "dist", "studio", "www", "index.html");
+// ファイルの取り込み: Android の WebView で開かない <input type="file" accept="…"> を HTML に置かない
+for (const app of Object.keys(require("../apps.json"))) {
+  const f = path.join(__dirname, "..", "dist", app, "www", "index.html");
+  if (!fs.existsSync(f)) continue;
+  const h = fs.readFileSync(f, "utf8");
+  const body = h.slice(h.indexOf("<body"), h.indexOf("<script"));
+  truthy(`dist/${app}: 取り込みは OS のファイル画面 (pickFile) — 静的な <input type="file"> なし`, !/<input[^>]+type="file"/.test(body) && h.includes("function pickFile(kind)"));
+}
+{
+  const plug = path.join(__dirname, "..", "app", "cordova", "bada-files");
+  const xml = fs.readFileSync(path.join(plug, "plugin.xml"), "utf8"), java = fs.readFileSync(path.join(plug, "src", "android", "BadaFiles.java"), "utf8");
+  truthy("Android プラグイン BadaFiles: ACTION_OPEN_DOCUMENT (開く) / MediaStore.Downloads (保存) / ACTION_CREATE_DOCUMENT / ダウンロード フォルダ",
+    xml.includes('<clobbers target="BadaFiles" />') && xml.includes("io.github.masaaki_avnturle.badafiles.BadaFiles") && /ACTION_OPEN_DOCUMENT/.test(java) && /MediaStore\.Downloads\.EXTERNAL_CONTENT_URI/.test(java) && /ACTION_CREATE_DOCUMENT/.test(java) && /ACTION_VIEW_DOWNLOADS/.test(java));
+  const main = fs.readFileSync(path.join(__dirname, "..", "app", "electron", "main.js"), "utf8"), pre = fs.readFileSync(path.join(__dirname, "..", "app", "electron", "preload.js"), "utf8");
+  truthy("Electron: OS 標準の「開く」ダイアログ (ct-open-file) とダウンロード フォルダ (ct-show-downloads)", main.includes("dialog.showOpenDialog") && main.includes('"ct-open-file"') && pre.includes('exposeInMainWorld("ctNative"'));
+  const cfgDir = path.join(__dirname, "..", "dist", "ufo", "cordova", "bada-files", "plugin.xml");
+  if (fs.existsSync(path.join(__dirname, "..", "dist", "ufo", "cordova"))) truthy("package-app.js がプラグインを dist/<app>/cordova/bada-files に同梱", fs.existsSync(cfgDir));
+}
 const bcDist = path.join(__dirname, "..", "dist", "badaclaude", "www", "index.html");
 if (fs.existsSync(bcDist)) {
   const h = fs.readFileSync(bcDist, "utf8");
