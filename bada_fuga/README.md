@@ -1523,6 +1523,28 @@ python3 compose_tablet59.py bank37.json score_tablet59.json && python3 synth.py 
 python3 compose_tablet60.py bank37.json score_tablet60.json && python3 synth.py score_tablet60.json tablet60.wav && python3 video.py score_tablet60.json tablet60.wav tablet60.mp4
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions LXI · Requiem e Fuga (プロのバンドのバラードの雰囲気に、9/29・9/25 の録音を合わせたレクイエムとフーガ, ホ短調, ♩=68, 約 3 分)
+
+録音 6 本 (9/29 15:12・15:16・15:20、9/25 12:46・12:50・13:04) から主題と音を取り、プロの楽曲 (LUNA SEA「MOTHER」ほか、アルバムのトラック 4・8・14・17・18) からは
+**解析で得た雰囲気だけ** (調・速さ・音量の山) を借りた。プロの楽曲の音そのもの・旋律は使っていない。
+
+| プロの楽曲 (解析) | 借りたもの |
+|:--|:--|
+| MOTHER — ホ短調、♩≈68、低音が厚いバラード、曲の 8 割の所が山で最後は静かに消える | 調 (ホ短調)・速さ (♩=68)・音量の山 (Fuga II のストレッタ → Amen で静まる)、バラードのハーフタイムのドラム |
+| トラック 4 — ホ長調、♩≈136、長く静かな曲 | フーガの 8 ビートを ♩=136 で数える、最後の Amen はホ長調の和音 |
+
+- 録音の調: 15:12・15:16 変ロ短調、15:20 ホ短調 (MOTHER と同じ調)、12:46 ヘ短調、12:50 ロ短調、13:04 変ホ短調
+- 形式: Introitus (15:20 の実音) → Requiem aeternam (バラード: 12:50・13:04 の主題を 2 倍の長さでコラールに) → Fuga I (15:12 の主題, 変ロ短調)
+  → Lacrimosa (15:16 の実音, ドラムなし) → Fuga II (15:20 の主題, ホ短調, ストレッタが曲の山) → Amen (変格終止 → ホ長調)
+- 4 声は録音から切り出したピアノの 1 音 (`build_sampler.py` → bank61)。シンセ・心臓の鼓動・弦・オルガンなし
+- ドラムは LVIII と同じロックの叩き方 (大太鼓をバスドラムの役で短く止める・スネア・暗く小さいハイハット・タムのフィル、金属のシンバルなし)。
+  フーガでピアノの約 5〜7 dB 下、バラードで約 10 dB 下
+
+```bash
+python3 build_sampler.py bank61 20260929_151249.mp3 20260929_151602.mp3 20260929_151919.mp3 20260929_152002.mp3 20260925_125053.mp3 20260925_130431.mp3 20260925_124643.mp3
+python3 compose_tablet61.py bank61/bank.json score_tablet61.json && python3 synth.py score_tablet61.json tablet61.wav && python3 video.py score_tablet61.json tablet61.wav tablet61.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
