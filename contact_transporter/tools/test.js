@@ -255,6 +255,17 @@ for (const app of Object.keys(require("../apps.json"))) {
   const body = h.slice(h.indexOf("<body"), h.indexOf("<script"));
   truthy(`dist/${app}: 取り込みは OS のファイル画面 (pickFile) — 静的な <input type="file"> なし`, !/<input[^>]+type="file"/.test(body) && h.includes("function pickFile(kind)"));
 }
+// Android 用 www: cordova.js は <head> に 1 つだけ、アプリのスクリプトはすべて構文的に正しい
+// (以前は CI の sed が JavaScript 内の "</head>" まで書き換え、Android 版の全スクリプトが壊れていた)
+for (const app of Object.keys(require("../apps.json"))) {
+  const f = path.join(__dirname, "..", "dist", app, "cordova", "www", "index.html");
+  if (!fs.existsSync(f)) continue;
+  const h = fs.readFileSync(f, "utf8"), web = fs.readFileSync(path.join(__dirname, "..", "dist", app, "www", "index.html"), "utf8");
+  let ok = true;
+  for (const m of h.matchAll(/<script>([\s\S]*?)<\/script>/g)) { try { new Function(m[1]); } catch (e) { ok = false; console.log(app, e.message); } }
+  const head = h.slice(0, h.indexOf("</head>"));
+  truthy(`dist/${app}/cordova/www (Android): cordova.js は <head> に 1 つ、スクリプトはすべて正しい、本体は Web 版と同一`, ok && (head.match(/<script src="cordova.js">/g) || []).length === 1 && h.replace('<script src="cordova.js"></script>\n', "") === web);
+}
 {
   const plug = path.join(__dirname, "..", "app", "cordova", "bada-files");
   const xml = fs.readFileSync(path.join(plug, "plugin.xml"), "utf8"), java = fs.readFileSync(path.join(plug, "src", "android", "BadaFiles.java"), "utf8");

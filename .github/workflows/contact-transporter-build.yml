@@ -130,8 +130,8 @@ jobs:
           npm install -g cordova@12.0.0
           cordova create runner-build app.placeholder Placeholder
           rm -rf runner-build/www
-          cp -r contact_transporter/dist/runner/www runner-build/www
-          sed -i 's#</head>#<script src="cordova.js"></script>\n</head>#' runner-build/www/index.html
+          # cordova.js 入りの www は package-app.js が作る (<head> の 1 か所だけ)
+          cp -r contact_transporter/dist/runner/cordova/www runner-build/www
           cp contact_transporter/dist/runner/cordova/config.xml runner-build/config.xml
           cd runner-build
           cordova platform add android@12.0.1
@@ -276,9 +276,10 @@ jobs:
           npm install -g cordova@12.0.0
           cordova create cordova-build app.placeholder Placeholder
           rm -rf cordova-build/www
-          cp -r "dist/${{ matrix.app }}/www" cordova-build/www
-          # プラグイン (ファイル保存) を使うため cordova.js を読み込む
-          sed -i 's#</head>#<script src="cordova.js"></script>\n</head>#' cordova-build/www/index.html
+          # cordova.js 入りの www は package-app.js が作る (<head> の 1 か所だけ。sed で置換すると
+          # アプリの JavaScript 内の "</head>" まで書き換わって全スクリプトが動かなくなる)
+          cp -r "dist/${{ matrix.app }}/cordova/www" cordova-build/www
+          node -e 'const h=require("fs").readFileSync("cordova-build/www/index.html","utf8");const n=(h.slice(0,h.indexOf("</head>")).match(/<script src="cordova.js">/g)||[]).length;for(const m of h.matchAll(/<script>([\s\S]*?)<\/script>/g))new Function(m[1]);if(n!==1)throw new Error("cordova.js x"+n);console.log("www OK: cordova.js x1, inline scripts parse")' 
           cp "dist/${{ matrix.app }}/cordova/config.xml" cordova-build/config.xml
           cd cordova-build
           cordova platform add android@12.0.1

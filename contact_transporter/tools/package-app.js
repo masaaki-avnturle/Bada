@@ -7,6 +7,7 @@
  *   dist/<アプリ>/electron/  … Windows 10/11 EXE (NSIS + ポータブル) / Linux AppImage・deb 用
  *                              (app/electron の main.js・preload.js・package.json をアプリ名・ID で書き換え)
  *   dist/<アプリ>/cordova/config.xml … Android APK 用 (app/cordova/config.xml をアプリ名・ID で書き換え)
+ *   dist/<アプリ>/cordova/www/index.html … Android 用 (cordova.js を <head> に追加)
  *   dist/<アプリ>/cordova/bada-files/ … ファイル取り込み・保存プラグイン (app/cordova/bada-files)
  *
  * 先に node tools/build.js <アプリ> で dist/<アプリ>/www/index.html を作っておくこと。
@@ -67,6 +68,17 @@ fs.writeFileSync(path.join(C, "config.xml"), cfg);
 const SIG = path.join(DIST, "signing");
 fs.mkdirSync(SIG, { recursive: true });
 for (const f of ["bada-apps-key.pk8", "bada-apps-cert.der", "bada-apps-codesign.pfx"]) fs.copyFileSync(path.join(ROOT, "app", "signing", f), path.join(SIG, f));
+// Android 用の www: cordova.js を読み込む <script> を <head> に 1 つだけ入れる。
+// (以前は CI の sed で「</head>」を置換していたため、アプリの JavaScript 内の文字列 "</head>" まで書き換わり、
+//  Android 版ではスクリプト全体が構文エラーになって、ファイル画面・フォルダが開かず何も動かなかった)
+{
+  const html = fs.readFileSync(path.join(DIST, "www", "index.html"), "utf8");
+  const at = html.indexOf("</head>");
+  if (at < 0 || at > html.indexOf("<script")) throw new Error("index.html の <head> が見つかりません");
+  const W = path.join(C, "www");
+  fs.mkdirSync(W, { recursive: true });
+  fs.writeFileSync(path.join(W, "index.html"), html.slice(0, at) + '<script src="cordova.js"></script>\n' + html.slice(at));
+}
 // ファイルの取り込み・保存プラグイン (Storage Access Framework / MediaStore) を同梱
 fs.cpSync(path.join(ROOT, "app", "cordova", "bada-files"), path.join(C, "bada-files"), { recursive: true });
 console.log(`${A.name} ${VER.version} (versionCode ${VER.versionCode}): dist/${key}/electron (appId ${A.id}) + dist/${key}/cordova/config.xml + dist/${key}/signing`);
