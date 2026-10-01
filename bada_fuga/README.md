@@ -1748,6 +1748,25 @@ python3 compose_tablet67.py level score_tablet70.json back.wav     # LXIX を弾
 python3 synth.py score_tablet70.json tablet70.wav && python3 video.py score_tablet70.json tablet70.wav tablet70.mp4
 ```
 
+## 🎹🕯 Requiem BADA — Tablet Sessions LXXI · Requiem 12:46 (9/25 12:46 の録音を主題曲に、16 倍に伸ばし、LXX をバックに, ヘ短調, ♩=60, 約 6 分 43 秒)
+
+LXX と同じ形で、主題曲を 9/25 12:46 の録音 (ヘ短調) に。
+
+- **主題**: 始まりの所の最上声は「ファ・ソ・ファ」と動きが少ないので、録音の中を探して、3 分 1 秒からの段のように下りる線を主題に —
+  ヘ短調で **ド・レ♭・ド・シ♭・ラ♭・ファ** (8 拍)。和声は 1 拍ごとに V・iv・V・iv (3 拍)・i
+- **16 倍の伸び**: ド 4・レ♭ 4・ド 4・シ♭ 12・ラ♭ 4・ファ 4 小節。テノールが 4 分音符ごとに打ち直し、深い鐘は 2 全音符ごと
+- **バック (LXX)**: 採譜して **5 半音下げ** (変ロ短調 → ヘ短調)、速さは変えずにピアノの実音で。LXX の長いファ → ミ♭ (属音 → 下属音) が、
+  5 半音下げるとこの曲の長いド → シ♭ にそのまま重なるので、そこに 8 小節ずつ (I・IV 楽章)
+- **フーガを醸す**: 最初のド (属音) の上で主題 → 5 度上の答え、長いシ♭ の上でストレッタ、最後の主音ファの上で 1 倍と 2 倍 (拡大) の主題を同時に。II 楽章は 12:46 の主題の 4 声フーガ
+- 主題曲の実音はレ♭・シ♭・ラ♭ の長い音の中と、Introitus・Lacrimosa で
+
+```bash
+# src/ に 20260925_124643.wav と tablet70.wav (LXX)
+python3 compose_tablet71.py bank61/bank.json src score_tablet71.json
+python3 compose_tablet67.py level score_tablet71.json back.wav
+python3 synth.py score_tablet71.json tablet71.wav && python3 video.py score_tablet71.json tablet71.wav tablet71.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
