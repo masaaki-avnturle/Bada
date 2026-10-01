@@ -1,0 +1,94 @@
+// gen.bada — Transformer + 量子測定による文字生成 (ContactGPT / BadaClaude 共通)
+//   上位 k 文字 → 温度付き softmax → ψ_i = √a_i e^{iθ_i} に符号化 → Born 則で測定 (設計図書 Q.1–Q.10)。
+//   使う側で lib/quantum.bada を #include し、ui_param で temp / topk / max_new を宣言しておく。
+#include lib/quantum.bada
+
+// 上位 k 個の [ロジット, 文字番号] を大きい順に
+def topk(logits, k) {
+  top <- []
+  used <- fill(len(logits), false)
+  repeat k {
+    best <- -1
+    bv <- 0
+    i <- 0
+    -> i < len(logits) {
+      -< used[i] <-> false {
+        -< best < 0 {
+          best <- i
+          bv <- logits[i]
+        } >- {
+          -< logits[i] > bv {
+            best <- i
+            bv <- logits[i]
+          }
+        }
+      }
+      i <- i + 1
+    }
+    used[best] <- true
+    append(top, [bv, best])
+  }
+  return top
+}
+// 温度付き softmax (Q.1: a_i = softmax(z)_i)
+def softmax_t(top, temp) {
+  a <- []
+  s <- 0
+  mx <- top[0][0]
+  i <- 0
+  -> i < len(top) {
+    e <- exp((top[i][0] - mx) / temp)
+    append(a, e)
+    s <- s + e
+    i <- i + 1
+  }
+  i <- 0
+  -> i < len(a) {
+    a[i] <- a[i] / s
+    i <- i + 1
+  }
+  return a
+}
+// 次の 1 文字 (文字番号) を決める: Transformer → 上位 k → softmax → 量子符号化 → 測定
+def gen_next(ids) {
+  top <- topk(gpt_logits(ids), int(param("topk")))
+  a <- softmax_t(top, max2(0.05, param("temp")))
+  theta <- []
+  i <- 0
+  -> i < len(a) {
+    append(theta, 2 * pi() * i / len(a))
+    i <- i + 1
+  }
+  return top[q_measure(q_encode(a, theta))][1]
+}
+// 生成を止めるか (次の質問 "Q:" が始まったら)
+def gen_stop(out) {
+  return endswith(out, "\nQ:")
+}
+// 同期版 (REPL 用): generate("Q: Γ は？\nA:")
+def generate(prompt) {
+  ids <- gpt_encode(prompt)
+  out <- ""
+  k <- int(param("topk"))
+  temp <- max2(0.05, param("temp"))
+  repeat int(param("max_new")) {
+    top <- topk(gpt_logits(ids), k)
+    a <- softmax_t(top, temp)
+    // 位相 θ_i (Q.2) — 候補ごとに等間隔の位相を与えて量子状態に符号化 (Q.3)
+    theta <- []
+    i <- 0
+    -> i < len(a) {
+      append(theta, 2 * pi() * i / len(a))
+      i <- i + 1
+    }
+    psi <- q_encode(a, theta)
+    j <- q_measure(psi)
+    tok <- top[j][1]
+    append(ids, tok)
+    out <- out + gpt_decode([tok])
+    -< endswith(out, "\nQ:") {
+      return trim(substr(out, 0, len(out) - 3))
+    }
+  }
+  return trim(out)
+}

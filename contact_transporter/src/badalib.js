@@ -22,6 +22,9 @@
  *   ファイル  file_write file_read file_exists (Bada が書いたプログラムを保存)
  *   論文      paper_loaded paper_info paper_eqs paper_eq paper_tags paper_params paper_stat paper_search paper_text
  *             (投稿された論文 PDF を paper.js が解析したもの)
+ *   知識      kb_ready kb_tokens kb_ndocs kb_nchunks kb_avglen kb_postings kb_len kb_doc kb_nsources kb_source
+ *             (BadaClaude: 論文 10 本 + 方程式の転置索引。採点は Bada 側)
+ *   Claude    claude_ready claude_model claude_ask (利用者が API キーを設定したときだけ)
  *   Bada      bada_expr (式を評価)
  *
  * 環境 (env) の ui / chat / exporter はタブごとの UI アダプタ。Node ではスタブで動く。
@@ -278,6 +281,73 @@
     };
   }
 
+  // ------------------------------------------------------------ 知識ベース (BadaClaude)
+  // 論文 10 本のチャンク (data/badaclaude/kb.json) + 方程式 2111 本を 1 つの文書集合にし、
+  // 転置索引 (語 → [[文書番号, 出現数], …]) だけをここで作る。BM25 の採点・順位付け・
+  // 回答の組み立ては Bada (apps/badaclaude.bada) が行う。
+  const KB_TAG_JA = { ROT: "複素回転体", SR: "特殊相対論", GAMMA: "ガンマ関数", ZETA: "ゼータ関数", BETA: "ベータ関数", JONES: "Jones 多項式",
+    MANIFOLD: "大域的部分積分多様体", QUANTUM: "量子", TRANSPORT: "輸送", ENTROPY: "エントロピー", OTHER: "その他" };
+  function kbTokens(s) {
+    const out = [];
+    const re = /[\p{Script=Han}々〆]+|[\p{Script=Katakana}ー]+|[\p{Script=Hiragana}]+|[A-Za-z][A-Za-z0-9_'.]*[A-Za-z0-9]|[A-Za-z]|\d+(?:\.\d+)?|[α-ωΑ-Ωβζγπψφθλ∫∮∇□⊕⊗ℏ]/gu;
+    let m; const low = String(s).toLowerCase();
+    while ((m = re.exec(low))) {
+      const w = m[0];
+      if (/^[\p{Script=Han}]+$/u.test(w) && w.length > 2) { out.push(w); for (let i = 0; i + 2 <= w.length; i++) out.push(w.slice(i, i + 2)); }
+      else out.push(w);
+    }
+    return out;
+  }
+  const kbCache = new WeakMap();
+  function kbIndex(env) {
+    const kb = typeof env.kb === "function" ? env.kb() : env.kb;
+    if (!kb) return null;
+    let I = kbCache.get(kb);
+    if (I) return I;
+    const docs = [];
+    for (const c of kb.chunks || []) { const src = kb.sources[c.src] || { title: "?" }; docs.push({ kind: "chunk", id: "S" + c.src + "p" + c.page, title: src.title, page: c.page, text: c.text, src: c.src }); }
+    for (const e of env.equations || []) docs.push({ kind: "eq", id: e.id, title: "", page: 0, text: e.expr + (e.value ? " = " + e.value : ""), src: -1, tags: e.tags });
+    const post = new Map(); let total = 0;
+    docs.forEach((d, i) => {
+      const toks = kbTokens(d.kind === "chunk" ? d.title + "\n" + d.text : d.text + " " + d.tags.map((t) => t + " " + (KB_TAG_JA[t] || t)).join(" ") + " " + d.id);
+      const tf = new Map(); for (const t of toks) tf.set(t, (tf.get(t) || 0) + 1);
+      for (const [t, n] of tf) { let l = post.get(t); if (!l) post.set(t, (l = [])); l.push([i, n]); }
+      d.len = toks.length; total += toks.length;
+    });
+    I = { kb, docs, post, avg: docs.length ? total / docs.length : 1 };
+    kbCache.set(kb, I);
+    return I;
+  }
+  function kbLib(env) {
+    const I = () => kbIndex(env);
+    const doc = (i) => { const x = I(); return x && x.docs[toNum(i)]; };
+    return {
+      kb_ready: () => !!I(),
+      kb_tokens: (s) => kbTokens(String(s)),
+      kb_ndocs: () => (I() ? I().docs.length : 0),
+      kb_avglen: () => (I() ? I().avg : 1),
+      kb_postings: (t) => { const x = I(); const l = x && x.post.get(String(t)); return l ? l.map((p) => p.slice()) : []; },
+      kb_len: (i) => { const d = doc(i); return d ? d.len : 0; },
+      // [種類 ("chunk" | "eq"), ID, 論文名, ページ, 本文, 論文番号]
+      kb_doc: (i) => { const d = doc(i); return d ? [d.kind, d.id, d.title, d.page, d.text, d.src] : null; },
+      kb_nchunks: () => (I() ? I().docs.filter((d) => d.kind === "chunk").length : 0),
+      kb_nsources: () => (I() ? I().kb.sources.length : 0),
+      kb_source: (n) => { const x = I(); const s = x && x.kb.sources[toNum(n)]; return s ? [s.title, s.file, s.pages] : null; },
+    };
+  }
+
+  // ------------------------------------------------------------ Claude API (BadaClaude, 任意)
+  // 何を検索し何を Claude に渡すか (システムプロンプト) は Bada が決め、ホストは送信と
+  // ストリーミング表示だけを担う。API キーは端末の localStorage にだけ保存される。
+  function claudeLib(env) {
+    const C = env.claude || {};
+    return {
+      claude_ready: () => !!(C.ready && C.ready()),
+      claude_model: () => (C.model ? C.model() : ""),
+      claude_ask: (system, q) => (C.ask ? C.ask(String(system), String(q)) : null),
+    };
+  }
+
   // Bada の式を同じ VM 上で評価する (電卓・REPL)
   function badaLib(env) {
     return {
@@ -295,7 +365,7 @@
 
   // すべてのホスト関数をまとめる
   function makeHost(env) {
-    return Object.assign({}, mathLib(env), env.equations ? eqLib(env) : {}, gptLib(env), env.scene ? cadLib(env) : {}, uiLib(env), paperLib(env), badaLib(env));
+    return Object.assign({}, mathLib(env), env.equations ? eqLib(env) : {}, gptLib(env), env.scene ? cadLib(env) : {}, uiLib(env), paperLib(env), kbLib(env), claudeLib(env), badaLib(env));
   }
 
   // Bada アプリのインスタンス: ソースを VM に読み込み、build / frame / on_message を呼ぶ
@@ -323,7 +393,7 @@
     eval(src) { this.vm.maxSteps = 5e7; this.vm.eval(src); }
   }
 
-  const api = { mathLib, eqLib, gptLib, cadLib, uiLib, paperLib, makeHost, Scene, BadaApp, opsMatrix, boundsOf };
+  const api = { mathLib, eqLib, gptLib, cadLib, uiLib, paperLib, kbLib, kbTokens, claudeLib, makeHost, Scene, BadaApp, opsMatrix, boundsOf };
   root.BadaLib = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

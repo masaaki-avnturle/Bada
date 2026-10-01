@@ -1,10 +1,12 @@
-name: Bada 3 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 — Android APK + Windows 10/11 EXE + Linux)
+name: Bada 4 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 / BadaClaude — Android APK + Windows 10/11 EXE + Linux)
 
-# contact_transporter/ の 3 つのアプリ — すべて量子プログラミング言語 Bada で書かれている
+# contact_transporter/ の 4 つのアプリ — すべて量子プログラミング言語 Bada で書かれている
 # (contact_transporter/bada/apps/*.bada、アプリ内 Bada IDE 付き):
 #   - ContactGPT        (contactgpt)  : 設計図書の方程式 2111 本で学習した Transformer + 量子測定サンプリング
 #   - Transporter CAD   (transporter) : 異次元輸送機の 3D CAD (STL / OBJ / DXF / 図面)
 #   - UFO Designer      (ufo)         : UFO 設計図面作成ソフト (三面図 + 等角図 + 寸法 + 部材表)
+#   - BadaClaude        (badaclaude)  : Claude / ChatGPT の対話の仕組み (字句化 → 意図推定 → 論文 10 本 + 方程式 2111 本の検索
+#                                       → 道具 → 回答 → Ω 台帳) を Bada で書いた対話エンジン (Claude API モードは任意)
 #   - Contact Transporter Studio (studio): 3 アプリの統合版
 # を、それぞれ
 #   - Android 向け APK
@@ -14,7 +16,7 @@ name: Bada 3 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 — An
 # 同じファイルを Release「contact-transporter-latest」(タグ ct-v* の push 時はそのタグ) にも添付します。
 # アプリの定義 (名前・ID・含めるタブ) は contact_transporter/apps.json。
 #
-# 論文 PDF → アプリ: 3 アプリとも「📄 論文→アプリ」タブで論文 PDF を投稿すると、Bada でアプリを書き、
+# 論文 PDF → アプリ: 4 アプリとも「📄 論文→アプリ」タブで論文 PDF を投稿すると、Bada でアプリを書き、
 # 作ったアプリ (.bada / 単体 HTML)・Windows 10 / 11 EXE・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存できる。
 # その APK は runner-apk ジョブが作る「ランナー APK」を差し替え・署名して、EXE は win-launcher ジョブが作る
 # ランチャー (app/windows/launcher.c、Windows 実機で動作確認) の末尾にアプリ一式を付けて作る。
@@ -167,11 +169,11 @@ jobs:
         run: node contact_transporter/tools/build.js all
       - name: Bada conformance (JS 移植 ↔ Python 本家 bada_silent_vim、リポジトリ内の全 .bada)
         run: python3 contact_transporter/tools/conformance.py
-      - name: Engine tests (Bada アプリ 3 本 / 設計図書の数値再現 / GPT 勾配 / CAD / 図面)
+      - name: Engine tests (Bada アプリ 4 本 / 設計図書の数値再現 / GPT 勾配 / CAD / 図面)
         run: node contact_transporter/tools/test.js
       - name: Prepare native wrappers (Electron / Cordova) per app
         run: |
-          for app in contactgpt transporter ufo studio runner; do
+          for app in contactgpt transporter ufo badaclaude studio runner; do
             node contact_transporter/tools/package-app.js "$app"
           done
       - uses: actions/upload-artifact@v4
@@ -233,6 +235,7 @@ jobs:
           - { app: contactgpt,  file: ContactGPT }
           - { app: transporter, file: TransporterCAD }
           - { app: ufo,         file: UFODesigner }
+          - { app: badaclaude,  file: BadaClaude }
           - { app: studio,      file: ContactTransporterStudio }
     steps:
       - uses: actions/download-artifact@v4
@@ -296,6 +299,7 @@ jobs:
           - { app: contactgpt,  file: ContactGPT }
           - { app: transporter, file: TransporterCAD }
           - { app: ufo,         file: UFODesigner }
+          - { app: badaclaude,  file: BadaClaude }
           - { app: studio,      file: ContactTransporterStudio }
     steps:
       - uses: actions/download-artifact@v4
@@ -325,6 +329,7 @@ jobs:
           - { app: contactgpt,  file: ContactGPT }
           - { app: transporter, file: TransporterCAD }
           - { app: ufo,         file: UFODesigner }
+          - { app: badaclaude,  file: BadaClaude }
           - { app: studio,      file: ContactTransporterStudio }
     steps:
       - uses: actions/download-artifact@v4
@@ -365,16 +370,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: Bada 3 apps — ContactGPT / 輸送機 3D CAD / UFO 設計図面 (${{ env.RELEASE_TAG }})
+          name: Bada 4 apps — ContactGPT / 輸送機 3D CAD / UFO 設計図面 / BadaClaude (${{ env.RELEASE_TAG }})
           prerelease: true
           body: |
-            量子プログラミング言語 Bada で書かれた 3 つのアプリ (アプリ内 Bada IDE 付き)。
+            量子プログラミング言語 Bada で書かれた 4 つのアプリ (アプリ内 Bada IDE 付き)。
 
             | アプリ | Android | Windows 10 / 11 | Linux |
             |:--|:--|:--|:--|
             | **ContactGPT** | `ContactGPT-android.apk` | `ContactGPT-*-x64.exe` / `*-portable.exe` | `ContactGPT-*.AppImage` / `*.deb` |
             | **輸送機 3D CAD** | `TransporterCAD-android.apk` | `TransporterCAD-*-x64.exe` / `*-portable.exe` | `TransporterCAD-*.AppImage` / `*.deb` |
             | **UFO 設計図面** | `UFODesigner-android.apk` | `UFODesigner-*-x64.exe` / `*-portable.exe` | `UFODesigner-*.AppImage` / `*.deb` |
+            | **BadaClaude** | `BadaClaude-android.apk` | `BadaClaude-*-x64.exe` / `*-portable.exe` | `BadaClaude-*.AppImage` / `*.deb` |
             | 統合版 (3 アプリ) | `ContactTransporterStudio-android.apk` | `ContactTransporterStudio-*.exe` | `ContactTransporterStudio-*.AppImage` / `*.deb` |
 
             - Android: 提供元不明のアプリのインストールを許可して APK を開く

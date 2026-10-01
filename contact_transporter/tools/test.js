@@ -159,6 +159,38 @@ truthy("[Bada] contactgpt.bada 計算 = Bada の式 (Z の第 1 零点 ≈ 0)", 
   truthy("[Bada]   → 生成された零点アプリが 14.134725 … 37.586178 の 6 個を出す", zo.join().includes("14.134725") && zo.join().includes("37.586178") && zo[zo.length - 1].includes("6 個"));
 }
 
+// ---- BadaClaude: 対話の頭脳 (apps/badaclaude.bada) — 検索・意図推定・道具・Claude 文脈・台帳
+{
+  const asked = [];
+  const bc = H.makeApp("apps/badaclaude.bada", { model: false, claude: { ready: () => asked.ready, ask: (system, q) => { asked.push({ system, q }); return null; } } });
+  const say = (q) => { bc.chat.replies.length = 0; bc.chat.refs.length = 0; bc.chat.codes.length = 0; bc.app.call("on_message", [q]); return bc.chat.replies.join("\n"); };
+  truthy("[BadaClaude] 知識ベース: 論文 10 本・抜粋 256 件 + 方程式 2111 本", /10 本の論文 · 抜粋 256 件 \+ 方程式 2111 本/.test(bc.ui.outputs.kb[1]));
+  let r = say("ゼータ関数とベータ関数の関係は?");
+  truthy("[BadaClaude] BM25 (Bada で採点) が「ベータ関数とゼータ関数の構造的対応」を引く", r.includes("『ベータ関数とゼータ関数の構造的対応』") && bc.chat.refs.length > 0);
+  truthy("[BadaClaude] 意図推定 (softmax → ψ → |ψ|²) = explain", /意図 explain/.test(r));
+  const first = r;
+  r = say("もっと");
+  truthy("[BadaClaude] 「もっと」で同じ質問の続きの結果", /意図 more/.test(r) && r !== first && r.includes("p."));
+  say("ACAFE.17");
+  truthy("[BadaClaude] 方程式 ID 参照", bc.chat.refs.includes("ACAFE.17"));
+  r = say("計算 rs_z(14.134725)");
+  truthy("[BadaClaude] 計算 (bada_expr) — Z(14.134725) ≈ 0", /= \*\*-?1\.\d+e-0?7\*\*/.test(r));
+  r = say("ベル状態を見せて");
+  truthy("[BadaClaude] 量子回路 (H + CNOT) の確率 [0.5, 0, 0, 0.5]", /0\.5000000000000001?, 0, 0, 0\.5/.test(r) || /\[0\.5\d*, 0, 0, 0\.5\d*\]/.test(r));
+  r = say("リーマン予想は証明されたの?");
+  truthy("[BadaClaude] 未解決問題は論文の標識どおり「未解決」と答える", /意図 open_problem/.test(r) && r.includes("未解決"));
+  say("```bada\nx <- 6\nprint x * 7\n```");
+  truthy("[BadaClaude] 送られた Bada コードを保存して実行に回す", bc.chat.codes.length === 1 && bc.chat.codes[0].target === "console" && bc.files[bc.chat.codes[0].file].includes("print x * 7"));
+  say("直径40mで舷窓12個のUFOの設計図アプリを作って");
+  truthy("[BadaClaude] 要求に応えて Bada でアプリを書く (codegen)", bc.chat.codes.length === 1 && bc.chat.codes[0].src.includes("ui_param"));
+  asked.ready = true;
+  say("反重力 UFO-OS とは");
+  truthy("[BadaClaude] Claude API モード: Bada が <bada_context> (出典つき) を組み立てて渡す", asked.length === 1 && asked[0].system.includes("<bada_context intent=\"explain\">") && asked[0].system.includes("BadaUFO-OS") && asked[0].q === "反重力 UFO-OS とは");
+  bc.app.call("after_claude", ["回答", "end_turn"]);
+  r = say("台帳");
+  truthy("[BadaClaude] Ω 台帳 (Omega::DATABASE[ledger]) に boot / turn / build / claude を追記", /boot/.test(r) && /turn/.test(r) && /build/.test(r) && /claude · end_turn/.test(r) && (bc.app.vm.tuplespace.ledger || []).length >= 10);
+}
+
 // ---- GPT 勾配チェック + 学習で損失が下がる + 重みの往復
 {
   const G = global.ContactGPT;
@@ -215,6 +247,11 @@ truthy("図面 DXF", sh.dxf.includes("ENTITIES") && sh.dxf.trim().endsWith("EOF"
 
 // ---- ビルド成果物
 const dist = path.join(__dirname, "..", "dist", "studio", "www", "index.html");
+const bcDist = path.join(__dirname, "..", "dist", "badaclaude", "www", "index.html");
+if (fs.existsSync(bcDist)) {
+  const h = fs.readFileSync(bcDist, "utf8");
+  truthy("dist/badaclaude: 知識ベースと頭脳 (apps/badaclaude.bada) を同梱、接続先は api.anthropic.com だけ許可", h.includes("window.CT_KB = {\"sources\"") && h.includes("apps/badaclaude.bada") && h.includes("connect-src 'self' data: blob: file: https://api.anthropic.com;"));
+}
 if (fs.existsSync(dist)) {
   const h = fs.readFileSync(dist, "utf8");
   truthy("dist/studio/www/index.html にプレースホルダが残っていない (書き出し用の PAYLOAD 以外)", !/\/\*@@(?!PAYLOAD@@)[A-Z_]+@@\*\//.test(h));

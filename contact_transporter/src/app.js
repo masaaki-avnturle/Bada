@@ -13,6 +13,8 @@
   const CAD = window.CTCad, Draft = window.CTDraft, GPTm = window.ContactGPT, B = window.Bada, L = window.BadaLib;
   const EQS = window.CT_EQUATIONS || [];
   const INDEX = new window.CTChat.Index(EQS);
+  // BadaClaude の知識ベース (論文 10 本のチャンク)。ほかのアプリでは null
+  const KBDATA = window.CT_KB || null;
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -130,7 +132,7 @@
     store.set("ct.bada.deleted", Object.keys(DEFAULT_FILES).filter((k) => !(k in files)));
   }
   for (const k of store.get("ct.bada.deleted", [])) delete files[k];
-  const MAIN = Object.assign({ chat: "apps/contactgpt.bada", cad: "apps/transporter.bada", ufo: "apps/ufo.bada" }, store.get("ct.bada.main", {}));
+  const MAIN = Object.assign({ chat: APP.chatMain || "apps/contactgpt.bada", cad: "apps/transporter.bada", ufo: "apps/ufo.bada" }, store.get("ct.bada.main", {}));
   // 書き出された単体アプリ (論文 PDF から作ったアプリ): 同梱の Bada ソースを主プログラムにする
   const PAYLOAD = window.CT_PAYLOAD;
   if (PAYLOAD) {
@@ -245,7 +247,7 @@
       this.ui = makeUI(this.uiRoot, this);
       this.t = 0; this.fitted = false;
       this.env = {
-        files, ui: this.ui, chat: opts.chat || null, equations: EQS, index: INDEX, scene: this.scene, paper: () => PAPER.analysis,
+        files, ui: this.ui, chat: opts.chat || null, claude: opts.claude || null, equations: EQS, index: INDEX, kb: KBDATA, scene: this.scene, paper: () => PAPER.analysis,
         onFileWrite: (n) => { saveFiles(); if (IDE.refresh) IDE.refresh(); conLine(name, `── ${n} を保存しました`, "sys"); },
         model: () => MODEL.current,
         colorLines: () => { const c = $(`#tab-${name} [data-colorlines]`); return !!(c && c.checked); },
@@ -390,6 +392,90 @@
     const tags = e.tags.map((t) => `<span class="tag">${GPTm.TAG_JA[t] || t}</span>`).join("");
     return `<div class="ref"><b>${esc(e.id)}</b> ${tags} <span class="st-${e.status}">${GPTm.STATUS_JA[e.status]}</span><br>${esc(e.expr)}${e.value ? `<br><span class="st-${e.status}">= ${esc(e.value)}</span>` : ""}</div>`;
   }
+  // ============================================================ Claude API (BadaClaude, 任意)
+  // 何を検索・計算して Claude に渡すか (システムプロンプト <bada_context>) は Bada の頭脳
+  // (apps/badaclaude.bada) が決める。ここは設定欄・送信・ストリーミング表示だけ。
+  // API キーは「端末に保存」を選んだときだけ localStorage に保存し、送信先は api.anthropic.com だけ。
+  const CLAUDE_MODELS = [["claude-opus-5-5", "Claude Opus 5.5 (既定)"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-4-5", "Claude Haiku 4.5"]];
+  function claudeHost(getBubble) {
+    const saved = store.get("ct.claude", {});
+    const S = Object.assign({ mode: "local", key: "", model: "claude-opus-5-5", effort: "medium", remember: false }, saved);
+    const history = [];
+    const side = $("#tab-chat .side");
+    if (side) {
+      const box = document.createElement("div"); box.className = "claude-cfg";
+      box.innerHTML = `<h3>Claude API (任意)</h3>
+        <p class="muted">「Claude API」を選んで Anthropic の API キーを入れると、Bada の頭脳が検索・計算した結果 (&lt;bada_context&gt;) をシステムプロンプトにして Claude に送り、回答をストリーミング表示します。既定のローカルでは Bada だけで答えます (オフライン)。</p>
+        <label class="row">応答 <select id="cl-mode"><option value="local">ローカル (Bada だけ)</option><option value="api">Claude API</option></select></label>
+        <label class="row">API キー <input type="password" id="cl-key" autocomplete="off" placeholder="sk-ant-…"></label>
+        <label class="row">モデル <select id="cl-model">${CLAUDE_MODELS.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select></label>
+        <label class="row">effort <select id="cl-effort"><option>low</option><option>medium</option><option>high</option></select></label>
+        <label class="row"><input type="checkbox" id="cl-remember"> キーをこの端末に保存する (共有端末では保存しない)</label>`;
+      side.insertBefore(box, $("#chat-ui").nextSibling);
+      const sync = () => {
+        S.mode = $("#cl-mode").value; S.key = $("#cl-key").value.trim(); S.model = $("#cl-model").value; S.effort = $("#cl-effort").value; S.remember = $("#cl-remember").checked;
+        store.set("ct.claude", { mode: S.mode, model: S.model, effort: S.effort, remember: S.remember, key: S.remember ? S.key : "" });
+      };
+      $("#cl-mode").value = S.mode; $("#cl-key").value = S.key; $("#cl-model").value = S.model; $("#cl-effort").value = S.effort; $("#cl-remember").checked = !!S.remember;
+      box.addEventListener("change", sync); $("#cl-key").addEventListener("input", sync);
+    }
+    async function stream(system, q, el) {
+      const messages = history.slice(-20).concat([{ role: "user", content: q }]);
+      const body = { model: S.model, max_tokens: 64000, stream: true, system, messages };
+      const headers = { "content-type": "application/json", "x-api-key": S.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+      if (S.model !== "claude-haiku-4-5") body.output_config = { effort: S.effort };
+      if (S.model === "claude-opus-5-5" || S.model === "claude-sonnet-5-5") {
+        // 安全分類器が応答を拒否したときは API 側で代替モデルに切り替えて答える
+        headers["anthropic-beta"] = "server-side-fallback-2026-07-01";
+        body.fallbacks = "default";
+      }
+      const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers, body: JSON.stringify(body) });
+      if (!res.ok) {
+        let msg = res.status + " " + res.statusText;
+        try { const j = await res.json(); if (j.error && j.error.message) msg = res.status + ": " + j.error.message; } catch (e) { /* 本文なし */ }
+        throw new Error("Claude API エラー " + msg + (res.status === 401 ? " — API キーを確認してください。" : ""));
+      }
+      const reader = res.body.getReader(), dec = new TextDecoder();
+      let buf = "", text = "", stop = null;
+      for (;;) {
+        const { value, done } = await reader.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let k;
+        while ((k = buf.indexOf("\n\n")) >= 0) {
+          const block = buf.slice(0, k); buf = buf.slice(k + 2);
+          const data = block.split("\n").filter((x) => x.startsWith("data:")).map((x) => x.slice(5).trim()).join("");
+          if (!data) continue;
+          let ev; try { ev = JSON.parse(data); } catch (e) { continue; }
+          if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") { text += ev.delta.text; el.textContent = text; $("#chat-log").scrollTop = $("#chat-log").scrollHeight; }
+          else if (ev.type === "message_delta" && ev.delta) stop = ev.delta.stop_reason || stop;
+          else if (ev.type === "error") throw new Error("Claude API: " + ((ev.error && ev.error.message) || "stream error"));
+        }
+      }
+      if (stop === "refusal") text += (text ? "\n\n" : "") + "(この依頼は Claude の安全方針により応答できませんでした)";
+      if (stop === "max_tokens") text += "\n\n(出力上限に達したため途中で終了しました)";
+      el.textContent = text;
+      return { text, stop };
+    }
+    return {
+      ready: () => S.mode === "api" && !!S.key,
+      model: () => S.model,
+      ask(system, q) {
+        const bubble = getBubble(); if (!bubble) return null;
+        const head = document.createElement("div"); head.className = "claude-head"; head.textContent = "Claude (" + S.model + ") — Bada の文脈で回答中…";
+        const el = document.createElement("div"); el.className = "ans claude streaming";
+        bubble.appendChild(head); bubble.appendChild(el);
+        stream(system, q, el).then(({ text, stop }) => {
+          el.classList.remove("streaming"); head.textContent = "Claude (" + S.model + ") — stop_reason: " + stop;
+          if (text && stop !== "refusal") history.push({ role: "user", content: q }, { role: "assistant", content: text });
+          if (tabs.chat) tabs.chat.app.call("after_claude", [text, String(stop || "")]);
+        }).catch((e) => {
+          el.classList.remove("streaming"); el.textContent = "⚠ " + (e && e.message ? e.message : String(e));
+          if (tabs.chat) tabs.chat.app.call("after_claude", ["", "error"]);
+        });
+        return null;
+      },
+    };
+  }
   tabInit.chat = function () {
     const byId = new Map(EQS.map((e) => [e.id, e]));
     let bubble = null, streamGen = 0;
@@ -412,7 +498,7 @@
         const runIt = () => {
           if (where === "console") {
             const out = $(".cbout", el); out.innerHTML = "";
-            const lines = [], env = { files, ui: { toast }, chat: {}, equations: EQS, index: INDEX, scene: new L.Scene(), model: () => MODEL.current, onPrint: (l) => lines.push(l) };
+            const lines = [], env = { files, ui: { toast }, chat: {}, equations: EQS, index: INDEX, kb: KBDATA, scene: new L.Scene(), model: () => MODEL.current, onPrint: (l) => lines.push(l) };
             const vm = new B.BadaVM({ host: L.makeHost(env), files, onPrint: env.onPrint, maxSteps: 2e8 });
             const t0 = performance.now();
             try { vm.load(files[file] || src, file); lines.push(`── 完了 ${(performance.now() - t0).toFixed(0)} ms (Bada VM)`); }
@@ -452,7 +538,7 @@
         return null;
       },
     };
-    const T = new BadaTab("chat", { chat });
+    const T = new BadaTab("chat", { chat, claude: APP.claude ? claudeHost(() => bubble) : null });
     T.onChips = (list) => {
       $("#chat-chips").innerHTML = list.map((c) => `<button>${esc(c)}</button>`).join("");
       $$("#chat-chips button").forEach((b) => b.addEventListener("click", () => ask(b.textContent)));
@@ -467,7 +553,7 @@
         bubble.scrollIntoView({ block: "end" });
       }, 10);
     }
-    addMsg(md("こんにちは、**ContactGPT** です。この対話エンジンは量子プログラミング言語 **Bada** で書かれています (`apps/contactgpt.bada`)。設計図書の全方程式 2111 本で学習した Transformer のロジットを Bada が受け取り、**量子状態 ψ = √a·e^{iθ} の Born 則測定**で次の文字を選びます。\n例: 「UFO.19」「ローレンツ因子は？」「計算 rs_z(14.1347)」— 計算 のあとは Bada の式です。"), "bot");
+    addMsg(md(APP.greet || "こんにちは、**ContactGPT** です。この対話エンジンは量子プログラミング言語 **Bada** で書かれています (`apps/contactgpt.bada`)。設計図書の全方程式 2111 本で学習した Transformer のロジットを Bada が受け取り、**量子状態 ψ = √a·e^{iθ} の Born 則測定**で次の文字を選びます。\n例: 「UFO.19」「ローレンツ因子は？」「計算 rs_z(14.1347)」— 計算 のあとは Bada の式です。"), "bot");
     $("#chat-form").addEventListener("submit", (e) => { e.preventDefault(); const v = $("#chat-in").value.trim(); if (v) { ask(v); $("#chat-in").value = ""; } });
     T.start();
     // 学習 (Web Worker)
@@ -557,10 +643,10 @@
       if (!(f in files)) return;
       cur = f; text().value = files[f]; $("#ide-name").textContent = f;
       // 実行先: 指定 → ファイル名からの推測 → このアプリの 3D タブ → コンソール
-      let tg = target || (f.startsWith("apps/") ? (f.includes("ufo") ? "ufo" : f.includes("gpt") ? "chat" : "cad") : null);
+      let tg = target || (f.startsWith("apps/") ? (f.includes("ufo") ? "ufo" : /gpt|claude/.test(f) ? "chat" : "cad") : null);
       if (!tg && /template|my_ship/.test(f)) tg = HAS("cad") ? "cad" : "ufo";
       if (tg && !HAS(tg)) tg = HAS("cad") ? "cad" : HAS("ufo") ? "ufo" : null;
-      if (tg === "chat" && !f.includes("gpt")) tg = null;
+      if (tg === "chat" && !/gpt|claude/.test(f)) tg = null;
       $("#ide-target").value = tg || "console";
       highlight(); listFiles(); $("#ide-asmout").textContent = "";
       store.set("ct.ide.cur", f);
@@ -606,7 +692,7 @@
       const target = $("#ide-target").value;
       if (target === "console") {
         conLine("ide", `── ${cur} を実行`, "sys");
-        const env = { files, ui: { toast }, chat: {}, equations: EQS, index: INDEX, scene: new L.Scene(), model: () => MODEL.current, onPrint: (l) => conLine("ide", l) };
+        const env = { files, ui: { toast }, chat: {}, equations: EQS, index: INDEX, kb: KBDATA, scene: new L.Scene(), model: () => MODEL.current, onPrint: (l) => conLine("ide", l) };
         const vm = new B.BadaVM({ host: L.makeHost(env), files, onPrint: env.onPrint, maxSteps: 2e8 });
         const t0 = performance.now();
         try { vm.load(files[cur], cur); conLine("ide", `── 完了 ${(performance.now() - t0).toFixed(0)} ms`, "sys"); }
@@ -617,7 +703,7 @@
       }
       showTab(target);
       tabs[target].start(cur);
-      toast(`${cur} を ${ { cad: "輸送機 3D CAD", ufo: "UFO 設計図面", chat: "ContactGPT" }[target]} タブで実行しました`);
+      toast(`${cur} を ${ { cad: "輸送機 3D CAD", ufo: "UFO 設計図面", chat: APP.chatName || "ContactGPT" }[target]} タブで実行しました`);
     }
     function init() {
       mountConsole("ide", null);
@@ -686,7 +772,7 @@
   }
   // 論文の Bada 生成器 (lib/paper.bada) を動かす VM
   function paperVM() {
-    const env = { files, ui: { toast }, chat: {}, equations: EQS, index: INDEX, scene: new L.Scene(), model: () => MODEL.current, paper: () => PAPER.analysis };
+    const env = { files, ui: { toast }, chat: {}, equations: EQS, index: INDEX, kb: KBDATA, scene: new L.Scene(), model: () => MODEL.current, paper: () => PAPER.analysis };
     const vm = new B.BadaVM({ host: L.makeHost(env), files, maxSteps: 2e8 });
     vm.load("#include lib/paper.bada\n", "<paper>");
     return vm;
@@ -713,7 +799,7 @@
         prog.textContent = `✔ ${name} を解析しました`;
         showSummary();
         showApp(makePaperApp("manifold"));
-        for (const t of Object.values(tabs)) if (t.name === "chat") conLine("chat", `── 論文「${PAPER.analysis.title}」を読み込みました (ContactGPT に「論文」について質問できます)`, "sys");
+        for (const t of Object.values(tabs)) if (t.name === "chat") conLine("chat", `── 論文「${PAPER.analysis.title}」を読み込みました (${APP.chatName || "ContactGPT"} に「論文」について質問できます)`, "sys");
       } catch (e) { prog.textContent = "✖ 読み込めませんでした: " + e.message; console.error(e); }
     }
     function showSummary() {
@@ -840,7 +926,7 @@
     }
     dlLog("設計書: 3D と図面を描いています…");
     // 2) 3D と 3) 図面 — 作ったアプリを裏で動かして描く
-    const env = { files, ui: headlessUI(), chat: {}, equations: EQS, index: INDEX, scene: new L.Scene(), model: () => MODEL.current, paper: () => PAPER.analysis };
+    const env = { files, ui: headlessUI(), chat: {}, equations: EQS, index: INDEX, kb: KBDATA, scene: new L.Scene(), model: () => MODEL.current, paper: () => PAPER.analysis };
     const run = new L.BadaApp(env);
     run.start(app.src, app.file);
     if (run.has("frame")) run.call("frame", [0]);

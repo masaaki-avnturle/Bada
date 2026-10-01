@@ -33,14 +33,17 @@
 
 **3 つのアプリはすべて量子プログラミング言語 Bada で書かれています**。**ContactGPT は「直径40mのUFOの設計図アプリを作って」などの要求に応えて Bada でアプリケーションを書いて実行**し、輸送機 CAD・UFO 設計図面は「外環を80mに」「図面を作って」などの要求・質問に Bada の `on_request` が応えます。さらに **3 アプリとも論文 PDF を投稿すると Bada でアプリを書き、作ったアプリ (.bada / 単体 HTML)・Windows 10 / 11 EXE・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存**できます (`contact_transporter/papers/` に PDF を置くと Actions の Artifacts `PaperApps` にも一式ができます)([`contact_transporter/bada/apps/`](contact_transporter/bada/apps/))。Bada 処理系を JavaScript に忠実移植(リポジトリ内の Bada 99 本で Python 版と出力一致)し、アプリ内の **Bada IDE** でソースを編集・新規作成して各タブで実行、各タブの **Bada コンソール**で動作中のアプリを操作できます。設計図書 **「CONTACT TRANSPORTER 異次元への輸送機 3 次元設計図書」**([`contact_transporter/contact_blueprint.pdf`](contact_transporter/contact_blueprint.pdf))の**方程式 2111 本**から作った設計スイート。**ContactGPT**(外部ライブラリなしでゼロから実装した Transformer を方程式レジストリで学習 + 方程式検索・数式電卓)、**異次元輸送機の 3D CAD**(Γ = 64800, φ = arcosh Γ, Riemann–Siegel Z(φ), Jones 多項式からジンバル環・ポッド・Jones コイル・扉の軸をパラメトリック生成、STL / OBJ / DXF 書き出し)、**UFO 設計図面作成ソフト**(三面図 + 等角図 + 寸法 + 表題欄 + 部材表を A3 図面に自動作図、反重力モデル L = cosh(x log x) の飛行シミュレーション)。※ 思索的・フィクションの設計図(幾何的な可視化)です。
 
-**Actions** → 「Bada 3 apps build」→ 最新の実行の **Artifacts** から、または [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `contact-transporter-latest` から、**3 つのアプリを別々に**ダウンロードできます:
+**Actions** → 「Bada 4 apps build」→ 最新の実行の **Artifacts** から、または [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `contact-transporter-latest` から、**4 つのアプリを別々に**ダウンロードできます:
 
 | アプリ | Android (APK) | Windows 10 / 11 | Linux |
 |:---|:---|:---|:---|
 | **ContactGPT** | `ContactGPT-android.apk` | `ContactGPT-*-x64.exe` / `*-portable.exe` | `ContactGPT-*.AppImage` / `*.deb` |
 | **輸送機 3D CAD** | `TransporterCAD-android.apk` | `TransporterCAD-*-x64.exe` / `*-portable.exe` | `TransporterCAD-*.AppImage` / `*.deb` |
 | **UFO 設計図面** | `UFODesigner-android.apk` | `UFODesigner-*-x64.exe` / `*-portable.exe` | `UFODesigner-*.AppImage` / `*.deb` |
+| **BadaClaude** | `BadaClaude-android.apk` | `BadaClaude-*-x64.exe` / `*-portable.exe` | `BadaClaude-*.AppImage` / `*.deb` |
 | 統合版 | `ContactTransporterStudio-android.apk` | `ContactTransporterStudio-*.exe` | `ContactTransporterStudio-*.AppImage` / `*.deb` |
+
+**BadaClaude** は Claude / ChatGPT の対話の仕組み (字句化 → 意図推定 ψ = √a·e^{iθ} → 論文 10 本 + 方程式 2111 本の BM25 検索 → 道具 → 出典つき回答 → Ω 台帳) を正規の Bada で書いた対話エンジンです ([`contact_transporter/bada/apps/badaclaude.bada`](contact_transporter/bada/apps/badaclaude.bada))。ほかの 3 アプリと同じく要求に応えて Bada でアプリを書き、論文 PDF からアプリ一式を作ってダウンロードできます。Claude API モード (任意・API キーは利用者が設定) では Bada が集めた文脈を Claude に渡します。学習済みの Claude / ChatGPT の重みは含みません。
 
 ビルドは [`contact-transporter-build.yml`](.github/workflows/contact-transporter-build.yml)、詳細は [`contact_transporter/`](contact_transporter/) を参照。
 

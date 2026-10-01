@@ -2,7 +2,7 @@
 /*
  * package-app.js — アプリごとのネイティブ ラッパーを用意する
  *
- *   node tools/package-app.js <contactgpt|transporter|ufo|studio>
+ *   node tools/package-app.js <contactgpt|transporter|ufo|badaclaude|studio>
  *
  *   dist/<アプリ>/electron/  … Windows 10/11 EXE (NSIS + ポータブル) / Linux AppImage・deb 用
  *                              (app/electron の main.js・preload.js・package.json をアプリ名・ID で書き換え)
@@ -55,5 +55,7 @@ cfg = cfg.replace(/<widget id="[^"]*"/, `<widget id="${A.id}"`)
   .replace(/<description>[^<]*<\/description>/, `<description>${xml(A.description)}</description>`);
 // 論文から作ったアプリの APK (ランナー) は v1 (JAR) 署名で配るため targetSdk 29 にする
 if (A.targetSdk) cfg = cfg.replace('<preference name="android-minSdkVersion" value="24" />', `<preference name="android-minSdkVersion" value="24" />\n  <preference name="android-targetSdkVersion" value="${A.targetSdk}" />\n  <preference name="android-compileSdkVersion" value="33" />`);
+// Claude API モード (BadaClaude): 通信先は api.anthropic.com だけを許可
+if (A.claude) cfg = cfg.replace('<content src="index.html" />', '<content src="index.html" />\n  <access origin="https://api.anthropic.com" />');
 fs.writeFileSync(path.join(C, "config.xml"), cfg);
 console.log(`${A.name}: dist/${key}/electron (appId ${A.id}) + dist/${key}/cordova/config.xml`);

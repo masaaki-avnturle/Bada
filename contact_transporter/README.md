@@ -68,9 +68,9 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 
 **Actions でも作れます**: [`papers/`](papers/) に PDF を置いて push すると、`paper-apps` ジョブが同じ一式を作り Artifacts **`PaperApps`** に置きます。
 
-## ダウンロード (GitHub Actions) — 3 つのアプリ
+## ダウンロード (GitHub Actions) — 4 つのアプリ
 
-リポジトリの **Actions** → **「Bada 3 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 …)」** →
+リポジトリの **Actions** → **「Bada 4 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 / BadaClaude …)」** →
 最新の成功した実行 (✅) を開き、ページ下部の **Artifacts** からダウンロードします。
 
 | アプリ | Android (APK) | Windows 10 / 11 (EXE) | Linux (AppImage / deb) |
@@ -78,6 +78,7 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 | **ContactGPT** | `ContactGPT-android-apk` | `ContactGPT-windows-exe` | `ContactGPT-linux` |
 | **輸送機 3D CAD** | `TransporterCAD-android-apk` | `TransporterCAD-windows-exe` | `TransporterCAD-linux` |
 | **UFO 設計図面** | `UFODesigner-android-apk` | `UFODesigner-windows-exe` | `UFODesigner-linux` |
+| **BadaClaude** | `BadaClaude-android-apk` | `BadaClaude-windows-exe` | `BadaClaude-linux` |
 | 統合版 (3 アプリ入り) | `ContactTransporterStudio-android-apk` | `ContactTransporterStudio-windows-exe` | `ContactTransporterStudio-linux` |
 | 論文 PDF から作ったアプリ | `PaperApps` (論文ごとに `.apk` / `.deb` / `.html` / `.bada` / 図面 / 論文 PDF) | ← | ← |
 
@@ -142,7 +143,27 @@ Riemann–Siegel θ、Borwein 法の ζ(½+it)、Jones 多項式、複素数演�
   U = GMm/r, E_ag = U·L, E⊥ = mc² − ½mv², 上昇シミュレーション (10 s で 607.6 m, 110.46 m/s)
 - 書き出し: **図面 SVG / PNG / DXF**、STL / OBJ / DXF 3D、プロジェクト JSON の保存・読込
 
-## 4. 方程式レジストリ
+## 4. BadaClaude — [`bada/apps/badaclaude.bada`](bada/apps/badaclaude.bada)
+
+Claude / ChatGPT が「質問を受けて答える」までの仕組みを、**正規の Bada** (`<-` `-<` `>-` `->` `<->` `Omega::DATABASE`) で書いた対話エンジンです。
+知識は論文 10 本 ([`data/badaclaude/sources/`](data/badaclaude/sources/) + 設計図書) の抜粋 256 件と方程式 2111 本。
+
+| 段 | Bada での処理 |
+|:--|:--|
+| ① 字句化 | `kb_tokens(q)` (文字種の連なり + 漢字 2-gram) → 不要語の除去 → 同義語の展開 (`query_tokens`) |
+| ② 意図推定 | Unknown-Prior Engine: 手掛かり z → a = softmax(z) → ψ_i = √a_i·e^{iθ_i} (`q_encode`) → \|ψ\|² (`q_probs`) |
+| ③ 検索 | BM25。ホストは転置索引 (`kb_postings`) を渡すだけで、**採点・順位付けは Bada** (`search`) |
+| ④ 道具 | アプリ作成 (`codegen`) / 計算 (`bada_expr`) / 量子回路 (H + CNOT, Born 則測定) / 送った ```` ```bada ```` コードの実行 / 設計値 / 投稿論文 |
+| ⑤ 回答 | 出典 (論文名・ページ・方程式 ID) つきの回答、Transformer + 量子測定の生成 (任意)、**Claude API** (任意) |
+| ⑥ 記録 | `Omega::DATABASE[ledger]` に boot / turn / build / claude を追記 (「台帳」で表示) |
+
+- 例: 「ゼータ関数とベータ関数の関係は?」→「もっと」/「ACAFE.17」/「計算 rs_z(14.134725)」/「ベル状態を見せて」/「リーマン予想は証明されたの?」/「直径40mで舷窓12個のUFOの設計図アプリを作って」/「台帳」
+- **📄 論文→アプリ** タブ: ほかの 3 アプリと同じく、PDF を投稿して作ったアプリ・Windows 10 / 11 EXE・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存
+- **Claude API モード (任意)**: 右の設定で「Claude API」を選び API キーを入れると、Bada が検索・計算した結果を `<bada_context>` としてシステムプロンプトに入れ、Claude に送ってストリーミング表示します (`system_prompt` も Bada)。モデル `claude-opus-5-5` (既定) / `claude-sonnet-5-5` / `claude-haiku-4-5`、effort low / medium / high。Opus 5.5 / Sonnet 5.5 では `fallbacks: "default"` (ベータ `server-side-fallback-2026-07-01`) を付け、安全分類器が拒否したときは API 側の代替モデルが答えます。キーは「端末に保存」を選んだときだけ端末内に保存し、通信先は `https://api.anthropic.com` だけです (この接続を許可しているのは BadaClaude だけ)。
+- 正直な範囲: **Anthropic の Claude や OpenAI の ChatGPT の学習済みの重みは含みません**。ローカルの知識は同梱の論文と方程式だけです。論文集自身が「未解決」「予想」と標識した主張 (リーマン予想・P ≠ NP) を解決済みとしては扱いません。
+- 知識ベースの再生成: `python3 contact_transporter/tools/build_kb.py` (pip install pypdf cffi) → `data/badaclaude/kb.json`
+
+## 5. 方程式レジストリ
 
 全 2111 本 (数値評価 632 本: calc 220 / 成立 231 / 不成立 181、記号式 1479 本) を検索・タグ・状態で絞り込み表示。
 [`data/equations.json`](data/equations.json) は [`tools/extract_equations.py`](tools/extract_equations.py) が
@@ -151,9 +172,9 @@ PDF のテキスト ([`data/contact_blueprint.txt`](data/contact_blueprint.txt))
 ## 開発
 
 ```sh
-node contact_transporter/tools/build.js all  # → dist/{contactgpt,transporter,ufo,studio}/www/index.html (ブラウザで開けば動く)
+node contact_transporter/tools/build.js all  # → dist/{contactgpt,transporter,ufo,badaclaude,studio}/www/index.html (ブラウザで開けば動く)
 node contact_transporter/tools/package-app.js ufo   # → dist/ufo/electron (Windows/Linux) + dist/ufo/cordova (Android)
-node contact_transporter/tools/test.js       # Bada アプリ 3 本・設計図書の数値再現・GPT 勾配・CAD・図面のテスト
+node contact_transporter/tools/test.js       # Bada アプリ 4 本・設計図書の数値再現・GPT 勾配・CAD・図面のテスト
 python3 contact_transporter/tools/conformance.py   # Bada の JS 移植 ↔ Python 本家 (全 .bada で出力一致)
 node contact_transporter/tools/badahost.js apps/ufo.bada   # Bada アプリをヘッドレス実行
 node contact_transporter/tools/train.js 2400 # ContactGPT をゼロから学習 (--resume で追加学習)
@@ -163,13 +184,14 @@ cd contact_transporter/dist/ufo/electron && npm install && npm start   # デス�
 ```
 contact_transporter/
   contact_blueprint.pdf        元の設計図書
-  bada/  apps/ (contactgpt · transporter · ufo)  lib/ (complex · zeta · jones · quantum · blueprint · ufo_flight · nlp · codegen)  examples/
-  data/  equations.json  contactgpt_weights.json  contact_blueprint.txt
+  bada/  apps/ (contactgpt · transporter · ufo · badaclaude)  lib/ (complex · zeta · jones · quantum · blueprint · ufo_flight · nlp · codegen
+         · paper · answers · gen · paper_chat)  examples/
+  data/  equations.json  contactgpt_weights.json  contact_blueprint.txt  badaclaude/ (kb.json · sources/ 論文 9 本)
   src/   bada.js badalib.js  paper.js exporters.js  physics.js gpt.js chat.js cad.js drafting.js viewer.js app.js index.html style.css
-  tools/ build.js package-app.js test.js conformance.py badahost.js train.js gradcheck.js extract_equations.py
+  tools/ build.js package-app.js test.js conformance.py badahost.js train.js gradcheck.js extract_equations.py build_kb.py
          paper2app.js paperinfo.js verify-apk.js   (論文 PDF → アプリ)
   papers/  論文 PDF の投稿先 (Actions が PaperApps を作る)   app/signing/  論文アプリ APK のデバッグ署名鍵
-  apps.json  3 アプリ + 統合版の定義 (名前・アプリ ID・含める画面)
+  apps.json  4 アプリ + 統合版の定義 (名前・アプリ ID・含める画面)
   app/   electron/ (Windows / Linux)   cordova/config.xml (Android)
 ```
 

@@ -33,6 +33,11 @@ function build(key) {
   put("GPT_SRC", safe(read(path.join(SRC, "gpt.js"))));
   put("EQUATIONS", safe(read(path.join(DATA, "equations.json")).replace(/\n/g, "")));
   put("WEIGHTS", A.weights ? safe(weights) : "null");
+  // BadaClaude: 論文 10 本のチャンク (方程式は EQUATIONS と共通なので除く)
+  if (A.kb) {
+    const kb = JSON.parse(read(path.join(DATA, "badaclaude", "kb.json")));
+    put("KB", safe(JSON.stringify({ sources: kb.sources, chunks: kb.chunks })));
+  } else put("KB", "null");
   // Bada ソース (apps / lib / examples) を仮想ファイル表として埋め込む
   const badaFiles = {};
   (function walk(d) {
@@ -45,6 +50,8 @@ function build(key) {
   put("BADA", safe(JSON.stringify(badaFiles)));
   put("BUILD", JSON.stringify({ version: pkg.version, date: new Date().toISOString().slice(0, 10) }));
   put("APP", JSON.stringify(Object.assign({ key }, A)));
+  // Claude API モード (BadaClaude) だけ api.anthropic.com への接続を許可する
+  if (A.claude) html = html.replace("default-src 'self' data: blob: gap: file:;", "default-src 'self' data: blob: gap: file:; connect-src 'self' data: blob: file: https://api.anthropic.com;");
   html = html.split("@@APP_TITLE@@").join(esc(A.title)).split("@@APP_SUBTITLE@@").join(esc(A.subtitle));
   // 論文 PDF → アプリ: pdf.js (+ 日本語 CMap)、書き出し用のランナー HTML / APK ひな形 / 署名鍵
   if (A.paper) {

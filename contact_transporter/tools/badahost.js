@@ -57,7 +57,12 @@ function makeApp(file, opts) {
   const wPath = path.join(ROOT, "data", "contactgpt_weights.json");
   if (opts.model !== false && fs.existsSync(wPath)) model = ContactGPT.GPT.fromJSON(JSON.parse(fs.readFileSync(wPath, "utf8")));
   const printed = [];
-  const env = { files, ui, chat, equations: eqs, index: new Index(eqs), scene: new L.Scene(), model: () => model,
+  const kbPath = path.join(ROOT, "data", "badaclaude", "kb.json");
+  const kb = fs.existsSync(kbPath) ? JSON.parse(fs.readFileSync(kbPath, "utf8")) : null;
+  // Claude API のスタブ (テストでは送信しない): opts.claude = { ready, ask }
+  const claude = Object.assign({ asked: [], ready: () => false, model: () => "claude-opus-5-5" }, opts.claude || {});
+  if (!claude.ask) claude.ask = (system, q) => { claude.asked.push({ system, q }); return null; };
+  const env = { files, ui, chat, equations: eqs, index: new Index(eqs), kb, claude, scene: new L.Scene(), model: () => model,
     onPrint: (l) => printed.push(l), onError: (e) => { throw e; } };
   const app = new L.BadaApp(env);
   app.start(files[file], file);
