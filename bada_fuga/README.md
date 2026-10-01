@@ -1722,6 +1722,32 @@ python3 build_sampler.py bank69 20260923_080918.mp3 20260929_*.mp3 20260925_*.mp
 python3 compose_tablet69.py bank69/bank.json src score_tablet69.json && python3 synth.py score_tablet69.json tablet69.wav && python3 video.py score_tablet69.json tablet69.wav tablet69.mp4
 ```
 
+## 🎹🕯 Requiem BADA — Tablet Sessions LXX · Requiem 08:06 (9/23 08:06 の録音を主題曲に、16 倍に伸ばし、LXIX をバックに, 変ロ短調, ♩=60, 約 6 分 43 秒)
+
+- **主題曲**: 9/23 08:06 の録音 (変ロ短調、ピアノの実音)。最上声から主題 — 変ロ短調で **シ♭・ソ♭・ファ・ミ♭・ド・シ♭** と下りる嘆きの線 (8 拍)。
+  和声は 1 拍ごとに i・iv・V7・iv・V7・V7・V7・i (`H8`)。録音の実音は Introitus・長い音の中・Lacrimosa で
+- **16 倍の伸び**: I・IV 楽章とも主題の 4 分音符を 16 倍 (4 小節) に — シ♭ 4・ソ♭ 4・ファ 4・ミ♭ 4・ド 12・シ♭ 4 小節。テノールが 4 分音符ごとに打ち直し、深い鐘は 2 全音符ごと
+- **バック (LXIX)**: LXIX はホ短調で三全音離れているので、その音を採譜して (basic-pitch) **6 半音下げ**、速さは変えずにピアノの実音で弾き直す。
+  LXIX の属音シの保続が、この曲の属音ファの保続にそのまま重なる。主題曲の実音より約 3 dB 小さく (`compose_tablet67.py level` でそろえてから)
+- **フーガを醸す**: 主音の上で主題 → 5 度上の答え、長いドの保続の上でストレッタ、最後の主音の上で 1 倍と 2 倍 (拡大) の主題を同時に。II 楽章は 08:06 の主題の 4 声フーガ
+
+| ×16 の長い音 | I. Requiem | IV. Finale |
+|:--|:--|:--|
+| シ♭ (4 小節) | 主題 → 答え | 主題 → 答え |
+| ソ♭ | 主題曲の実音 | 主題曲の実音 |
+| ファ (属音) | LXIX ×16 の属音の保続 | LXIX Finale の属音の保続 |
+| ミ♭ | 主題曲の実音 | 主題曲の実音 |
+| ド (12 小節) | LXIX のストレッタのあたり → 主題のストレッタ | LXIX の II. Fuga → 主題のストレッタ |
+| シ♭ | 1 倍 + 2 倍の主題 | 1 倍 + 2 倍の主題 (最後) |
+
+```bash
+python3 build_sampler.py bank70 20260923_080607.mp3 20260923_080918.mp3 20260929_*.mp3 20260925_*.mp3
+# src/ に 20260923_080607.wav と tablet69.wav (LXIX)
+python3 compose_tablet70.py bank70/bank.json src score_tablet70.json
+python3 compose_tablet67.py level score_tablet70.json back.wav     # LXIX を弾き直した所だけを鳴らした wav で大きさをそろえる
+python3 synth.py score_tablet70.json tablet70.wav && python3 video.py score_tablet70.json tablet70.wav tablet70.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
