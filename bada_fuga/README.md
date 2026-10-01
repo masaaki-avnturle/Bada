@@ -1853,6 +1853,28 @@ LXXIV (21 分 36 秒) をまるごと 16 倍にすると 5 時間 45 分にな�
 python3 compose_tablet75.py bank74/bank.json score_tablet74.json score_tablet75.json && python3 synth.py score_tablet75.json tablet75.wav && python3 video.py score_tablet75.json tablet75.wav tablet75.mp4
 ```
 
+## 🎹🌅 Requiem BADA — Tablet Sessions LXXVI · Requiem della vita (人生の縮図 — 断片ではなく、調和と共鳴でつながる 1 つのレクイエム, 約 6 分 40 秒)
+
+録音の抜粋を切り貼りせず、主題曲 (5 本の録音) から作った主題だけで **人の一生** を途切れずにたどる。すべて楽譜から、録音から切り出したピアノの 1 音で。
+
+| 区間 | 調・速さ | 主題 (録音) | 書き方 |
+|:--|:--|:--|:--|
+| 1. Nascita 誕生 | ニ長調 ♩=56 | 12:46 の上る線 (長調の形) | 光のような分散和音から生まれ、主 → 下属 → 属 → オクターヴ上と育つ。最後はテノールが 2 倍で |
+| 2. Gioventù 青春 | ト長調 ♩=72 | 08:53 | 流れる 3 連の分散和音の上で歌い、後半はアルトの主題にソプラノがその拍の和音の音で寄り添う (3〜6 度上) |
+| 3. Lotta 闘い | ロ短調 ♩=72 | 08:49 | 4 声フーガ (提示・下属調・ストレッタ・保続低音) — 一生でいちばん強い所 |
+| 4. Amore e perdita 愛と喪失 | ト短調 ♩=60 | 08:06 の下りる嘆き | コラール。最後はその主題を 2 倍にしてバスで下りる (ラメント・バス) |
+| 5. Vecchiaia 老い | ホ短調 ♩=52 | 08:09 | 主題を 8 倍に伸ばして打ち直す (時間がゆっくりに)。その上に誕生と青春の主題が思い出のように戻る |
+| 6. Morte 死 | ニ短調 ♩=48 | 12:46 の下りる線 | 2 倍の長さで。主音レの鐘が小節ごとに鳴り、消えていく |
+| 7. Lux aeterna 永遠の光 | ニ長調 ♩=52 | 12:46 の上る線 | 誕生の主題が 2 倍で戻り、1 倍と 2 倍が重なって、IV → V → I の Amen — 一生がめぐる |
+
+- **調和と共鳴**: 長調の区間は和声をすべて書く — 主題の音をいちばん多く含む和音を 1 拍ごとに選び (`harm_major`)、ほかの声部は前の音にいちばん近い和音の音へなめらかに (`chorale`)。
+  3 連の分散和音が長く響き合い、響き (残響 6 秒・ピアノの減衰) を長めに。短調の区間はフーガとコラール
+- 音量の山も一生のように: 誕生は小さく、青春から闘いで大きく、老い・死で静まり、永遠の光でまた明るく
+
+```bash
+python3 compose_tablet76.py bank74/bank.json score_tablet76.json && python3 synth.py score_tablet76.json tablet76.wav && python3 video.py score_tablet76.json tablet76.wav tablet76.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
