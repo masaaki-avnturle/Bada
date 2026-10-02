@@ -2045,6 +2045,25 @@ python3 compose_tablet85.py bank85/bank.json score_tablet85.json && python3 synt
 python3 compose_tablet86.py bank85/bank.json score_tablet86.json && python3 synth.py score_tablet86.json tablet86.wav && python3 video.py score_tablet86.json tablet86.wav tablet86.mp4
 ```
 
+## 🎹🌸 Requiem BADA — Tablet Sessions LXXXVII · Fiore dolce XVI (12:50:53・08:53・LXXXVI を主体に、バックで LXXX・LXXXI・LXXIV のモチーフを 16 倍に, ホ短調, 5 分 10 秒)
+
+- **主体 (前)**:
+  - **Intro** (18 小節, ♩=60): 9/25 12:50:53 (ロ短調のピアノ、4 分 24 秒 — 新しい録音、bank87) と 9/24 08:53 から、LXXXV と同じ方法でいちばん歌う 16 拍の旋律を採り、
+    ホ短調で交互に → 重ねて (08:53 がオクターヴ下) → カノン (12:50:53 が 1 小節遅れ)。伴奏は LXXXVI と同じ循環和音の型。12:50:53 の旋律はその録音から切り出した音で
+  - **本体** (62 小節): LXXXVI (Fiore dolce, ピアノだけ) をそのまま 72 拍あとに置く
+- **バック (後ろ、16 倍)**: 3 つのモチーフ (8 拍) をそれぞれ 128 拍 (32 小節) に伸ばし、2 拍ごとに息をするように打ち直す (頭を強く)
+  - LXXX — 08:53 の主題 (ミ・ファ#・シ・ミ・ミ): 低音 ミ 2〜ミ 3 + オクターヴ上を薄く、小節 0〜32
+  - LXXXI — 9/28 の代表の節をホ短調に (レ・ミ・ミ・シ・ド・レ#・ミ): テノール、小節 26〜58
+  - LXXIV — 主題 I (08:09: ミ・ファ#・ソ・ソ#・ラ): 低音、小節 44〜76
+  - 伸ばした音は 4 小節の循環和音をまたぐので、どの音もどこかの和音と半音でぶつかる。そこで (1) Intro の和音は伸ばした主題にも合わせて選び、
+    (2) 入りの小節は数小節の範囲でぶつかる長さがいちばん短い位置に、(3) 半音でぶつかる和音の間は打ち直さず余韻だけにする (ぶつかる拍 48 → 16 など)
+- バックは前より約 6 dB 下 (ステムで測って 0.3 → 0.42)。音源はピアノだけの録音 (08:09・08:53・08:49・13:04・12:50:53) の 1 音、声なし。音域ド 2〜ミ 5
+
+```bash
+python3 build_sampler.py bank87 20260925_125053.mp3
+python3 compose_tablet87.py bank85/bank.json bank87/bank.json score_tablet86.json score_tablet87.json && python3 synth.py score_tablet87.json tablet87.wav && python3 video.py score_tablet87.json tablet87.wav tablet87.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
