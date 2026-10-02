@@ -2228,6 +2228,28 @@ python3 compose_tablet96.py score_tablet94.json bp_cache/piano_solo_8x_2130_2386
 python3 render_long.py score_tablet96.json out96 192 3      # out96/tablet96.mp4 (全体)、out96/tablet96.m4a (音)、out96/parts/tablet96_NN.mp4 (部)
 ```
 
+## 🎹🕯🎉 Requiem BADA — Tablet Sessions XCVII · Praeludium, Fuga e Requiem XVI — Natalitia (9/24 08:53 を 16 倍に — 規律的に、洗脳的に、フーガでありレクイエムであり、前奏曲と間奏曲をはさみ、終焉が生誕祭へ, ロ短調 → ロ長調, ♩=60, 56 分 32 秒)
+
+- **骨組み (×16、規律・洗脳)**: 9/24 08:53 の録音 (3 分 22 秒、ロ短調; XCI の主題歌) の採譜 (bank85) を 16 倍に伸ばし、2 拍ごと (低い音は 4 拍ごと) に息をするように打ち直す (♩=60、止まらない)。
+  その下で、**録音そのものを速さだけ 16 倍に引き伸ばした音** (librosa の位相ボコーダ、高さは変えない、`rec0853_x16.wav`) が 54 分の霧のように流れる。和音は採譜のまま 16 倍に。録音の頭の無音 2.4 秒は飛ばす
+- **形式** (848 小節):
+
+| 所 | 小節 | 中身 |
+|:--|:--|:--|
+| Praeludium | 0〜48 | 骨組みと霧だけ — 弔鐘ひとつから |
+| ×5 [Fuga → Interludium → Requiem] | 48〜688 | **Fuga** (32): 主題 ミ・ファ#・シ・ミ・ミ の 4 声フーガ — 提示 → エピソード → 反行 → ストレッタ → ファ# の保続 → 低音の拡大 (回を重ねるごとに強く、骨組みは下で小さく) ／ **Interludium** (32): 録音を 4 倍に引き伸ばした音が同じ所を 4 倍の速さで通る (メンスーラ・カノン) ／ **Requiem** (64): 弔鐘 → 採譜の和音のコラール (4 拍ごと) と主題の 4 倍の拡大がテノールで 4 回 |
+| Finis — 終焉 | 688〜760 | 骨組みが薄れ、霧だけが残り、低い シ の保続へ |
+| Natalitia — 生誕祭 | 760〜840 | **ロ長調へ**: 主題のストレッタが 4 声で 2 小節ごとに上へ上へ (24 回) → 拡大 ×2 の頂点、1 拍ごとの鼓動 (ロ長調の和音)、祝鐘、高い ミ・ファ#・シ・ミ・ミ のマントラ。生成された声部の短 3 度・短 6 度・短 7 度は長調に上げる |
+| Coda | 840〜848 | ロ長調の和音と祝鐘が残って消える |
+
+- 音はすべて 08:53 の録音から切り出したピアノの 1 音 (bank85)、録音そのものを引き伸ばした音、鐘。声なし。生誕祭の頂点は `fixed_peak` 1.0 でわずかに飽和させて盛り上げる
+- 長いので `render_long.py` で 192 小節ずつ合成・描画してつなぎ、送れる大きさの 3 部に分ける
+
+```bash
+ffmpeg -i 20260924_085314.mp3 -ac 1 -ar 44100 rec0853.wav   # 録音 → librosa.effects.time_stretch で rec0853_x16.wav・rec0853_x4.wav
+python3 compose_tablet97.py bank85/bank.json rec0853_x16.wav rec0853_x4.wav score_tablet97.json && python3 render_long.py score_tablet97.json out97 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash
