@@ -2348,6 +2348,23 @@ python3 compose_tablet103.py bank85p/bank.json rec0853.wav score_tablet103.json 
 python3 compose_tablet104.py bank85p/bank.json score_tablet104.json && python3 synth.py score_tablet104.json tablet104.wav && python3 video.py score_tablet104.json tablet104.wav tablet104.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions CV · Fiore e Fuga 9/23 per augmentationem XVI (CIV を 16 倍に伸ばして、同じようにフーガを醸す曲に, ♩=60, 1 時間 21 分 4 秒)
+
+CIV (76 小節) をまるごと 16 倍に — XCVI と同じく、**すべての 3 小節** (26 の窓) を順に 3 つの速さで同時に鳴らす (`compose_tablet105.py` は楽譜を受け取る汎用の 16 倍化):
+
+| 層 | 速さ | 鳴らし方 |
+|:--|:--|:--|
+| 骨組み | ×16 | 3 小節が 48 小節に。4 声も、旋律・左手・層のピアノも、2 拍ごと (低い音は 4 拍ごと) に息をするように打ち直す |
+| 中の層 | ×4 | 48 小節のあいだに 4 回 |
+| フーガ | ×1 | CIV の速さのまま。3 小節鳴って 3 小節休む、を 8 回 — 遠くで |
+
+- 鐘は ×16 の位置にひとつずつ。和音・区切りも 16 倍に。76 × 16 = 1216 小節。全体の大きさは `fixed_peak` 0.35 で正規化 (CIV の層は小さい音が多いので)
+- 音源は bank85p (ピアノだけ)。声なし。`render_long.py` で 192 小節ずつ合成・描画してつなぎ、4 部に分ける
+
+```bash
+python3 compose_tablet105.py score_tablet104.json score_tablet105.json && python3 render_long.py score_tablet105.json out105 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash
