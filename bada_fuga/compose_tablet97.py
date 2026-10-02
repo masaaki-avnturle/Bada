@@ -224,7 +224,7 @@ def post(P, events, ex):
 
 META = {
     'style': 'recsampler', 'bank': BANK, 'rec_order': [R], 'piano_decay': 2.0, 'reverb': [5.5, 2.2, 0.44], 'fps': 15, 'fixed_peak': 1.0,
-    'title': 'Requiem BADA — XCVII · Praeludium, Fuga e Requiem XVI — Natalitia',
+    'title': 'Requiem BADA — XCVII · Natalitia XVI',
     'subtitle': '9/24 08:53 を 16 倍に — 規律的に、洗脳的に。フーガでありレクイエムであり、前奏曲と間奏曲をはさみ、終焉が生誕祭 (ロ長調) へ (♩=60, 56 分 32 秒)',
     'legend': ['PF', 'X'], 'vname': {'PF': '骨組み ×16 / 層', 'X': '鐘'},
     'footer': ['Praeludium → ×5 [Fuga (主題 08:53 の 4 声フーガ) → Interludium (4 倍の録音) → Requiem (コラール、主題 ×4、弔鐘)] → Finis (終焉) → Natalitia (生誕祭、ロ長調) → Coda',
