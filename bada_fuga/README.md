@@ -2250,6 +2250,25 @@ ffmpeg -i 20260924_085314.mp3 -ac 1 -ar 44100 rec0853.wav   # 録音 → librosa
 python3 compose_tablet97.py bank85/bank.json rec0853_x16.wav rec0853_x4.wav score_tablet97.json && python3 render_long.py score_tablet97.json out97 192 3
 ```
 
+## 🎹🔔 Requiem BADA — Tablet Sessions XCVIII · Tre in uno (XCVII の 3 つの部を同時に — 上手に共鳴させて、3 分以内に, ロ短調 → ロ長調, ♩=60, 2 分 55 秒)
+
+XCVII (56 分、3 部) を 3 つの層に凝縮して同時に鳴らす (42 小節 = 2 分 48 秒 + 残響 7 秒):
+
+| 層 | 中身 |
+|:--|:--|
+| 第 1 部の層 (骨組み) | 08:53 の採譜を実速に戻して 160 秒に (録音の 199.8 秒 × 0.8) ピアノで。下で録音そのものを同じだけ速めた音 (高さは変えず、`rec0853_fast.wav`) が霧のように |
+| 第 2 部の層 (Fuga) | 4 小節目から主題 ミ・ファ#・シ・ミ・ミ の 4 声フーガ: 提示 → 反行 → ストレッタ → ファ# の保続 → 拡大 |
+| 第 3 部の層 (Natalitia) | 30 小節目から 1 拍ごとの鼓動、祝鐘、高いマントラ。36 小節目から 3 つの層ともロ長調 (短 3 度・短 6 度・短 7 度を上げる)、ロ長調の和音と鐘で閉じる |
+
+- **共鳴**: 3 つの層の和音は録音の採譜の進行 (×0.8) を土台にそろえる。フーガの和音は `harm_fit` で「主題の音を最も多く含み、かつ録音の和音に近いもの」を選ぶ (録音の和音と同じなら加点)。
+  鼓動とマントラも、その時の和音の音だけで
+- 音はすべて 08:53 のピアノの 1 音、録音、鐘。声なし
+
+```bash
+# rec0853_fast.wav: 録音 (頭の 2.4 秒を飛ばして) を librosa.effects.time_stretch で 160 秒に
+python3 compose_tablet98.py bank85/bank.json rec0853_fast.wav score_tablet98.json && python3 synth.py score_tablet98.json tablet98.wav && python3 video.py score_tablet98.json tablet98.wav tablet98.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
