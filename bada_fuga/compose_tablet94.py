@@ -90,7 +90,7 @@ if __name__ == '__main__':
     d['meta'] = dict(d['meta'], pause_bar=d['meta']['pause_bar'] * K,
                      title='Requiem BADA — XCIV · Fuga per augmentationem (Klavier)',
                      subtitle='XCIII の全音符を 2 倍に伸ばして — 伸ばした Contrapunctus XIV の上に、主題を元の速さで重ねてフーガを醸す (ニ短調, ♩=60)',
-                     legend=['PF'], vname={'PF': '×1 の主題 / 管 → ピアノ'},
+                     legend=['PF'], vname={'PF': '×1 の主題'},
                      footer=['Prologo (実音だけ) → Sectio I ×2 (拡大の上に主題 II ×1、保続の上に主題 I ×1 のストレッタ) → Sectio II ×2 (B-A-C-H の先ぶれ) → Sectio III ×2 (拡大カノン) → 途切れる → Epilogo (実音 + 主題 I ×1)',
                              'すべて 9/24 08:53 の録音から切り出したピアノの 1 音と、piano_solo_8x の実音。4 拍より長い音は 2 拍ごとに打ち直す。声なし。'])
     json.dump(d, open(OUT, 'w'), ensure_ascii=False)
