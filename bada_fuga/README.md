@@ -2408,6 +2408,22 @@ Fuga senza voce (70 小節) をまるごと 16 倍に (`compose_tablet105.py`、
 python3 compose_tablet105.py score_voxfuga.json score_voxfuga16.json bank6/bank.json && python3 render_long.py score_voxfuga16.json out_voxfuga16 192 3
 ```
 
+## 🎹🌸 Requiem BADA — Tablet Sessions CVIII · Fiore dolce senza sospiri (LXXXV から喘ぎ声を消して, ホ短調, 3 分 58 秒)
+
+- **喘ぎ声の正体**: 音源の 1 音 (bank85 / bank85p) のうち 83 音中 27 音が、立ち上がりが遅く (山まで 0.2〜0.8 秒) 減衰せずにふくらむ音だった
+  (ペダルの響き・うなり・声の混じった音を「1 音」として切り出したもの)。`synth.py` はこれを持続部のループで伸ばすので、息を吸うように聞こえる
+- **直したこと**:
+  - `clean_bank.py`: 各 1 音の立ち上がり (山までの時間) と減衰 (0.1〜0.3 秒 → 0.6〜1.0 秒) を測り、立ち上がり 0.12 秒以内でふくらまない音だけを残す (bank85q: 56 音)。
+    採譜 (旋律を採る表) は `--recordings=` で bank85 から
+  - `piano_decay` 2.2 秒: 長い音もピアノのように自然に減衰させる (ループで伸ばした持続音を残さない)
+  - 録音そのもの (LXXXV の Intro の 11:21 の実音) は使わない (LXXXVI と同じ)。曲 (旋律・和音・形式) は LXXXV・LXXXVI と同じ (`compose_tablet86.build`)
+- 確かめ: 各音がどの 1 音で鳴るかを synth と同じ規則で数えると、LXXXVI は 641 音中 348 音がふくらむ音で鳴っていた。CVIII は 0
+
+```bash
+python3 clean_bank.py bank85p/bank.json bank85q.json --recordings=bank85/bank.json
+python3 compose_tablet108.py bank85q.json score_tablet108.json && python3 synth.py score_tablet108.json tablet108.wav && python3 video.py score_tablet108.json tablet108.wav tablet108.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
