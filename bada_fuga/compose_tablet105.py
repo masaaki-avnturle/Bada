@@ -8,12 +8,14 @@ Requiem BADA — Tablet Sessions CV · Fiore e Fuga 9/23 per augmentationem XVI 
     ×1   フーガ: CIV の速さのまま。3 小節鳴って 3 小節休む、を 8 回 — 遠くで
   鐘は ×16 の位置にひとつずつ。和音・区切りも 16 倍に。76 × 16 = 1216 小節 = 1 時間 21 分 4 秒 (♩=60)
   音源は bank85p (ピアノだけ)。声なし
-  使い方: python compose_tablet105.py <score_tablet104.json> [score_tablet105.json] → python render_long.py score_tablet105.json out105 192 3
+  使い方: python compose_tablet105.py <score_tablet104.json> [score_tablet105.json] [bank85p.json (録音を採譜に置き換えるとき)] → python render_long.py score_tablet105.json out105 192 3
 """
 import sys, json, math
 from collections import Counter
 
 SRC = sys.argv[1]; OUT = sys.argv[2] if len(sys.argv) > 2 else 'score_tablet105.json'
+BANKP = sys.argv[3] if len(sys.argv) > 3 else None                                # 録音 (REC) を採譜に置き換えるための bank (CVI → CVII)
+REC_G = 1.6                                                                       # 採譜の音の大きさ (録音の代わり、表として)
 K = 16; WIN = 12
 
 def source_events(d):
@@ -21,6 +23,18 @@ def source_events(d):
     for n in d['notes']: ev.append((n['t'], n['d'], n['m'], float(n.get('dyn', 1.0)), n['label'], n['v'], n.get('src')))
     for e in d['extras']:
         if e['v'] == 'PF': ev.append((e['t'], e['d'], e['m'], float(e['gain']) / 0.5, e.get('label'), 'PF', e.get('rid')))
+    if BANKP:                                                                     # 録音の実音 → その採譜をピアノで (16 倍には伸ばせないので)
+        bank = json.load(open(BANKP))['recordings']
+        for e in d['extras']:
+            if e['v'] != 'REC': continue
+            rid = str(e.get('rid', '')).replace('.wav', '')
+            if rid not in bank: continue
+            first = True
+            for sg in bank[rid]['segs']:
+                t = e['t'] + (sg['t'] - e.get('off', 0.0))
+                if t < e['t'] or t >= e['t'] + e['d']: continue
+                for m in sg['m']:
+                    ev.append((t, min(max(0.5, sg['d']), e['t'] + e['d'] - t), m, REC_G * (1.2 if m < 48 else 1.0), ('録音 %s の採譜 (実音の代わり)' % rid[9:11] + ':' + rid[11:13]) if first else None, 'PF', rid)); first = False
     return sorted(ev, key=lambda x: x[0])
 
 def build(d):
@@ -68,12 +82,18 @@ def build(d):
 
 if __name__ == '__main__':
     d = json.load(open(SRC)); out = build(d)
-    out['meta'] = dict(d['meta'], fps=15, fixed_peak=0.35,
-                       title='Requiem BADA — CV · Fiore e Fuga 9/23 XVI',
-                       subtitle='CIV をまるごと 16 倍に (1 時間 21 分) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す (変ロ短調 → ホ短調 → ホ長調, ♩=60)',
-                       legend=['PF', 'X'], vname={'PF': '×16 / ×4 / ×1 の層', 'X': '鐘'},
-                       footer=['CIV の 76 小節 × 16 = 1216 小節: I. Fiore dolce 08:06 ×16 → II. Requiem 08:06 ×16 → III. Fuga 08:09 ×16 → IV. Fusione ×16 → V. Amen ×16',
-                               '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。音源は bank85p (ピアノだけ) と鐘。声なし。'])
+    h, rem = divmod(out['duration'], 3600); dur_s = '%d 時間 %d 分' % (h, rem // 60)
+    if 'CVI' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CVII · Canzone 9/23 tre in uno XVI',
+                    subtitle='CVI をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。録音は採譜のピアノに (変ロ短調 → ホ短調 → ホ長調, ♩=60)' % dur_s,
+                    footer=['CVI の 110 小節 × 16 = 1760 小節: 表 1 08:06 (採譜) ×16 → 表 2 08:09 (採譜) ×16 → Fusione ×16 → Amen ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。録音の実音は採譜のピアノに置き換えた (声なし)。音源は bank85p。'])
+    else:
+        meta = dict(title='Requiem BADA — CV · Fiore e Fuga 9/23 XVI',
+                    subtitle='CIV をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す (変ロ短調 → ホ短調 → ホ長調, ♩=60)' % dur_s,
+                    footer=['CIV の 76 小節 × 16 = 1216 小節: I. Fiore dolce 08:06 ×16 → II. Requiem 08:06 ×16 → III. Fuga 08:09 ×16 → IV. Fusione ×16 → V. Amen ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。音源は bank85p (ピアノだけ) と鐘。声なし。'])
+    out['meta'] = dict(d['meta'], fps=15, fixed_peak=(0.8 if BANKP else 0.35), legend=['PF', 'X'], vname={'PF': '×16 / ×4 / ×1 の層', 'X': '鐘'}, **meta)
     json.dump(out, open(OUT, 'w'), ensure_ascii=False)
     h, rem = divmod(out['duration'], 3600)
     print('bars', out['nbars'], 'duration %d:%02d:%02d' % (h, rem // 60, rem % 60), 'notes', len(out['notes']), 'extras', Counter(e.get('layer', e['v']) for e in out['extras']))

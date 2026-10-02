@@ -2377,6 +2377,16 @@ python3 compose_tablet105.py score_tablet104.json score_tablet105.json && python
 python3 compose_tablet106.py bank85p/bank.json rec0806.wav rec0809.wav score_tablet106.json && python3 synth.py score_tablet106.json tablet106.wav && python3 video.py score_tablet106.json tablet106.wav tablet106.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions CVII · Canzone 9/23 tre in uno XVI (CVI を 16 倍に伸ばして、同じようにフーガを醸す曲に, ♩=60, 1 時間 57 分 20 秒)
+
+CVI (110 小節) をまるごと 16 倍に — `compose_tablet105.py` (汎用の 16 倍化) に、**録音の実音をその採譜のピアノに置き換える** 引数 (bank85p) を足して。
+録音は 16 倍には伸ばせない (引き伸ばした音は声のように聞こえる) ので、08:06・08:09 の採譜の音を表の大きさ (`REC_G` 1.6) で ×16・×4・×1 の 3 つの速さに。
+ほかは CV と同じ (3 小節の窓ごとに ×16 の骨組み・×4 が 4 回・×1 が 8 回)。110 × 16 = 1760 小節。`fixed_peak` 0.8。音源は bank85p。声なし
+
+```bash
+python3 compose_tablet105.py score_tablet106.json score_tablet107.json bank85p/bank.json && python3 render_long.py score_tablet107.json out107 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash
