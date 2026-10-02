@@ -2080,6 +2080,25 @@ python3 compose_tablet87.py bank85/bank.json bank87/bank.json score_tablet86.jso
 python3 compose_tablet88.py score_tablet87.json score_tablet88.json && python3 synth.py score_tablet88.json tablet88.wav && python3 video.py score_tablet88.json tablet88.wav tablet88.mp4
 ```
 
+## 🎹⛪ Requiem BADA — Tablet Sessions LXXXIX · Requiem e Fuga, recto e verso (cp14_x4 を伴奏に、9/23・9/24・9/28・9/29 の録音を化学合成 — レクイエムとフーガを表と裏に, ニ短調, ♩=60, 6 分 24 秒)
+
+- **伴奏**: cp14_x4.mp4 (Contrapunctus BADA の 4 分音符を 4 倍に伸ばした 32 分、ニ短調) の音声から、ニ短調の濃い 4 つの窓 (0〜96 秒 / 720〜784 / 840〜936 / 1788〜1917 = 終わりまで) を
+  REC extra で切り出す (前後 3 秒のフェード)。表の楽章では 0.6、裏の楽章では 0.25
+- **主題 (6 つ)**: 録音の採譜の最上声から 8 拍、ニ短調に移して (CT.excerpt / make_subject) — 9/23 08:06 (ヘ短調)・08:09 (ト長調 → ホ短調として)・9/24 08:53 (ロ短調)・
+  9/28 06:42 (変イ長調 → ヘ短調として、歌 — 旋律だけをピアノで)・9/29 15:12・15:16 (変ロ短調)。bank89 = bank85 + bank82 の 9/29、音源はピアノだけの 6 本の録音の 1 音
+- **形式 — レクイエムとフーガが表と裏を入れ替える**:
+  - I. Requiem (表, 24 小節): 08:53・08:06・06:42 を 4 倍に伸ばして前で (2 拍ごとに打ち直し、オクターヴ下を薄く)。和音は伸ばした主題から (harm_from_entries)。裏: 08:09 の主題 (1 倍) が小さく 3 回
+  - II. Fuga (表, 16): 08:09 の主題の 4 声フーガ (T11.bach_fugue)。裏: 06:42 ×4 がバスで小さく、cp14_x4 も小さく
+  - III. Requiem (表, 24): 15:12・15:16・08:09 を 4 倍に。裏: 15:12 の主題が小さく
+  - IV. Fuga (表, 16): 08:53 の主題の 4 声フーガ。裏: 15:16 ×4 が低く小さく
+  - V. Stretto (12): 6 つの主題が 2 小節ずつずれて次々に (表も裏も一つに) → Amen (ニ長調, 4)
+- 音量 (ステムで測って): cp14_x4 表 約 −24 dB、伸ばした主題 (表) 約 −22 dB、フーガ 約 −18 dB、裏の主題 約 −33 dB。
+  高音はミ 5 まで (RANGE['S'] の上限 76、入りごとのオクターヴ折り返し)。音域レ 2〜ミ 5
+
+```bash
+python3 compose_tablet89.py bank89/bank.json cp14_x4.wav score_tablet89.json && python3 synth.py score_tablet89.json tablet89.wav && python3 video.py score_tablet89.json tablet89.wav tablet89.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
