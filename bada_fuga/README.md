@@ -2424,6 +2424,20 @@ python3 clean_bank.py bank85p/bank.json bank85q.json --recordings=bank85/bank.js
 python3 compose_tablet108.py bank85q.json score_tablet108.json && python3 synth.py score_tablet108.json tablet108.wav && python3 video.py score_tablet108.json tablet108.wav tablet108.mp4
 ```
 
+## 🎹🎵🔔 Requiem BADA — Tablet Sessions CIX · Canzone tre in uno 08:09 senza sospiri (CII から喘ぎ声を消して — 提出された 9/29 の録音の 1 音で, ホ短調 → ホ長調, ♩=60, 4 分 31 秒)
+
+曲は CII と同じ (`compose_tablet102.build`; 4 つ目の引数で裏の層の音源の録音を選べるようにした)。消したもの:
+- **裏の層の 1 音**: CII では 2087 の音のうち 566 がふくらむ音 (息のように聞こえる) で鳴っていた。`clean_bank.py` で外した表 bank109 (bank85p + 9/29 15:12・15:16 の 1 音、103 音 → 68 音) で、
+  提出された 9/29 15:16 の音 (立ち上がりの速い 11 音) を優先して鳴らす (849 音がそれ、残りは 13:04・12:46 の音)。ふくらむ音で鳴る音は 0
+- **表の録音 (08:09)**: `dip_breath.py` — 1〜4 kHz が調波でなく平らなノイズになる 0.5 秒 (息のような所、7 か所・計 5 秒) を見つけ、その間だけ 1〜6 kHz を 12 dB 下げる。ほかは加工なし
+- 9/29 15:12・15:16 の録音そのものにも同じ検出をかけた (平らなノイズの 0.5 秒は 3 か所と 2 か所、ピアノの音のない所で鳴る音はなし)
+
+```bash
+python3 clean_bank.py bank_merged.json bank109.json     # bank85p + bank82 の 9/29 の 1 音
+python3 dip_breath.py rec0809.wav rec0809_clean.wav
+python3 compose_tablet109.py bank109.json rec0809_clean.wav score_tablet109.json && python3 synth.py score_tablet109.json tablet109.wav && python3 video.py score_tablet109.json tablet109.wav tablet109.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

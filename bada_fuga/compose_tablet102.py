@@ -8,13 +8,14 @@ Requiem BADA — Tablet Sessions CII · Canzone tre in uno 08:09 (XCIX / C の 3
     第 2 部の層 (Fuga)    : 主題 ソ・ファ#・ソ・シ・ミ の 4 声フーガ (提示 → 反行 → ストレッタ → 保続 → 拡大)。和音は録音のその時の和音に寄せて選ぶ (共鳴)
     第 3 部の層 (Natalitia): 録音の終わりが近づく 40 小節目から 1 拍ごとの鼓動・祝鐘・高いマントラ、録音が終わる 57 小節目からホ長調の生誕祭 (ストレッタ、拡大、頂点) → Coda
   音源は bank85p (9/28 の歌の音を除いたピアノだけ)。声なし。66 小節 = 4 分 24 秒 + 残響
-  使い方: python compose_tablet102.py <bank85p.json> <rec0809.wav (mp3 から)> [score_tablet102.json]
+  使い方: python compose_tablet102.py <bank85p.json> <rec0809.wav (mp3 から)> [score_tablet102.json] [裏の音源の録音 id]
 """
 import sys, os, json, math
 from compose import *
 import compose
 
 BANK = sys.argv[1]; RECWAV = os.path.abspath(sys.argv[2]); OUT = sys.argv[3] if len(sys.argv) > 3 else 'score_tablet102.json'
+SRC = sys.argv[4] if len(sys.argv) > 4 else '20260923_080918'                 # 裏の層のピアノの 1 音を切り出す録音 (CIX では 9/29 15:16)
 R = '20260923_080918'; REC = json.load(open(BANK))['recordings'][R]
 BPM = 60; T_REC = 8.0                                                           # 録音は 2 小節目から
 SUBJ = [(0.5, 67), (0.5, 66), (3, 67), (2, 71), (2, 76)]                       # ソ・ファ#・ソ・シ・ミ
@@ -29,7 +30,7 @@ extras = []; RH = []
 
 def add(v, beat, dbeats, m, gain, label=None, **kw):
     extras.append(dict(v=v, beat=round(beat, 4), dbeats=round(dbeats, 4), m=int(m), gain=round(gain, 4), label=label, **kw))
-def pf(beat, dbeats, m, gain, label=None, layer='rec', rel=0.5): add('PF', beat, dbeats, m, gain, label, rid=R, rel=rel, layer=layer)
+def pf(beat, dbeats, m, gain, label=None, layer='rec', rel=0.5): add('PF', beat, dbeats, m, gain, label, rid=SRC, rel=rel, layer=layer)
 
 def harm_fit(P, b0, b1, entries, cands):
     for bar in range(b0, b1):
@@ -128,7 +129,7 @@ def post(P, events, ex):
     add('X', (TOTAL - 1) * BPB, 8, 76, 0.5, None); add('X', (TOTAL - 1) * BPB + 2, 8, 64, 0.4, None)
     for v in VOICES: events[v] = [(s, d, majify(m) if s >= MAJ0 * BPB else m, lab) for s, d, m, lab in events[v]]
 
-META = {'style': 'recsampler', 'bank': BANK, 'rec_order': [R], 'piano_decay': 2.0, 'reverb': [5.0, 2.0, 0.42],
+META = {'style': 'recsampler', 'bank': BANK, 'rec_order': [SRC], 'piano_decay': 2.0, 'reverb': [5.0, 2.0, 0.42],
         'title': 'Requiem BADA — CII · Canzone tre in uno 08:09', 'subtitle': '表: 9/23 08:09 の録音そのもの ／ 裏: XCIX の 3 つの部を融合 (骨組み + フーガ + 生誕祭)、和音を録音にそろえて共鳴 (ホ短調 → ホ長調, ♩=60, 4 分 31 秒)',
         'legend': ['PF', 'X'], 'vname': {'PF': '裏の層', 'X': '鐘'},
         'footer': ['表: 録音 (実音、加工なし) が 2 小節目から 3 分 37 秒 ／ 裏: 第 1 部 = 採譜の骨組み (小さく)、第 2 部 = 主題の 4 声フーガ、第 3 部 = 鼓動・祝鐘・マントラ → 録音が終わるとホ長調の生誕祭',
