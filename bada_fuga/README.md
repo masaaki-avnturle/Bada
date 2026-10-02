@@ -2313,6 +2313,15 @@ python3 -c "import json; b=json.load(open('bank85/bank.json')); b['samples']=[s 
 python3 compose_tablet101.py bank85p/bank.json rec0853.wav score_tablet101.json && python3 synth.py score_tablet101.json tablet101.wav && python3 video.py score_tablet101.json tablet101.wav tablet101.mp4
 ```
 
+## 🎹🎵🔔 Requiem BADA — Tablet Sessions CII · Canzone tre in uno 08:09 (XCIX / C の 3 つの部を同時に融合して裏に、9/23 08:09 の録音そのものを表に, ホ短調 → ホ長調, ♩=60, 4 分 31 秒)
+
+CI と同じ作りを 08:09 で: 表 = 9/23 08:09 の録音 (3 分 37 秒) を 2 小節目から加工なしで ／ 裏 = 採譜の骨組み (小さく) + 主題 ソ・ファ#・ソ・シ・ミ の 4 声フーガ (和音は録音のその時の和音に寄せる) + 40 小節目から鼓動・祝鐘・マントラ ／
+録音が終わる 57 小節目からホ長調の生誕祭 → Coda。音源は bank85p (ピアノだけ)。声なし。66 小節
+
+```bash
+python3 compose_tablet102.py bank85p/bank.json rec0809.wav score_tablet102.json && python3 synth.py score_tablet102.json tablet102.wav && python3 video.py score_tablet102.json tablet102.wav tablet102.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
