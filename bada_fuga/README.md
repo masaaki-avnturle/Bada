@@ -2322,6 +2322,19 @@ CI と同じ作りを 08:09 で: 表 = 9/23 08:09 の録音 (3 分 37 秒) を 2
 python3 compose_tablet102.py bank85p/bank.json rec0809.wav score_tablet102.json && python3 synth.py score_tablet102.json tablet102.wav && python3 video.py score_tablet102.json tablet102.wav tablet102.mp4
 ```
 
+## 🎹🎵📜 Requiem BADA — Tablet Sessions CIII · Canzone 08:53 sopra Contrapunctus (XCVI の 3 つの層を同時に融合してバックに、9/24 08:53 の録音そのものを表に, ロ短調, ♩=60, 4 分 7 秒)
+
+- **表**: 9/24 08:53 の録音 (3 分 22 秒) を 2 小節目から、元の速さ・元の高さで、加工なし
+- **裏** (XCVI = piano_solo_8x の主題による Contrapunctus XIV の ×16・×4・×1 の層を、ロ短調 (−3) に移して録音の実速に合わせる):
+  ×16 の層 = 第 1 主題 (ソ・ド#・ソ・ファ#・シ・ファ#・ミ・レ・シ) ×4 を低く 2 拍ごとに息をするように打ち直す (8 小節ごとに 6 回) ／ ×4 の層 = 第 2 主題 ×4 と B-A-C-H ×4 (ロ短調では ソ・ファ#・ラ・ソ#) が交互に内声で小さく ／
+  ×1 の層 = 4 声のフーガ: 第 1 主題の提示 → 第 2 主題の提示 → 反行 → B-A-C-H の提示 → ストレッタ → 二重 → ファ# の保続 → 低音の拡大 (和音は録音のその時の和音に寄せて選ぶ `harm_fit`)
+- 録音が終わる 53 小節目から三重フーガ → 58 小節目の 2 拍目で楽譜が途切れる (Contrapunctus XIV のように) → 沈黙
+- 音源は bank85p (9/28 の歌の音を除いたピアノだけ)、鐘。声なし。60 小節
+
+```bash
+python3 compose_tablet103.py bank85p/bank.json rec0853.wav score_tablet103.json && python3 synth.py score_tablet103.json tablet103.wav && python3 video.py score_tablet103.json tablet103.wav tablet103.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
