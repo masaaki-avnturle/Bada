@@ -2365,6 +2365,18 @@ CIV (76 小節) をまるごと 16 倍に — XCVI と同じく、**すべての
 python3 compose_tablet105.py score_tablet104.json score_tablet105.json && python3 render_long.py score_tablet105.json out105 192 3
 ```
 
+## 🎹🎵🌀 Requiem BADA — Tablet Sessions CVI · Canzone 9/23 tre in uno (CV の 3 つの層を同時に融合して、9/23 の 2 本の録音を表に — 融合した層も表に, 変ロ短調 → ホ短調 → ホ長調, ♩=60, 7 分 27 秒)
+
+- **表 1** (0〜50): 9/23 08:06 の録音 (3 分 3 秒、実音、加工なし) を 2 小節目から ／ **表 2** (50〜106): 9/23 08:09 の録音 (3 分 37 秒) を 50 小節目から
+- 同じ高さで (表として) CV = CIV の 3 つの層を録音の実速に合わせて融合: ×16 の層 = 主題を 16 倍 (後半は ×8・×4 も) に伸ばして低く 2 拍ごとに息をする ／ ×4 の層 = 主題 ×4 がテノールで 8 小節ごと ／
+  ×1 の層 = 08:06 のフガート (提示 → 反行 → ストレッタ → 拡大)、08:09 の 4 声フーガ (提示 → 反行 → ストレッタ) → Fusione (08:06 ×2 の低音 + 08:09 のストレッタ)。和音は録音のその時の和音に寄せて選ぶ (`harm_fit`)
+- Fiore の左手 (8 分音符の分散和音、前半) と Flower の 4 度の和音 (後半) も録音の和音で。Amen (106〜110) はホ長調の和音と鐘
+- 録音にピアノの音のない所で鳴る音がないか採譜と照らして調べた (−38 dB 以上の区間なし)。音源は bank85p (ピアノだけ)。声なし
+
+```bash
+python3 compose_tablet106.py bank85p/bank.json rec0806.wav rec0809.wav score_tablet106.json && python3 synth.py score_tablet106.json tablet106.wav && python3 video.py score_tablet106.json tablet106.wav tablet106.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
