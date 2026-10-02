@@ -2398,6 +2398,16 @@ Introitus (主題がバス → テノールと 1 声ずつ) → Kyrie (4 声の�
 python3 compose_voxfuga.py bank6/bank.json vbank/bank.json score_voxfuga.json && python3 synth.py score_voxfuga.json voxfuga.wav && python3 video.py score_voxfuga.json voxfuga.wav voxfuga.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Vox · Fuga senza voce XVI (Fuga senza voce を 16 倍に伸ばして、同じようにフーガを醸す曲に, イ短調, ♩=60, 1 時間 14 分 40 秒)
+
+Fuga senza voce (70 小節) をまるごと 16 倍に (`compose_tablet105.py`、CV・CVII と同じ 3 つの速さの重ね)。70 × 16 = 1120 小節。
+- 鼓動 (`PK`)・オスティナート (`OS`)・持続音 (`DN`) もピアノの 1 音として ×16・×4・×1 に (4 声に合わせて 0.3 倍に)。Mix のピアノ録音 11:23 の実音は採譜のピアノに (0.45 倍)
+- `equalize`: 声部の少ない曲なので、8 小節ごとの音の量 (音量² × 長さ) をそろえる (0.5〜1.8 倍、隣の区画となめらかに)。bank6 の低い音のサンプルは 1 音で +16 dB ほど大きいので、48 より低い音の dyn をまず 0.35 倍に
+
+```bash
+python3 compose_tablet105.py score_voxfuga.json score_voxfuga16.json bank6/bank.json && python3 render_long.py score_voxfuga16.json out_voxfuga16 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash
