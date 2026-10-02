@@ -2099,6 +2099,22 @@ python3 compose_tablet88.py score_tablet87.json score_tablet88.json && python3 s
 python3 compose_tablet89.py bank89/bank.json cp14_x4.wav score_tablet89.json && python3 synth.py score_tablet89.json tablet89.wav && python3 video.py score_tablet89.json tablet89.wav tablet89.mp4
 ```
 
+## 🎹⛪ Requiem BADA — Tablet Sessions XC · Continuazione 12:50:53 (LXXXIX からカノンを消し、フーガを裏のベースに — 9/25 12:50:53 の終わりから続きを作曲, ニ短調 / ニ長調, ♩=60, 5 分 20 秒)
+
+- **裏 (ベース)**: LXXXIX の I〜IV (80 小節 → 76 小節で切る)。V のストレッタ (カノン) と Amen は消す。フーガ (08:09・08:53) は ×0.32、伸ばした主題は裏の大きさ (×0.21 / ×0.35)、cp14_x4 は全部 0.18
+- **表 — 9/25 12:50:53 の続き**: 録音 (ロ短調、4 分 24 秒) は A7 → D の **ニ長調** で閉じるので、裏のニ短調とそのままつながる
+  - **Intro** (0〜5 小節): 録音の最後の 20 秒そのもの (実音、REC)
+  - 録音の終わりの節 **M = ミ・ラ・ソ・ファ#・ソ・ファ#** (8 拍、256.8 秒〜) を種に、裏の和音 (LXXXIX の harm) に 2 小節ごとに **いちばん合う移調** (±7 半音、強拍・長い音が和音の音になるように、
+    前と同じ移調は避ける) で置いていく — シャコンヌのように裏の和声に従って動く続き
+  - I (5〜24) M の連鎖 ／ II (24〜40) M を 2 倍に (裏: フーガ 08:09) ／ III (40〜64) M と転回 (ファ# を軸に) を 2 小節ごとに交互に ／ IV (64〜76) M をオクターヴで、最後は 2 倍で (裏: フーガ 08:53)
+  - 左手: 裏の和音の根音 (1 拍目に 2 拍)・5 度 (3 拍目)、内声は 3 度・5 度を 2・4 拍目に — 録音の終わりの簡素な手つき
+  - **Amen** (76〜80): A7 → D、録音が閉じた和音 (ラ 2・レ 4・ファ# 4) で閉じる。裏はここで消える
+- 旋律の音は 12:50:53 の録音から切り出した 1 音 (ファ# 3〜シ 5)、低音は 13:04。表は裏より約 4 dB 大きく (ステムで測って: 表 ×2.2)。音域レ 2〜ミ 5、声なし
+
+```bash
+python3 compose_tablet90.py score_tablet89.json bank89/bank.json bank87/bank.json score_tablet90.json && python3 synth.py score_tablet90.json tablet90.wav && python3 video.py score_tablet90.json tablet90.wav tablet90.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
