@@ -2187,6 +2187,31 @@ XCIII (piano_solo_8x の主題による Contrapunctus XIV、すべて実音の�
 python3 compose_tablet94.py score_tablet93.json score_tablet94.json && python3 synth.py score_tablet94.json tablet94.wav && python3 video.py score_tablet94.json tablet94.wav tablet94.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions XCV · Fuga per augmentationem XVI (Klavier) (XCIV を 16 倍に伸ばして、同じようにフーガを醸す曲に, ニ短調, ♩=60, 15 分 12 秒)
+
+XCIV (11 分 44 秒) をまるごと 16 倍にすると 3 時間 8 分になるので、LXXV と同じく、フーガの主題が入る **核の 3 小節** (12 秒) を 4 つ選び、
+それぞれを **3 つの速さで同時に** 鳴らす (メンスーラ・カノン)。声なし (歌声は元からない)。
+
+| 層 | 速さ | 鳴らし方 |
+|:--|:--|:--|
+| 骨組み (4 声) | ×16 | 3 小節が 48 小節 (3 分 12 秒) に。伸ばした音は 2 拍ごと (低い音は 4 拍ごと) に、息をするようにふくらんで打ち直す |
+| 中の層 | ×4 | 3 小節が 12 小節に。48 小節のあいだに 4 回 |
+| フーガ | ×1 | XCIV の速さのまま。3 小節鳴って 3 小節休む、を 8 回 — 遠くで (小さく) |
+
+| 楽章 | 核の 3 小節 (XCIV の小節) |
+|:--|:--|
+| I. Sectio I ×16 | 20〜23 — 主題 I の答唱 (ソプラノ) とアルトの対位 |
+| II. Sectio II ×16 | 88〜91 — 主題 I (ソプラノ) + 主題 II (テノール) の二重フーガ |
+| III. Sectio III ×16 | 128〜131 — 主題 I + 主題 II + B-A-C-H の三重フーガ、その上の主題 I ×1 (拡大カノン) も 16 倍に |
+| IV. 途切れる所 ×16 | 144〜147 — 3 度目の三重の重なり。核の 10 拍目で楽譜が途切れる = 40 小節目で 3 つの層がそろって止まる → 4 小節の沈黙 |
+
+- Prologo (16 小節) / Epilogo (24 小節) は XCIV と同じ piano_solo_8x の実音 (速さは変えず、×16 の骨組みに合わせて小さく)
+- すべて 9/24 08:53 の録音から切り出したピアノの 1 音と、piano_solo_8x の実音
+
+```bash
+python3 compose_tablet95.py score_tablet94.json score_tablet95.json && python3 synth.py score_tablet95.json tablet95.wav && python3 video.py score_tablet95.json tablet95.wav tablet95.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
