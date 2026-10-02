@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Bada 冬景 — Winter Math Music Visualizer</title>
+<style>
+:root{
+  --bg:#070b12; --panel:#0e1520; --line:#1f2b3d; --ink:#dfe8f5; --dim:#8a9ab3;
+  --ice:#9fd2ff; --gold:#ffd36b; --accent:#6fc3ff; --danger:#ff7a7a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;font-size:14px}
+header{display:flex;align-items:baseline;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.04em}
+header h1 b{color:var(--ice)}
+header span{color:var(--dim);font-size:12px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:0;min-height:calc(100% - 46px)}
+#stage{position:relative;display:flex;align-items:center;justify-content:center;padding:12px;background:#04070c;min-width:0}
+#cv{width:100%;max-height:calc(100vh - 150px);object-fit:contain;background:#000;border-radius:6px;display:block;aspect-ratio:16/9}
+#stage:fullscreen{padding:0;background:#000}
+#stage:fullscreen #cv{max-height:100vh;height:100vh;border-radius:0}
+#drop{position:absolute;inset:12px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;
+  border:2px dashed #2e4565;border-radius:8px;color:var(--dim);pointer-events:none;text-align:center;padding:16px;background:rgba(4,7,12,.55)}
+#drop.hide{display:none}
+#drop strong{color:var(--ink);font-size:16px}
+aside{border-left:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
+fieldset{border:1px solid var(--line);border-radius:8px;margin:0 0 12px;padding:10px 12px}
+legend{color:var(--ice);font-size:12px;padding:0 6px}
+label{display:block;margin:6px 0 3px;color:var(--dim);font-size:12px}
+input[type=text],select{width:100%;background:#0a111b;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}
+input[type=range]{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1}
+button{background:#15233a;color:var(--ink);border:1px solid #29405f;border-radius:6px;padding:8px 10px;font:inherit;cursor:pointer;min-height:36px}
+button:hover{background:#1b2d4a}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:#1d4f7a;border-color:#3a7bb3}
+button.rec{background:#5a1f2a;border-color:#a2414f}
+.chk{display:flex;align-items:center;gap:8px;margin:6px 0;color:var(--ink);font-size:13px}
+.chk input{width:16px;height:16px}
+#progress{height:6px;background:#0a111b;border-radius:3px;overflow:hidden;margin-top:8px}
+#progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3a7bb3,#9fd2ff)}
+#msg{min-height:18px;margin-top:8px;font-size:12px;color:var(--dim);word-break:break-all}
+#msg.err{color:var(--danger)}
+#info{font-family:ui-monospace,"Cascadia Mono","Consolas",monospace;font-size:11.5px;color:var(--dim);white-space:pre-wrap;line-height:1.5}
+.eq{font-family:ui-monospace,"Cascadia Mono","Consolas",monospace;font-size:11px;color:#9fb3cf;line-height:1.55}
+.eq b{color:var(--ice);font-weight:600}
+#seek{margin-top:10px}
+#time{font-variant-numeric:tabular-nums;color:var(--dim);font-size:12px}
+@media (max-width:860px){
+  main{grid-template-columns:1fr}
+  aside{border-left:0;border-top:1px solid var(--line)}
+  #cv{max-height:62vh}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Bada <b>冬景</b> — 冬景色 × 数学 の 楽曲映像化</h1>
+  <span>β–ζ 方程式群 (定理1–6・系1–2) と多様体エントロピー不変量 Ξ による抽象画ビジュアライザ</span>
+</header>
+<main>
+  <div id="stage">
+    <canvas id="cv" width="1280" height="720"></canvas>
+    <div id="drop"><strong>🎼 曲をここにドロップ</strong><span>MP3 / WAV / M4A / OGG / FLAC、または音声付き動画 (MP4 / WebM)</span><span>右のパネルの「📂 曲を開く」でも読み込めます</span></div>
+  </div>
+  <aside>
+    <fieldset>
+      <legend>① 楽曲</legend>
+      <div class="row">
+        <button id="btnOpen" class="primary">📂 曲を開く</button>
+        <button id="btnDemo">❄ デモ曲</button>
+      </div>
+      <input id="file" type="file" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,.webm,.mov" hidden>
+      <label for="title">タイトル</label>
+      <input id="title" type="text" placeholder="曲名 (映像の左上に表示)">
+      <label for="subtitle">サブタイトル</label>
+      <input id="subtitle" type="text" placeholder="例: Requiem BADA — 冬景色">
+      <div id="progress"><i></i></div>
+      <div id="msg"></div>
+    </fieldset>
+    <fieldset>
+      <legend>② 映像</legend>
+      <label for="mode">表示モード</label>
+      <select id="mode">
+        <option value="scene">冬景色 + ピアノロール (既定)</option>
+        <option value="pure">冬景色のみ (抽象画)</option>
+        <option value="roll">ピアノロールのみ (参照動画風)</option>
+      </select>
+      <label for="res">解像度</label>
+      <select id="res">
+        <option value="1280x720">1280 × 720 (HD)</option>
+        <option value="1920x1080">1920 × 1080 (フル HD)</option>
+        <option value="1080x1080">1080 × 1080 (正方形)</option>
+        <option value="1080x1920">1080 × 1920 (縦型)</option>
+      </select>
+      <label for="fps">フレームレート</label>
+      <select id="fps"><option value="30">30 fps</option><option value="60">60 fps</option></select>
+      <label class="chk"><input id="optMath" type="checkbox" checked> 方程式オーバーレイ (s, ζ(s), x(s), p(s), Ξ)</label>
+      <label class="chk"><input id="optHud" type="checkbox" checked> タイトル・小節・コード表示</label>
+    </fieldset>
+    <fieldset>
+      <legend>③ 再生・書き出し</legend>
+      <div class="row">
+        <button id="btnPlay" disabled>▶ 再生</button>
+        <button id="btnStop" disabled>⏹ 停止</button>
+        <button id="btnFull">⛶ 全画面</button>
+      </div>
+      <input id="seek" type="range" min="0" max="1000" value="0" disabled>
+      <div id="time">0:00 / 0:00</div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnRec" class="rec" disabled>🎬 動画を書き出し</button>
+        <button id="btnSave" disabled>💾 動画を保存</button>
+      </div>
+      <div id="recfmt" class="eq" style="margin-top:6px"></div>
+    </fieldset>
+    <fieldset>
+      <legend>④ 解析</legend>
+      <div id="info">曲を読み込むと、調・テンポ・音符・コードを解析します。</div>
+    </fieldset>
+    <fieldset>
+      <legend>方程式 → 映像 の対応</legend>
+      <div class="eq">
+        <b>定理1</b> ζ(s)=2ˢπˢ⁻¹sin(πs/2)·β(s,1−s)/Γ(s)·ζ(1−s)<br>　→ 上辺の霜 (負の実軸上の ζ)<br>
+        <b>系1</b> ζ(−2n)=0 → 霜の切れ目＝氷柱 (自明な零点)<br>
+        <b>系2</b> ξ(s)=ξ(1−s), Re s=½ → 凍った湖の鏡映軸<br>
+        <b>Z(t)</b> 臨界線上の |ζ(½+it)| → 雪山の稜線、零点 ρ → 谷の灯り<br>
+        <b>定理3</b> x(s)=e^{W(ζ(s))} → 降雪量 (音量 → s)<br>
+        <b>定理4</b> p(s)=arcsin(π/ζ(s))/π, s ≤ s* → オーロラ<br>
+        <b>定理5</b> x(p,q)=e^{W(β(p,q))} → 雪の結晶 (音名 → 素数対)<br>
+        <b>定理6</b> β(p(s),1−p(s))=ζ(s)=x log x → オーロラの曲線<br>
+        <b>Ξ</b> β(H+1,M+1) (クロマのエントロピー) → 色相
+      </div>
+    </fieldset>
+  </aside>
+</main>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════
+ *  Bada 冬景 (Fuyukei) — 冬景色と数学を融合させた抽象画で楽曲を映像化する
+ *
+ *  ENGINE (純ロジック, Node で単体テスト可能)
+ *    1. 数学核 — 山口フレームワーク「ベータ関数とゼータ関数の構造的対応」の方程式群
+ *    2. 音楽解析 — FFT / ピーク → 音符 / クロマ → コード・調 / スペクトルフラックス → テンポ
+ *    3. 音楽 → 数学 の写像 (mathState)
+ *  UI (ブラウザ専用)
+ *    4. 冬景色レンダラ (Canvas 2D)
+ *    5. 再生・解析・録画・保存
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. 数学核 ───────────────────────────────────────────────────── */
+var TAU = 2 * Math.PI;
+var LZ_G = 7;
+var LZ_C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+  771.32342877765313, -176.61502916214059, 12.507343278686905,
+  -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+
+/* Γ(x) — Lanczos 近似 + オイラーの相反公式 (x < ½) */
+function gammaR(x){
+  if (x <= 0 && x === Math.floor(x)) return Infinity;          /* 極 */
+  if (x < 0.5) return Math.PI / (Math.sin(Math.PI * x) * gammaR(1 - x));
+  x -= 1;
+  var a = LZ_C[0], t = x + LZ_G + 0.5;
+  for (var i = 1; i < 9; i++) a += LZ_C[i] / (x + i);
+  return Math.sqrt(TAU) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
+}
+
+/* log Γ(x) (x > 0) — 大きな引数のベータ関数用 */
+function lgammaR(x){
+  if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - lgammaR(1 - x);
+  x -= 1;
+  var a = LZ_C[0], t = x + LZ_G + 0.5;
+  for (var i = 1; i < 9; i++) a += LZ_C[i] / (x + i);
+  return 0.5 * Math.log(TAU) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+
+/* β(p,q) = Γ(p)Γ(q)/Γ(p+q) */
+function betaR(p, q){
+  if (p > 0 && q > 0) return Math.exp(lgammaR(p) + lgammaR(q) - lgammaR(p + q));
+  return gammaR(p) * gammaR(q) / gammaR(p + q);
+}
+
+/* 式(3): 対角線 q = 1−p 上の β(s,1−s) = π / sin(πs) (円関数) */
+function betaDiag(s){ return Math.PI / Math.sin(Math.PI * s); }
+
+/* Borwein のアルゴリズム (ディリクレ η) の係数 d_k */
+var BW_N = 48;
+var BW_D = (function(){
+  var n = BW_N, d = [], term = 1, sum = 1;
+  d.push(sum);
+  for (var i = 0; i < n; i++){
+    term *= 4 * (n + i) * (n - i) / ((2 * i + 1) * (2 * i + 2));
+    sum += term;
+    d.push(sum);
+  }
+  return d;
+})();
+
+/* η(s) = Σ (−1)^{n−1} n^{−s} (実数 s > 0) */
+function etaR(s){
+  var n = BW_N, dn = BW_D[n], sum = 0;
+  for (var k = 0; k < n; k++){
+    var term = (BW_D[k] - dn) / Math.pow(k + 1, s);
+    sum += (k & 1) ? -term : term;
+  }
+  return -sum / dn;
+}
+
+/* ζ(s) (実数). s ≥ ½ は η から、s < ½ は定理1 (ベータ型関数等式) で解析接続 */
+function zetaR(s){
+  if (s === 1) return Infinity;
+  if (s >= 0.5){
+    if (s > 60) return 1 + Math.pow(2, -s);
+    return etaR(s) / (1 - Math.pow(2, 1 - s));
+  }
+  return zetaFE(s);
+}
+
+/* 定理1:  ζ(s) = 2^s π^{s−1} sin(πs/2) · β(s,1−s)/Γ(s) · ζ(1−s)
+ *   整数点では β(s,1−s)/Γ(s) → Γ(1−s) の極限をとる。
+ *   系1: s = −2n で sin(πs/2) = 0 → 自明な零点。 */
+function zetaFE(s){
+  if (s === 0) return -0.5;
+  if (s < 0 && s / 2 === Math.floor(s / 2)) return 0;                 /* 系1 */
+  var bg = (s === Math.floor(s)) ? gammaR(1 - s) : betaDiag(s) / gammaR(s);
+  return Math.pow(2, s) * Math.pow(Math.PI, s - 1) * Math.sin(Math.PI * s / 2) * bg * zetaR(1 - s);
+}
+
+/* 定理1 の右辺を β を明示して評価 (検証用) */
+function theorem1RHS(s, zeta1ms){
+  var z = (zeta1ms === undefined) ? zetaR(1 - s) : zeta1ms;
+  return Math.pow(2, s) * Math.pow(Math.PI, s - 1) * Math.sin(Math.PI * s / 2) *
+         betaR(s, 1 - s) / gammaR(s) * z;
+}
+
+/* 系2: 臨界線上の Hardy Z 関数  Z(t) = e^{iθ(t)} ζ(½+it)  (実数値, |Z| = |ζ(½+it)|)
+ * Riemann–Siegel 公式 (主和 + 第一補正項). t ≥ 10 で十分な精度。 */
+function rsTheta(t){
+  return t / 2 * Math.log(t / TAU) - t / 2 - Math.PI / 8 + 1 / (48 * t) + 7 / (5760 * t * t * t);
+}
+function hardyZ(t){
+  t = Math.abs(t);
+  if (t < 10) t = 10;
+  var a = Math.sqrt(t / TAU), N = Math.floor(a), p = a - N, th = rsTheta(t), sum = 0;
+  for (var n = 1; n <= N; n++) sum += Math.cos(th - t * Math.log(n)) / Math.sqrt(n);
+  var den = Math.cos(TAU * p);
+  if (Math.abs(den) < 1e-7) { p += 1e-6; den = Math.cos(TAU * p); }
+  var c0 = Math.cos(TAU * (p * p - p - 1 / 16)) / den;
+  return 2 * sum + (((N - 1) & 1) ? -1 : 1) * Math.pow(t / TAU, -0.25) * c0;
+}
+
+/* Lambert W 関数 (主枝, x ≥ −1/e) — Halley 法 */
+function lambertW(x){
+  if (x === 0) return 0;
+  if (!(x >= -1 / Math.E)) return NaN;
+  if (x === Infinity) return Infinity;
+  var w;
+  if (x < -0.3) w = -1 + Math.sqrt(2 * (1 + Math.E * x));
+  else if (x < 3) w = Math.log1p(x) * (1 - 0.15 * Math.log1p(x));
+  else { var L = Math.log(x); w = L - Math.log(L); }
+  for (var i = 0; i < 60; i++){
+    var ew = Math.exp(w), f = w * ew - x, wp1 = w + 1;
+    var dw = f / (ew * wp1 - (wp1 + 1) * f / (2 * wp1));
+    w -= dw;
+    if (Math.abs(dw) <= 1e-15 * (1 + Math.abs(w))) break;
+  }
+  return w;
+}
+
+/* 定理3 / 定理5: x log x = c (x > 1) の唯一解  x = e^{W(c)} = c / W(c) */
+function entropyX(c){ return Math.exp(lambertW(c)); }
+function xLogX(x){ return x > 0 ? x * Math.log(x) : 0; }
+
+/* 定理4: 対角線上の解 p(s) = arcsin(π/ζ(s))/π   (ζ(s) ≥ π のときのみ) */
+function pOfS(s){
+  var z = zetaR(s);
+  if (!(z >= Math.PI)) return NaN;
+  return Math.asin(Math.PI / z) / Math.PI;
+}
+
+/* 可解域の閾値 s*: ζ(s*) = π の唯一解 (二分法) */
+function solveSStar(){
+  var lo = 1 + 1e-6, hi = 3;
+  for (var i = 0; i < 200; i++){
+    var mid = (lo + hi) / 2;
+    if (zetaR(mid) > Math.PI) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+var S_STAR = solveSStar();
+
+/* 定理5: x(p,q) = e^{W(β(p,q))} — 素数対を含む全ての p,q > 0 で厳密に可解 */
+function xOfPQ(p, q){ return entropyX(betaR(p, q)); }
+
+/* 定理6: 共通座標条件 β(p,q) = ζ(s) ⇔ 同一の x */
+function commonCoordinate(s){
+  var z = zetaR(s), p = pOfS(s), x = entropyX(z);
+  return { s: s, zeta: z, p: p, beta: isNaN(p) ? NaN : betaDiag(p), x: x, xlogx: xLogX(x) };
+}
+
+/* 大域的部分積分多様体のエントロピー不変量 Ξ (既提出レポート) を β–ζ 論文の修正で読む:
+ *   H = シャノン情報量, M = Σ p_i / (x_i log x_i)²,  Ξ = β(H+1, M+1)
+ *   Ξ / (x log x) = 1 の唯一解 x_Ξ = e^{W(Ξ)} (定理5) */
+function manifoldElement(x){
+  if (x <= 1) return 1;
+  var xl = x * Math.log(x);
+  return Math.abs(xl) < 1e-9 ? 1 : 1 / (xl * xl);
+}
+function shannonBits(w){
+  var s = 0, i, h = 0;
+  for (i = 0; i < w.length; i++) s += Math.max(0, w[i]);
+  if (!(s > 0)) return 0;
+  for (i = 0; i < w.length; i++){
+    var p = Math.max(0, w[i]) / s;
+    if (p > 0) h -= p * Math.log(p) / Math.LN2;
+  }
+  return h;
+}
+function manifoldInvariant(weights){
+  var w = Array.prototype.slice.call(weights).map(function(v){ return Math.max(0, v); });
+  var s = w.reduce(function(a, b){ return a + b; }, 0);
+  if (!(s > 0)) return { H: 0, M: 0, xi: betaR(1, 1), x: entropyX(betaR(1, 1)) };
+  var dist = w.map(function(v){ return v / s; }).sort(function(a, b){ return b - a; });
+  var H = shannonBits(dist), M = 0;
+  for (var i = 0; i < dist.length; i++) M += dist[i] * manifoldElement(i + 2);
+  var xi = betaR(H + 1, M + 1);
+  return { H: H, M: M, xi: xi, x: entropyX(xi) };
+}
+
+/* 決定論的乱数 */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ── 2. 音楽解析 ─────────────────────────────────────────────────── */
+var NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+var PRIMES12 = [2,3,5,7,11,13,17,19,23,29,31,37];          /* 音名 → 素数 */
+
+function midiToFreq(m){ return 440 * Math.pow(2, (m - 69) / 12); }
+function freqToMidi(f){ return 69 + 12 * Math.log(f / 440) / Math.LN2; }
+function midiName(m){ return NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1); }
+
+/* 基数2 FFT (in-place) */
+function fftInPlace(re, im){
+  var n = re.length, i, j, k, len;
+  for (i = 1, j = 0; i < n; i++){
+    var bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j){
+      var tr = re[i]; re[i] = re[j]; re[j] = tr;
+      var ti = im[i]; im[i] = im[j]; im[j] = ti;
+    }
+  }
+  for (len = 2; len <= n; len <<= 1){
+    var ang = -TAU / len, wr = Math.cos(ang), wi = Math.sin(ang), half = len >> 1;
+    for (i = 0; i < n; i += len){
+      var cr = 1, ci = 0;
+      for (k = 0; k < half; k++){
+        var a = i + k, b = a + half;
+        var xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - xr; im[b] = im[a] - xi;
+        re[a] += xr; im[a] += xi;
+        var ncr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = ncr;
+      }
+    }
+  }
+}
+
+var CHORD_TYPES = [
+  { suf:"",     iv:[0,4,7],    pen:0 },
+  { suf:"m",    iv:[0,3,7],    pen:0 },
+  { suf:"7",    iv:[0,4,7,10], pen:0.035 },
+  { suf:"m7",   iv:[0,3,7,10], pen:0.035 },
+  { suf:"maj7", iv:[0,4,7,11], pen:0.04 },
+  { suf:"sus4", iv:[0,5,7],    pen:0.015 },
+  { suf:"sus2", iv:[0,2,7],    pen:0.02 },
+  { suf:"dim",  iv:[0,3,6],    pen:0.03 }
+];
+
+/* クロマ (12) → コード名 (例: "Bm", "Asus4", "A#m7") */
+function detectChord(chroma){
+  var norm = 0, i;
+  for (i = 0; i < 12; i++) norm += chroma[i] * chroma[i];
+  if (!(norm > 1e-12)) return null;
+  norm = Math.sqrt(norm);
+  var best = null;
+  for (var r = 0; r < 12; r++){
+    for (var c = 0; c < CHORD_TYPES.length; c++){
+      var ct = CHORD_TYPES[c], dot = 0;
+      for (i = 0; i < ct.iv.length; i++) dot += chroma[(r + ct.iv[i]) % 12];
+      var score = dot / (norm * Math.sqrt(ct.iv.length)) - ct.pen;
+      if (!best || score > best.score) best = { root:r, type:c, score:score };
+    }
+  }
+  best.name = NOTE_NAMES[best.root] + CHORD_TYPES[best.type].suf;
+  return best;
+}
+
+/* Krumhansl–Kessler 調性プロファイル → 調 */
+var KK_MAJ = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+var KK_MIN = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+var KEY_JA_MAJ = ["ハ長調","変ニ長調","ニ長調","変ホ長調","ホ長調","ヘ長調","嬰ヘ長調","ト長調","変イ長調","イ長調","変ロ長調","ロ長調"];
+var KEY_JA_MIN = ["ハ短調","嬰ハ短調","ニ短調","変ホ短調","ホ短調","ヘ短調","嬰ヘ短調","ト短調","嬰ト短調","イ短調","変ロ短調","ロ短調"];
+function pearson(a, b){
+  var n = a.length, ma = 0, mb = 0, i;
+  for (i = 0; i < n; i++){ ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  var num = 0, da = 0, db = 0;
+  for (i = 0; i < n; i++){
+    var x = a[i] - ma, y = b[i] - mb;
+    num += x * y; da += x * x; db += y * y;
+  }
+  return (da > 0 && db > 0) ? num / Math.sqrt(da * db) : 0;
+}
+function estimateKey(chroma){
+  var best = null;
+  for (var t = 0; t < 12; t++){
+    for (var m = 0; m < 2; m++){
+      var prof = m ? KK_MIN : KK_MAJ, rot = [];
+      for (var i = 0; i < 12; i++) rot.push(prof[(i - t + 12) % 12]);
+      var r = pearson(chroma, rot);
+      if (!best || r > best.score) best = { tonic:t, minor:!!m, score:r };
+    }
+  }
+  best.name = NOTE_NAMES[best.tonic] + (best.minor ? " minor" : " major");
+  best.nameJa = (best.minor ? KEY_JA_MIN : KEY_JA_MAJ)[best.tonic];
+  return best;
+}
+
+/* オンセット包絡 (スペクトルフラックス) の自己相関 → BPM */
+function estimateTempo(flux, hopSec){
+  var n = flux.length, i;
+  if (n < 8) return { bpm:120, confidence:0 };
+  var mean = 0;
+  for (i = 0; i < n; i++) mean += flux[i];
+  mean /= n;
+  var f = new Float64Array(n);
+  for (i = 0; i < n; i++) f[i] = flux[i] - mean;
+  var lagMin = Math.max(1, Math.floor(60 / (200 * hopSec))), lagMax = Math.min(n - 2, Math.ceil(60 / (45 * hopSec)));
+  var ac = new Float64Array(lagMax + 2), e0 = 0;
+  for (i = 0; i < n; i++) e0 += f[i] * f[i];
+  if (!(e0 > 0)) return { bpm:120, confidence:0 };
+  var best = -Infinity, bestLag = 0;
+  for (var L = lagMin; L <= lagMax + 1; L++){
+    var s = 0;
+    for (i = 0; i + L < n; i++) s += f[i] * f[i + L];
+    ac[L] = s / (n - L);
+  }
+  for (L = lagMin; L <= lagMax; L++){
+    var bpm = 60 / (L * hopSec);
+    var w = Math.exp(-0.5 * Math.pow(Math.log(bpm / 110) / Math.LN2 / 1.1, 2));
+    var v = ac[L] * w;
+    if (v > best){ best = v; bestLag = L; }
+  }
+  if (!bestLag) return { bpm:120, confidence:0 };
+  var a = ac[bestLag - 1] || ac[bestLag], b = ac[bestLag], c = ac[bestLag + 1] || ac[bestLag];
+  var den = a - 2 * b + c, d = den !== 0 ? 0.5 * (a - c) / den : 0;
+  if (!(Math.abs(d) <= 1)) d = 0;
+  return { bpm: 60 / ((bestLag + d) * hopSec), confidence: b / (e0 / n) };
+}
+
+/* 音声 (モノラル Float32Array) を段階的に解析するアナライザ */
+function createAnalyzer(samples, sampleRate, opts){
+  opts = opts || {};
+  var fps = opts.fps || 30;
+  var dec = Math.max(1, Math.floor(sampleRate / 22050 + 1e-9));
+  var sr = sampleRate / dec, x;
+  if (dec === 1) x = samples;
+  else {
+    x = new Float32Array(Math.floor(samples.length / dec));
+    for (var di = 0; di < x.length; di++){
+      var acc = 0;
+      for (var dj = 0; dj < dec; dj++) acc += samples[di * dec + dj];
+      x[di] = acc / dec;
+    }
+  }
+  var N = sr > 16000 ? 4096 : 2048, half = N / 2;
+  var hop = sr / fps, hopSec = 1 / fps;
+  var nFrames = Math.max(1, Math.ceil(x.length / hop));
+  var win = new Float64Array(N), wsum = 0, i;
+  for (i = 0; i < N; i++){ win[i] = 0.5 - 0.5 * Math.cos(TAU * i / (N - 1)); wsum += win[i]; }
+  var re = new Float64Array(N), im = new Float64Array(N), mag = new Float64Array(half + 1);
+  var prevC = new Float64Array(half + 1);
+  var binLo = Math.max(2, Math.ceil(28 * N / sr)), binHi = Math.min(half - 2, Math.floor(4400 * N / sr));
+  var binPC = new Int8Array(half + 1);
+  for (i = 0; i <= half; i++){
+    var fq = i * sr / N;
+    binPC[i] = (fq >= 50 && fq <= 5000) ? ((Math.round(freqToMidi(fq)) % 12) + 12) % 12 : -1;
+  }
+  var frames = [], cursor = 0;
+
+  function frame(fi){
+    var center = fi * hop, start = Math.round(center - half), k;
+    for (k = 0; k < N; k++){
+      var idx = start + k;
+      re[k] = (idx >= 0 && idx < x.length) ? x[idx] * win[k] : 0;
+      im[k] = 0;
+    }
+    fftInPlace(re, im);
+    var scale = 2 / wsum, flux = 0, ptot = 0, pw = [], chroma = new Float32Array(12);
+    var lo = 0, mid = 0, hi = 0, cnum = 0, cden = 0, fmax = 0;
+    for (k = 0; k <= half; k++){
+      var m = Math.sqrt(re[k] * re[k] + im[k] * im[k]) * scale;
+      mag[k] = m;
+      var c = Math.log1p(100 * m), dlt = c - prevC[k];
+      if (dlt > 0) flux += dlt;
+      prevC[k] = c;
+      var fq = k * sr / N, p2 = m * m;
+      if (fq >= 30 && fq < 250) lo += p2; else if (fq >= 250 && fq < 2000) mid += p2; else if (fq >= 2000) hi += p2;
+      if (binPC[k] >= 0) chroma[binPC[k]] += p2;
+      if (k >= binLo && k <= binHi){ pw.push(p2); ptot += p2; cnum += fq * m; cden += m; if (m > fmax) fmax = m; }
+    }
+    /* スペクトル・エントロピー (0..1) */
+    var ent = 0;
+    if (ptot > 0){
+      for (k = 0; k < pw.length; k++){ var pp = pw[k] / ptot; if (pp > 0) ent -= pp * Math.log(pp); }
+      ent /= Math.log(pw.length);
+    }
+    /* RMS (時間領域, ホップ幅) */
+    var r0 = Math.max(0, Math.round(center - hop / 2)), r1 = Math.min(x.length, Math.round(center + hop / 2)), rs = 0;
+    for (k = r0; k < r1; k++) rs += x[k] * x[k];
+    var rms = r1 > r0 ? Math.sqrt(rs / (r1 - r0)) : 0;
+    /* スペクトルピーク → 音高 (倍音を抑制) */
+    var cand = [];
+    for (k = binLo + 1; k < binHi; k++){
+      var mk = mag[k];
+      if (mk > 0.0015 && mk > mag[k - 1] && mk >= mag[k + 1] && mk >= 0.12 * fmax){
+        var la = Math.log(mag[k - 1] + 1e-12), lb = Math.log(mk), lc = Math.log(mag[k + 1] + 1e-12);
+        var den = la - 2 * lb + lc, d = den !== 0 ? 0.5 * (la - lc) / den : 0;
+        if (!(Math.abs(d) <= 1)) d = 0;
+        cand.push({ f:(k + d) * sr / N, mag:mk });
+      }
+    }
+    cand.sort(function(a, b){ return b.mag - a.mag; });
+    cand = cand.slice(0, 14).sort(function(a, b){ return a.f - b.f; });
+    var kept = [];
+    for (k = 0; k < cand.length; k++){
+      var P = cand[k], harmonic = false;
+      for (var j = 0; j < kept.length; j++){
+        var r = P.f / kept[j].f, h = Math.round(r);
+        if (h >= 2 && h <= 8 && Math.abs(1200 * Math.log(r / h) / Math.LN2) < 45 && P.mag < 2.2 * kept[j].mag){ harmonic = true; break; }
+      }
+      if (!harmonic) kept.push(P);
+    }
+    var peaks = [];
+    for (k = 0; k < kept.length && peaks.length < 8; k++){
+      var mi = Math.round(freqToMidi(kept[k].f));
+      if (mi >= 21 && mi <= 108) peaks.push({ midi:mi, mag:kept[k].mag });
+    }
+    var csum = 0;
+    for (k = 0; k < 12; k++) csum += chroma[k];
+    if (csum > 0) for (k = 0; k < 12; k++) chroma[k] /= csum;
+    frames.push({ t: fi * hopSec, rms: rms, flux: fi === 0 ? 0 : flux, ent: ent,
+                  centroid: cden > 0 ? cnum / cden : 0, chroma: chroma, peaks: peaks,
+                  lo: Math.sqrt(lo), mid: Math.sqrt(mid), hi: Math.sqrt(hi), cpow: csum });
+  }
+
+  function finish(){
+    var n = frames.length, i, k, maxRms = 1e-9, maxLo = 1e-9, maxMid = 1e-9, maxHi = 1e-9, gMax = 1e-9, maxFlux = 1e-9;
+    for (i = 0; i < n; i++){
+      var F = frames[i];
+      if (F.rms > maxRms) maxRms = F.rms;
+      if (F.lo > maxLo) maxLo = F.lo;
+      if (F.mid > maxMid) maxMid = F.mid;
+      if (F.hi > maxHi) maxHi = F.hi;
+      if (F.flux > maxFlux) maxFlux = F.flux;
+      for (k = 0; k < F.peaks.length; k++) if (F.peaks[k].mag > gMax) gMax = F.peaks[k].mag;
+    }
+    /* 正規化 + 平滑化エネルギー (±0.25 秒) */
+    var W = Math.max(1, Math.round(0.25 * fps)), pre = new Float64Array(n + 1);
+    for (i = 0; i < n; i++) pre[i + 1] = pre[i] + frames[i].rms / maxRms;
+    for (i = 0; i < n; i++){
+      var F2 = frames[i], a = Math.max(0, i - W), b = Math.min(n, i + W + 1);
+      F2.rmsN = F2.rms / maxRms;
+      F2.energy = (pre[b] - pre[a]) / (b - a);
+      F2.loN = F2.lo / maxLo; F2.midN = F2.mid / maxMid; F2.hiN = F2.hi / maxHi;
+      F2.fluxN = F2.flux / maxFlux;
+    }
+    /* 音符: フレーム間でピークを連結 (2 フレームまでの途切れを許容) */
+    var gate = 0.035 * gMax, active = {}, notes = [], minLen = Math.max(2, Math.round(0.08 * fps));
+    function close(nt){ if (nt.end - nt.start + 1 >= minLen) notes.push(nt); }
+    for (i = 0; i < n; i++){
+      var present = {};
+      if (frames[i].rmsN > 0.02){
+        for (k = 0; k < frames[i].peaks.length; k++){
+          var pk = frames[i].peaks[k];
+          if (pk.mag >= gate) present[pk.midi] = pk.mag;
+        }
+      }
+      for (var key in present){
+        var mm = +key;
+        if (active[mm]){ active[mm].end = i; active[mm].gap = 0; if (present[key] > active[mm].vel) active[mm].vel = present[key]; }
+        else active[mm] = { midi:mm, start:i, end:i, gap:0, vel:present[key] };
+      }
+      for (var ak in active){
+        if (!(ak in present)){
+          active[ak].gap++;
+          if (active[ak].gap > 2){ close(active[ak]); delete active[ak]; }
+        }
+      }
+    }
+    for (var rk in active) close(active[rk]);
+    notes = notes.map(function(nt){
+      return { midi:nt.midi, start:nt.start * hopSec, end:(nt.end + 1) * hopSec, vel:Math.min(1, nt.vel / gMax) };
+    }).sort(function(a, b){ return a.start - b.start || a.midi - b.midi; });
+    /* 音域 */
+    var lo = 108, hi = 21;
+    notes.forEach(function(nt){ if (nt.midi < lo) lo = nt.midi; if (nt.midi > hi) hi = nt.midi; });
+    if (lo > hi){ lo = 36; hi = 84; }
+    lo = Math.max(21, Math.floor((lo - 2) / 12) * 12);
+    hi = Math.min(108, Math.ceil((hi + 2) / 12) * 12);
+    if (hi - lo < 36){ var mid0 = (lo + hi) / 2; lo = Math.max(21, Math.round(mid0 - 18)); hi = lo + 36; }
+    /* コード: ±0.4 秒の平滑化クロマ + ヒステリシス */
+    var CW = Math.max(1, Math.round(0.4 * fps)), cp = [];
+    for (k = 0; k < 12; k++){
+      var arr = new Float64Array(n + 1);
+      for (i = 0; i < n; i++) arr[i + 1] = arr[i] + frames[i].chroma[k] * Math.min(1, frames[i].rmsN * 4);
+      cp.push(arr);
+    }
+    var prev = null, total = new Float64Array(12);
+    for (i = 0; i < n; i++){
+      var a2 = Math.max(0, i - CW), b2 = Math.min(n, i + CW + 1), ch = [];
+      for (k = 0; k < 12; k++){ ch.push(cp[k][b2] - cp[k][a2]); }
+      for (k = 0; k < 12; k++) total[k] += frames[i].chroma[k] * frames[i].rmsN;
+      var cd = frames[i].energy > 0.04 ? detectChord(ch) : null;
+      if (cd && prev && cd.name !== prev.name){
+        var keep = 0, pv = CHORD_TYPES[prev.type];
+        var nrm = 0;
+        for (k = 0; k < 12; k++) nrm += ch[k] * ch[k];
+        for (k = 0; k < pv.iv.length; k++) keep += ch[(prev.root + pv.iv[k]) % 12];
+        var keepScore = keep / (Math.sqrt(nrm) * Math.sqrt(pv.iv.length)) - pv.pen;
+        if (cd.score < keepScore + 0.03) cd = prev;
+      }
+      frames[i].chord = cd;
+      if (cd) prev = cd;
+    }
+    var flux = frames.map(function(F){ return F.flux; });
+    return {
+      duration: x.length / sr, fps: fps, hopSec: hopSec, frames: frames, notes: notes,
+      noteLo: lo, noteHi: hi, tempo: estimateTempo(flux, hopSec), key: estimateKey(total),
+      invariant: manifoldInvariant(total), chroma: Array.prototype.slice.call(total)
+    };
+  }
+
+  return {
+    total: nFrames,
+    step: function(count){
+      var end = Math.min(nFrames, cursor + count);
+      for (; cursor < end; cursor++) frame(cursor);
+      return { done: cursor >= nFrames, progress: cursor / nFrames };
+    },
+    result: finish
+  };
+}
+
+function analyzeAll(samples, sampleRate, opts){
+  var a = createAnalyzer(samples, sampleRate, opts);
+  while (!a.step(1e9).done) {}
+  return a.result();
+}
+
+function frameIndexAt(an, t){
+  var i = Math.round(t / an.hopSec);
+  return Math.max(0, Math.min(an.frames.length - 1, i));
+}
+function barAt(an, t){
+  var bpm = an.tempo.bpm || 120;
+  return { bar: Math.max(1, Math.floor(Math.max(0, t) * bpm / 240) + 1),
+           total: Math.max(1, Math.ceil(an.duration * bpm / 240)) };
+}
+
+/* ── 3. 音楽 → 数学 の写像 ───────────────────────────────────────── */
+/* 平滑化エネルギー E∈[0,1] → 実数 s > 1 (大きい音 → s→1⁺ → ζ(s) 大) */
+function musicS(energy){
+  var e = Math.max(0, Math.min(1, energy || 0));
+  return 1.02 + 2.5 * Math.pow(1 - e, 1.5);
+}
+/* 音名 (ピッチクラス) → 素数対 (p, q) = (根音, 完全5度上) */
+function primePair(pc){ return [PRIMES12[((pc % 12) + 12) % 12], PRIMES12[(((pc + 7) % 12) + 12) % 12]]; }
+
+function mathState(an, t){
+  var F = an.frames[frameIndexAt(an, t)];
+  var s = musicS(F.energy), z = zetaR(s), x = entropyX(z), p = pOfS(s);
+  var chord = F.chord, pc = chord ? chord.root : 0;
+  var pq = primePair(pc), b = betaR(pq[0], pq[1]);
+  var inv = manifoldInvariant(F.chroma);
+  return {
+    frame: F, s: s, zeta: z, x: x, p: p,
+    aurora: isNaN(p) ? 0 : 1 - 2 * p,             /* s ≤ s* で 0..1 */
+    chord: chord, pq: pq, betaPQ: b, xPQ: entropyX(b), inv: inv
+  };
+}
+
+/* デモ曲: ロ短調 Bm – G – D – A (各 2 秒, ピアノ風の加算合成) */
+function synthDemo(sampleRate, seconds){
+  var n = Math.floor(sampleRate * seconds), out = new Float32Array(n);
+  var prog = [[47,59,62,66],[43,59,62,67],[50,62,66,69],[45,61,64,69]];
+  var mel = [[74,0],[73,0.5],[71,1.0],[69,1.5],[71,0],[74,1.0],[78,0],[76,1.0],[73,0],[69,1.0]];
+  var seg = 2.0;
+  function tone(m, t0, dur, amp){
+    var f = midiToFreq(m), s0 = Math.floor(t0 * sampleRate), s1 = Math.min(n, Math.floor((t0 + dur) * sampleRate));
+    for (var i = s0; i < s1; i++){
+      var tt = (i - s0) / sampleRate;
+      var env = Math.min(1, tt * 200) * (0.35 + 0.65 * Math.exp(-tt * 2.2)) * Math.min(1, (s1 - i) / (0.05 * sampleRate));
+      out[i] += amp * env * (Math.sin(TAU * f * tt) + 0.3 * Math.sin(TAU * 2 * f * tt) + 0.12 * Math.sin(TAU * 3 * f * tt));
+    }
+  }
+  var mi = 0;
+  for (var c = 0; c * seg < seconds; c++){
+    var ch = prog[c % prog.length], t0 = c * seg;
+    for (var k = 0; k < ch.length; k++) tone(ch[k], t0, seg, k === 0 ? 0.16 : 0.1);
+    if (c >= 4){
+      for (var j = 0; j < 2; j++){
+        var mm = mel[mi % mel.length]; mi++;
+        tone(mm[0], t0 + j * 1.0, 0.95, 0.09);
+      }
+    }
+  }
+  var peak = 0;
+  for (var i2 = 0; i2 < n; i2++) peak = Math.max(peak, Math.abs(out[i2]));
+  if (peak > 0) for (i2 = 0; i2 < n; i2++) out[i2] *= 0.8 / peak;
+  return out;
+}
+
+/* ── 書き出し補助 (純ロジック) ── */
+var RECORDER_MIMES = [
+  { mime:'video/mp4;codecs="avc1.640028,mp4a.40.2"', ext:"mp4",  label:"MP4 (H.264 + AAC)" },
+  { mime:"video/mp4",                                 ext:"mp4",  label:"MP4" },
+  { mime:"video/webm;codecs=vp9,opus",                ext:"webm", label:"WebM (VP9 + Opus)" },
+  { mime:"video/webm;codecs=vp8,opus",                ext:"webm", label:"WebM (VP8 + Opus)" },
+  { mime:"video/webm",                                ext:"webm", label:"WebM" }
+];
+function pickRecorderMime(isSupported){
+  for (var i = 0; i < RECORDER_MIMES.length; i++){
+    var ok = false;
+    try { ok = !!isSupported(RECORDER_MIMES[i].mime); } catch (e) { ok = false; }
+    if (ok) return RECORDER_MIMES[i];
+  }
+  return { mime:"", ext:"webm", label:"WebM" };
+}
+function videoBitrate(w, h, fps){
+  var bps = Math.round(w * h * fps * 0.1);
+  return Math.max(1500000, Math.min(24000000, bps));
+}
+function fmtTime(sec){
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+  return m + ":" + (s < 10 ? "0" : "") + s;
+}
+function sanitizeName(name){
+  var s = String(name || "").replace(/[\\\/:*?"<>|\u0000-\u001f]+/g, "_").replace(/\s+/g, " ").trim();
+  s = s.replace(/^\.+/, "");
+  return s ? s.slice(0, 120) : "fuyukei";
+}
+function parseResolution(v){
+  var m = /^(\d+)x(\d+)$/.exec(String(v || ""));
+  return m ? { w:+m[1], h:+m[2] } : { w:1280, h:720 };
+}
+/* ═════════════════ ENGINE END ═════════════════ */
+
+/* ── 4. 冬景色レンダラ ───────────────────────────────────────────── */
+var AUR_N = 72;
+var AUR_Z = (function(){                     /* オーロラ曲線: s ∈ (1, s*] の ζ(s) = β(p(s),1−p(s)) */
+  var a = [];
+  for (var i = 0; i <= AUR_N; i++){ var u = i / AUR_N; a.push(Math.log(zetaR(1 + (S_STAR - 1) * (0.04 + 0.96 * u)))); }
+  return a;
+})();
+var FROST_N = 480, FROST_S0 = -14.6, FROST_S1 = -0.35;
+var FROST = (function(){                     /* 定理1 で計算した負の実軸上の ζ(s) */
+  var v = [], mx = 0, i;
+  for (i = 0; i <= FROST_N; i++){
+    var s = FROST_S0 + (FROST_S1 - FROST_S0) * i / FROST_N;
+    var z = Math.pow(Math.abs(zetaFE(s)), 0.3);
+    v.push(z); if (z > mx) mx = z;
+  }
+  return v.map(function(z){ return z / mx; });
+})();
+
+function Renderer(canvas){
+  this.cv = canvas;
+  this.ctx = canvas.getContext("2d");
+  this.up = document.createElement("canvas");
+  this.uctx = this.up.getContext("2d");
+  this.reset();
+}
+Renderer.prototype.reset = function(){
+  this.flakes = [];
+  this.lastT = null;
+  this.noteCursor = 0;
+  this.rand = mulberry32(91);
+  this.lightPulse = 0;
+};
+Renderer.prototype.resize = function(w, h){
+  this.cv.width = w; this.cv.height = h;
+  this.W = w; this.H = h;
+  this.hz = Math.round(h * 0.64);
+  this.up.width = w; this.up.height = this.hz;
+  var r = mulberry32(2357), stars = [], k = Math.round(260 * Math.sqrt(w * h / (1280 * 720)));
+  for (var i = 0; i < k; i++) stars.push({ x:r() * w, y:Math.pow(r(), 1.4) * this.hz * 0.85, r:0.4 + r() * 1.3, ph:r() * TAU, pc:i % 12 });
+  this.stars = stars;
+  this.flakes = [];
+};
+
+Renderer.prototype.draw = function(t, an, o){
+  var W = this.W, H = this.H, ctx = this.ctx;
+  var dt = this.lastT === null ? 0 : t - this.lastT;
+  if (dt < 0 || dt > 0.5){ dt = 0; this.syncCursor(an, t); }
+  this.lastT = t;
+  var ms = an ? mathState(an, t) : this.idleState(t);
+  ms.t = t;
+  if (o.mode === "roll"){
+    ctx.fillStyle = "#06090f"; ctx.fillRect(0, 0, W, H);
+    this.drawRoll(an, t, o, true);
+    if (o.hud) this.drawHud(an, t, ms, o);
+    if (o.math) this.drawMath(ms, o);
+    return;
+  }
+  this.drawUpper(t, ms, an);
+  ctx.drawImage(this.up, 0, 0);
+  this.drawLake(t, ms);
+  this.updateFlakes(dt, ms, an, t);
+  this.drawFlakes();
+  this.drawFrost(t, ms, o);
+  if (o.mode === "scene" && an) this.drawRoll(an, t, o, false);
+  if (o.hud) this.drawHud(an, t, ms, o);
+  if (o.math) this.drawMath(ms, o);
+};
+
+Renderer.prototype.idleState = function(t){
+  var e = 0.35 + 0.25 * Math.sin(t * 0.4), s = musicS(e), z = zetaR(s), p = pOfS(s);
+  var pq = primePair(11), b = betaR(pq[0], pq[1]);
+  return { frame:{ energy:e, loN:0.2, midN:0.3, hiN:0.2, fluxN:0, centroid:1200, chroma:new Float32Array(12), rmsN:e },
+           s:s, zeta:z, x:entropyX(z), p:p, aurora:isNaN(p) ? 0 : 1 - 2 * p, chord:null, pq:pq, betaPQ:b, xPQ:entropyX(b),
+           inv:manifoldInvariant([1,1,1,1,1,1,1,1,1,1,1,1]) };
+};
+
+/* 色: 調 (短調 → 藍, 長調 → 菫の夜明け) と Ξ による色相 */
+Renderer.prototype.palette = function(an, ms){
+  var minor = an ? an.key.minor : true;
+  var hue = (minor ? 214 : 252) + 40 * (ms.inv.xi - 0.05);
+  return { hue: hue, minor: minor };
+};
+
+Renderer.prototype.drawUpper = function(t, ms, an){
+  var u = this.uctx, W = this.W, hz = this.hz, H = this.H, F = ms.frame;
+  var pal = this.palette(an, ms), hue = pal.hue;
+  /* 空 */
+  var g = u.createLinearGradient(0, 0, 0, hz);
+  g.addColorStop(0, "hsl(" + (hue + 10) + ",55%,4%)");
+  g.addColorStop(0.55, "hsl(" + hue + ",45%,10%)");
+  g.addColorStop(1, "hsl(" + (hue - 14) + ",38%," + (20 + 8 * F.energy) + "%)");
+  u.globalCompositeOperation = "source-over";
+  u.fillStyle = g; u.fillRect(0, 0, W, hz);
+  /* 星 — 音名ごとのクロマで瞬く */
+  var ch = F.chroma, hiN = F.hiN || 0;
+  for (var i = 0; i < this.stars.length; i++){
+    var st = this.stars[i];
+    var tw = 0.45 + 0.35 * Math.sin(t * (1.3 + st.r) + st.ph) + 0.9 * (ch[st.pc] || 0) + 0.25 * hiN;
+    u.globalAlpha = Math.max(0.05, Math.min(1, tw));
+    u.fillStyle = "#eaf3ff";
+    u.fillRect(st.x, st.y, st.r, st.r);
+  }
+  u.globalAlpha = 1;
+  /* 月: 単位円 e^{iθ} — β(s,1−s) = π/sin(πs) の円関数 */
+  var mx = W * 0.82, my = hz * 0.2, mr = Math.min(W, H) * 0.045;
+  var mg = u.createRadialGradient(mx, my, mr * 0.2, mx, my, mr * 4);
+  mg.addColorStop(0, "rgba(235,242,255,0.35)"); mg.addColorStop(1, "rgba(235,242,255,0)");
+  u.fillStyle = mg; u.fillRect(mx - mr * 4, my - mr * 4, mr * 8, mr * 8);
+  u.fillStyle = "#eef4ff"; u.beginPath(); u.arc(mx, my, mr, 0, TAU); u.fill();
+  u.fillStyle = "hsl(" + hue + ",40%,9%)";
+  var ph = 0.5 + 0.5 * Math.sin(t * 0.05);
+  u.beginPath(); u.arc(mx + mr * (0.3 + 0.9 * ph), my - mr * 0.15, mr * 0.95, 0, TAU); u.fill();
+  this.drawAurora(u, t, ms, hue);
+  this.drawMountains(u, t, ms);
+};
+
+/* 定理4・6: s ≤ s* のときだけ見えるオーロラ。曲線は ζ(s)=β(p(s),1−p(s))=x(s)log x(s) */
+Renderer.prototype.drawAurora = function(u, t, ms, hue){
+  var W = this.W, hz = this.hz, F = ms.frame;
+  var A = 0.12 + 0.88 * Math.max(0, ms.aurora);
+  var len = hz * (0.14 + 0.06 * Math.log(1 + ms.x));
+  u.globalCompositeOperation = "lighter";
+  for (var b = 0; b < 3; b++){
+    var base = hz * (0.12 + 0.09 * b), hueB = 150 + b * 40 + 30 * Math.sin(t * 0.07 + b) + (hue - 214) * 0.5;
+    var step = Math.max(3, Math.round(W / 360));
+    for (var xx = 0; xx <= W; xx += step){
+      var uu = xx / W, ii = Math.min(AUR_N, Math.floor(uu * AUR_N));
+      var lz = AUR_Z[ii] / AUR_Z[0];
+      var y = base + hz * 0.10 * (1 - lz) + Math.sin(uu * 7 + t * 0.35 + b * 1.7) * hz * 0.035 * (1 + F.midN)
+            + Math.sin(uu * 23 - t * 0.9 + b) * hz * 0.008;
+      var inten = A * (0.35 + 0.65 * Math.pow(Math.sin(uu * 3.1 + t * 0.2 + b) * 0.5 + 0.5, 2)) * (b === 0 ? 1 : 0.6);
+      var gr = u.createLinearGradient(0, y, 0, y + len);
+      gr.addColorStop(0, "hsla(" + hueB + ",90%,65%,0)");
+      gr.addColorStop(0.12, "hsla(" + hueB + ",90%,62%," + (0.22 * inten) + ")");
+      gr.addColorStop(1, "hsla(" + (hueB + 40) + ",80%,50%,0)");
+      u.fillStyle = gr;
+      u.fillRect(xx, y, step, len);
+    }
+  }
+  u.globalCompositeOperation = "source-over";
+};
+
+/* 雪山: 稜線の高さ = log(1 + |Z(t)|),  Z(t) = e^{iθ}ζ(½+it). 零点 ρ で谷になる */
+var MOUNTAIN_LAYERS = [
+  { t0: 60,  speed: 0.25, span: 34, base: 0.20, amp: 0.30, light: 46, sat: 22 },
+  { t0: 140, speed: 0.55, span: 26, base: 0.10, amp: 0.30, light: 30, sat: 26 },
+  { t0: 20,  speed: 1.00, span: 18, base: 0.02, amp: 0.30, light: 17, sat: 30 }
+];
+Renderer.prototype.drawMountains = function(u, t, ms){
+  var W = this.W, hz = this.hz, F = ms.frame;
+  var step = Math.max(3, Math.round(W / 320));
+  for (var li = 0; li < MOUNTAIN_LAYERS.length; li++){
+    var L = MOUNTAIN_LAYERS[li];
+    var tOff = L.t0 + t * L.speed, pts = [], zeros = [], prevZ = null;
+    for (var xx = 0; xx <= W + step; xx += step){
+      var tt = tOff + xx / W * L.span, Z = hardyZ(tt);
+      var h = Math.min(1.25, Math.log1p(Math.abs(Z)) / Math.log1p(4));
+      var y = hz - hz * (L.base + L.amp * h * (0.9 + 0.2 * (F.loN || 0)));
+      pts.push([xx, y]);
+      if (prevZ !== null && (prevZ < 0) !== (Z < 0)) zeros.push([xx - step / 2, y]);
+      prevZ = Z;
+    }
+    var top = hz - hz * (L.base + L.amp * 1.25);
+    var g = u.createLinearGradient(0, top, 0, hz);
+    g.addColorStop(0, "hsl(210,30%," + Math.min(96, L.light + 50) + "%)");
+    g.addColorStop(0.28, "hsl(212," + L.sat + "%," + (L.light + 22) + "%)");
+    g.addColorStop(0.6, "hsl(216," + L.sat + "%," + L.light + "%)");
+    g.addColorStop(1, "hsl(220," + L.sat + "%," + Math.max(5, L.light - 10) + "%)");
+    u.fillStyle = g;
+    u.beginPath(); u.moveTo(0, hz);
+    for (var i = 0; i < pts.length; i++) u.lineTo(pts[i][0], pts[i][1]);
+    u.lineTo(W, hz); u.closePath(); u.fill();
+    /* 稜線の雪明かり */
+    u.strokeStyle = "rgba(235,245,255," + (0.15 + 0.15 * li) + ")";
+    u.lineWidth = 1;
+    u.beginPath();
+    for (i = 0; i < pts.length; i++){ if (i) u.lineTo(pts[i][0], pts[i][1]); else u.moveTo(pts[i][0], pts[i][1]); }
+    u.stroke();
+    /* 非自明な零点 ρ = ½ + it → 谷の灯り */
+    if (li === MOUNTAIN_LAYERS.length - 1){
+      for (var zi = 0; zi < zeros.length; zi++){
+        var zx = zeros[zi][0], zy = zeros[zi][1] + 4;
+        var rg = u.createRadialGradient(zx, zy, 0, zx, zy, 14 + 18 * (F.fluxN || 0));
+        rg.addColorStop(0, "rgba(255,214,140,0.85)"); rg.addColorStop(1, "rgba(255,214,140,0)");
+        u.fillStyle = rg; u.fillRect(zx - 34, zy - 34, 68, 68);
+      }
+    }
+  }
+};
+
+/* 系2: 凍った湖 = 臨界線 Re s = ½ に関する鏡映 s ↔ 1−s */
+Renderer.prototype.drawLake = function(t, ms){
+  var ctx = this.ctx, W = this.W, H = this.H, hz = this.hz, lh = H - hz, F = ms.frame;
+  ctx.fillStyle = "#04070d"; ctx.fillRect(0, hz, W, lh);
+  var sl = 3, amp = 2 + 9 * (F.loN || 0);
+  for (var y = 0; y < lh; y += sl){
+    var sy = Math.round(hz - 1 - y * (hz / lh) * 0.9);
+    if (sy < 0) break;
+    var k = y / lh, dx = Math.sin(y * 0.11 + t * 1.7) * amp * (0.3 + k) + Math.sin(y * 0.033 - t * 0.6) * 3 * k;
+    ctx.globalAlpha = 0.62 * (1 - k * 0.75);
+    ctx.drawImage(this.up, 0, sy, W, Math.max(1, sl * 0.9), dx, hz + y, W, sl);
+  }
+  ctx.globalAlpha = 1;
+  var g = ctx.createLinearGradient(0, hz, 0, H);
+  g.addColorStop(0, "rgba(120,160,210,0.10)"); g.addColorStop(1, "rgba(5,8,14,0.55)");
+  ctx.fillStyle = g; ctx.fillRect(0, hz, W, lh);
+  /* 氷のひび: 円関数 π/sin(πs) の等高線を斜めに */
+  ctx.strokeStyle = "rgba(200,225,255,0.07)"; ctx.lineWidth = 1;
+  for (var c = 1; c <= 5; c++){
+    ctx.beginPath();
+    for (var xx = 0; xx <= W; xx += 8){
+      var s = 0.02 + 0.96 * xx / W, v = Math.log(betaDiag(s) / Math.PI);
+      var yy = hz + lh * (0.15 * c + 0.05 * v);
+      if (xx) ctx.lineTo(xx, yy); else ctx.moveTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+  /* 地平線 = 臨界線 */
+  ctx.strokeStyle = "rgba(220,235,255," + (0.25 + 0.35 * (F.energy || 0)) + ")";
+  ctx.beginPath(); ctx.moveTo(0, hz + 0.5); ctx.lineTo(W, hz + 0.5); ctx.stroke();
+};
+
+/* 定理3: 降雪量 ∝ x(s) = e^{W(ζ(s))}.  定理5: 発音ごとに素数対 (p,q) の結晶 */
+Renderer.prototype.syncCursor = function(an, t){
+  this.noteCursor = 0;
+  if (!an) return;
+  var ns = an.notes, lo = 0, hi = ns.length;
+  while (lo < hi){ var mid = (lo + hi) >> 1; if (ns[mid].start <= t) lo = mid + 1; else hi = mid; }
+  this.noteCursor = lo;
+};
+Renderer.prototype.updateFlakes = function(dt, ms, an, t){
+  var W = this.W, H = this.H, r = this.rand, F = ms.frame, sc = H / 720;
+  var area = W * H / (1280 * 720);
+  var target = Math.min(900, Math.round(22 * ms.x * area));
+  var dots = 0, i;
+  for (i = 0; i < this.flakes.length; i++) if (!this.flakes[i].crystal) dots++;
+  var spawn = Math.min(target - dots, Math.ceil(target * dt * 0.25) + (dt > 0 ? 1 : 0));
+  if (this.flakes.length === 0 && target > 0) spawn = target;     /* 初期化: 画面全体に */
+  for (i = 0; i < spawn; i++){
+    this.flakes.push({ x:r() * W, y:this.flakes.length < target && dt === 0 ? r() * H : -5 - r() * 20,
+                       z:0.3 + r() * 0.7, ph:r() * TAU, crystal:false });
+  }
+  /* 発音 → 結晶 */
+  if (an && dt > 0){
+    var ns = an.notes, made = 0;
+    while (this.noteCursor < ns.length && ns[this.noteCursor].start <= t){
+      var nt = ns[this.noteCursor++];
+      if (nt.start < t - 0.5 || made > 6) continue;
+      var pc = ((nt.midi % 12) + 12) % 12, pq = primePair(pc), xpq = xOfPQ(pq[0], pq[1]);
+      var size = (8 + 26 * nt.vel) * sc * (0.55 + 1.6 * Math.sqrt((xpq - 1) / (xOfPQ(2, 2) - 1)));
+      var fx = W * (0.04 + 0.92 * (nt.midi - an.noteLo) / Math.max(1, an.noteHi - an.noteLo));
+      this.flakes.push({ x:fx, y:-size, z:1, ph:r() * TAU, crystal:true, p:pq[0], q:pq[1], size:size,
+                         rot:r() * TAU, spin:(r() - 0.5) * 0.8, life:0, vel:nt.vel });
+      made++;
+      this.lightPulse = Math.min(1, this.lightPulse + 0.15);
+    }
+  }
+  this.lightPulse *= Math.pow(0.1, dt);
+  var wind = ((F.centroid || 1200) - 1400) / 1400 * 18 * sc;
+  var keep = [];
+  for (i = 0; i < this.flakes.length; i++){
+    var f = this.flakes[i];
+    if (f.crystal){
+      f.y += (16 + 10 * f.vel) * sc * dt;
+      f.x += (wind * 0.6 + Math.sin(t * 0.8 + f.ph) * 6 * sc) * dt;
+      f.rot += f.spin * dt; f.life += dt;
+    } else {
+      f.y += (18 + 42 * f.z) * sc * dt * (0.8 + 0.6 * (F.energy || 0));
+      f.x += (wind * f.z + Math.sin(t * 1.3 + f.ph) * 9 * sc * f.z) * dt;
+    }
+    if (f.x < -40) f.x += W + 80; else if (f.x > W + 40) f.x -= W + 80;
+    if (f.y < H + 40 && !(f.crystal && f.life > 40)) keep.push(f);
+  }
+  /* 多すぎる粒は捨てる (s が大きくなり x(s) が減った時) */
+  if (dots > target * 1.3) keep = keep.filter(function(f, idx){ return f.crystal || idx % 4 !== 0; });
+  this.flakes = keep;
+};
+Renderer.prototype.drawFlakes = function(){
+  var ctx = this.ctx, sc = this.H / 720;
+  ctx.fillStyle = "#f3f8ff";
+  for (var i = 0; i < this.flakes.length; i++){
+    var f = this.flakes[i];
+    if (f.crystal) continue;
+    ctx.globalAlpha = 0.35 + 0.6 * f.z;
+    var rr = (0.6 + 1.9 * f.z) * sc;
+    ctx.fillRect(f.x, f.y, rr, rr);
+  }
+  ctx.globalAlpha = 1;
+  for (i = 0; i < this.flakes.length; i++) if (this.flakes[i].crystal) this.drawCrystal(this.flakes[i]);
+};
+/* 結晶: 6 本の腕。枝の数 ← p, 枝の角度 ← q, 大きさ ← x(p,q) = e^{W(β(p,q))} */
+Renderer.prototype.drawCrystal = function(f){
+  var ctx = this.ctx, r = f.size, nb = 2 + (f.p % 3), ang = Math.PI / (3 + (f.q % 3));
+  ctx.save();
+  ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+  ctx.globalAlpha = Math.max(0, Math.min(0.95, 1.4 - f.life / 30));
+  ctx.strokeStyle = "#f4faff"; ctx.lineWidth = Math.max(1, r / 14); ctx.lineCap = "round";
+  ctx.shadowColor = "rgba(160,210,255,0.9)"; ctx.shadowBlur = r * 0.5;
+  ctx.beginPath();
+  for (var a = 0; a < 6; a++){
+    ctx.moveTo(0, 0); ctx.lineTo(r, 0);
+    for (var j = 1; j <= nb; j++){
+      var px = r * j / (nb + 1), bl = r * 0.42 * (1 - j / (nb + 2)) * (0.6 + 0.1 * (f.q % 5));
+      ctx.moveTo(px, 0); ctx.lineTo(px + bl * Math.cos(ang), bl * Math.sin(ang));
+      ctx.moveTo(px, 0); ctx.lineTo(px + bl * Math.cos(ang), -bl * Math.sin(ang));
+    }
+    ctx.rotate(Math.PI / 3);
+  }
+  ctx.stroke();
+  ctx.restore();
+};
+
+/* 定理1・系1: 上辺の霜 = |ζ(s)|^0.3 (s ∈ [−14.6, −0.35], 定理1で解析接続)。s = −2n の零点で途切れて氷柱になる */
+Renderer.prototype.drawFrost = function(t, ms, o){
+  var ctx = this.ctx, W = this.W, H = this.H, F = ms.frame;
+  var depth = H * (0.035 + 0.05 * (0.4 + 0.6 * (F.loN || 0)));
+  ctx.beginPath(); ctx.moveTo(0, 0);
+  for (var i = 0; i <= FROST_N; i++){
+    var xx = W * i / FROST_N, v = FROST[i];
+    var drip = Math.pow(v, 3) * depth * 1.4 * (0.6 + 0.4 * Math.sin(i * 0.9 + t * 0.5));
+    ctx.lineTo(xx, depth * 0.35 * v + drip);
+  }
+  ctx.lineTo(W, 0); ctx.closePath();
+  var g = ctx.createLinearGradient(0, 0, 0, depth * 1.8);
+  g.addColorStop(0, "rgba(240,248,255,0.92)"); g.addColorStop(1, "rgba(200,225,255,0.15)");
+  ctx.fillStyle = g; ctx.fill();
+  if (o.math){
+    ctx.fillStyle = "rgba(230,240,255,0.75)";
+    ctx.font = Math.round(H * 0.014) + "px ui-monospace,Consolas,monospace";
+    ctx.textAlign = "center";
+    for (var n = 1; n <= 7; n++){
+      var s = -2 * n, xz = W * (s - FROST_S0) / (FROST_S1 - FROST_S0);
+      ctx.fillText(String(s), xz, depth * 0.55 + H * 0.018);
+    }
+    ctx.textAlign = "left";
+  }
+};
+
+/* ピアノロール (参照動画の構成: 再生線, 音名グリッド, コード名, 小節) */
+Renderer.prototype.drawRoll = function(an, t, o, full){
+  if (!an) return;
+  var ctx = this.ctx, W = this.W, H = this.H;
+  var top = full ? H * 0.17 : H * 0.15, bot = full ? H * 0.82 : this.hz - H * 0.03;
+  var lo = an.noteLo, hi = an.noteHi, rows = hi - lo + 1, rh = (bot - top) / rows;
+  var pps = W / 9, playX = W * 0.28;
+  var tBeg = t - playX / pps, tEnd = t + (W - playX) / pps;
+  ctx.save();
+  if (full){
+    ctx.fillStyle = "#0b1119"; ctx.fillRect(0, top, W, bot - top);
+    ctx.fillStyle = "#24515f"; ctx.fillRect(0, top - H * 0.012, W, H * 0.012);
+  }
+  /* 音名グリッド (C ごと) */
+  ctx.font = Math.round(H * 0.013) + "px ui-monospace,Consolas,monospace";
+  for (var m = Math.ceil(lo / 12) * 12; m <= hi; m += 12){
+    var gy = bot - (m - lo + 0.5) * rh;
+    ctx.strokeStyle = full ? "rgba(140,160,190,0.14)" : "rgba(200,220,255,0.07)";
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    ctx.fillStyle = full ? "rgba(160,175,200,0.6)" : "rgba(210,225,255,0.35)";
+    ctx.fillText(midiName(m), 4, gy - 2);
+  }
+  /* 小節線 */
+  var bpm = an.tempo.bpm || 120, barSec = 240 / bpm;
+  ctx.strokeStyle = full ? "rgba(140,160,190,0.10)" : "rgba(200,220,255,0.05)";
+  for (var bt = Math.ceil(tBeg / barSec) * barSec; bt < tEnd; bt += barSec){
+    var bx = playX + (bt - t) * pps;
+    ctx.beginPath(); ctx.moveTo(bx, top); ctx.lineTo(bx, bot); ctx.stroke();
+  }
+  /* 音符 */
+  var ns = an.notes, a = 0, b = ns.length;
+  while (a < b){ var md = (a + b) >> 1; if (ns[md].start < tBeg - 12) a = md + 1; else b = md; }
+  for (var i = a; i < ns.length && ns[i].start < tEnd; i++){
+    var n = ns[i];
+    if (n.end < tBeg || n.midi < lo || n.midi > hi) continue;
+    var x0 = playX + (n.start - t) * pps, x1 = playX + (n.end - t) * pps;
+    var y = bot - (n.midi - lo + 1) * rh + rh * 0.15, h = Math.max(2, rh * 0.7);
+    var on = n.start <= t && t < n.end;
+    if (full){
+      ctx.fillStyle = on ? "#ffd36b" : "rgba(184,146,63," + (0.55 + 0.4 * n.vel) + ")";
+    } else {
+      ctx.fillStyle = on ? "rgba(255,240,200,0.95)" : "rgba(170,210,255," + (0.18 + 0.32 * n.vel) + ")";
+    }
+    if (on){ ctx.shadowColor = full ? "rgba(255,211,107,0.8)" : "rgba(200,230,255,0.9)"; ctx.shadowBlur = 10; }
+    ctx.fillRect(x0, y, Math.max(1.5, x1 - x0 - 1), h);
+    ctx.shadowBlur = 0;
+  }
+  /* 再生線 */
+  ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = Math.max(1, H / 600);
+  ctx.beginPath(); ctx.moveTo(playX, top); ctx.lineTo(playX, bot); ctx.stroke();
+  /* コード名 */
+  var F = an.frames[frameIndexAt(an, t)];
+  if (F.chord){
+    ctx.fillStyle = full ? "#e8e2d0" : "rgba(240,246,255,0.9)";
+    ctx.font = "italic " + Math.round(H * 0.026) + "px Georgia,'Times New Roman',serif";
+    ctx.fillText(F.chord.name, playX + 6, bot - 6);
+  }
+  ctx.restore();
+};
+
+Renderer.prototype.drawHud = function(an, t, ms, o){
+  var ctx = this.ctx, W = this.W, H = this.H, pad = Math.round(W * 0.012) + 6;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 6;
+  ctx.fillStyle = "#f2f5fa"; ctx.textBaseline = "top";
+  var ts = Math.round(H * 0.036);
+  ctx.font = ts + "px Georgia,'Noto Serif JP','Yu Mincho','Hiragino Mincho ProN',serif";
+  ctx.fillText(o.title || "Bada 冬景", pad, H * 0.095);
+  ctx.font = Math.round(H * 0.017) + "px ui-monospace,Consolas,monospace";
+  ctx.fillStyle = "rgba(220,230,245,0.8)";
+  var sub = o.subtitle ? o.subtitle + " — " : "";
+  if (an) sub += an.key.nameJa + " · " + Math.round(an.tempo.bpm) + " BPM · 冬景色 × β–ζ 方程式群";
+  else sub += "冬景色 × β–ζ 方程式群";
+  ctx.fillText(sub, pad, H * 0.095 + ts * 1.15);
+  if (an){
+    var ba = barAt(an, t), rx = W - pad - W * 0.13;
+    ctx.font = Math.round(H * 0.017) + "px Georgia,serif";
+    ctx.fillStyle = "#e9edf5";
+    ctx.fillText("Bar " + ba.bar + " / " + ba.total, rx, H * 0.095);
+    ctx.fillText(fmtTime(t) + " / " + fmtTime(an.duration), rx, H * 0.095 + H * 0.024);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect(rx, H * 0.095 + H * 0.052, W * 0.13, 3);
+    ctx.fillStyle = "#cfe3ff"; ctx.fillRect(rx, H * 0.095 + H * 0.052, W * 0.13 * Math.min(1, t / an.duration), 3);
+  }
+  ctx.restore();
+};
+
+Renderer.prototype.drawMath = function(ms, o){
+  var ctx = this.ctx, W = this.W, H = this.H, pad = Math.round(W * 0.012) + 6;
+  var fs = Math.max(10, Math.round(H * 0.0145)), lh = fs * 1.45;
+  function f(v, d){ return isFinite(v) ? v.toFixed(d) : "—"; }
+  var lines = [
+    "定理3  s=" + f(ms.s, 3) + "  ζ(s)=" + f(ms.zeta, 4) + "  x(s)=e^{W(ζ(s))}=" + f(ms.x, 4) + "  → 降雪量",
+    "定理4  p(s)=arcsin(π/ζ(s))/π=" + f(ms.p, 4) + "  (s* = " + S_STAR.toFixed(6) + ")  → オーロラ " + Math.round(Math.max(0, ms.aurora) * 100) + "%",
+    "定理5  " + (ms.chord ? ms.chord.name + " → " : "") + "β(" + ms.pq[0] + "," + ms.pq[1] + ")=" + ms.betaPQ.toExponential(3) +
+      "  x(p,q)=e^{W(β)}=" + f(ms.xPQ, 6) + "  → 結晶",
+    "定理1  ζ(s)=2ˢπˢ⁻¹sin(πs/2)·β(s,1−s)/Γ(s)·ζ(1−s)   系1 ζ(−2n)=0 → 氷柱   系2 Re s=½ → 湖面",
+    "Ξ=β(H+1,M+1)=" + f(ms.inv.xi, 5) + "  (H=" + f(ms.inv.H, 3) + " bit, M=" + f(ms.inv.M, 4) + ")  x_Ξ=" + f(ms.inv.x, 5)
+  ];
+  var y0 = H - pad - lh * lines.length;
+  ctx.save();
+  ctx.fillStyle = "rgba(4,8,14,0.45)";
+  ctx.fillRect(pad - 6, y0 - 6, Math.min(W - 2 * pad + 12, fs * 52), lh * lines.length + 10);
+  ctx.font = fs + "px ui-monospace,'Cascadia Mono',Consolas,monospace";
+  ctx.textBaseline = "top";
+  for (var i = 0; i < lines.length; i++){
+    ctx.fillStyle = i === 4 ? "rgba(255,220,150,0.85)" : "rgba(205,225,250,0.85)";
+    ctx.fillText(lines[i], pad, y0 + i * lh);
+  }
+  ctx.restore();
+};
+
+/* ── 5. 再生・解析・録画・保存 ─────────────────────────────────────── */
+function boot(){
+  var $ = function(id){ return document.getElementById(id); };
+  var cv = $("cv"), renderer = new Renderer(cv);
+  var AC = null, gainNode = null, buffer = null, src = null, startAt = 0, offset = 0, playing = false;
+  var analysis = null, recorder = null, recDest = null, recChunks = [], recBlob = null, recChoice = null, recording = false;
+  var fileBase = "fuyukei";
+
+  function setMsg(t, err){ $("msg").textContent = t || ""; $("msg").className = err ? "err" : ""; }
+  function setProgress(p){ $("progress").firstElementChild.style.width = Math.round(p * 100) + "%"; }
+
+  function applyResolution(){
+    var r = parseResolution($("res").value);
+    renderer.resize(r.w, r.h);
+    cv.style.aspectRatio = r.w + " / " + r.h;
+  }
+  applyResolution();
+  $("res").addEventListener("change", function(){ if (!recording) applyResolution(); });
+
+  function ensureCtx(){
+    if (!AC){
+      var Ctor = window.AudioContext || window.webkitAudioContext;
+      AC = new Ctor();
+      gainNode = AC.createGain();
+      gainNode.connect(AC.destination);
+    }
+    if (AC.state === "suspended") AC.resume();
+  }
+  function now(){ return playing ? Math.min(buffer.duration, AC.currentTime - startAt) : offset; }
+  function stopSrc(){
+    if (src){ src.onended = null; try { src.stop(); } catch (e) {} src.disconnect(); src = null; }
+  }
+  function play(from){
+    if (!buffer) return;
+    ensureCtx(); stopSrc();
+    from = Math.max(0, Math.min(buffer.duration - 0.01, from));
+    src = AC.createBufferSource(); src.buffer = buffer; src.connect(gainNode);
+    src.onended = function(){
+      playing = false; offset = buffer.duration; updateButtons();
+      if (recording) setTimeout(stopRecording, 400);
+    };
+    startAt = AC.currentTime - from;
+    src.start(0, from);
+    playing = true; renderer.lastT = null; updateButtons();
+  }
+  function pause(){ if (!playing) return; offset = now(); stopSrc(); playing = false; updateButtons(); }
+  function updateButtons(){
+    $("btnPlay").disabled = !buffer || recording;
+    $("btnPlay").textContent = playing ? "⏸ 一時停止" : "▶ 再生";
+    $("btnStop").disabled = !buffer;
+    $("seek").disabled = !buffer || recording;
+    $("btnRec").disabled = !buffer || recording;
+    $("btnRec").textContent = recording ? "⏺ 書き出し中…" : "🎬 動画を書き出し";
+    $("btnSave").disabled = !recBlob;
+    $("res").disabled = recording; $("fps").disabled = recording;
+  }
+
+  function opts(){
+    return { mode: $("mode").value, math: $("optMath").checked, hud: $("optHud").checked,
+             title: $("title").value.trim(), subtitle: $("subtitle").value.trim() };
+  }
+  function loop(){
+    var t = buffer ? now() : performance.now() / 1000;
+    renderer.draw(t, analysis, opts());
+    if (buffer){
+      $("time").textContent = fmtTime(t) + " / " + fmtTime(buffer.duration);
+      if (!seeking) $("seek").value = Math.round(1000 * t / buffer.duration);
+    }
+    requestAnimationFrame(loop);
+  }
+  var seeking = false;
+  $("seek").addEventListener("input", function(){
+    seeking = true;
+    var t = buffer.duration * $("seek").value / 1000;
+    if (playing) play(t); else { offset = t; renderer.lastT = null; }
+  });
+  $("seek").addEventListener("change", function(){ seeking = false; });
+
+  function showInfo(an){
+    var nNotes = an.notes.length, chords = {}, i;
+    for (i = 0; i < an.frames.length; i++) if (an.frames[i].chord) chords[an.frames[i].chord.name] = (chords[an.frames[i].chord.name] || 0) + 1;
+    var top = Object.keys(chords).sort(function(a, b){ return chords[b] - chords[a]; }).slice(0, 8).join(" ");
+    $("info").textContent =
+      "長さ      " + fmtTime(an.duration) + "\n" +
+      "調        " + an.key.nameJa + " (" + an.key.name + ")\n" +
+      "テンポ    " + an.tempo.bpm.toFixed(1) + " BPM / " + barAt(an, an.duration).total + " 小節\n" +
+      "音符      " + nNotes + " (" + midiName(an.noteLo) + "–" + midiName(an.noteHi) + ")\n" +
+      "主なコード " + (top || "—") + "\n" +
+      "Ξ (曲全体) " + an.invariant.xi.toFixed(5) + "  x_Ξ=" + an.invariant.x.toFixed(5) + "\n" +
+      "s*        " + S_STAR.toFixed(9);
+  }
+
+  function loadBuffer(buf, name){
+    pause(); stopSrc(); offset = 0; analysis = null; buffer = buf; renderer.reset(); renderer.resize(renderer.W, renderer.H);
+    recBlob = null; updateButtons();
+    fileBase = sanitizeName(name);
+    if (!$("title").value) $("title").value = name;
+    $("drop").classList.add("hide");
+    var ch = buf.numberOfChannels, len = buf.length, mono = new Float32Array(len);
+    for (var c = 0; c < ch; c++){ var d = buf.getChannelData(c); for (var i = 0; i < len; i++) mono[i] += d[i] / ch; }
+    var fps = +$("fps").value || 30;
+    var an = createAnalyzer(mono, buf.sampleRate, { fps: Math.min(fps, 30) });
+    setMsg("解析中… (音符・コード・調・テンポ)");
+    (function tick(){
+      var r = an.step(120);
+      setProgress(r.progress);
+      if (!r.done){ setTimeout(tick, 0); return; }
+      analysis = an.result();
+      showInfo(analysis);
+      setMsg("✅ 解析完了 — ▶ 再生 または 🎬 動画を書き出し");
+      updateButtons();
+    })();
+  }
+
+  function decode(arrayBuf, name){
+    ensureCtx();
+    setMsg("デコード中…"); setProgress(0);
+    var done = function(b){ loadBuffer(b, name); };
+    var fail = function(e){ setMsg("この形式は読み込めませんでした: " + (e && e.message || e), true); };
+    try {
+      var p = AC.decodeAudioData(arrayBuf, done, fail);
+      if (p && typeof p.then === "function") p.catch(function(){});
+    } catch (e) { fail(e); }
+  }
+  function openFile(file){
+    if (!file) return;
+    var name = file.name.replace(/\.[^.]+$/, "");
+    var fr = new FileReader();
+    fr.onload = function(){ decode(fr.result, name); };
+    fr.onerror = function(){ setMsg("ファイルを読めませんでした。", true); };
+    fr.readAsArrayBuffer(file);
+  }
+  $("btnOpen").addEventListener("click", function(){ ensureCtx(); $("file").click(); });
+  $("file").addEventListener("change", function(){ openFile(this.files[0]); this.value = ""; });
+  $("btnDemo").addEventListener("click", function(){
+    ensureCtx();
+    var sec = 32, data = synthDemo(AC.sampleRate, sec), b = AC.createBuffer(1, data.length, AC.sampleRate);
+    b.getChannelData(0).set(data);
+    $("title").value = "";
+    loadBuffer(b, "Winter Demo — Bm G D A");
+  });
+  var stage = $("stage");
+  stage.addEventListener("dragover", function(e){ e.preventDefault(); });
+  stage.addEventListener("drop", function(e){
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]);
+  });
+
+  $("btnPlay").addEventListener("click", function(){ ensureCtx(); if (playing) pause(); else play(offset >= buffer.duration - 0.05 ? 0 : offset); });
+  $("btnStop").addEventListener("click", function(){
+    if (recording) { stopSrc(); playing = false; stopRecording(); }
+    else { pause(); offset = 0; renderer.reset(); renderer.resize(renderer.W, renderer.H); }
+    updateButtons();
+  });
+  $("btnFull").addEventListener("click", function(){
+    var el = stage;
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (el.requestFullscreen) el.requestFullscreen();
+  });
+  document.addEventListener("keydown", function(e){
+    if (e.code === "Space" && buffer && !recording && e.target.tagName !== "INPUT" && e.target.tagName !== "SELECT"){
+      e.preventDefault(); $("btnPlay").click();
+    }
+  });
+
+  /* 録画: canvas.captureStream + Web Audio → MediaRecorder */
+  var canRecord = typeof window.MediaRecorder === "function" && typeof cv.captureStream === "function";
+  recChoice = canRecord ? pickRecorderMime(function(m){ return MediaRecorder.isTypeSupported(m); }) : null;
+  $("recfmt").textContent = canRecord ? "出力形式: " + recChoice.label + " (リアルタイム録画: 曲の長さと同じ時間がかかります)" : "この環境は動画の書き出しに対応していません (再生・全画面表示は可能)";
+
+  function startRecording(){
+    if (!buffer || !analysis || !canRecord) return;
+    ensureCtx(); pause();
+    var fps = +$("fps").value || 30, r = parseResolution($("res").value);
+    applyResolution(); renderer.reset(); renderer.resize(r.w, r.h);
+    var vstream = cv.captureStream(fps);
+    recDest = AC.createMediaStreamDestination();
+    gainNode.connect(recDest);
+    var stream = new MediaStream(vstream.getVideoTracks().concat(recDest.stream.getAudioTracks()));
+    var o = { videoBitsPerSecond: videoBitrate(r.w, r.h, fps), audioBitsPerSecond: 192000 };
+    if (recChoice.mime) o.mimeType = recChoice.mime;
+    try { recorder = new MediaRecorder(stream, o); }
+    catch (e) { recorder = new MediaRecorder(stream); recChoice = { mime:"", ext:"webm", label:"WebM" }; }
+    recChunks = []; recBlob = null;
+    recorder.ondataavailable = function(e){ if (e.data && e.data.size) recChunks.push(e.data); };
+    recorder.onstop = function(){
+      recBlob = new Blob(recChunks, { type: recorder.mimeType || (recChoice.ext === "mp4" ? "video/mp4" : "video/webm") });
+      recording = false;
+      try { gainNode.disconnect(recDest); } catch (e) {}
+      setMsg("✅ 書き出し完了 (" + (recBlob.size / 1048576).toFixed(1) + " MB) — 💾 動画を保存");
+      updateButtons();
+    };
+    recording = true; updateButtons();
+    recorder.start(1000);
+    setMsg("⏺ 書き出し中… ウィンドウを前面に表示したままにしてください。");
+    offset = 0; play(0);
+  }
+  function stopRecording(){
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  }
+  $("btnRec").addEventListener("click", startRecording);
+
+  function anchorDownload(blob, name){
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); }, 0);
+    setMsg("💾 " + name + " をダウンロードしました。");
+  }
+  function saveVideo(){
+    if (!recBlob){ setMsg("保存できる動画がありません。", true); return; }
+    var ext = /mp4/.test(recBlob.type) ? "mp4" : "webm", name = sanitizeName(fileBase + " — 冬景") + "." + ext;
+    var plainType = ext === "mp4" ? "video/mp4" : "video/webm";
+    var cdv = window.cordova && window.cordova.plugins && window.cordova.plugins.saveDialog;
+    if (cdv && typeof cdv.saveFile === "function"){
+      setMsg("保存先を選択してください…");
+      cdv.saveFile(recBlob, name).then(
+        function(){ setMsg("✅ 保存しました: " + name); },
+        function(err){ if (err && !/cancel/i.test(String(err))) setMsg("保存に失敗しました: " + err, true); else setMsg(""); });
+      return;
+    }
+    if (typeof window.showSaveFilePicker === "function"){
+      var acc = {}; acc[plainType] = ["." + ext];
+      window.showSaveFilePicker({ suggestedName: name, types: [{ description: "動画ファイル", accept: acc }] })
+        .then(function(h){ return h.createWritable(); })
+        .then(function(w){ return w.write(recBlob).then(function(){ return w.close(); }); })
+        .then(function(){ setMsg("✅ 保存しました: " + name); })
+        .catch(function(e){ if (e && e.name === "AbortError") return; anchorDownload(recBlob, name); });
+      return;
+    }
+    anchorDownload(recBlob, name);
+  }
+  $("btnSave").addEventListener("click", saveVideo);
+
+  /* テスト・自動化用フック */
+  window.__fuyukei = {
+    loadSamples: function(data, sr, name){
+      ensureCtx();
+      var b = AC.createBuffer(1, data.length, sr); b.getChannelData(0).set(data); loadBuffer(b, name || "test");
+    },
+    seek: function(t){ offset = t; renderer.lastT = null; },
+    state: function(){ return { analysis: !!analysis, time: now(), recording: recording, notes: analysis ? analysis.notes.length : 0,
+                                key: analysis ? analysis.key.nameJa : null, bpm: analysis ? analysis.tempo.bpm : null }; },
+    drawAt: function(t){ renderer.draw(t, analysis, opts()); },
+    renderAt: function(t, steps){
+      renderer.lastT = null; renderer.syncCursor(analysis, Math.max(0, t - 2));
+      for (var k = (steps || 60); k >= 0; k--) renderer.draw(Math.max(0, t - k / 30), analysis, opts());
+    }
+  };
+
+  updateButtons();
+  requestAnimationFrame(loop);
+}
+
+if (!(typeof window !== "undefined" && window.__ENGINE_TEST__)){
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+}
+</script>
+</body>
+</html>
