@@ -2212,6 +2212,22 @@ XCIV (11 分 44 秒) をまるごと 16 倍にすると 3 時間 8 分になる�
 python3 compose_tablet95.py score_tablet94.json score_tablet95.json && python3 synth.py score_tablet95.json tablet95.wav && python3 video.py score_tablet95.json tablet95.wav tablet95.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions XCVI · Fuga per augmentationem XVI integra (Klavier) (XCIV をまるごと 16 倍に — 3 時間 8 分、声なし, ニ短調, ♩=60)
+
+XCV は核の 3 小節を 4 つ選んだが、ここでは XCIV (176 小節、11 分 44 秒) の **すべての 3 小節** (59 の窓) を順に、XCV と同じ 3 つの速さ (×16 の骨組み・×4 が 4 回・×1 が 8 回) で同時に鳴らす。
+176 小節 × 16 = **2816 小節 = 3 時間 7 分 44 秒**。
+
+- **声を消す**: XCIV の Prologo / Epilogo で流していた piano_solo_8x.mp4 の実音 (声が入っている) をやめ、その採譜 (basic-pitch、+5) をピアノの 1 音で弾いて、同じ 3 つの速さに。
+  これで音はすべて 9/24 08:53 の録音から切り出したピアノの 1 音だけ
+- 楽譜が途切れる所 (XCIV 146 小節目の 2 拍目) もそのまま 16 倍の所 (2340 小節目) で全部が止まり、沈黙 (4 小節 → 64 小節 = 4 分 16 秒) も 16 倍に
+- **長い曲を分割して作る** (`render_long.py`): 192 小節 (12 分 48 秒) ずつ synth.py で合成し (正規化の基準を `fixed_peak` で固定、`no_fade`)、前の区間の残響 7 秒を次の区間の頭に重ねてつなぐ。
+  動画も区間ごとに video.py で描き (`bar_offset` / `time_offset` で小節番号と時間は全体のものを表示、`fps` 15)、ffmpeg で連結。送れる大きさ (30 MiB 以下) の部にも分ける
+
+```bash
+python3 compose_tablet96.py score_tablet94.json bp_cache/piano_solo_8x_2130_2386.json score_tablet96.json
+python3 render_long.py score_tablet96.json out96 192 3      # out96/tablet96.mp4 (全体)、out96/tablet96.m4a (音)、out96/parts/tablet96_NN.mp4 (部)
+```
+
 ## 作り方 (再現)
 
 ```bash

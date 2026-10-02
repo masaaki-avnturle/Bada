@@ -143,6 +143,10 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     harm = d['harm']
     bar_times = d.get('bar_times') or [b * bpb * spb for b in range(d['nbars'] + 1)]
     bt = np.array(bar_times)
+    global FPS
+    FPS = int(meta.get('fps', FPS))                                                   # 長い曲は fps を下げて描ける
+    BOFF = int(meta.get('bar_offset', 0)); NB_ALL = int(meta.get('total_bars', d['nbars']))   # 分割して描くとき: 小節番号と時間の表示を全体のものに
+    TOFF = float(meta.get('time_offset', 0.0)); T_ALL = meta.get('total_time')
     def beat_at(tm):
         b = int(np.searchsorted(bt, tm, side='right') - 1); b = max(0, min(b, len(bt) - 2))
         return b * bpb + (tm - bt[b]) / (bt[b + 1] - bt[b]) * bpb
@@ -229,8 +233,11 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         # 小節番号・時間
         beat = beat_at(now); bar = int(beat // bpb) + 1
         if bar <= d['nbars']:
-            dr.text((W - 250, 22), 'Bar %d / %d' % (bar, d['nbars']), font=f_num, fill=(200, 204, 216))
-        dr.text((W - 250, 48), '%d:%02d / %d:%02d' % (now // 60, now % 60, total // 60, total % 60), font=f_num, fill=(140, 146, 166))
+            dr.text((W - 250, 22), 'Bar %d / %d' % (bar + BOFF, NB_ALL), font=f_num, fill=(200, 204, 216))
+        tn, tt = now + TOFF, (T_ALL if T_ALL else total)
+        tstr = (('%d:%02d:%02d' % (tn // 3600, (tn % 3600) // 60, tn % 60)) if tt >= 3600 else ('%d:%02d' % (tn // 60, tn % 60)))
+        tstr2 = (('%d:%02d:%02d' % (tt // 3600, (tt % 3600) // 60, tt % 60)) if tt >= 3600 else ('%d:%02d' % (tt // 60, tt % 60)))
+        dr.text((W - 250, 48), tstr + ' / ' + tstr2, font=f_num, fill=(140, 146, 166))
         # 小節線
         first_bar = int(np.searchsorted(bt, now - back, side='right') - 2)
         for b in range(max(first_bar, 0), len(bt)):
@@ -239,7 +246,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             if 0 <= x <= W:
                 dr.line([(x, ROLL_Y0 - 6), (x, ROLL_Y1 + 6)], fill=(34, 38, 56))
                 if b + 1 <= d['nbars']:
-                    dr.text((x + 3, ROLL_Y0 - 4), str(b + 1), font=f_small, fill=(70, 76, 98))
+                    dr.text((x + 3, ROLL_Y0 - 4), str(b + 1 + BOFF), font=f_small, fill=(70, 76, 98))
         # 録音の実音が流れる区間
         for e in recs:
             x0 = NOW_X + (e['t'] - now) * PPS; x1 = NOW_X + (e['t'] + e['d'] - now) * PPS

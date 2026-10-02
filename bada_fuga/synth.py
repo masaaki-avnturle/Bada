@@ -1199,12 +1199,13 @@ def main(score='score.json', out='fuga.wav'):
     mixL = L + wet * Lw * 3.0 + HL; mixR = R + wet * Rw * 3.0 + HR
     st = np.stack([mixL, mixR], axis=1)
     peak = np.abs(st).max()
-    st = st / peak * 0.89
+    norm = float(d.get('meta', {}).get('fixed_peak') or peak)     # 長い曲を分割して合成するときは、同じ基準で正規化する
+    st = st / norm * 0.89
     # soft knee
     st = np.tanh(st * 1.15) / np.tanh(1.15)
     # fade out tail
     tail = int((5.0 if (requiem or piano or symphony or mantra or recs) else 2.5) * SR)
-    st[-tail:] *= np.linspace(1, 0, tail)[:, None]
+    if not d.get('meta', {}).get('no_fade'): st[-tail:] *= np.linspace(1, 0, tail)[:, None]
     sf.write(out, st, SR, subtype='PCM_16')
     print('wrote', out, '%.1fs' % total, 'peak', peak)
 
