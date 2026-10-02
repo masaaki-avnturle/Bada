@@ -2064,6 +2064,22 @@ python3 build_sampler.py bank87 20260925_125053.mp3
 python3 compose_tablet87.py bank85/bank.json bank87/bank.json score_tablet86.json score_tablet87.json && python3 synth.py score_tablet87.json tablet87.wav && python3 video.py score_tablet87.json tablet87.wav tablet87.mp4
 ```
 
+## 🎹🌸 Requiem BADA — Tablet Sessions LXXXVIII · Summa dolce (LXXXVII をベースに、提出された全曲の主題を表に — 4 倍・8 倍・16 倍を使い分けて, ホ短調, 5 分 10 秒)
+
+- **ベース (後ろ)**: LXXXVII (Fiore dolce XVI) をそのまま、×0.7 で少し後ろへ
+- **表 (前)**: 提出された曲の主題をホ短調に移して伸ばし、2 拍ごと (16 倍は 4 拍ごと) に息をするように打ち直す。ソプラノはオクターヴ下、バスはオクターヴ上を薄く重ねる
+  - **背骨 — cp14_x8**: Contrapunctus BADA の主題 I (レ・ミ・ファ・ファ#・ソ・ラ・ソ・ファ・ミ・レ・ド#・レ、20 拍) を **×16** = 320 拍 = 曲全体 (80 小節)、アルト
+  - **08:53** (tablet60 の主題 ①: ミ・ファ#・シ・ミ・ミ) **×4** 小節 3〜 と 70〜 (再現) ／ **acceptance** (タブレットの主題: シ・ラ・ソ・ラ・ソ・ファ#) ×4 小節 11〜
+  - **requiem** (ディエス・イレ: ソ・ファ#・ソ・ミ・ファ#・レ・ミ) **×8** 小節 21〜 ／ **symphony** (歌う嘆きのバス: ミ・ファ#・ソ・レ#・ミ・ファ#・レ) ×8 バス、小節 38〜
+  - **tablet60** (主題 ② 11:21、ヘ短調からホ短調へ) ×4 小節 40〜 ／ **tablet** (主題 ① 17:48) ×4 小節 49〜、(主題 ⑤ 08:09) ×4 小節 57〜
+- 入りの小節は前後 2 小節の範囲で、ベースの和音 (4 小節で巡る Em7 → Cmaj7 → Am7 → B7 の系統) と半音でぶつかる長さがいちばん短い位置に。ぶつかる和音の間は打ち直さず余韻だけ
+  (主題 I ×16 は 320 拍のうち 68 拍がぶつかるので、その拍は打ち直さない)
+- 表の主題はベースより約 3〜4 dB 大きく (ステムで測って 0.5 → 0.28)。すべてピアノの実音 (声なし)。音域ド 2〜ミ 5
+
+```bash
+python3 compose_tablet88.py score_tablet87.json score_tablet88.json && python3 synth.py score_tablet88.json tablet88.wav && python3 video.py score_tablet88.json tablet88.wav tablet88.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
