@@ -2266,7 +2266,7 @@ XCVII (56 分、3 部) を 3 つの層に凝縮して同時に鳴らす (42 小�
 
 ```bash
 # rec0853_fast.wav: 録音 (頭の 2.4 秒を飛ばして) を librosa.effects.time_stretch で 160 秒に
-python3 compose_tablet98.py bank85/bank.json rec0853_fast.wav score_tablet98.json && python3 synth.py score_tablet98.json tablet98.wav && python3 video.py score_tablet98.json tablet98.wav tablet98.mp4
+python3 compose_tablet98.py bank85p/bank.json rec0853_fast.wav score_tablet98.json && python3 synth.py score_tablet98.json tablet98.wav && python3 video.py score_tablet98.json tablet98.wav tablet98.mp4
 ```
 
 ## 🎹🕯🎉 Requiem BADA — Tablet Sessions XCIX · Praeludium, Fuga e Requiem XVI — Natalitia (08:09) (9/23 08:09 を 16 倍に — 規律的に、洗脳的に、フーガでありレクイエムであり、前奏曲と間奏曲をはさみ、終焉が生誕祭へ, ホ短調 → ホ長調, ♩=60, 56 分 32 秒)
@@ -2279,7 +2279,7 @@ XCVII と同じ設計を、9/23 08:09 の録音 (3 分 37 秒、ホ短調) で�
   録音の終わりの 25 秒は骨組みには入らず、生誕祭に変わる
 
 ```bash
-python3 compose_tablet99.py bank85/bank.json score_tablet99.json && python3 render_long.py score_tablet99.json out99 192 3
+python3 compose_tablet99.py bank85p/bank.json score_tablet99.json && python3 render_long.py score_tablet99.json out99 192 3
 ```
 
 ## 🎹🔔 Requiem BADA — Tablet Sessions C · Tre in uno (08:09) (XCIX の 3 つの部を同時に — 上手に共鳴させて、3 分以内に, ホ短調 → ホ長調, ♩=60, 2 分 55 秒)
@@ -2288,7 +2288,17 @@ XCVIII と同じ設計を 08:09 で: 第 1 部の層 = 採譜を実速に戻し�
 第 3 部の層 = 30 小節目から鼓動・祝鐘・マントラ、36 小節目から 3 つの層ともホ長調。音はすべて 08:09 のピアノの 1 音と鐘。声なし
 
 ```bash
-python3 compose_tablet100.py bank85/bank.json score_tablet100.json && python3 synth.py score_tablet100.json tablet100.wav && python3 video.py score_tablet100.json tablet100.wav tablet100.mp4
+python3 compose_tablet100.py bank85p/bank.json score_tablet100.json && python3 synth.py score_tablet100.json tablet100.wav && python3 video.py score_tablet100.json tablet100.wav tablet100.mp4
+```
+
+## 🎹 音源の注意 — bank85p (bank85 から 9/28 の「歌」の録音の音を除いたピアノだけの音源)
+
+bank85 には 9/28 06:42・17:46 (歌の録音) から切り出した低い音 (40〜50) が入っていて、`sampler_tone` は要る高さにいちばん近い音を (録音をまたいで) 選ぶので、
+低い保続音・鼓動の低いオクターヴ・バス声部がその歌の音になり、XCVIII・C で「喘ぎ声」のように聞こえた。
+bank85p = bank85 の samples から rid が 20260928 のものを除いたもの (83 音、9 本のピアノの録音)。XCVIII・C・XCIX はこれで作り直した。
+
+```bash
+python3 -c "import json; b=json.load(open('bank85/bank.json')); b['samples']=[s for s in b['samples'] if not s['rid'].startswith('20260928')]; json.dump(b, open('bank85p/bank.json','w'))"
 ```
 
 ## 作り方 (再現)
