@@ -2269,6 +2269,28 @@ XCVII (56 分、3 部) を 3 つの層に凝縮して同時に鳴らす (42 小�
 python3 compose_tablet98.py bank85/bank.json rec0853_fast.wav score_tablet98.json && python3 synth.py score_tablet98.json tablet98.wav && python3 video.py score_tablet98.json tablet98.wav tablet98.mp4
 ```
 
+## 🎹🕯🎉 Requiem BADA — Tablet Sessions XCIX · Praeludium, Fuga e Requiem XVI — Natalitia (08:09) (9/23 08:09 を 16 倍に — 規律的に、洗脳的に、フーガでありレクイエムであり、前奏曲と間奏曲をはさみ、終焉が生誕祭へ, ホ短調 → ホ長調, ♩=60, 56 分 32 秒)
+
+XCVII と同じ設計を、9/23 08:09 の録音 (3 分 37 秒、ホ短調) で。主題は採譜の最上声から **ソ・ファ#・ソ・シ・ミ** (8 拍)。
+
+- XCVII との違い: 録音そのものを引き伸ばした「霧」と「4 倍の録音」は、位相ボコーダの持続音が声のように聞こえるので使わない。間奏曲は **採譜の同じ所を 4 倍の速さでピアノが通る** (骨組み ×16 とのメンスーラ・カノン)。
+  音はすべて 08:09 の録音から切り出したピアノの 1 音 (bank85) と鐘。声なし
+- 形式は XCVII と同じ 848 小節 (Praeludium 48 → ×5 [Fuga 32 → Interludium 32 → Requiem 64] → Finis 72 → Natalitia 80 → Coda 8)。生誕祭は **ホ長調** (短 3 度・短 6 度・短 7 度を上げる)。
+  録音の終わりの 25 秒は骨組みには入らず、生誕祭に変わる
+
+```bash
+python3 compose_tablet99.py bank85/bank.json score_tablet99.json && python3 render_long.py score_tablet99.json out99 192 3
+```
+
+## 🎹🔔 Requiem BADA — Tablet Sessions C · Tre in uno (08:09) (XCIX の 3 つの部を同時に — 上手に共鳴させて、3 分以内に, ホ短調 → ホ長調, ♩=60, 2 分 55 秒)
+
+XCVIII と同じ設計を 08:09 で: 第 1 部の層 = 採譜を実速に戻して 160 秒に (録音の 215 秒 × 0.744)、第 2 部の層 = 主題 ソ・ファ#・ソ・シ・ミ の 4 声フーガ (和音は録音の進行に寄せて選ぶ)、
+第 3 部の層 = 30 小節目から鼓動・祝鐘・マントラ、36 小節目から 3 つの層ともホ長調。音はすべて 08:09 のピアノの 1 音と鐘。声なし
+
+```bash
+python3 compose_tablet100.py bank85/bank.json score_tablet100.json && python3 synth.py score_tablet100.json tablet100.wav && python3 video.py score_tablet100.json tablet100.wav tablet100.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
