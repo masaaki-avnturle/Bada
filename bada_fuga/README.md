@@ -2165,6 +2165,29 @@ python3 compose_tablet92.py piano_solo_8x.wav score_tablet92.json && python3 syn
 python3 compose_tablet93.py score_tablet92.json bank85/bank.json score_tablet93.json && python3 synth.py score_tablet93.json tablet93.wav && python3 video.py score_tablet93.json tablet93.wav tablet93.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions XCIV · Fuga per augmentationem (Klavier) (XCIII の全音符を 2 倍に伸ばして、フーガを醸す曲に, ニ短調, ♩=60, 11 分 44 秒)
+
+XCIII (piano_solo_8x の主題による Contrapunctus XIV、すべて実音のピアノ) をもとに、**全音符を 2 倍に** (拡大 — 『フーガの技法』Contrapunctus VII "per augmentationem" のように) して、
+伸ばしたフーガの上に主題を**元の速さ (×1)** で重ねて、フーガを醸す。声なし (XCIII にも声はない)。
+
+- すべての音の長さと時刻を 2 倍に: 88 小節 → 176 小節 (♩=60 のまま)。4 拍より長くなった音は 2 拍ごとに打ち直す (ピアノなので)。和音・区切り・途切れる所 (148 小節目の 2 拍目) も 2 倍に
+- Prologo / Epilogo の piano_solo_8x の実音は速さを変えず、2 倍の長さの窓を流す (Prologo: 2186〜2250 秒 = 主題 I を採った所の全部、Epilogo: 2250〜2346 秒)
+- **フーガを醸す** — 同じ主題の ×2 と ×1 が同時に鳴る拡大カノン (PF extras、`FUGA` の表):
+
+| 所 (XCIII の小節) | 伸ばした (×2) もの | 重ねる ×1 の主題 |
+|:--|:--|:--|
+| Prologo (8〜12) | piano_solo_8x の実音 | 主題 I がアルトで、ソプラノが答唱 |
+| Sectio I 低音の拡大 (27〜31) | 主題 I ×4 (低音) | 主題 II が高く 2 回 |
+| Sectio I 属音の保続 (31〜33) | ラ の保続と主題 I ×2 | 主題 I のストレッタ (アルト → ソプラノ → テノール) |
+| Sectio II エピソード (42〜44) | エピソード ×2 | B-A-C-H の先ぶれ (ソプラノ、テノール) |
+| Sectio III 三重 1 (64〜66) | I + II + B-A-C-H ×2 | 主題 I がソプラノで 2 回 (拡大カノン) |
+| Sectio III 拡大の上 (68〜71) | 主題 I ×4 の上の II と B-A-C-H | 主題 II ×2 回 → B-A-C-H |
+| Epilogo (78〜84) | piano_solo_8x の実音 | 主題 I がアルトで → 反行形 → 低く消える |
+
+```bash
+python3 compose_tablet94.py score_tablet93.json score_tablet94.json && python3 synth.py score_tablet94.json tablet94.wav && python3 video.py score_tablet94.json tablet94.wav tablet94.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
