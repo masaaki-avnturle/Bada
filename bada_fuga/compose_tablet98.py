@@ -15,6 +15,7 @@ import compose
 
 BANK = sys.argv[1]; FAST = os.path.abspath(sys.argv[2]); OUT = sys.argv[3] if len(sys.argv) > 3 else 'score_tablet98.json'
 R = '20260924_085314'; REC = json.load(open(BANK))['recordings'][R]
+FOG = 0.0                                                                      # 霧 (録音を速めた音) の大きさ — 位相ボコーダの持続音が「エー」という声のように聞こえるので消した
 BPM = 60; T0 = 2.4; SC = 160.0 / (REC['dur'] - T0)                              # 録音の時間 → 拍 (×0.8)
 SUBJ = [(1, 64), (3, 66), (1.5, 71), (1.5, 76), (1, 76)]
 CANDS_M = ['Bm', 'Em', 'F#', 'F#7', 'D', 'G', 'A', 'C#m7b5', 'Em/G', 'Bm/D', 'Gmaj7', 'Bm7', 'Em7', 'Asus4', 'D7', 'C', 'Cmaj7', 'E']
@@ -67,7 +68,7 @@ def build():
         RH.append(cur); P.harm[q] = cur
     for b in range(MAJ0, TOTAL): P.set_harm(b, ['B', 'B', 'E', 'E'] if b % 2 == 0 else ['F#7', 'F#7', 'B', 'B'])
     for b in range(TOTAL - 2, TOTAL): P.set_harm(b, 'B'); P.hold.add(b)
-    P.section(0, 'Tre in uno — 第 1 部の層 (骨組み、実速)', '08:53 の採譜を実速に (×0.8 で 160 秒)、下に録音そのものを同じだけ速めた霧 — 弔鐘ひとつから')
+    P.section(0, 'Tre in uno — 第 1 部の層 (骨組み、実速)', '08:53 の採譜を実速に (×0.8 で 160 秒) ピアノの 1 音で — 弔鐘ひとつから (録音を速めた霧は、声のように聞こえるので消した)')
     for v in VOICES: P.rest_bars(v, 0, FUGA0)
     f = FUGA0; lab = '主題 08:53'; E = []
     P.section(f, '+ 第 2 部の層 (Fuga)', '主題の 4 声フーガ: 提示 → 反行 → ストレッタ → ファ# の保続 → 拡大 — 和音は録音の進行に寄せて (共鳴)')
@@ -104,7 +105,7 @@ def post(P, events, ex):
         for m in s['m']:
             mm = majify(m) if b0 >= MAJ0 * BPB else m
             pf(b0, max(0.5, s['d'] * SC), mm, 0.30 * (1.2 if m < 48 else 1.0), '08:53 の採譜 (実速 ×0.8)' if first else None, 'rec'); first = False
-    add('REC', 0, TOTAL * BPB, 0, 0.35, None, src=FAST, off=0.0, fin=2.0, fout=8.0, rid='rec0853_fast', tag='08:53 の録音を ×0.8 の時間に (高さは変えず) — 霧')
+    if FOG > 0: add('REC', 0, TOTAL * BPB, 0, FOG, None, src=FAST, off=0.0, fin=2.0, fout=8.0, rid='rec0853_fast', tag='08:53 の録音を ×0.8 の時間に (高さは変えず) — 霧')
     # 第 3 部の層: 鼓動 (1 拍ごと)、祝鐘、高いマントラ
     for bar in range(NATAL0, TOTAL):
         k = bar - NATAL0; g = 0.1 + 0.12 * min(1.0, k / 8.0)
@@ -121,10 +122,10 @@ def post(P, events, ex):
     for v in VOICES: events[v] = [(s, d, majify(m) if s >= MAJ0 * BPB else m, lab) for s, d, m, lab in events[v]]
 
 META = {'style': 'recsampler', 'bank': BANK, 'rec_order': [R], 'piano_decay': 2.0, 'reverb': [5.0, 2.0, 0.42],
-        'title': 'Requiem BADA — XCVIII · Tre in uno', 'subtitle': 'XCVII の 3 つの部を同時に — 録音 (実速) + フーガ + 生誕祭、和音を録音にそろえて共鳴 (ロ短調 → ロ長調, ♩=60, 2 分 55 秒)',
+        'title': 'Requiem BADA — XCVIII · Tre in uno', 'subtitle': 'XCVII の 3 つの部を同時に — 採譜 (実速) + フーガ + 生誕祭、和音を録音にそろえて共鳴 (ロ短調 → ロ長調, ♩=60, 2 分 55 秒)',
         'legend': ['PF', 'X'], 'vname': {'PF': '第 1・3 部の層', 'X': '鐘'},
-        'footer': ['第 1 部の層: 08:53 の採譜 (実速) と録音の霧 ／ 第 2 部の層: 主題の 4 声フーガ ／ 第 3 部の層: 鼓動・祝鐘・マントラ → 36 小節目からロ長調',
-                   '3 つの層の和音は録音の進行にそろえる。音はすべて 08:53 のピアノの 1 音、録音、鐘。声なし。']}
+        'footer': ['第 1 部の層: 08:53 の採譜 (実速) ／ 第 2 部の層: 主題の 4 声フーガ ／ 第 3 部の層: 鼓動・祝鐘・マントラ → 36 小節目からロ長調',
+                   '3 つの層の和音は録音の進行にそろえる。音はすべて 08:53 のピアノの 1 音と鐘。声なし。']}
 
 if __name__ == '__main__':
     compose.main(OUT, seed=98, bpm=BPM, builder=build, meta=META, extras=extras, post=post)
