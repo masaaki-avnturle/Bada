@@ -2115,6 +2115,18 @@ python3 compose_tablet89.py bank89/bank.json cp14_x4.wav score_tablet89.json && 
 python3 compose_tablet90.py score_tablet89.json bank89/bank.json bank87/bank.json score_tablet90.json && python3 synth.py score_tablet90.json tablet90.wav && python3 video.py score_tablet90.json tablet90.wav tablet90.mp4
 ```
 
+## 🎹🎵 Requiem BADA — Tablet Sessions XCI · Canzone 08:53 (9/24 08:53 を主題歌に、バックに piano_solo_8x, ロ短調, 4 分 16 秒)
+
+- **主題歌**: 9/24 08:53 の録音 (ロ短調のピアノ、3 分 22 秒) をそのまま、元の速さ・元の高さで (REC、実音)。画面には採譜の音を gain 0 の PF で出す (音は出さない)
+- **バック**: piano_solo_8x.mp4 (42 分、調がゆっくり移る ×8 のピアノ) の音声を 90 秒ごとに調で調べ、ロ短調とその近い調が続く **2130〜2386 秒** (ホ短調 → ロ短調 → イ短調 → ト長調) の窓を
+  移調せずに敷く (録音と同じロ短調の窓 2160〜2250 秒が主題歌の真ん中に来る)。gain 0.14 で主題歌より約 8 dB 下 (最初 0.35 では主題歌と同じ大きさだった)
+- Intro (4 小節、バックだけ) → 主題歌 (4〜54.5 小節) → Coda (55〜64): 主題 ミ・ファ#・シ・ミ・ミ を 4 倍に伸ばし、録音自身から切り出した音で 2 拍ごとに打ち直し — バックは消えていく
+- すべてピアノの実音、声なし
+
+```bash
+python3 compose_tablet91.py score_tablet86.bank.json bank85/bank.json piano_solo_8x.wav score_tablet91.json && python3 synth.py score_tablet91.json tablet91.wav && python3 video.py score_tablet91.json tablet91.wav tablet91.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
