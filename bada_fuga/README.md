@@ -2335,6 +2335,19 @@ python3 compose_tablet102.py bank85p/bank.json rec0809.wav score_tablet102.json 
 python3 compose_tablet103.py bank85p/bank.json rec0853.wav score_tablet103.json && python3 synth.py score_tablet103.json tablet103.wav && python3 video.py score_tablet103.json tablet103.wav tablet103.mp4
 ```
 
+## 🎹🌸📜 Requiem BADA — Tablet Sessions CIV · Fiore e Fuga 9/23 (9/23 の 08:06・08:09 を主題曲に、LXXXVI (Fiore dolce) と LXXXIX (Requiem e Fuga) の作りで融合 — 声を消して, 変ロ短調 → ホ短調 → ホ長調, ♩=60, 5 分 11 秒)
+
+- **声を消す**: 9/23 の録音の実音は使わず、採譜 (bank85) とピアノだけの音源 (bank85p) で。主題は採譜の最上声から — 08:06: ファ・ミ♭・ファ・ソ♭・ラ・シ♭・ド・シ♭ (変ロ短調)、08:09: ソ・ファ#・ソ・シ・ミ (ホ短調)
+- I. Fiore dolce 08:06 (0〜24): LXXXVI の歌う形 — 08:06 の採譜の旋律を実速で、左手は根音と 8 分音符で揺れる分散和音 (Sweet Revenge の手つき)、和音は採譜のまま
+- II. Requiem 08:06 (24〜40): LXXXIX の形 — 弔鐘 → 主題を 4 倍に伸ばして 2 拍ごとに息をするように (2 回)、和音のコラール
+- III. Fuga 08:09 (40〜56, ホ短調): 4 声フーガ — 提示 → 反行 → ストレッタ
+- IV. Fusione (56〜72): 08:06 の主題をホ短調に移して (+6: シ・ラ・シ・ド・レ#・ミ・ファ#・ミ) 2 倍に伸ばした低音の上で、08:09 の主題のストレッタ (4 声)、Flower の 4 度の和音
+- V. Amen (72〜76): ホ長調の和音と鐘
+
+```bash
+python3 compose_tablet104.py bank85p/bank.json score_tablet104.json && python3 synth.py score_tablet104.json tablet104.wav && python3 video.py score_tablet104.json tablet104.wav tablet104.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
