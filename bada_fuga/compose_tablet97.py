@@ -15,14 +15,15 @@ Requiem BADA — Tablet Sessions XCVII · Praeludium, Fuga e Requiem XVI — Nat
     Natalitia (760〜840)                   生誕祭 — ロ長調へ。主題のストレッタが 4 声で 2 小節ごとに上へ上へ、1 拍ごとの鼓動、祝鐘、高い ミ・ファ#・シ・ミ・ミ のマントラ、ロ長調の和音で頂点
     Coda (840〜848)                        ロ長調の和音と鐘が残る
   音はすべて 08:53 の録音から切り出したピアノの 1 音 (bank85) と、録音そのものを引き伸ばした音、鐘。声なし。
-  使い方: python compose_tablet97.py <bank85.json> <rec0853_x16.wav> <rec0853_x4.wav> [score_tablet97.json] → python render_long.py score_tablet97.json out97
+  使い方: python compose_tablet97.py <bank85p.json> [score_tablet97.json] → python render_long.py score_tablet97.json out97
+  (作り直し: 霧と 4 倍の録音は声のように聞こえるのでやめ、間奏曲は採譜 ×4 のピアノに。音源は 9/28 の歌の音を除いた bank85p)
 """
 import sys, os, json, math
 from compose import *
 import compose
 
-BANK = sys.argv[1]; X16, X4 = os.path.abspath(sys.argv[2]), os.path.abspath(sys.argv[3])
-OUT = sys.argv[4] if len(sys.argv) > 4 else 'score_tablet97.json'
+BANK = sys.argv[1]
+OUT = sys.argv[2] if len(sys.argv) > 2 else 'score_tablet97.json'                 # (作り直し: 録音を引き伸ばした音は使わない。音源は bank85p = ピアノだけ)
 R = '20260924_085314'; REC = json.load(open(BANK))['recordings'][R]
 T0 = 2.4                                                                       # 録音の頭の無音 (2.4 秒) は飛ばす
 BPM, K = 60, 16
@@ -121,7 +122,7 @@ def build():
             if s['t'] <= tr: cur = s['ch']
         P.harm[q] = cur if q < NB_REC * BPB else 'Bm'
     b = 0
-    P.section(0, 'Praeludium — 骨組みと霧', '08:53 の採譜を 16 倍に伸ばして 2 拍ごとに打ち直す (規律) — 下で録音そのものを 16 倍に引き伸ばした霧 — 弔鐘ひとつから')
+    P.section(0, 'Praeludium — 骨組み', '08:53 の採譜を 16 倍に伸ばして 2 拍ごとに打ち直す (規律) — 弔鐘ひとつから')
     for v in VOICES: P.rest_bars(v, 0, PRAE)
     for k in range(PRAE): SEC[k] = ('prae', 0)
     b = PRAE
@@ -130,7 +131,7 @@ def build():
         fuga(P, b, c)
         for k in range(FUGA): SEC[b + k] = ('fuga', c)
         b += FUGA
-        P.section(b, 'Interludium %s — 4 倍の録音' % 'I II III IV V'.split()[c], '録音の同じ所を 4 倍の速さで引き伸ばした音が骨組み (16 倍) の上を通る — メンスーラ・カノン')
+        P.section(b, 'Interludium %s — 4 倍の採譜' % 'I II III IV V'.split()[c], '採譜の同じ所を 4 倍の速さでピアノが通る — 骨組み (16 倍) との メンスーラ・カノン')
         for v in VOICES: P.rest_bars(v, b, b + INTER)
         for k in range(INTER): SEC[b + k] = ('inter', c)
         b += INTER
@@ -139,7 +140,7 @@ def build():
         for k in range(REQ): SEC[b + k] = ('req', c)
         b += REQ
     assert b == FINIS0
-    P.section(b, 'Finis — 終焉', '骨組みが薄れて、霧だけが残り、低い シ の保続へ — 録音の終わりが 16 倍にゆっくり近づく')
+    P.section(b, 'Finis — 終焉', '骨組みが薄れて、低い シ の保続へ — 録音の終わりが 16 倍にゆっくり近づく')
     for v in VOICES: P.rest_bars(v, b, NATAL0)
     for k in range(FINIS0, NATAL0): SEC[k] = ('finis', 0)
     P.section(NATAL0, 'Natalitia — 生誕祭 (ロ長調)', '終焉が生誕祭に: 主題のストレッタが 4 声で 2 小節ごとに上へ上へ、1 拍ごとの鼓動、祝鐘、高い ミ・ファ#・シ・ミ・ミ のマントラ、ロ長調の和音で頂点')
@@ -169,22 +170,15 @@ def post(P, events, ex):
                 amp = 1.0 if i == 0 else 0.6 + 0.25 * math.sin(math.pi * i / max(1, n_ - 1))
                 g = 0.3 * gsec(bar) * amp
                 if g > 0.005: pf(bt, step, m, g, None, 'bb')
-    # 霧: 録音を 16 倍に引き伸ばした音 (区分ごとの大きさで)
-    GR = {'prae': 0.5, 'fuga': 0.22, 'inter': 0.4, 'req': 0.5, 'finis': 0.5}
-    b = 0
-    while b < NATAL0:
-        kind = SEC[b][0]; e = b
-        while e < NATAL0 and SEC[e][0] == kind: e += 1
-        if kind == 'finis':
-            add('REC', b * BPB, (e - b) * BPB, 0, GR[kind], None, src=X16, off=b * 4.0 + K * T0, fin=0.5, fout=60.0, rid='rec0853_x16', tag='08:53 を 16 倍に引き伸ばした霧 — 終焉')
-        else:
-            add('REC', b * BPB, (e - b) * BPB, 0, GR[kind] * (1.0 if kind != 'prae' else 1.0), None, src=X16, off=b * 4.0 + K * T0, fin=(16.0 if b == 0 else 0.5), fout=0.5, rid='rec0853_x16',
-                tag='08:53 を 16 倍に引き伸ばした霧')
-        b = e
-    # 間奏曲: 4 倍の録音 (同じ所を 4 倍の速さで)
+    # 間奏曲: 採譜の同じ所を 4 倍の速さでピアノが通る (はじめは録音を 4 倍に引き伸ばした音だったが、声のように聞こえるのでやめた。霧も同じ理由でやめた)
     for bar, (kind, c) in sorted(SEC.items()):
         if kind == 'inter' and SEC.get(bar - 1, ('',))[0] != 'inter':
-            add('REC', bar * BPB, INTER * BPB, 0, 0.45, None, src=X4, off=bar * 1.0 + 4 * T0, fin=3.0, fout=6.0, rid='rec0853_x4', tag='08:53 を 4 倍に引き伸ばして — 同じ所を 4 倍の速さで')
+            tr0 = bar / 4.0 + T0; first = True
+            for s in REC['segs']:
+                bt = bar * BPB + 4 * (s['t'] - tr0)
+                if bt < bar * BPB or bt >= (bar + INTER) * BPB - 1: continue
+                for m in s['m']:
+                    pf(bt, max(0.5, 4 * s['d']), m, 0.2 * (1.2 if m < 48 else 1.0), '採譜 ×4 (同じ所を 4 倍の速さで)' if first else None, 'x4', rel=0.6); first = False
     # レクイエム: 弔鐘、コラール (4 拍ごと)、主題の 4 倍の拡大 (テノール)
     for bar, (kind, c) in sorted(SEC.items()):
         if kind != 'req': continue
@@ -227,8 +221,8 @@ META = {
     'title': 'Requiem BADA — XCVII · Natalitia XVI',
     'subtitle': '9/24 08:53 を 16 倍に — 規律的に、洗脳的に。フーガでありレクイエムであり、前奏曲と間奏曲をはさみ、終焉が生誕祭 (ロ長調) へ (♩=60, 56 分 32 秒)',
     'legend': ['PF', 'X'], 'vname': {'PF': '骨組み ×16 / 層', 'X': '鐘'},
-    'footer': ['Praeludium → ×5 [Fuga (主題 08:53 の 4 声フーガ) → Interludium (4 倍の録音) → Requiem (コラール、主題 ×4、弔鐘)] → Finis (終焉) → Natalitia (生誕祭、ロ長調) → Coda',
-               '骨組み: 08:53 の採譜を 16 倍に伸ばして 2 拍ごとに打ち直す。霧: 録音そのものを 16 倍に引き伸ばした音。音はすべて 08:53 のピアノの 1 音と鐘。声なし。'],
+    'footer': ['Praeludium → ×5 [Fuga (主題 08:53 の 4 声フーガ) → Interludium (4 倍の採譜) → Requiem (コラール、主題 ×4、弔鐘)] → Finis (終焉) → Natalitia (生誕祭、ロ長調) → Coda',
+               '骨組み: 08:53 の採譜を 16 倍に伸ばして 2 拍ごとに打ち直す。音はすべてピアノの 1 音 (bank85p) と鐘。録音を引き伸ばした音は使わない。声なし。'],
 }
 
 if __name__ == '__main__':

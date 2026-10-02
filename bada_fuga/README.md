@@ -2242,12 +2242,13 @@ python3 render_long.py score_tablet96.json out96 192 3      # out96/tablet96.mp4
 | Natalitia — 生誕祭 | 760〜840 | **ロ長調へ**: 主題のストレッタが 4 声で 2 小節ごとに上へ上へ (24 回) → 拡大 ×2 の頂点、1 拍ごとの鼓動 (ロ長調の和音)、祝鐘、高い ミ・ファ#・シ・ミ・ミ のマントラ。生成された声部の短 3 度・短 6 度・短 7 度は長調に上げる |
 | Coda | 840〜848 | ロ長調の和音と祝鐘が残って消える |
 
-- 音はすべて 08:53 の録音から切り出したピアノの 1 音 (bank85)、録音そのものを引き伸ばした音、鐘。声なし。生誕祭の頂点は `fixed_peak` 1.0 でわずかに飽和させて盛り上げる
+- 音はすべて 08:53 の録音から切り出したピアノの 1 音、鐘。声なし。生誕祭の頂点は `fixed_peak` 1.0 でわずかに飽和させて盛り上げる
+- **作り直し**: 音源を bank85p (9/28 の歌の音を除いたピアノだけ) に。録音を引き伸ばした「霧」と「4 倍の録音」は声のように聞こえるのでやめ、間奏曲は採譜の同じ所を 4 倍の速さでピアノが通る形に (XCIX と同じ)
 - 長いので `render_long.py` で 192 小節ずつ合成・描画してつなぎ、送れる大きさの 3 部に分ける
 
 ```bash
 ffmpeg -i 20260924_085314.mp3 -ac 1 -ar 44100 rec0853.wav   # 録音 → librosa.effects.time_stretch で rec0853_x16.wav・rec0853_x4.wav
-python3 compose_tablet97.py bank85/bank.json rec0853_x16.wav rec0853_x4.wav score_tablet97.json && python3 render_long.py score_tablet97.json out97 192 3
+python3 compose_tablet97.py bank85p/bank.json score_tablet97.json && python3 render_long.py score_tablet97.json out97 192 3
 ```
 
 ## 🎹🔔 Requiem BADA — Tablet Sessions XCVIII · Tre in uno (XCVII の 3 つの部を同時に — 上手に共鳴させて、3 分以内に, ロ短調 → ロ長調, ♩=60, 2 分 55 秒)
@@ -2299,6 +2300,17 @@ bank85p = bank85 の samples から rid が 20260928 のものを除いたもの
 
 ```bash
 python3 -c "import json; b=json.load(open('bank85/bank.json')); b['samples']=[s for s in b['samples'] if not s['rid'].startswith('20260928')]; json.dump(b, open('bank85p/bank.json','w'))"
+```
+
+## 🎹🎵🔔 Requiem BADA — Tablet Sessions CI · Canzone tre in uno 08:53 (XCVII の 3 つの部を同時に融合して裏に、9/24 08:53 の録音そのものを表に, ロ短調 → ロ長調, ♩=60, 4 分 15 秒)
+
+- **表**: 9/24 08:53 の録音 (3 分 22 秒、ピアノの実音) を 2 小節目から、元の速さ・元の高さで、加工なし (引き伸ばしも速めもしない — 加工した音が声のように聞こえたため)
+- **裏** (XCVII の 3 つの部を 3 つの層に、録音の実速に合わせて): 第 1 部 = 採譜の骨組みを小さく (2 拍ごとの息をする打ち直し) ／ 第 2 部 = 主題 ミ・ファ#・シ・ミ・ミ の 4 声フーガ (6〜36 小節、和音は録音のその時の和音に寄せて選ぶ `harm_fit`) ／
+  第 3 部 = 40 小節目から 1 拍ごとの鼓動・祝鐘・高いマントラ、録音が終わる 53 小節目からロ長調の生誕祭 (ストレッタ、拡大、頂点) → Coda
+- 音源は bank85p (ピアノだけ)。声なし。62 小節
+
+```bash
+python3 compose_tablet101.py bank85p/bank.json rec0853.wav score_tablet101.json && python3 synth.py score_tablet101.json tablet101.wav && python3 video.py score_tablet101.json tablet101.wav tablet101.mp4
 ```
 
 ## 作り方 (再現)
