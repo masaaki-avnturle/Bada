@@ -2151,6 +2151,20 @@ XCI でバックに敷いた piano_solo_8x.mp4 (42 分、×8 のピアノ) の�
 python3 compose_tablet92.py piano_solo_8x.wav score_tablet92.json && python3 synth.py score_tablet92.json tablet92.wav && python3 video.py score_tablet92.json tablet92.wav tablet92.mp4
 ```
 
+## 🎹📜 Requiem BADA — Tablet Sessions XCIII · Contrapunctus XIV sinfonico (Klavier) (XCII を、すべて実音のピアノで弾いているように, ニ短調, ♩=60, 5 分 52 秒)
+
+楽譜・形式・主題は XCII とまったく同じ。管弦楽の音をすべて、録音から切り出したピアノの 1 音 (bank85、9/24 08:53 の音) で弾き直した。
+
+- 弦 5 部 (4 声) → そのままピアノの 4 声 (recsampler: 低音は 1 オクターヴ下の柔らかい音を薄く重ねる)
+- 木管・金管 (Fl・Ob・Cl・Hn・Tp・Tb) → ピアノ。弦と同じ高さを同時に重ねていた所 (主題の入りの重ね) は 1 つの鍵盤に (ほとんどがこれで消え、残るのは Fl の 1 オクターヴ上と Hn の和音)。
+  ホルンの和音の持続は 2 拍ごとに打ち直すピアノの和音に。ティンパニは外す。低弦の保続 (Cb・Vc) は低いピアノの 1 音に
+- 同時に鳴らす音は 7 つまで (4 声は必ず、残りは強い順)
+- Prologo / Epilogo の piano_solo_8x の実音はもともとピアノなのでそのまま (全体が管弦楽より小さいので ×0.33 に)
+
+```bash
+python3 compose_tablet93.py score_tablet92.json bank85/bank.json score_tablet93.json && python3 synth.py score_tablet93.json tablet93.wav && python3 video.py score_tablet93.json tablet93.wav tablet93.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
