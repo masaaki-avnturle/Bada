@@ -7,7 +7,6 @@ Requiem BADA — Tablet Sessions XCIV · Fuga per augmentationem (Klavier) (XCII
       88 小節 → 176 小節 (♩=60 のまま、11 分 44 秒)。4 拍より長くなった音は 2 拍ごとに打ち直す (ピアノなので)
     - Prologo / Epilogo の piano_solo_8x の実音は速さを変えず、2 倍の長さの窓を流す (Prologo: 2186〜2250 秒 = 主題 I を採った所の全部、Epilogo: 2250〜2346 秒)
     - フーガを醸す: 伸ばした (×2) フーガの上に、主題を元の速さ (×1) で重ねる — 同じ主題の ×2 と ×1 が同時に鳴る「拡大カノン」:
-        Prologo (実音の上)        主題 I ×1 がアルトで、ソプラノが答唱
         Sectio I 低音の拡大 (×4)   主題 II ×1 が高く 2 回
         Sectio I 属音の保続        主題 I ×1 のストレッタ (アルト → ソプラノ → テノール)
         Sectio II エピソード        B-A-C-H ×1 が先ぶれで (ソプラノ、テノール)
@@ -30,7 +29,6 @@ def invert(mat): m0 = mat[0][1]; return [(d, 2 * m0 - m) for d, m in mat]
 VN = {'S': 'Soprano', 'A': 'Alto', 'T': 'Tenore'}
 # (元の小節, 拍, 主題, 移調, 声部 (表示), 大きさ, ラベル)
 FUGA = [
-    (8, 0, S1, 0, 'A', 0.30, '主題 I ×1 — 醸す (実音の上)'), (10, 0, S1, 7 + 12, 'S', 0.28, '主題 I ×1 答唱'),
     (27, 0, S2, 12, 'S', 0.30, '主題 II ×1 — 拡大の上で'), (29, 0, S2, 7 + 12, 'S', 0.30, '主題 II ×1 答唱'),
     (31, 0, S1, 0, 'A', 0.32, '主題 I ×1 ストレッタ (保続の上)'), (31, 2, S1, 12, 'S', 0.30, '主題 I ×1 ストレッタ'), (32, 0, S1, -12, 'T', 0.30, '主題 I ×1 ストレッタ'),
     (42, 0, S3, 12, 'S', 0.26, 'B-A-C-H ×1 — 先ぶれ'), (43, 0, S3, -12, 'T', 0.26, 'B-A-C-H ×1 — 先ぶれ'),
@@ -87,13 +85,13 @@ if __name__ == '__main__':
              harm=[c for c in d['harm'] for _ in range(K)])
     d['sections'] = [dict(s, t=s['t'] * K, bar=(s['bar'] - 1) * K + 1) for s in d['sections']]
     for s in d['sections']: s['sub'] = s['sub'] + ' — 全音符を 2 倍に'
-    d['sections'][0]['sub'] = '主題 I を採った 2186〜2250 秒の全部 (+5、速さは変えず) — その上で主題 I ×1 が醸し始める'
+    d['sections'][0]['sub'] = '主題 I を採った 2186〜2250 秒の全部 (+5、速さは変えず) — 実音だけ'
     d['sections'][-1]['sub'] = '沈黙のあと、piano_solo_8x の実音 (2250〜2346 秒、+5) — その上で主題 I ×1 がもう一度、反行して、消える'
     d['meta'] = dict(d['meta'], pause_bar=d['meta']['pause_bar'] * K,
                      title='Requiem BADA — XCIV · Fuga per augmentationem (Klavier)',
                      subtitle='XCIII の全音符を 2 倍に伸ばして — 伸ばした Contrapunctus XIV の上に、主題を元の速さで重ねてフーガを醸す (ニ短調, ♩=60)',
                      legend=['PF'], vname={'PF': '×1 の主題 / 管 → ピアノ'},
-                     footer=['Prologo (実音 + 主題 I ×1) → Sectio I ×2 (拡大の上に主題 II ×1、保続の上に主題 I ×1 のストレッタ) → Sectio II ×2 (B-A-C-H の先ぶれ) → Sectio III ×2 (拡大カノン) → 途切れる → Epilogo (実音 + 主題 I ×1)',
+                     footer=['Prologo (実音だけ) → Sectio I ×2 (拡大の上に主題 II ×1、保続の上に主題 I ×1 のストレッタ) → Sectio II ×2 (B-A-C-H の先ぶれ) → Sectio III ×2 (拡大カノン) → 途切れる → Epilogo (実音 + 主題 I ×1)',
                              'すべて 9/24 08:53 の録音から切り出したピアノの 1 音と、piano_solo_8x の実音。4 拍より長い音は 2 拍ごとに打ち直す。声なし。'])
     json.dump(d, open(OUT, 'w'), ensure_ascii=False)
     print('bars', nb, 'duration', d['duration'], 'notes', len(notes), 'extras', Counter(e['v'] for e in extras), 'fuga notes', sum(1 for e in extras if e.get('layer') == 'fuga'))
