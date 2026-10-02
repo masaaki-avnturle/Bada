@@ -2438,6 +2438,26 @@ python3 dip_breath.py rec0809.wav rec0809_clean.wav
 python3 compose_tablet109.py bank109.json rec0809_clean.wav score_tablet109.json && python3 synth.py score_tablet109.json tablet109.wav && python3 video.py score_tablet109.json tablet109.wav tablet109.mp4
 ```
 
+## 🎹🔔 Requiem BADA — Tablet Sessions C · Tre in uno (08:09) senza sospiri (C から息のような音を消して, ホ短調 → ホ長調, ♩=60, 2 分 55 秒)
+
+曲は C のまま。音源を bank109 (立ち上がりが速く減衰する 1 音だけ、`clean_bank.py`) に替えた。C では 1424 の音のうち 402 がふくらむ音で鳴っていた → 0
+
+```bash
+python3 compose_tablet100.py bank109.json score_tablet100q.json   # meta の題は senza sospiri に
+```
+
+## 🎹🎵🔔 Requiem BADA — Tablet Sessions CX · Canzone 9/23 e 9/24 tre in uno senza sospiri (C の作りで、9/23 08:09 と 9/24 08:53 の録音 (息の所を下げて) を表に融合, ホ短調 → ロ短調 → ロ長調, ♩=60, 8 分 3 秒)
+
+- **表 1** (2〜57 小節): 9/23 08:09 の録音 ／ **表 2** (60〜110 小節): 9/24 08:53 の録音 — どちらも `dip_breath.py` で息のような所 (08:09 は 7 か所、08:53 は 2 か所) だけ 1〜6 kHz を 12 dB 下げ、ほかは加工なし
+- **裏** (C / CI / CII の 3 つの層を、それぞれの録音の実速に合わせて): 第 1 部 = 採譜の骨組みを小さく ／ 第 2 部 = 08:09 の主題 (ホ短調)・08:53 の主題 (ロ短調) の 4 声フーガ (提示 → 反行 → ストレッタ → 拡大、和音は録音のその時の和音に寄せる `harm_fit`) ／
+  第 3 部 = 録音の終わりが近づくと鼓動・祝鐘・高いマントラ。08:53 が終わる 111 小節目からロ長調の Natalitia (2 つの主題のストレッタ、拡大) → Coda。119 小節
+- 音源は bank109。声なし。`compose_tablet110.py`
+
+```bash
+python3 dip_breath.py rec0809.wav rec0809_clean.wav && python3 dip_breath.py rec0853.wav rec0853_clean.wav
+python3 compose_tablet110.py bank109.json rec0809_clean.wav rec0853_clean.wav score_tablet110.json && python3 synth.py score_tablet110.json tablet110.wav && python3 video.py score_tablet110.json tablet110.wav tablet110.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
