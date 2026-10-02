@@ -2127,6 +2127,30 @@ python3 compose_tablet90.py score_tablet89.json bank89/bank.json bank87/bank.jso
 python3 compose_tablet91.py score_tablet86.bank.json bank85/bank.json piano_solo_8x.wav score_tablet91.json && python3 synth.py score_tablet91.json tablet91.wav && python3 video.py score_tablet91.json tablet91.wav tablet91.mp4
 ```
 
+## 🎼📜 Requiem BADA — Tablet Sessions XCII · Contrapunctus XIV sinfonico (XCI のバックの piano_solo_8x を Contrapunctus XIV の主題にして、管弦楽で, ニ短調, ♩=60, 5 分 52 秒)
+
+XCI でバックに敷いた piano_solo_8x.mp4 (42 分、×8 のピアノ) のロ短調の窓 (2186〜2386 秒) を採譜 (basic-pitch、ONNX) し、その最上声の線から
+バッハ『フーガの技法』**Contrapunctus XIV** (未完の三重フーガ) の主題を作って、交響曲の編成で。音はすべて合成の管弦楽 + piano_solo_8x の実音。声なし。
+
+- **主題** (採譜の最上声から。源の音の集合 シ・ファ・ド・ミ・ラ・レ・ソ は +5 するとニ短調の音階にそろうので、+5 してニ短調に):
+  - 第 1 主題 (荘重) ← 2186〜2250 秒の最上声 F4·B3·F4·E4·A3·E4·G3·D4 → **シ♭・ミ・シ♭・ラ・レ・ラ・ソ・ファ・レ** (8 拍。源の シ–ファ の三全音が シ♭–ミ に残る)
+  - 第 2 主題 (駆け足) ← 2250〜2386 秒の最上声 (イ・ソ・ハの領域) → 8 分音符の 2 小節 ド・ソ・レ・ファ・ミ・レ・ミ・ド・レ・ミ・シ♭・ラ・ソ・ファ・ミ・ド#
+  - 第 3 主題 = **B-A-C-H** (シ♭・ラ・ド・シ — バッハ自身の署名、Contrapunctus XIV の第 3 主題そのもの)
+- **形式** (88 小節):
+  - Prologo (0〜8): piano_solo_8x の実音 (主題を採った 2186 秒から、速さを変えず +5 に移して) — 低弦の レ とティンパニが近づく
+  - Sectio I (8〜34): 第 1 主題の 4 声の提示 (弦) → エピソード → 反行形 (オーボエ) → 下属調の入りとストレッタ → 低弦の拡大形 (ホルン) → 属音の保続 → 終止
+  - Sectio II (34〜56): 第 2 主題の 4 声の提示 (木管が加わる) → エピソード → 第 1 主題との二重フーガ ×4 → 終止
+  - Sectio III (56〜76): B-A-C-H の 4 声の提示 (金管) → 三重フーガ (3 つの主題を同時に、ティンパニ) → 第 1 主題の拡大の上で → 3 度目の重なりの 2 小節目の 2 拍目で
+    **楽譜が途切れる** (Contrapunctus XIV の 239 小節目のように。動画はそこで「休止」の表示) → 沈黙
+  - Epilogo (76〜88): piano_solo_8x の実音だけが戻って消えていく (2250 秒から、+5 でニ短調に)
+- 管弦楽: 弦 5 部 (S/A/T/B → Vn I / Vn II / Va / Vc+Cb) + Fl・Ob・Cl (主題の入りを重ねる) + Hn (和音、拡大形) + Tp・Tb (Sectio III) + Timp。
+  和音は主題の音から (harm_from_entries。B-A-C-H の シ♮ のために G7・E7、下属調の入りの ミ♭ のために E♭・Cm を候補に足した)
+- video.py: meta の `pause_bar` で「休止」の表示の小節を曲ごとに指定できるように。symphony の色に Vc・Cb (extras) を足した
+
+```bash
+python3 compose_tablet92.py piano_solo_8x.wav score_tablet92.json && python3 synth.py score_tablet92.json tablet92.wav && python3 video.py score_tablet92.json tablet92.wav tablet92.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

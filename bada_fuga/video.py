@@ -63,6 +63,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     th = dict(THEMES[meta.get('style', 'organ')])
     for k in ('title', 'subtitle', 'footer'):
         if meta.get(k): th[k] = meta[k]
+    if meta.get('pause_bar') is not None: th['pause_bar'] = meta['pause_bar']     # 楽譜が途切れる小節 (曲ごとに)
     recs = [e for e in d.get('extras', []) if e['v'] == 'REC']
     notes = d['notes'] + [dict(e, label=e.get('label')) for e in d.get('extras', []) if e['v'] != 'REC']
     COL.update({'X': (236, 214, 150), 'D': (120, 70, 140), 'P': (190, 60, 70), 'H': (250, 240, 200), 'W': (170, 150, 120), 'L': (150, 110, 90)})
@@ -76,8 +77,10 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
                       'FL': 'Fl', 'WW': 'Ob', 'CL': 'Cl', 'HN': 'Hn', 'TR': 'Tp', 'TB': 'Tb', 'TP': 'Timp'})
     if meta.get('style') == 'symphony':
         COL.update({'S': (235, 180, 120), 'A': (215, 140, 110), 'T': (180, 110, 130), 'B': (130, 90, 100), 'FL': (190, 235, 220), 'WW': (120, 200, 120), 'CL': (110, 170, 200),
-                    'HN': (210, 170, 90), 'TR': (240, 200, 80), 'TB': (170, 120, 60), 'TP': (170, 60, 60)})
-        VNAME.update({'S': 'Vn I', 'A': 'Vn II', 'T': 'Va', 'B': 'Vc·Cb', 'FL': 'Fl', 'WW': 'Ob', 'CL': 'Cl', 'HN': 'Hn', 'TR': 'Tp', 'TB': 'Tb', 'TP': 'Timp'})
+                    'HN': (210, 170, 90), 'TR': (240, 200, 80), 'TB': (170, 120, 60), 'TP': (170, 60, 60),
+                    'V1': (200, 120, 90), 'V2': (170, 100, 80), 'VA': (150, 90, 110), 'VC': (120, 70, 60), 'CB': (90, 60, 50)})
+        VNAME.update({'S': 'Vn I', 'A': 'Vn II', 'T': 'Va', 'B': 'Vc·Cb', 'FL': 'Fl', 'WW': 'Ob', 'CL': 'Cl', 'HN': 'Hn', 'TR': 'Tp', 'TB': 'Tb', 'TP': 'Timp',
+                      'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'CB': 'Cb'})
     if meta.get('style') == 'concerto':
         COL.update({'H': (250, 240, 200), 'V1': (200, 120, 90), 'V2': (170, 100, 80), 'VA': (150, 90, 110), 'VC': (120, 70, 60), 'CB': (90, 60, 50),
                     'WW': (120, 200, 120), 'FL': (190, 235, 220), 'HN': (210, 170, 90), 'TP': (160, 60, 60)})
