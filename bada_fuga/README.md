@@ -2387,6 +2387,17 @@ CVI (110 小節) をまるごと 16 倍に — `compose_tablet105.py` (汎用の
 python3 compose_tablet105.py score_tablet106.json score_tablet107.json bank85p/bank.json && python3 render_long.py score_tablet107.json out107 192 3
 ```
 
+## 🎹🌀 Requiem BADA — Vox · Fuga senza voce (声のないフーガ — Vox から歌声を消して、フーガの雰囲気を醸し出す曲に, イ短調, ♩=60, 4 分 47 秒)
+
+Vox (`compose_vox.py`) の調・主題 (歌声の伸ばした音から作った 8 拍の主題)・鼓動・持続音・オスティナート・B-A-D-A はそのまま、
+**歌声のフレーズ (REC) と歌声のサンプラー (VOX) をすべて外し**、4 声はすべて 9/24 のピアノ録音の 1 音に。曲全体が主題のフーガになる:
+Introitus (主題がバス → テノールと 1 声ずつ) → Kyrie (4 声の提示) → Mix (ピアノ録音 11:23 の実音の上で主題の拡大 ×2) → Fuga (提示 → 反行 → ストレッタ → 拡大の上でストレッタ)
+→ Sanctus (オスティナートの上で主題と反行が交互に) → Agnus Dei (B-A-D-A に主題がソプラノで) → Lux aeterna (拡大 ×2 → 長調の和音)。70 小節。`compose_voxfuga.py`
+
+```bash
+python3 compose_voxfuga.py bank6/bank.json vbank/bank.json score_voxfuga.json && python3 synth.py score_voxfuga.json voxfuga.wav && python3 video.py score_voxfuga.json voxfuga.wav voxfuga.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
