@@ -15,7 +15,7 @@ import mido
 
 Q = 2.0
 PULSE = 0.5
-VEL = {"S": 58, "A": 52, "T": 52, "B": 58}
+VEL = {"S": 58, "A": 52, "T": 52, "B": 58, "X": 66}  # X: a theme voice above the fugue (theme0923.py)
 DISS = {1, 2, 6, 10, 11}
 TO_MAJOR = {3: 4, 8: 9, 10: 11}  # after the transposition to C: Eb->E, Ab->A, Bb->B
 MINOR = "--minor" in sys.argv  # keep C minor: a fugue in C minor, pulse a little softer
