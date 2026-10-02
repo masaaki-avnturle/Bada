@@ -11,12 +11,13 @@ Requiem BADA — Tablet Sessions CXI · Canzone 9/24 quattro in uno senza sospir
                            提示 → 反行 → ストレッタ → 拡大 (短い録音では提示 → ストレッタ)。和音は録音のその時の和音に寄せる (共鳴)
     第 3 部の層 (Natalitia): 各録音の終わりが近づくと 1 拍ごとの鼓動・祝鐘・高いマントラ。最後の録音が終わるとロ長調の生誕祭 (08:53 と 11:23 の主題のストレッタ) → Coda
   音源は bank109 (立ち上がりが遅くふくらむ 1 音を clean_bank.py で外した表)。声なし
-  使い方: python compose_tablet111.py <bank109.json> <wav のフォルダ (<rid>_clean.wav)> [score_tablet111.json]
+  使い方: python compose_tablet111.py <bank109.json> <wav のフォルダ (<rid>_clean.wav)> [score_tablet111.json] [--senza-mantra-campane (マントラと鐘も消す)]
 """
 import sys, os, json, math
 from compose import *
 import compose
 
+NO_MC = '--senza-mantra-campane' in sys.argv; sys.argv = [a for a in sys.argv if not a.startswith('--')]          # マントラと鐘を消す
 BANK = sys.argv[1]; WDIR = os.path.abspath(sys.argv[2]); OUT = sys.argv[3] if len(sys.argv) > 3 else 'score_tablet111.json'
 sys.argv = [sys.argv[0], BANK]
 import compose_tablet as CT                                                                        # 採譜から主題を作る (excerpt, make_subject)
@@ -101,14 +102,14 @@ def build():
     for v in VOICES: P.rest_bars(v, 0, SEG[0][3])
     for i, (rid, name, t0, b0, b1, subj, cands, major) in enumerate(SEG):
         keyname = {5: 'ヘ', 11: 'ロ'}[PLAN[i][2]] + ('長調' if major else '短調')
-        P.section(b0, '表 %d: 9/24 %s の録音 (%s、息の所だけ下げて) + 骨組み' % (i + 1, name, keyname), '弔鐘 → 録音そのもの — 裏で採譜の骨組みが小さく息をする')
+        P.section(b0, '表 %d: 9/24 %s の録音 (%s、息の所だけ下げて) + 骨組み' % (i + 1, name, keyname), ('' if NO_MC else '弔鐘 → ') + '録音そのもの — 裏で採譜の骨組みが小さく息をする')
         for v in VOICES: P.rest_bars(v, b0, b0 + 4)
         full = (b1 - b0) >= 34
         P.section(b0 + 4, '裏: %s の主題のフーガ' % name, '主題 %s の 4 声フーガ: %s — 和音は録音のその時の和音に寄せて (共鳴)' % (' '.join(name_of(m) for _, m in subj), '提示 → 反行 → ストレッタ → 拡大' if full else '提示 → ストレッタ'))
         e = fuga(P, b0 + 4, subj, '主題 %s' % name, cands, full)
         nat = max(e, b1 - 14)
         for v in VOICES: P.rest_bars(v, e, b1 + 2 if i + 1 < len(SEG) else MAJ0)
-        P.section(nat, '裏: 鼓動・祝鐘・マントラ (%s の終わりが近づく)' % name, '1 拍ごとの鼓動と高いマントラ' + ('' if i + 1 < len(SEG) else ' — 録音が終わるとロ長調へ'))
+        P.section(nat, ('裏: 鼓動 (%s の終わりが近づく)' if NO_MC else '裏: 鼓動・祝鐘・マントラ (%s の終わりが近づく)') % name, ('1 拍ごとの鼓動' if NO_MC else '1 拍ごとの鼓動と高いマントラ') + ('' if i + 1 < len(SEG) else ' — 録音が終わるとロ長調へ'))
         SEG[i] = SEG[i] + (nat,)
     P.section(MAJ0, 'Natalitia (ロ長調) — 08:53 と 11:23 の主題のストレッタ', '2 つの主題がロ長調で重なり、頂点 → Coda')
     sA, sB = SEG[1][5], SEG[3][5]; E = []
@@ -121,6 +122,11 @@ def build():
     return P
 
 def post(P, events, ex):
+    global add
+    if NO_MC:
+        add0 = add
+        def add(v, *a, **kw):
+            if v != 'X': add0(v, *a, **kw)
     for i, (rid, name, t0, b0, b1, subj, cands, major, nat) in enumerate(SEG):
         add('X', t0 - 8, 6, 47 if i % 2 else 52, 0.45 if i == 0 else 0.35, '弔鐘' if i == 0 else None)
         add('REC', t0, RECS[rid]['dur'], 0, 0.8, None, src=os.path.join(WDIR, rid + '_clean.wav'), off=0.0, fin=0.02, fout=1.0, rid=rid + '.wav', tag='9/24 %s — 表 (息の所だけ下げて)' % name)
@@ -141,7 +147,7 @@ def post(P, events, ex):
             for j in range(int(BPB / step)):
                 for m in tones: pf(bar * BPB + j * step, step, m, g * (1.0 if j == 0 else 0.75) * (1.25 if m < 48 else 0.8), '鼓動 (1 拍ごと)' if (k == 0 and j == 0 and m == root and i == 0) else None, 'pulse', rid=rid)
             if k % 4 == 0: add('X', bar * BPB, 6, 64 + 12 * ((k // 4) % 2), 0.3 + 0.3 * min(1.0, k / 14.0), '祝鐘' if (k == 0 and i == 0) else None)
-            if k % 2 == 0 and bar < nat1 - 2:
+            if k % 2 == 0 and bar < nat1 - 2 and not NO_MC:
                 t = bar * BPB; lab = '高いマントラ' if (k == 0 and i == 0) else None
                 for d, m in subj: pf(t, d, (majify(m) if (last and bar >= MAJ0) else m) + 24, 0.12 + 0.1 * min(1.0, k / 14.0), lab, 'mantra', rid=rid, rel=0.8); t += d; lab = None
     add('X', (TOTAL - 1) * BPB, 8, 71, 0.5, None); add('X', (TOTAL - 1) * BPB + 2, 8, 59, 0.4, None)
@@ -155,6 +161,10 @@ META = {'style': 'recsampler', 'bank': BANK, 'rec_order': [p[0] for p in PLAN], 
                    '音源は bank109 (立ち上がりが速く減衰する 1 音だけ)。録音は息のような所だけ 1〜6 kHz を下げ、ほかは加工なし。11:21 (声・シンセの混じった録音) は使わない。声なし。']}
 
 if __name__ == '__main__':
+    if NO_MC:
+        META['title'] += ', mantra e campane'; META['legend'] = ['PF']; META['vname'] = {'PF': '裏の層'}
+        META['subtitle'] = META['subtitle'].replace('息のような音を消して', '息のような音・マントラ・鐘を消して').replace('裏: 骨組み + 各録音の主題のフーガ + 生誕祭', '裏: 骨組み + 各録音の主題のフーガ + 鼓動')
+        META['footer'][0] = '表: 9/24 の 4 本の録音 (実音) を順に ／ 裏: 第 1 部 = 採譜の骨組み (小さく)、第 2 部 = 各録音の主題の 4 声フーガ、第 3 部 = 鼓動だけ → 最後の録音が終わるとロ長調の生誕祭 (鐘なし)'
     for s in SEG: print(s[1], 'bars', s[3], '-', s[4], 'subject', ' '.join('%s:%g' % (name_of(m), d) for d, m in s[5]))
     compose.main(OUT, seed=111, bpm=BPM, builder=build, meta=META, extras=extras, post=post)
     d = json.load(open(OUT)); from collections import Counter

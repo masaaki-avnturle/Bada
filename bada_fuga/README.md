@@ -2465,10 +2465,12 @@ python3 compose_tablet110.py bank109.json rec0809_clean.wav rec0853_clean.wav sc
 - **裏** (CI の 3 つの層を、それぞれの録音の実速に合わせて): 第 1 部 = 採譜の骨組みを小さく ／ 第 2 部 = 各録音の主題の 4 声フーガ — 08:53 は CI の主題 ミ・ファ#・シ・ミ・ミ、ほかは採譜の最上声から作った 8 拍の主題 (`compose_tablet.make_subject`、長調の 11:18 は平行短調で)。
   提示 → 反行 → ストレッタ → 拡大 (短い 11:23 は提示 → ストレッタ)。和音は録音のその時の和音に寄せる `harm_fit` ／ 第 3 部 = 各録音の終わりが近づくと鼓動・祝鐘・高いマントラ
 - 11:23 が終わる 178 小節目からロ長調の Natalitia (08:53 と 11:23 の主題のストレッタ、拡大) → Coda。185 小節。音源は bank109。声なし。mp4 は 960×540 に縮めて 30 MiB 以内に
+- **マントラと鐘も消した版** (`--senza-mantra-campane`): 第 3 部の層は 1 拍ごとの鼓動だけ、弔鐘・祝鐘・Coda の鐘もなし。題は「… senza sospiri, mantra e campane」
 
 ```bash
 for r in 20260924_084937 20260924_085314 20260924_111846 20260924_112313; do python3 dip_breath.py $r.wav wavs/${r}_clean.wav; done
 python3 compose_tablet111.py bank109.json wavs score_tablet111.json && python3 synth.py score_tablet111.json tablet111.wav && python3 video.py score_tablet111.json tablet111.wav tablet111.mp4
+python3 compose_tablet111.py bank109.json wavs score_tablet111b.json --senza-mantra-campane   # マントラと鐘も消して
 ```
 
 ## 作り方 (再現)
