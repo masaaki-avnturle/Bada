@@ -2488,6 +2488,19 @@ for r in 132245 132431 132703; do python3 dip_breath.py 20261003_$r.wav src/2026
 python3 compose_tablet112.py bank112/bank.json bank109.json score_tablet89.json src score_tablet112.json && python3 synth.py score_tablet112.json tablet112.wav && python3 video.py score_tablet112.json tablet112.wav tablet112.mp4
 ```
 
+## 🎹⛪ Requiem BADA — Tablet Sessions CXIII · Requiem 10/03 sopra un tema (CXII に大黒柱の主題を決めて — 洗脳的でレクイエムのような主題のメロディーで書き換え, 変ロ短調 → 変ロ長調, ♩=60, 6 分 47 秒)
+
+- **大黒柱の主題** (8 拍): ラ♭・レ♭・ミ♭・レ♭・ミ♭・レ♭・ド・シ♭ — 10/03 の 3 本の採譜の最上声で繰り返し現れる節を数えると (n-gram)、ソ#・ド#・レ#・ド#・レ#・ド# が 13:24 (109 秒〜) と 13:27 (33 秒〜) の両方にあった。
+  それを主音に下りて終わるように整えた (レ♭ と ミ♭ のあいだを揺れ続けて、最後にド → シ♭ へ沈む)
+- **メロディー** (表、13:24 のピアノの 1 音): Praeludium (0〜28) = 主題を 2 倍に伸ばしてアルトが 7 回唱える (2 回目からテノールがオクターヴ下、5 回目からソプラノがオクターヴ上; 和音は主題に寄せる) →
+  Interludium (29〜64) = 主題が裏の和音 (13:24 の採譜) に 2 小節ごとにいちばん合う移調で置かれていくシャコンヌ (`best_tr`、テノールは 2 倍、ソプラノは転回) → Fuga (65〜92) = 主題の 4 声フーガ (提示 → 反行 → ストレッタ → 拡大) → 締めくくり (93〜100) = ストレッタ (変ロ長調) と LXXXIX の Amen
+- **洗脳的**: 13:04 の低い音で 1 拍ごとの鼓動が最後まで止まらない。同じ主題だけが回り続ける
+- **裏**: CXII と同じ LXXXIX (−4、小さく) と 13:19 の音の共鳴。CXII で表だった 13:22・13:24・13:27 の録音の実音は小さく裏に (0.18)。音量 (ステム、同じ基準): 主題 −23〜−16 dB、録音 −30、LXXXIX −29〜−36、共鳴 −28、鼓動 −31。声なし。`compose_tablet113.py` (CXII の関数を使う)
+
+```bash
+python3 compose_tablet113.py bank112/bank.json bank109.json score_tablet89.json src score_tablet113.json && python3 synth.py score_tablet113.json tablet113.wav && python3 video.py score_tablet113.json tablet113.wav tablet113.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
