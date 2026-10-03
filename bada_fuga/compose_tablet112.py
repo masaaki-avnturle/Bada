@@ -3,7 +3,7 @@
 """
 Requiem BADA — Tablet Sessions CXII · Praeludium, Interludium e Fuga 10/03 (LXXXIX をベースに、10/03 13:19 の音を共鳴のシンセサイザーに、13:22・13:24・13:27 の実音をメロディーに)
   ベース (裏): LXXXIX (Requiem e Fuga, recto e verso, ニ短調 96 小節) の楽譜を変ロ短調 (−4) に移して 2 小節目から全部 — 伸ばした主題・2 つのフーガ・ストレッタ・Amen (cp14_x4 の音声は使わない)。
-    4 声は ×0.14、伸ばした主題のピアノは ×0.12 で小さく (ステムで測って、表の録音より約 7 dB 下)
+    4 声は ×0.45、伸ばした主題のピアノは ×0.4 で小さく (ステムで測って、表の録音より約 7 dB 下)
   共鳴のシンセサイザー: 10/03 13:19 の録音から切り出した 8 音 (rid VOXRS — 減衰させず、持続部をループで伸ばす) で、その時の和音 (根音・5 度・3 度) を鳴らし続ける。和音は表の録音の採譜から (録音のない所は LXXXIX の和音)
   メロディー (表): 10/03 の録音の実音 (dip_breath.py で息のような所だけ下げて、ほかは加工なし)
     Praeludium  — 13:22 (1 分 40 秒、変ロ短調) を 2 小節目から
@@ -70,7 +70,7 @@ def augment(mat, k=2): return [(k * d, m) for d, m in mat]
 
 def build():
     P = Piece(TOTAL)
-    for k in range(TOTAL): P.tempo[k] = BPM; P.dyn[k] = 1.0
+    for k in range(TOTAL): P.tempo[k] = BPM; P.dyn[k] = 1.3
     for q in range(TOTAL * BPB):                                                                    # 和音: 表の録音の採譜 → なければ LXXXIX (−4)
         cur = None
         for rid, t0 in ((R22, T22), (R24, T24), (R27, T27)):
@@ -118,7 +118,7 @@ def post(P, events, ex):
         while q1 < TOTAL * BPB and P.harm[q1] == h: q1 += 1
         d = max(1.0, (q1 - q) + 0.6); c = chord(h); last = q >= (TOTAL - 2) * BPB
         pcs = [c['root'], c['fifth'], c['third']]; tones = [min((x for x in range(52, 76) if x % 12 == p), key=lambda x: abs(x - 62)) for p in pcs]
-        g = 0.065 if not last else 0.09
+        g = 0.2 if not last else 0.28
         for i, m in enumerate(tones):
             if m % 12 in MAJ and q >= CLOSE * BPB: m = majify(m)
             add('PF', q + 0.05 * i, d, m, g * (1.0 if i == 0 else 0.75), '共鳴 (13:19 の音)' if first else None, rid='VOXRS', rel=1.2, layer='res'); first = False
@@ -132,12 +132,12 @@ def merge_base(path):
     for n in S89['notes']:
         t = n['t'] + off
         if t >= TOTAL * BPB: continue
-        d['notes'].append(dict(n, t=t, beat=n['beat'] + off, m=n['m'] + TR, dyn=round(n.get('dyn', 1.0) * 0.14, 4), label=None, role='base'))
+        d['notes'].append(dict(n, t=t, beat=n['beat'] + off, m=n['m'] + TR, dyn=round(n.get('dyn', 1.0) * 0.45, 4), label=None, role='base'))
     for e in S89['extras']:
         if e['v'] != 'PF': continue
         t = e['t'] + off
         if t >= TOTAL * BPB: continue
-        d['extras'].append(dict(e, t=t, beat=e['beat'] + off, m=e['m'] + TR, gain=round(e['gain'] * 0.12, 4), label=None, layer='base'))
+        d['extras'].append(dict(e, t=t, beat=e['beat'] + off, m=e['m'] + TR, gain=round(e['gain'] * 0.4, 4), label=None, layer='base'))
     d['notes'].sort(key=lambda n: n['t']); d['extras'].sort(key=lambda e: e['t'])
     json.dump(d, open(path, 'w'), ensure_ascii=False)
 
