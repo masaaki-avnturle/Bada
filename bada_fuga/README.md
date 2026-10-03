@@ -2522,6 +2522,19 @@ CXIV (100 小節) をまるごと 16 倍に (`compose_tablet105.py`)。100 × 16
 python3 compose_tablet105.py score_tablet114.json score_tablet115.json bank112/bank.json && python3 render_long.py score_tablet115.json out115 192 3
 ```
 
+## 🎹🎵 Requiem BADA — Tablet Sessions CXVI · Canzone 10/03 sopra late_bach_fuga_8x (いつも通りに: 10/03 13:24・13:27 を主題歌に、バックに late_bach_fuga_8x, 変ロ短調, ♩=60, 5 分 15 秒)
+
+- **主題歌**: 10/03 13:24 (2 分 16 秒、5 小節目から) → 13:27 (1 分 43 秒、41 小節目から) の録音をそのまま、元の速さ・元の高さで (`dip_breath.py` で息のような所だけ下げて)
+- **バック**: late_bach_fuga_8x.mp4 (29 分 23 秒、×8 のピアノ) の音声を 60 秒ごとに調で調べると全体がニ短調 (相関 0.63〜0.93) — 主題歌は変ロ短調なので、ニ短調がいちばん濃い 1260 秒からの窓を
+  テープのように −4 (速さ 0.79 倍 = ×10 のピアノに) して敷く。ステムで測って主題歌より約 7 dB 下 (gain 0.3)。Coda で消えていく
+- **裏の層**: 採譜の骨組みを小さく ／ 13:27 のあいだは、その採譜から作った主題 (シ♭・ド#・ファ・シ♭・ミ♭・ファ・ラ・ファ・ミ♭・シ♭) の 4 声フーガ (提示 → 反行 → ストレッタ → 拡大、和音は録音のその時の和音に寄せる `harm_fit`)
+- **Coda** (68〜77): 主題を 4 倍に伸ばして、13:27 自身の音で 2 拍ごとに打ち直す (XCI と同じ)。音源は CXII と同じ。声なし。`compose_tablet116.py` (CXII の関数を使う)
+
+```bash
+ffmpeg -i late_bach_fuga_8x.mp4 -vn -ac 1 -ar 44100 src/late_bach_fuga_8x.wav
+python3 compose_tablet116.py bank112/bank.json bank109.json score_tablet89.json src score_tablet116.json && python3 synth.py score_tablet116.json tablet116.wav && python3 video.py score_tablet116.json tablet116.wav tablet116.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
