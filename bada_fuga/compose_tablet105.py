@@ -21,7 +21,10 @@ K = 16; WIN = 12
 def source_events(d):
     ev = []; vox = 'Fuga senza voce' in d['meta'].get('title', '')
     rec_g, aux = (0.45, 0.3) if vox else (REC_G, 1.0)                              # Vox: 採譜・鼓動・持続音・オスティナートは 4 声に合わせて控えめに
-    for n in d['notes']: ev.append((n['t'], n['d'], n['m'], float(n.get('dyn', 1.0)), n['label'], n['v'], n.get('src')))
+    for n in d['notes']:
+        if n.get('role') == 'base':                                               # 裏 (LXXXIX など) の音は小さいピアノの層として (4 声の大きさにしない)
+            ev.append((n['t'], n['d'], n['m'], 0.62 * float(n.get('dyn', 1.0)) + 0.08, n['label'], 'PF', n.get('src'))); continue
+        ev.append((n['t'], n['d'], n['m'], float(n.get('dyn', 1.0)), n['label'], n['v'], n.get('src')))
     for e in d['extras']:
         if e['v'] in ('PF', 'PK', 'OS', 'DN'): ev.append((e['t'], e['d'], e['m'], float(e['gain']) / 0.5 * (1.0 if e['v'] == 'PF' else aux), e.get('label'), 'PF', e.get('rid')))   # 鼓動・オスティナート・持続音もピアノの 1 音
     if BANKP:                                                                     # 録音の実音 → その採譜をピアノで (16 倍には伸ばせないので)
@@ -35,7 +38,7 @@ def source_events(d):
                 t = e['t'] + (sg['t'] - e.get('off', 0.0))
                 if t < e['t'] or t >= e['t'] + e['d']: continue
                 for m in sg['m']:
-                    ev.append((t, min(max(0.5, sg['d']), e['t'] + e['d'] - t), m, rec_g * (1.2 if m < 48 else 1.0), ('録音 %s:%s の採譜 (実音の代わり)' % (rid[9:11], rid[11:13])) if first else None, 'PF', rid)); first = False
+                    ev.append((t, min(max(0.5, sg['d']), e['t'] + e['d'] - t), m, rec_g * float(e.get('gain', 0.8)) / 0.8 * (1.2 if m < 48 else 1.0), ('録音 %s:%s の採譜 (実音の代わり)' % (rid[9:11], rid[11:13])) if first else None, 'PF', rid)); first = False
     return sorted(ev, key=lambda x: x[0])
 
 def build(d):
@@ -104,7 +107,12 @@ def equalize(out, block=32):
 if __name__ == '__main__':
     d = json.load(open(SRC)); out = build(d)
     h, rem = divmod(out['duration'], 3600); dur_s = '%d 時間 %d 分' % (h, rem // 60)
-    if 'Fuga senza voce' in d['meta'].get('title', ''):
+    if 'sopra due temi' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXV · Requiem 10/03 sopra due temi XVI',
+                    subtitle='CXIV をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。録音は採譜のピアノに、共鳴は 13:19 の音のまま (変ロ短調 → 変ロ長調, ♩=60)' % dur_s,
+                    footer=['CXIV の 100 小節 × 16 = 1600 小節: Praeludium ×16 → Interludium ×16 → Fuga (二重フーガ) ×16 → 締めくくり ×16 — 大黒柱の主題と 3 分目の主題',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。裏 (LXXXIX)・共鳴・鼓動・録音の採譜も 16 倍に。声なし。'])
+    elif 'Fuga senza voce' in d['meta'].get('title', ''):
         meta = dict(title='Requiem BADA — Vox · Fuga senza voce XVI',
                     subtitle='Fuga senza voce をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。ピアノ録音の音だけ、声なし (イ短調, ♩=60)' % dur_s,
                     footer=['Fuga senza voce の 70 小節 × 16 = 1120 小節: Introitus ×16 → Kyrie ×16 → Mix (録音は採譜のピアノに) ×16 → Fuga ×16 → Sanctus ×16 → Agnus Dei ×16 → Lux aeterna ×16',
@@ -119,7 +127,12 @@ if __name__ == '__main__':
                     subtitle='CIV をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す (変ロ短調 → ホ短調 → ホ長調, ♩=60)' % dur_s,
                     footer=['CIV の 76 小節 × 16 = 1216 小節: I. Fiore dolce 08:06 ×16 → II. Requiem 08:06 ×16 → III. Fuga 08:09 ×16 → IV. Fusione ×16 → V. Amen ×16',
                             '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。音源は bank85p (ピアノだけ) と鐘。声なし。'])
-    if 'Fuga senza voce' in d['meta'].get('title', ''): equalize(out)
+    if 'sopra due temi' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXV · Requiem 10/03 sopra due temi XVI',
+                    subtitle='CXIV をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。録音は採譜のピアノに、共鳴は 13:19 の音のまま (変ロ短調 → 変ロ長調, ♩=60)' % dur_s,
+                    footer=['CXIV の 100 小節 × 16 = 1600 小節: Praeludium ×16 → Interludium ×16 → Fuga (二重フーガ) ×16 → 締めくくり ×16 — 大黒柱の主題と 3 分目の主題',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。裏 (LXXXIX)・共鳴・鼓動・録音の採譜も 16 倍に。声なし。'])
+    elif 'Fuga senza voce' in d['meta'].get('title', ''): equalize(out)
     out['meta'] = dict(d['meta'], fps=15, fixed_peak=(0.8 if BANKP else 0.35), legend=['PF', 'X'], vname={'PF': '×16 / ×4 / ×1 の層', 'X': '鐘'}, **meta)
     json.dump(out, open(OUT, 'w'), ensure_ascii=False)
     h, rem = divmod(out['duration'], 3600)

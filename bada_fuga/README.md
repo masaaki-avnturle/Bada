@@ -2512,6 +2512,16 @@ python3 compose_tablet113.py bank112/bank.json bank109.json score_tablet89.json 
 python3 compose_tablet114.py bank112/bank.json bank109.json score_tablet89.json src score_tablet114.json && python3 synth.py score_tablet114.json tablet114.wav && python3 video.py score_tablet114.json tablet114.wav tablet114.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions CXV · Requiem 10/03 sopra due temi XVI (CXIV を 16 倍に伸ばして、同じようにフーガを醸す曲に, 変ロ短調 → 変ロ長調, ♩=60, 1 時間 46 分 40 秒)
+
+CXIV (100 小節) をまるごと 16 倍に (`compose_tablet105.py`)。100 × 16 = 1600 小節。
+- 裏 (LXXXIX) の音 (`role: base`) は 4 声の大きさにせず、小さいピアノの層 (PF) として 16 倍に。録音 (13:22・13:24・13:27、裏に小さく) は採譜のピアノに (元の gain に比例)。共鳴 (13:19 の音、VOXRS) と鼓動もそのまま 16 倍に
+- 要所 4 か所を短く合成して測った音量は −19〜−27 dB で均一。`fixed_peak` 0.8
+
+```bash
+python3 compose_tablet105.py score_tablet114.json score_tablet115.json bank112/bank.json && python3 render_long.py score_tablet115.json out115 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash
