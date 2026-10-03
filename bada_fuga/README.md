@@ -2473,6 +2473,21 @@ python3 compose_tablet111.py bank109.json wavs score_tablet111.json && python3 s
 python3 compose_tablet111.py bank109.json wavs score_tablet111b.json --senza-mantra-campane   # マントラと鐘も消して
 ```
 
+## 🎹🎛️ Requiem BADA — Tablet Sessions CXII · Praeludium, Interludium e Fuga 10/03 (LXXXIX をベースに、10/03 13:19 の音を共鳴のシンセサイザーに、13:22・13:24・13:27 の実音をメロディーに, 変ロ短調 → 変ロ長調, ♩=60, 6 分 47 秒)
+
+- **ベース (裏)**: LXXXIX の楽譜 (ニ短調 96 小節) を変ロ短調 (−4) に移して 2 小節目から全部 — 伸ばした主題・2 つのフーガ・ストレッタ・Amen。cp14_x4 の音声は使わない。4 声 ×0.14、ピアノ ×0.12 (表の録音より約 7 dB 下)
+- **共鳴のシンセサイザー**: 10/03 13:19 の録音から切り出した 8 音 (rid `VOXRS` — 減衰させず、持続部をループで伸ばす) で、その時の和音 (根音・5 度・3 度 + 低い根音) を鳴らし続ける。和音は表の録音の採譜から (録音のない所は LXXXIX の和音)
+- **メロディー (表)**: 10/03 の録音の実音 (すべて変ロ短調; `dip_breath.py` で息のような所だけ下げて、ほかは加工なし) —
+  Praeludium: 13:22 (1 分 40 秒) を 2 小節目から → Interludium: 13:24 (2 分 16 秒) を 29 小節目から → Fuga: 13:27 (1 分 43 秒) を 65 小節目から、その採譜の最上声から作った 8 拍の主題 (シ♭・ド#・ファ・シ♭・ミ♭・ファ・ラ・ファ・ミ♭・シ♭) の 4 声フーガを裏で (提示 → 反行 → ストレッタ → 拡大、和音は録音のその時の和音に寄せる `harm_fit`)
+- **締めくくり**: 録音が終わる 93 小節目から主題が変ロ長調で 4 声のストレッタに — 裏の LXXXIX の Amen と重なって、変ロ長調の和音で閉じる。100 小節
+- 音源: フーガの 4 声は 13:24・13:22 のピアノの 1 音 (立ち上がりが速く減衰するもの) + bank109、共鳴は 13:19 の音。音量はステムで測って: 表 −19 dB、裏 −25、共鳴 −24、フーガ −19。声なし
+
+```bash
+python3 build_sampler.py bank112 20261003_131932.wav 20261003_132245.wav 20261003_132431.wav 20261003_132703.wav
+for r in 132245 132431 132703; do python3 dip_breath.py 20261003_$r.wav src/20261003_${r}_clean.wav; done
+python3 compose_tablet112.py bank112/bank.json bank109.json score_tablet89.json src score_tablet112.json && python3 synth.py score_tablet112.json tablet112.wav && python3 video.py score_tablet112.json tablet112.wav tablet112.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
