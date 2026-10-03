@@ -2501,6 +2501,17 @@ python3 compose_tablet112.py bank112/bank.json bank109.json score_tablet89.json 
 python3 compose_tablet113.py bank112/bank.json bank109.json score_tablet89.json src score_tablet113.json && python3 synth.py score_tablet113.json tablet113.wav && python3 video.py score_tablet113.json tablet113.wav tablet113.mp4
 ```
 
+## 🎹⛪ Requiem BADA — Tablet Sessions CXIV · Requiem 10/03 sopra due temi (CXIII に、3 分目あたりの節を第 2 の主題として加えて, 変ロ短調 → 変ロ長調, ♩=60, 6 分 47 秒)
+
+- **3 分目の主題** (8 拍、ニ短調): ミ・シ・ド・ミ・レ・ド — 曲の 3 分目あたり (13:24 の録音の 55〜68 秒、ニ短調・ヘ長調に傾く所: Dm → Fmaj7 → Esus4 → Am → Bsus4 → Dm) の最上声そのまま
+- 大黒柱の主題 (ラ♭・レ♭・ミ♭・レ♭・ミ♭・レ♭・ド・シ♭) との 2 つの主題で: Praeludium = 6 回目から 3 分目の主題 ×2 がソプラノに ／ Interludium = ソプラノが 3 分目の主題 (和音に合う移調) と転回を交互に、
+  **3 分目 (43〜50 小節) では 3 分目の主題が録音と同じ高さでそのまま歌う** (裏の和音がその時の録音の和音なので) ／ Fuga = 二重フーガ (大黒柱の提示 → 3 分目の主題の提示、反行と重ねて → ストレッタ → 拡大の上で 3 分目の主題) ／ 締めくくり = ストレッタ (変ロ長調) と 3 分目の主題、LXXXIX の Amen
+- ほかは CXIII と同じ (LXXXIX のベース、13:19 の共鳴、録音を小さく裏に、1 拍ごとの鼓動)。`compose_tablet114.py`
+
+```bash
+python3 compose_tablet114.py bank112/bank.json bank109.json score_tablet89.json src score_tablet114.json && python3 synth.py score_tablet114.json tablet114.wav && python3 video.py score_tablet114.json tablet114.wav tablet114.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
