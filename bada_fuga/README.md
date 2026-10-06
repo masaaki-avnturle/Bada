@@ -2580,6 +2580,18 @@ python3 compose_tablet117.py bank112/bank.json bank109.json score_tablet89.json 
 for n in $(seq 1 12); do python3 compose_tablet118.py $n bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_118_$n.json && python3 synth.py score_118_$n.json nn_$n.wav && python3 video.py score_118_$n.json nn_$n.wav nn_$n.mp4; done
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions CXIX · Ninna nanna ultima XVI (CXVIII の No. 12 を 16 倍に伸ばして、フーガを醸す曲に, ♩=60, 3 時間 17 分 20 秒)
+
+No. 12 (185 小節、♩=60 → 44) をまるごと 16 倍に (`compose_tablet105.py`)。185 × 16 = 2960 小節。
+- テンポが途中で落ちる曲なので、16 倍化は秒ではなく **拍 (beat / dbeats)** で窓を切る (♩=60 固定; 元の遅くなる部分は拍で写す)。録音 (REC) の採譜も秒 → 拍に直して置く
+- 窓 (12 拍) をまたぐ長い音 (終わりの共鳴など) は窓ごとに分けて次の窓でも続ける (これがないと終わりの 2 分が無音になった)
+- 声部の重ね (`layer: theme`) は声部そのものがあるので除く。録音は表なので採譜の大きさはそのまま (`rec_g` 1.0)。8 小節ごとの音の量をそろえる (`equalize`)
+- 要所を短く合成して測った音量: くつろぎ −21 dB、暖まり −20、冷え −20、眠り −27、終わり −33 (静かに)
+
+```bash
+python3 compose_tablet105.py score_118_12.json score_tablet119.json bank_recs.json && python3 render_long.py score_tablet119.json out119 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash

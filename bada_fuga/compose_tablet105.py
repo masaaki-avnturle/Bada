@@ -19,30 +19,36 @@ REC_G = 1.6                                                                     
 K = 16; WIN = 12
 
 def source_events(d):
-    ev = []; vox = 'Fuga senza voce' in d['meta'].get('title', '')
-    rec_g, aux = (0.45, 0.3) if vox else (REC_G, 1.0)                              # Vox: 採譜・鼓動・持続音・オスティナートは 4 声に合わせて控えめに
+    ev = []; vox = 'Fuga senza voce' in d['meta'].get('title', ''); lull = 'ninne nanne' in d['meta'].get('title', '')
+    rec_g, aux = (0.45, 0.3) if vox else (1.0, 1.0) if lull else (REC_G, 1.0)      # Vox: 採譜・鼓動・持続音・オスティナートは 4 声に合わせて控えめに ／ 子守歌: 録音は表なので採譜もそのまま
+    B = lambda x, k_t, k_b: float(x.get(k_b, x[k_t]))                                # テンポの変わる曲は拍 (beat / dbeats) で
     for n in d['notes']:
         if n.get('role') == 'base':                                               # 裏 (LXXXIX など) の音は小さいピアノの層として (4 声の大きさにしない)
-            ev.append((n['t'], n['d'], n['m'], 0.62 * float(n.get('dyn', 1.0)) + 0.08, n['label'], 'PF', n.get('src'))); continue
-        ev.append((n['t'], n['d'], n['m'], float(n.get('dyn', 1.0)), n['label'], n['v'], n.get('src')))
+            ev.append((B(n, 't', 'beat'), B(n, 'd', 'dbeats'), n['m'], 0.62 * float(n.get('dyn', 1.0)) + 0.08, n['label'], 'PF', n.get('src'))); continue
+        ev.append((B(n, 't', 'beat'), B(n, 'd', 'dbeats'), n['m'], float(n.get('dyn', 1.0)), n['label'], n['v'], n.get('src')))
     for e in d['extras']:
-        if e['v'] in ('PF', 'PK', 'OS', 'DN'): ev.append((e['t'], e['d'], e['m'], float(e['gain']) / 0.5 * (1.0 if e['v'] == 'PF' else aux), e.get('label'), 'PF', e.get('rid')))   # 鼓動・オスティナート・持続音もピアノの 1 音
+        if e['v'] in ('PF', 'PK', 'OS', 'DN') and e.get('layer') != 'theme': ev.append((B(e, 't', 'beat'), B(e, 'd', 'dbeats'), e['m'], float(e['gain']) / 0.5 * (1.0 if e['v'] == 'PF' else aux), e.get('label'), 'PF', e.get('rid')))   # 'theme' (声部の重ね) は声部そのものがあるので除く   # 鼓動・オスティナート・持続音もピアノの 1 音
     if BANKP:                                                                     # 録音の実音 → その採譜をピアノで (16 倍には伸ばせないので)
         bank = json.load(open(BANKP))['recordings']
         for e in d['extras']:
             if e['v'] != 'REC': continue
             rid = str(e.get('rid', '')).replace('.wav', '')
             if rid not in bank: continue
-            first = True
+            first = True; t0, d0 = B(e, 't', 'beat'), B(e, 'd', 'dbeats'); sc = d0 / float(e['d']) if e['d'] else 1.0   # 秒 → 拍
             for sg in bank[rid]['segs']:
-                t = e['t'] + (sg['t'] - e.get('off', 0.0))
-                if t < e['t'] or t >= e['t'] + e['d']: continue
+                t = t0 + (sg['t'] - e.get('off', 0.0)) * sc
+                if t < t0 or t >= t0 + d0: continue
                 for m in sg['m']:
-                    ev.append((t, min(max(0.5, sg['d']), e['t'] + e['d'] - t), m, rec_g * float(e.get('gain', 0.8)) / 0.8 * (1.2 if m < 48 else 1.0), ('録音 %s:%s の採譜 (実音の代わり)' % (rid[9:11], rid[11:13])) if first else None, 'PF', rid)); first = False
+                    ev.append((t, min(max(0.5, sg['d'] * sc), t0 + d0 - t), m, rec_g * float(e.get('gain', 0.8)) / 0.8 * (1.2 if m < 48 else 1.0), ('録音 %s:%s の採譜 (実音の代わり)' % (rid[9:11], rid[11:13])) if first else None, 'PF', rid)); first = False
     return sorted(ev, key=lambda x: x[0])
 
 def build(d):
-    ev_all = source_events(d); bells = [e for e in d['extras'] if e['v'] == 'X']
+    ev_all = []                                                                    # 窓 (12 拍) をまたぐ長い音は窓ごとに分けて、次の窓でも続ける (終わりの長い共鳴が消えないように)
+    for t, dd, m, g, lab, v, rid in source_events(d):
+        while dd > 0.05:
+            end = (int(t // WIN) + 1) * WIN; piece = min(dd, end - t)
+            ev_all.append((t, piece, m, g, lab, v, rid)); lab = None; t += piece; dd -= piece
+    bells = [dict(e, t=float(e.get('beat', e['t']))) for e in d['extras'] if e['v'] == 'X']
     notes, extras, entries, harm, sections = [], [], [], [], []
     sec_src = sorted(d['sections'], key=lambda s: s['t']); nb = 0
     for w0 in range(0, d['nbars'] * 4, WIN):
@@ -107,7 +113,12 @@ def equalize(out, block=32):
 if __name__ == '__main__':
     d = json.load(open(SRC)); out = build(d)
     h, rem = divmod(out['duration'], 3600); dur_s = '%d 時間 %d 分' % (h, rem // 60)
-    if 'sopra due temi' in d['meta'].get('title', ''):
+    if 'ninne nanne' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXIX · Ninna nanna ultima XVI',
+                    subtitle='CXVIII の No. 12 をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。録音は採譜のピアノに、共鳴・鼓動も 16 倍に。鐘なし (♩=60)' % dur_s,
+                    footer=['No. 12 の 185 小節 × 16 = 2960 小節: くつろぎ (08:49) ×16 → 暖まり (11:18) ×16 → 冷え (13:22) ×16 → 眠り (15:16) ×16 → 長調の共鳴と B-A-D-A ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 が遠くで 8 回。元の曲のテンポの落ち方は拍で写す (♩=60 固定)。8 小節ごとの音の量をそろえる。声なし。'])
+    elif 'sopra due temi' in d['meta'].get('title', ''):
         meta = dict(title='Requiem BADA — CXV · Requiem 10/03 sopra due temi XVI',
                     subtitle='CXIV をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。録音は採譜のピアノに、共鳴は 13:19 の音のまま (変ロ短調 → 変ロ長調, ♩=60)' % dur_s,
                     footer=['CXIV の 100 小節 × 16 = 1600 小節: Praeludium ×16 → Interludium ×16 → Fuga (二重フーガ) ×16 → 締めくくり ×16 — 大黒柱の主題と 3 分目の主題',
@@ -127,12 +138,17 @@ if __name__ == '__main__':
                     subtitle='CIV をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す (変ロ短調 → ホ短調 → ホ長調, ♩=60)' % dur_s,
                     footer=['CIV の 76 小節 × 16 = 1216 小節: I. Fiore dolce 08:06 ×16 → II. Requiem 08:06 ×16 → III. Fuga 08:09 ×16 → IV. Fusione ×16 → V. Amen ×16',
                             '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。音源は bank85p (ピアノだけ) と鐘。声なし。'])
-    if 'sopra due temi' in d['meta'].get('title', ''):
+    if 'ninne nanne' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXIX · Ninna nanna ultima XVI',
+                    subtitle='CXVIII の No. 12 をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。録音は採譜のピアノに、共鳴・鼓動も 16 倍に。鐘なし (♩=60)' % dur_s,
+                    footer=['No. 12 の 185 小節 × 16 = 2960 小節: くつろぎ (08:49) ×16 → 暖まり (11:18) ×16 → 冷え (13:22) ×16 → 眠り (15:16) ×16 → 長調の共鳴と B-A-D-A ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 が遠くで 8 回。元の曲のテンポの落ち方は拍で写す (♩=60 固定)。8 小節ごとの音の量をそろえる。声なし。'])
+    elif 'sopra due temi' in d['meta'].get('title', ''):
         meta = dict(title='Requiem BADA — CXV · Requiem 10/03 sopra due temi XVI',
                     subtitle='CXIV をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。録音は採譜のピアノに、共鳴は 13:19 の音のまま (変ロ短調 → 変ロ長調, ♩=60)' % dur_s,
                     footer=['CXIV の 100 小節 × 16 = 1600 小節: Praeludium ×16 → Interludium ×16 → Fuga (二重フーガ) ×16 → 締めくくり ×16 — 大黒柱の主題と 3 分目の主題',
                             '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。裏 (LXXXIX)・共鳴・鼓動・録音の採譜も 16 倍に。声なし。'])
-    elif 'Fuga senza voce' in d['meta'].get('title', ''): equalize(out)
+    elif 'Fuga senza voce' in d['meta'].get('title', '') or 'ninne nanne' in d['meta'].get('title', ''): equalize(out)
     out['meta'] = dict(d['meta'], fps=15, fixed_peak=(0.8 if BANKP else 0.35), legend=['PF', 'X'], vname={'PF': '×16 / ×4 / ×1 の層', 'X': '鐘'}, **meta)
     json.dump(out, open(OUT, 'w'), ensure_ascii=False)
     h, rem = divmod(out['duration'], 3600)
