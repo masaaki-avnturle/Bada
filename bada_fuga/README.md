@@ -2553,6 +2553,33 @@ python3 compose_tablet116.py bank112/bank.json bank109.json score_tablet89.json 
 python3 compose_tablet117.py bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_tablet117.json && python3 synth.py score_tablet117.json tablet117.wav && python3 video.py score_tablet117.json tablet117.wav tablet117.mp4
 ```
 
+## 🎹🌙 Requiem BADA — Tablet Sessions CXVIII · Dodici ninne nanne (12 の子守歌 — CXVII と同じ原理で、パターンの違う 12 曲, ♩=56〜64 → 40〜48, 各 10〜15 分)
+
+共通の原理 (CXVII): 眠りの 4 段階 (くつろぎ → 暖まり → 冷え → 眠り)、実音のピアノ (息の所だけ下げた録音) を表に、主題がだんだん伸びて低く沈み、テンポと鼓動 (13:04 の低い音) がゆっくり落ちて消える。
+13:19 の音の共鳴がその時の和音を保つ。弔鐘・祝鐘なし、声なし。`compose_tablet118.py <No.>` (CXVII の作りを一般化、PLANS 表)
+
+| No. | 題 | 録音 (くつろぎ → 暖まり → 冷え → 眠り) | 主題 | 歌わせ方 | 層 | 終わり | ♩ |
+|---|---|---|---|---|---|---|---|
+| 1 | Ninna nanna rifatta | 13:22 → 11:18 → 08:49 → 13:27 | 3 分目 | 唱え | Sweet+Flower, LXXXIX, 8x | 長調 + B-A-D-A | 60→42 |
+| 2 | Ciaccona | 13:24 → 08:53 → 08:06 → 13:22 | 大黒柱 | シャコンヌ | Sweet | 主題だけ | 58→44 |
+| 3 | Canone | 08:09 → 11:18 → 15:12 → 13:27 | 08:09 | カノン | Flower, LXXXIX, 8x | 長調 + B-A-D-A | 60→46 |
+| 4 | Mantra | 11:23 → 13:22 → 08:49 → 15:16 | 08:53 | マントラ (同じ高さ) | 8x | 共鳴だけ | 56→40 |
+| 5 | Discesa | 13:27 → 11:18 → 08:06 → 13:24 | 大黒柱 | 下降 (S → A → T → B) | Sweet, LXXXIX | 長調 + B-A-D-A | 60→44 |
+| 6 | Cantilena 9/29 | 15:12 → 15:16 → 08:49 → 13:22 | 13:27 | 唱え | Flower, 8x | 主題だけ | 60→44 |
+| 7 | Ciaccona 9/24 | 08:53 → 11:18 → 11:23 → 13:27 | 3 分目 | シャコンヌ | Sweet+Flower, LXXXIX | 長調 + B-A-D-A | 64→46 |
+| 8 | Canone 08:06 | 08:06 → 13:24 → 08:49 → 15:12 | 08:06 | カノン | LXXXIX, 8x | 共鳴だけ | 58→42 |
+| 9 | Mantra del tema | 13:22 → 08:53 → 15:16 → 13:24 | 大黒柱 | マントラ | Flower | 主題だけ | 60→44 |
+| 10 | Fuga sommessa | 11:18 → 13:24 → 08:09 → 08:49 | 08:09 | 小さなフーガ (暖まりで) | Sweet, 8x | 長調 + B-A-D-A | 60→48 |
+| 11 | Discesa 13:27 | 13:24 → 11:23 → 08:06 → 13:27 | 13:27 | 下降 | LXXXIX, 8x | 長調 + B-A-D-A | 56→40 |
+| 12 | Ninna nanna ultima | 08:49 → 11:18 → 13:22 → 15:16 | 大黒柱 | 唱え | Sweet+Flower, LXXXIX, 8x | 長調 + B-A-D-A | 60→44 |
+
+- 主題は段落の録音の調に移してから、歌わせ方ごとに和音に合わせる (`best_tr` ±7、マントラは段落全体で 1 つの移調 `stage_tr`)。LXXXVI・LXXXIX・8 倍のバッハの移調も段落の調から
+- No. 1 = CXVII を 3 分目の主題で作り直したもの、No. 2〜5 = パターンの違う 4 曲、No. 6〜12 = 同じ原理の 7 曲。mp4 は 960×540 に縮めて 30 MiB 以内に
+
+```bash
+for n in $(seq 1 12); do python3 compose_tablet118.py $n bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_118_$n.json && python3 synth.py score_118_$n.json nn_$n.wav && python3 video.py score_118_$n.json nn_$n.wav nn_$n.mp4; done
+```
+
 ## 作り方 (再現)
 
 ```bash
