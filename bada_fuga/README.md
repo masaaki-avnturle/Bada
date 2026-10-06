@@ -2535,6 +2535,24 @@ ffmpeg -i late_bach_fuga_8x.mp4 -vn -ac 1 -ar 44100 src/late_bach_fuga_8x.wav
 python3 compose_tablet116.py bank112/bank.json bank109.json score_tablet89.json src score_tablet116.json && python3 synth.py score_tablet116.json tablet116.wav && python3 video.py score_tablet116.json tablet116.wav tablet116.mp4
 ```
 
+## 🎹🌙 Requiem BADA — Tablet Sessions CXVII · Ninna nanna 10/03 (眠りへの曲 — CXVI・CXI・requiem・LXXXVI・LXXXIX の材料で、実音のピアノを主体に、鐘なし, 変ロ短調 → ヘ長調 → ヘ短調 → 変ロ長調, ♩=60 → 44, 12 分 59 秒)
+
+眠りの 4 段階 (テンポは後半で 60 → 44 へゆっくり落ち、鼓動も一緒に遅くなる):
+| 段階 | 小節 | 実音のピアノ (表) | 重ねるもの |
+|---|---|---|---|
+| I. Rilassamento くつろぎ | 0〜38 | 10/03 13:24 (変ロ短調) | 大黒柱の主題 ×2 をアルトが静かに、LXXXVI の Sweet の旋律 (+6 で変ロ短調に) が小さく、13:19 の音の共鳴、♩=60 の鼓動 |
+| II. Calore 暖まり | 38〜80 | 9/24 11:18 (ヘ長調 — 暖かい) | 主題が和音に合う移調で (長調の響き、`best_tr`)、共鳴は 3 度を重ねて暖かく |
+| III. Raffreddamento 冷え | 80〜136 | 9/24 08:49 (ヘ短調)、♩=60 → 50 | LXXXVI の Flower の旋律 (+1 でヘ短調の五音音階に)、主題は 4 倍に伸びてアルト → テノール → バスと下りる、共鳴は 1 オクターヴ下、LXXXIX の I. Requiem の伸ばした主題 (−4) が遠くで |
+| IV. Sonno 眠り | 136〜176 | 10/03 13:27 を半分の大きさで、♩=50 → 44 | late_bach_fuga_8x (−4、×10) が遠くで、主題は 8 倍に低く、鼓動は 2 拍に 1 つになって消える。最後の 8 小節は変ロ長調の共鳴と B-A-D-A (requiem の主題) だけが静かに消える |
+
+- 私の周波数帯: 録音の音域 (ソ 2〜ファ 6、重心 1〜1.5 kHz) の中にピアノの 1 音の層 (ソ 3〜ファ 5) を置く。弔鐘・祝鐘は使わない。声なし
+- 主題の声部は 1 音のサンプラーの上限 (vel 1.0) を超えられないので、同じ音を PF の層としても重ねて実音の約 10 dB 下に。ステム (同じ基準): 実音 −16 dB、主題 −24、LXXXVI −27、共鳴 −27、鼓動 −32、LXXXIX −31、8 倍のバッハ −33
+- テンポが変わるので、実音の長さ (秒) は `beats_for` で拍に直して置く。`compose_tablet117.py` (CXII の関数を使う)。mp4 は 960×540 に縮めて 30 MiB 以内に
+
+```bash
+python3 compose_tablet117.py bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_tablet117.json && python3 synth.py score_tablet117.json tablet117.wav && python3 video.py score_tablet117.json tablet117.wav tablet117.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
