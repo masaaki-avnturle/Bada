@@ -2592,6 +2592,22 @@ No. 12 (185 小節、♩=60 → 44) をまるごと 16 倍に (`compose_tablet10
 python3 compose_tablet105.py score_118_12.json score_tablet119.json bank_recs.json && python3 render_long.py score_tablet119.json out119 192 3
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions CXX · Fuga ben temperata, R&B e rock (10/12 の録音をベースに、鼓動をロックバンドのドラムに見立てて — 平均律のフーガを R&B のリズムが中音域で支える、睡眠誘導の洗脳的な曲, 変ロ短調, ♩=72, 6 分 20 秒)
+
+- **ベース (裏)**: 10/12 06:27 (2 分 56 秒) → 06:30 (1 分 9 秒) → 06:27 の録音の実音 (変ロ短調; `dip_breath.py` で息の所だけ下げて、06:27 は 29 か所)、小さく (0.35 / 0.25)
+- **表 — 平均律のようなフーガ** (ピアノの 1 音、4 声): 主題 I = 06:27 の最上声から (ド#・ラ・ド・シ♭)、主題 II = 06:30 の最上声から (シ♭・ファ・ド#・ファ・シ♭・シ♭)。
+  Intro → Fuga I (提示 → 嬉遊 (主題の頭の追いかけ合い、R&B の和音が前に) → 反行とストレッタ → 保続低音) → Fuga II (提示 → 二重のストレッタ → 拡大の上で 2 つの主題 → 頂点) → Coda (鼓動だけに、変ロ長調)。
+  和音は主題の音を含み、録音のその時の和音に近いものを選ぶ (`harm_fit`)
+- **中音域 (R&B)**: 7th・9th の和音 (ド 4〜ミ♭ 5) を 1 拍目・2 拍目の裏・3 拍目の 16 分裏・4 拍目の裏に、ベース (13:04 の低い音) は根音を 1 拍目と 3 拍目の裏、5 度を 4 拍目の裏に。808 の重低音が根音を支える
+- **裏 — ロックバンドのドラム** (`synth.rock_drum`、extras `DR`): キック = 鼓動 (ドッ・クン、1・3 拍目; 本打 + 0.32 秒後の弱い打)、スネアはハーフタイム (3 拍目)、ハイハットは 8 分 + スウィングする 16 分のゴースト (+0.33 拍)、
+  8 小節ごとに 16 分のフィル、段落の頭にクラッシュ、保続〜Fuga II はライド、拡大からオープンハット。Coda は鼓動だけ
+- ♩=72 = 安静より少し速い心拍 (神経は高まるが平常心)。音量 (ステム、同じ基準): フーガ −18〜−15 dB、R&B の和音 −24、ベース −26、808 −26、ドラム −24、録音 −27。弔鐘・祝鐘なし、声なし
+
+```bash
+python3 build_sampler.py bank1012 20261012_062753.wav 20261012_063057.wav && for r in 062753 063057; do python3 dip_breath.py 20261012_$r.wav src/20261012_${r}_clean.wav; done
+python3 compose_tablet120.py bank1012/bank.json bank109.json src score_tablet120.json && python3 synth.py score_tablet120.json tablet120.wav && python3 video.py score_tablet120.json tablet120.wav tablet120.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
