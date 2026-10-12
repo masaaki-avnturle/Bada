@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>BadaGPT電信 — BadaGPT TELEGRAPH</title>
+<style>
+:root{--txt:rgba(232,242,255,.96);--txt2:rgba(168,190,228,.7);--acc:#8fd0ff;--acc2:#b98cff;--ok:#5cd08a;--warn:#ff9a6b;--bad:#ff6b6b}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:radial-gradient(ellipse at 50% -10%,#122046,#080b14 60%,#05070e);color:var(--txt);
+ font-family:-apple-system,'Hiragino Kaku Gothic ProN','Yu Gothic UI','Noto Sans JP',system-ui,sans-serif;min-height:100vh;padding:14px 14px 40px}
+.wrap{max-width:860px;margin:0 auto}
+header{text-align:center;padding:6px 0 14px}
+h1{font-weight:300;letter-spacing:.14em;font-size:21px;background:linear-gradient(90deg,#8fd0ff,#b98cff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{font-size:9.5px;letter-spacing:.16em;color:var(--txt2);margin-top:6px;line-height:1.8}
+.card{background:rgba(18,26,46,.55);border:1px solid rgba(150,190,255,.16);border-radius:16px;padding:14px;margin-bottom:12px;
+ box-shadow:0 18px 50px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.06)}
+.card h2{font-size:11px;letter-spacing:.18em;color:var(--acc);margin-bottom:10px;font-weight:600}
+label{display:block;font-size:10px;letter-spacing:.1em;color:var(--txt2);margin:8px 0 4px}
+input,textarea,select{width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(150,190,255,.2);border-radius:10px;
+ color:#eaf4ff;font-size:14px;padding:10px 12px;outline:none;font-family:inherit}
+textarea{resize:vertical;min-height:110px;line-height:1.6}
+input:focus,textarea:focus{border-color:rgba(143,208,255,.6)}
+.btn{padding:10px 14px;border:1px solid rgba(150,190,255,.25);border-radius:11px;cursor:pointer;font-size:13px;color:#dfeaff;background:rgba(30,42,70,.7);font-family:inherit}
+.btn:active{transform:scale(.98)}.btn:disabled{opacity:.45;cursor:default}
+.main{width:100%;margin-top:12px;padding:15px;border:none;border-radius:12px;cursor:pointer;font-size:16px;font-weight:600;letter-spacing:.1em;
+ color:#04121f;background:linear-gradient(90deg,#8fd0ff,#7be0c0);box-shadow:0 10px 30px rgba(120,200,255,.3)}
+.main:disabled{opacity:.55;cursor:wait}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.chip{font-size:11px;padding:6px 11px;border-radius:20px;background:rgba(30,42,70,.6);border:1px solid rgba(150,190,255,.2);color:#dfeaff;cursor:pointer}
+.chip.on{background:rgba(143,208,255,.22);border-color:rgba(143,208,255,.5)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+@media(max-width:560px){.grid{grid-template-columns:repeat(2,1fr)}}
+.tile{background:rgba(10,16,30,.6);border:1px solid rgba(130,170,240,.14);border-radius:11px;padding:9px 10px;min-height:54px}
+.tile .k{font-size:8.5px;letter-spacing:.12em;color:var(--txt2)}
+.tile .v{font-size:15px;margin-top:4px;font-variant-numeric:tabular-nums;color:#eaf4ff;word-break:break-all}
+.tile.acc .v{color:var(--acc)}.tile.acc2 .v{color:var(--acc2)}.tile.ok .v{color:var(--ok)}
+#stage{width:100%;height:190px;display:block;border-radius:12px;background:radial-gradient(ellipse at 50% 40%,#0b1430,#06090f);border:1px solid rgba(130,170,240,.14)}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.morse{font-size:11px;letter-spacing:2px;color:#8fe0ff;word-break:break-all;line-height:1.7;background:rgba(0,0,0,.3);border-radius:9px;padding:8px 10px;margin-top:8px;max-height:60px;overflow:auto}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.steps span{font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid rgba(150,190,255,.18);color:var(--txt2)}
+.steps span.run{border-color:var(--acc);color:var(--acc)}.steps span.done{border-color:var(--ok);color:var(--ok)}.steps span.fail{border-color:var(--bad);color:var(--bad)}
+.spec{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:13px;line-height:1.6}
+.spec dt{color:var(--txt2);font-size:11px;padding-top:2px}
+.pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid rgba(150,190,255,.25);margin:0 4px 4px 0}
+.pill.as{border-style:dashed;color:var(--txt2)}
+.cov{height:10px;border-radius:10px;background:rgba(0,0,0,.35);overflow:hidden;margin:6px 0}
+.cov>div{height:100%;background:linear-gradient(90deg,#7be0c0,#8fd0ff);transition:width .5s}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+th,td{border-bottom:1px solid rgba(150,190,255,.12);padding:6px 6px;text-align:left;vertical-align:top}
+th{color:var(--txt2);font-weight:500;font-size:11px}
+td.ok{color:var(--ok)}td.ng{color:var(--warn)}
+.checks li{list-style:none;font-size:12.5px;padding:3px 0}
+.checks .ok::before{content:"✓ ";color:var(--ok)}.checks .ng::before{content:"✗ ";color:var(--bad)}
+.preview-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.frame-wrap{display:flex;justify-content:center;background:rgba(0,0,0,.25);border-radius:12px;padding:8px}
+#preview{width:100%;height:560px;border:1px solid rgba(150,190,255,.2);border-radius:12px;background:#fff;transition:width .3s}
+#preview.phone{width:390px;max-width:100%}
+.paper{background:#fbfbf8;color:#1a1a1a;border-radius:12px;padding:22px 24px;max-height:520px;overflow:auto;font-size:13.5px;line-height:1.75}
+.paper h1{font-size:19px;color:#111;background:none;-webkit-text-fill-color:initial;letter-spacing:0;font-weight:700;margin-bottom:8px}
+.paper h2{font-size:15px;margin:16px 0 6px;color:#123}.paper h3{font-size:13.5px;margin:12px 0 4px;color:#234}
+.paper p{margin:6px 0}.paper ul{margin:6px 0 6px 20px}.paper blockquote{border-left:3px solid #9ab;padding:4px 10px;color:#345;background:#eef2f6;margin:6px 0}
+.paper table{color:#222}.paper th,.paper td{border-bottom:1px solid #dde}.paper th{color:#456}.paper code{background:#eef;padding:0 4px;border-radius:4px}
+.bconsole{font-size:9.5px;line-height:1.6;color:rgba(150,200,255,.82);background:rgba(0,0,0,.32);border:1px solid rgba(120,170,255,.16);border-radius:9px;padding:8px 10px;max-height:150px;overflow:auto;white-space:pre-wrap}
+.hist{display:flex;flex-direction:column;gap:6px}
+.hist div{display:flex;gap:8px;align-items:center;font-size:12px;padding:8px 10px;border:1px solid rgba(150,190,255,.14);border-radius:10px;cursor:pointer}
+.hist div:hover{border-color:var(--acc)}
+.hist b{flex:1;font-weight:500}.hist i{font-style:normal;color:var(--txt2);font-size:10px}
+.muted{color:var(--txt2);font-size:11.5px;line-height:1.7}
+.err{color:var(--bad)}
+.hidden{display:none!important}
+#spectrum{width:100%;height:60px;margin-top:8px;border-radius:10px;background:#06090f;border:1px solid rgba(130,170,240,.14)}
+.note{font-size:9.5px;color:rgba(140,165,210,.6);line-height:1.8;margin-top:10px;text-align:center}
+details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--acc);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <h1>BadaGPT電信</h1>
+ <div class="sub">BadaGPT TELEGRAPH · 思考入力 → 電信 → 全体把握 → 設計 → 生成 → 検証 → 論文<br>
+ 依頼の全体を捉えてアプリケーションを錬成し、Android (APK) / Windows 10・11 / Linux へ · Bada 言語駆動</div>
+</header>
+
+<div class="card">
+ <h2>① 思考入力 — 作りたいアプリを思い描くまま書く</h2>
+ <textarea id="thought" placeholder="例: 読んだ本を管理したい。項目はタイトル、著者、読了日、評価、感想。評価順に並べ替えたい。青いダークなデザインで、スマホと Windows で使いたい。"></textarea>
+ <div class="row" id="examples"></div>
+ <div class="row">
+  <button class="btn hidden" id="voiceBtn">🎙 音声で入力</button>
+  <button class="btn" id="listenBtn">📶 スマホから電信で受信</button>
+  <button class="btn hidden" id="stopBtn">⏹ 受信を止めて復号</button>
+  <button class="btn" id="sendFskBtn">🔊 この依頼を電信で送る</button>
+ </div>
+ <canvas id="spectrum" class="hidden"></canvas>
+ <div class="muted" id="modemStat"></div>
+ <label>論文の著者名 (任意)</label>
+ <input id="author" placeholder="例: 山口 雅旭">
+ <button class="main" id="goBtn">⚡ 電信して錬成 (Bada 実行)</button>
+</div>
+
+<div class="card">
+ <h2>② 電信 — 思考入力を BadaGPT へ送る</h2>
+ <canvas id="stage"></canvas>
+ <div class="grid" style="margin-top:10px">
+  <div class="tile acc"><div class="k">H エントロピー</div><div class="v" id="m-h">—</div></div>
+  <div class="tile acc2"><div class="k">Ξ 多様体不変量</div><div class="v" id="m-xi">—</div></div>
+  <div class="tile"><div class="k">Jones 交差数 n / V(2)</div><div class="v" id="m-n">—</div></div>
+  <div class="tile"><div class="k">⟨K⟩ Kauffman 括弧</div><div class="v" id="m-k" style="font-size:12px">—</div></div>
+  <div class="tile ok"><div class="k">テレポート忠実度 (思考実験)</div><div class="v" id="m-fid">—</div></div>
+  <div class="tile acc"><div class="k">搬送波</div><div class="v" id="m-car">—</div></div>
+ </div>
+ <div class="morse mono" id="m-morse">—</div>
+</div>
+
+<div class="card">
+ <h2>③ 全体把握 — 依頼のすべての節を仕様へ</h2>
+ <div class="steps" id="steps"></div>
+ <div id="specView" class="muted">「電信して錬成」を押すと、ここに仕様が表示されます。</div>
+</div>
+
+<div class="card hidden" id="genCard">
+ <h2>④ 生成と検証 — できあがったアプリ</h2>
+ <ul class="checks" id="checks"></ul>
+ <div class="preview-bar" style="margin-top:10px">
+  <span class="chip on" id="vPhone">📱 スマホ幅</span><span class="chip" id="vWide">🖥 デスクトップ幅</span>
+  <span class="muted" id="genInfo"></span>
+ </div>
+ <div class="frame-wrap"><iframe id="preview" class="phone" sandbox="allow-scripts allow-modals allow-downloads" title="生成アプリのプレビュー"></iframe></div>
+ <div class="row">
+  <button class="btn" id="dlHtml">⬇ アプリ (HTML)</button>
+  <button class="btn" id="dlZip">📦 APK / Windows / Linux ビルド一式 (ZIP)</button>
+  <button class="btn" id="dlPdf">📄 論文 PDF</button>
+  <button class="btn" id="dlMd">📝 論文 Markdown</button>
+ </div>
+ <div class="muted" id="outState"></div>
+</div>
+
+<div class="card hidden" id="paperCard">
+ <h2>⑤ 論文 — 要求 → 設計 → 実装 → 検証</h2>
+ <div class="paper" id="paperView"></div>
+</div>
+
+<div class="card">
+ <h2>⑥ BADA コンソール (badagpt.bada 実行トレース)</h2>
+ <div class="bconsole mono" id="bconsole">BADA ▸ 実行待ち…</div>
+</div>
+
+<div class="card">
+ <h2>⑦ 電報の履歴</h2>
+ <div class="hist" id="hist"><div class="muted">まだありません。</div></div>
+</div>
+
+<div class="card">
+ <details>
+  <summary>⑧ 設定 — Claude で生成する (任意)</summary>
+  <p class="muted" style="margin-top:8px">API キーがなくても内蔵エンジンで完全にオフライン動作します。Anthropic の API キーを入れると、全体把握の結果 (未解釈の節を含む) を Claude に渡して、より自由な形のアプリを生成させます。キーはこの端末の中だけに保存されます。生成結果は同じ検証にかけ、不合格なら内蔵エンジンの結果を使います。</p>
+  <label>Anthropic API キー</label>
+  <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off">
+  <label>モデル</label>
+  <select id="model"></select>
+  <div class="row"><button class="btn" id="saveKey">保存</button><button class="btn" id="clearKey">キーを消去</button><span class="muted" id="keyState"></span></div>
+ </details>
+</div>
+
+<div class="note">
+ 「思考入力」は文章・音声・電信 (FSK 音) で入力した依頼文のことで、脳の信号を読み取る機能はありません。<br>
+ グラビトン↔電磁波変換・量子テレポーテーションの数値は山口フレームワークに基づく<b>思考実験の可視化</b>です。<br>
+ 依頼文の全体把握・アプリ生成・検証・論文・PDF/ZIP 書き出し・FSK 音響通信は<b>実際に動作</b>します。<br>
+ © Masaaki Yamaguchi · 山口 雅旭 · BadaGPT電信 v<span id="ver"></span>
+</div>
+</div>
+
+<script>
+/*@ENGINE@*/
+</script>
+<script>
+/*@UI@*/
+</script>
+</body>
+</html>

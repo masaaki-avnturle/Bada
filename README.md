@@ -135,6 +135,24 @@
 
 ---
 
+## 📡🤖 ダウンロード — BadaGPT電信(思考入力から依頼の全体を捉えてアプリを錬成)
+
+**BADA グラビトン電信の電信エンジンの上に BadaGPT を載せたアプリ。** 作りたいアプリを思い描くまま書く(または話す・スマホから FSK 音で電信する)と、Bada プログラム `badagpt.bada` が **電信 → 全体把握 → 設計 → 生成 → 検証 → 論文** を実行し、依頼の**すべての節**を仕様へ対応付けた上で(網羅率・節ごとの対応表・仮定・未解釈の節を明示)、そのまま動くアプリ・生成過程の**論文 (PDF)**・生成アプリを **APK / Windows / Linux** にビルドする一式 (ZIP) を作ります。14 種の部品(記録・管理 / ToDo / メモ / 家計簿 / タイマー / 電卓 / クイズ / お絵かき / 量子回路 / モールス電信 …)を組み合わせ、依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**Releases → badagpt-telegraph-latest**](https://github.com/masaaki-avnturle/Bada/releases/tag/badagpt-telegraph-latest)
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-gpt-telegraph-debug.apk` |
+| **Windows 10 / 11** | `BadaGPTTelegraph-*-x64.exe` (インストーラ) / `BadaGPTTelegraph-*-portable.exe` |
+| **Linux** | `BadaGPTTelegraph-*-x86_64.AppImage` / `BadaGPTTelegraph-*-amd64.deb` |
+| **ブラウザ** | `BadaGPTTelegraph-web.html` (または [`bada_gpt_telegraph/index.html`](bada_gpt_telegraph/index.html)) |
+| **論文** | [`BadaGPT_Telegraph_paper.pdf`](bada_gpt_telegraph/paper/BadaGPT_Telegraph_paper.pdf) |
+
+ビルドは [`badagpt-telegraph-app-build.yml`](.github/workflows/badagpt-telegraph-app-build.yml) が実行します。使い方・設計は [`bada_gpt_telegraph/`](bada_gpt_telegraph/) を参照。
+
+---
+
 ## ⛩ ダウンロード — BadaGPT道場(ChatGPTの技を伝授する技術伝授アプリ)
 
 **ChatGPT が「応答し、アプリケーションを作る」ときに試行している技を、量子プログラミング言語 Bada の上でユーザーに伝授するアプリケーション。** BadaGPT は応答のたびに自分のパイプライン(**トークン化 → 意図解析 → 計画 → 生成 → 検証 → 応答**)を開示し、道場カリキュラムで七つの技(トークン化 / 自己注意 self-attention / 次トークン予測 / 意図解析 / 計画と生成=アプリ錬成 / 検証と自己修正 / 量子 Bada)をひとつずつ稽古 → 印可 → **免許皆伝**。日本語の依頼文からアプリを錬成する **🛠 アプリ錬成**(Bada on Rails scaffold / GUI / 量子デモ)、本物の self-attention 順伝播、量子 Bada 実行系(qubit / H / X / Z / CNOT / measure)を搭載。依存ゼロ・単一 HTML・オフライン動作。
