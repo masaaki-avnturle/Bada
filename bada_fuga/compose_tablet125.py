@@ -217,7 +217,7 @@ def post(P, events, ex):
         bar = q // BPB
         if bar < 6: pass                                                                            # Inno の 1 句目: 何も重ねない (身に着ける寒さ)
         elif bar < INTRO:                                                                           # Inno の 2 句目から: 高い開いた 5 度 (シ・ファ#) だけ
-            d = max(1.0, (q1 - q) + 0.6); g = 0.07
+            d = max(1.0, (q1 - q) + 0.6); g = 0.8                                                  # 高い音のサンプルは小さいので大きめに (ステムで −35 dB ほど)
             for i, m in enumerate((83, 90)): add('PF', q + 0.05 * i, d, m, g * (1.0 if i == 0 else 0.7), '高い開いた 5 度 (共鳴)' if first else None, rid='VOXRS', rel=1.5, layer='res'); first = False
         else:
             d = max(1.0, (q1 - q) + 0.6); c = chord(h)
