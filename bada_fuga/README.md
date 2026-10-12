@@ -2653,6 +2653,19 @@ python3 build_sampler.py bank1012b 20261012_130315.wav 20261012_130635.wav 20261
 python3 compose_tablet123.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet123.json && python3 synth.py score_tablet123.json tablet123.wav && python3 video.py score_tablet123.json tablet123.wav tablet123.mp4
 ```
 
+## 🎹⛪🥋 Requiem BADA — Tablet Sessions CXXIV · Requiem di Natale in Si minore (CXXIII をロ短調で — キリスト礼拝の荘厳さと、剣道の大会の始まりに総合体育館で流れる国歌の、冷たい空気のキリリとした気持ち, ロ短調, ♩=56, 11 分 17 秒)
+
+- **ロ短調で全体を**: 讃美歌 (13:06 の最上声の音) をロ短調の五音音階 (シ・レ・ミ・ファ#・ラ) に乗せ直し、句の終わりはレ/ファ#・ミ/シ・レ/ファ#・シ。フーガの主題はその第 1 句、対主題は 10/03 13:27 の主題を半音上げたもの
+- **キリリとした空気**: Introitus は国歌のように 4 声のユニゾン (オクターヴ) で始まり、2 回目から開いた 5 度のコラール。和音は 7th を使わず Bm・D・G・F#m・A・Em・sus4 だけ。♩=56、残響は体育館・礼拝堂のように長く (8 秒)。
+  最後は開いた 5 度 (シ・ファ#) のユニゾン。始めと終わりに深い鐘 (シ 1) がひとつ
+- **荘厳さ**: 13:19 の音の共鳴をオルガンのように全曲で (和音の根音・5 度・3 度と低い根音)
+- **実音**: 9/24 08:53 (Introitus) と 11:23 (Sanctus) はもともとロ短調、10/12 13:03 (Kyrie) と 13:07 (Agnus Dei) はテープで半音上げてロ短調に (速さ 1.06 倍)。採譜の和音も +1 して共鳴に使う
+- 形式は CXXIII と同じ (Introitus → Kyrie 二重フーガ → Sanctus カノン → Agnus Dei B-A-D-A → Lux aeterna)。`compose_tablet124.py` (CXXIII を差し替え)
+
+```bash
+python3 compose_tablet124.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet124.json && python3 synth.py score_tablet124.json tablet124.wav && python3 video.py score_tablet124.json tablet124.wav tablet124.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
