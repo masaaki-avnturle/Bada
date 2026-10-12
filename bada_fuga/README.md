@@ -2627,6 +2627,18 @@ python3 compose_tablet120.py bank1012/bank.json bank109.json src score_tablet120
 python3 compose_tablet121.py bank1012/bank.json bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_tablet121.json && python3 synth.py score_tablet121.json tablet121.wav && python3 video.py score_tablet121.json tablet121.wav tablet121.mp4
 ```
 
+## 🎹🌙📜 Requiem BADA — Tablet Sessions CXXII · Contrapunctus XIV, ninna nanna (バッハ『フーガの技法』Contrapunctus XIV を 10/12 で作り換え — 二重フーガ、バックを CXVII の形で, 変ロ短調 → ヘ長調 → ヘ短調 → 変ロ長調, ♩=66 → 44, 11 分 48 秒)
+
+CXXI と同じ枠 (眠りの 4 段階、ジャズ/R&B の中音域、鼓動と共鳴、実音のピアノ主体、鐘なし) で、フーガを Contrapunctus XIV の形に:
+- **第 1 主題** = 06:27 の最上声の音を Cp. XIV の第 1 主題のリズム (♩. ♪ ♩ ♩ ♩ ♩ ♪ ♪ ♩、長い音) に乗せる ／ **第 2 主題** = 06:30 の最上声の音を第 2 主題のリズム (8 分音符の走り、16 音) に ／ **B-A-C-H** (第 3 の主題)。`shape` (ニ短調の音階に寄せ、主音で終える)
+- I. くつろぎ (06:27): 第 1 主題の提示 → 対提示 ／ II. 暖まり (11:18、ヘ長調): 第 2 主題の提示 → 第 1 主題と結ぶ **二重フーガ** ／ III. 冷え (08:49): 第 1 主題の拡大 (×2 → ×4) の上で第 2 主題と反行、下りていく ／
+  IV. 眠り (06:30): 第 1 主題の拡大 (×4) の上に B-A-C-H が入り、**Cp. XIV のように楽譜が途切れる** (160 小節目) — 残るのは共鳴と遠くの 8 倍のバッハ → 変ロ長調の共鳴の中で B-A-D-A が静かに答えて消える
+- `compose_tablet122.py` (CXXI の build を差し替え)
+
+```bash
+python3 compose_tablet122.py bank1012/bank.json bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_tablet122.json && python3 synth.py score_tablet122.json tablet122.wav && python3 video.py score_tablet122.json tablet122.wav tablet122.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
