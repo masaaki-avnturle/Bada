@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<!--
+  BadaGPT (改良版 / chatGPT版) — 思考入力からアプリ・PDF・ソースコードを生成する Bada言語コード生成スタジオ
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_badagpt
+
+  「思考入力」(Ω-Telepathy の思考タイピング出力など) を仕様として受け取り、BadaGPT が
+  Bada言語パイプライン(トークン化→意図解析→計画→生成→検証)で処理して、
+  対象の APK / Windows10,11 / PDF / 任意アプリの「ソースコード一式」を生成・ダウンロードする。
+
+  ・既定: オフラインで決定論的に雛形生成 (依存ゼロ・単一HTML)
+  ・改良(chatGPT版): 自分の OpenAI APIキーを入れると実際の ChatGPT でコード生成
+
+  ⚠ 「思考入力」は概念版テレパシー(Ω-Telepathy)のテキスト出力であり、実際の読心ではありません。
+     生成物は雛形/概念実証です。APIキーは端末内でのみ使用し、送信先は api.openai.com のみ。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BadaGPT 改良版 — コード生成スタジオ</title>
+<style>
+  :root{--bg:#0b0e14;--bg2:#101623;--bg3:#161e2e;--line:#233047;--fg:#dce6f5;--dim:#8194b0;--gold:#c8a44a;--cyan:#40b8c0;--green:#48c08a;--violet:#9060d0;--mono:Consolas,Menlo,monospace}
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;display:flex;flex-direction:column;height:100%}
+  header{padding:12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0e1420,#0b0e14)}
+  h1{margin:0;font-size:18px}h1 b{color:var(--gold)}
+  .sub{color:var(--dim);font-size:12px;margin-top:2px}
+  .disc{margin:8px 16px 0;padding:8px 11px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:#e0b020;font-size:11.5px}
+  main{flex:1;display:flex;min-height:0}
+  #chat{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+  .side{width:290px;border-left:1px solid var(--line);padding:12px;overflow:auto;background:var(--bg2)}
+  .msg{max-width:86%;padding:10px 12px;border-radius:12px;font-size:14px;line-height:1.6;white-space:pre-wrap}
+  .u{align-self:flex-end;background:#17324e;border:1px solid #27527d}
+  .b{align-self:flex-start;background:var(--bg3);border:1px solid var(--line)}
+  .pipe{font-family:var(--mono);font-size:11px;color:var(--dim);border-left:2px solid var(--violet);padding-left:8px;margin:6px 0}
+  .file{margin-top:8px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .file .fh{display:flex;justify-content:space-between;align-items:center;background:#0e1626;padding:5px 9px;font-family:var(--mono);font-size:12px;color:var(--cyan)}
+  .file pre{margin:0;padding:9px;font-family:var(--mono);font-size:10.5px;color:#cfe3ff;max-height:240px;overflow:auto;white-space:pre}
+  .dl{background:#132235;color:var(--green);border:1px solid #2a567d;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11.5px}
+  footer{border-top:1px solid var(--line);padding:10px 14px;background:var(--bg2)}
+  .inrow{display:flex;gap:8px}
+  textarea#in{flex:1;background:#06090f;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:14px;resize:vertical;height:62px;font-family:inherit}
+  button.send{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:0 18px;cursor:pointer;font-weight:700}
+  label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px}
+  select,input[type=text],input[type=password],textarea.sd{width:100%;background:#06090f;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:7px;font-size:12.5px;font-family:var(--mono)}
+  textarea.sd{height:56px;resize:vertical}
+  .side h3{font-size:12.5px;color:var(--gold);margin:0 0 6px;border-bottom:1px solid var(--line);padding-bottom:5px}
+  .tag{display:inline-block;background:#0e1626;border:1px solid var(--line);border-radius:10px;padding:2px 8px;font-size:11px;color:var(--cyan);margin:2px}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><b>Bada</b>GPT <span style="color:var(--cyan)">改良版</span> — 思考入力 → アプリ/PDF/ソースコード生成スタジオ</h1>
+  <div class="sub">chatGPT版・Bada言語パイプライン · 道場(学習用)とは別物のコード生成器 · Bada/bio_medicine</div>
+</header>
+<div class="disc">⚠ 「思考入力」は概念版 Ω-Telepathy のテキスト出力で<b>実際の読心ではありません</b>。生成物は雛形/概念実証です。
+  OpenAIキーは端末内でのみ使用し、送信先は api.openai.com のみ（空ならオフライン生成）。</div>
+<main>
+  <div id="chat"></div>
+  <div class="side">
+    <h3>👁 思考入力 (Ω-Telepathy 出力)</h3>
+    <textarea class="sd" id="thought" placeholder="Ω-Telepathy で思考タイピングした文、またはイメージした要件を貼り付け/入力"></textarea>
+    <button class="dl" id="useThought" style="margin-top:6px">この思考入力を仕様に取り込む →</button>
+    <h3 style="margin-top:14px">🎯 生成ターゲット</h3>
+    <select id="target">
+      <option value="web">Web アプリ (単一HTML)</option>
+      <option value="apk">Android APK 一式 (Cordova)</option>
+      <option value="windows">Windows10/11 EXE 一式 (Electron)</option>
+      <option value="pdf">PDF ドキュメント</option>
+    </select>
+    <h3 style="margin-top:14px">🤖 生成エンジン</h3>
+    <label>OpenAI APIキー (空 = オフラインBada生成)</label>
+    <input type="password" id="apikey" placeholder="sk-... (任意・端末内のみ)"/>
+    <label>モデル</label>
+    <input type="text" id="model" value="gpt-4o-mini"/>
+    <div style="font-size:11px;color:var(--dim);margin-top:6px">キー有 = 実ChatGPTで生成 / 無 = Bada決定論生成（オフライン）</div>
+    <h3 style="margin-top:14px">生成できる雛形</h3>
+    <div><span class="tag">計算機</span><span class="tag">メモ/ToDo</span><span class="tag">タイマー</span><span class="tag">フォーム</span><span class="tag">汎用</span></div>
+  </div>
+</main>
+<footer>
+  <div class="inrow">
+    <textarea id="in" placeholder="例: 「ToDoメモのAndroidアプリを作って」「タイマーのWindowsアプリ」「仕様書のPDF」… (思考入力を取り込むと自動で入ります)"></textarea>
+    <button class="send" id="send">生成 ▶</button>
+  </div>
+</footer>
+
+<script>
+"use strict";
+var chat=document.getElementById("chat");
+function el(cls,txt){var d=document.createElement("div");d.className=cls;if(txt!=null)d.textContent=txt;return d;}
+function add(cls,txt){var m=el("msg "+cls,txt);chat.appendChild(m);chat.scrollTop=chat.scrollHeight;return m;}
+function addHTML(cls,html){var m=el("msg "+cls);m.innerHTML=html;chat.appendChild(m);chat.scrollTop=chat.scrollHeight;return m;}
+
+/* ============ Bada言語パイプライン (決定論) ============ */
+function tokenize(s){return (s.toLowerCase().match(/[a-z]+|[ぁ-んァ-ヶ一-龠]+|\d+/g)||[]);}
+function parseSpec(text){
+  var t=text.toLowerCase();
+  var target=document.getElementById("target").value;
+  // 意図語でターゲット上書き
+  if(/android|apk/.test(t))target="apk";
+  else if(/windows|exe|win10|win11/.test(t))target="windows";
+  else if(/pdf|ドキュメント|仕様書|文書/.test(t))target="pdf";
+  var kind="generic";
+  if(/計算|電卓|calc/.test(t))kind="calc";
+  else if(/todo|メモ|notes|note|タスク|買い物|リスト/.test(t))kind="notes";
+  else if(/タイマー|timer|ストップ|カウント/.test(t))kind="timer";
+  else if(/フォーム|form|入力|アンケート|申込/.test(t))kind="form";
+  // タイトル
+  var title=(text.trim().split(/[\n。.]/)[0]||"Bada App").slice(0,40).replace(/[^\wぁ-んァ-ヶ一-龠 \-]/g,"").trim()||"BadaApp";
+  // フィールド抽出(フォーム/メモ用の名詞っぽい語)
+  var fields=[];var m=text.match(/[「『]([^」』]{1,16})[」』]/g);if(m)m.forEach(function(x){fields.push(x.replace(/[「『」』]/g,""));});
+  return {target:target,kind:kind,title:title,fields:fields,raw:text};
+}
+
+/* ============ Web アプリ生成 (働く雛形) ============ */
+function genWebApp(spec){
+  var title=spec.title, kind=spec.kind;
+  var body="";
+  if(kind==="calc"){
+    body='<h2>'+title+'</h2><input id="d" readonly style="width:100%;font-size:28px;text-align:right;padding:10px;background:#06090f;color:#dce6f5;border:1px solid #233047;border-radius:8px"/>'+
+      '<div id="k" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px"></div>'+
+      '<scr'+'ipt>var d=document.getElementById("d");"7 8 9 / 4 5 6 * 1 2 3 - 0 . = +".split(" ").forEach(function(c){var b=document.createElement("button");b.textContent=c;b.style.cssText="padding:16px;font-size:18px;background:#101623;color:#dce6f5;border:1px solid #233047;border-radius:8px;cursor:pointer";b.onclick=function(){if(c=="="){try{d.value=(""+Function("return("+d.value.replace(/[^-+*/.\\d]/g,"")+")")()).slice(0,14);}catch(e){d.value="ERR";}}else d.value=(d.value==="ERR"?"":d.value)+c;};document.getElementById("k").appendChild(b);});</scr'+'ipt>';
+  } else if(kind==="timer"){
+    body='<h2>'+title+'</h2><div id="t" style="font-size:48px;font-family:monospace;text-align:center;margin:20px 0">00:00.0</div>'+
+      '<div style="display:flex;gap:8px"><button id="s" style="flex:1;padding:14px">Start</button><button id="p" style="flex:1;padding:14px">Stop</button><button id="r" style="flex:1;padding:14px">Reset</button></div>'+
+      '<scr'+'ipt>var el=document.getElementById("t"),st=0,acc=0,iv=null;function f(ms){var m=ms/1000;return String(Math.floor(m/60)).padStart(2,"0")+":"+String(Math.floor(m%60)).padStart(2,"0")+"."+Math.floor((ms%1000)/100);}function up(){el.textContent=f(acc+(Date.now()-st));}document.getElementById("s").onclick=function(){if(iv)return;st=Date.now();iv=setInterval(up,100);};document.getElementById("p").onclick=function(){if(!iv)return;clearInterval(iv);iv=null;acc+=Date.now()-st;};document.getElementById("r").onclick=function(){clearInterval(iv);iv=null;acc=0;el.textContent="00:00.0";};</scr'+'ipt>';
+  } else { // notes/form/generic はリスト+入力(localStorage)
+    var ph=spec.fields.length?spec.fields[0]:"項目";
+    body='<h2>'+title+'</h2><div style="display:flex;gap:6px"><input id="i" placeholder="'+ph+'" style="flex:1;padding:10px;background:#06090f;color:#dce6f5;border:1px solid #233047;border-radius:8px"/><button id="a" style="padding:10px 16px">追加</button></div><ul id="l" style="list-style:none;padding:0"></ul>'+
+      '<scr'+'ipt>var K="'+(title.replace(/\W/g,"")||"bada")+'_items",L=document.getElementById("l");function load(){return JSON.parse(localStorage.getItem(K)||"[]");}function save(a){localStorage.setItem(K,JSON.stringify(a));}function render(){var a=load();L.innerHTML="";a.forEach(function(x,i){var li=document.createElement("li");li.style.cssText="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #233047";li.innerHTML="<span>"+x.replace(/</g,"&lt;")+"</span>";var b=document.createElement("button");b.textContent="×";b.onclick=function(){a.splice(i,1);save(a);render();};li.appendChild(b);L.appendChild(li);});}document.getElementById("a").onclick=function(){var i=document.getElementById("i");if(!i.value.trim())return;var a=load();a.push(i.value.trim());save(a);i.value="";render();};render();</scr'+'ipt>';
+  }
+  return "<!DOCTYPE html>\n<html lang=\"ja\"><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/><title>"+title+"</title>\n"+
+    "<style>body{margin:0;font-family:-apple-system,Meiryo,sans-serif;background:#0b0e14;color:#dce6f5;padding:16px}button{background:#1a2740;color:#c8a44a;border:1px solid #c8a44a;border-radius:8px;cursor:pointer}h2{color:#c8a44a}</style></head>\n"+
+    "<body>\n"+body+"\n<!-- generated by BadaGPT (Bada pipeline) -->\n</body></html>\n";
+}
+
+/* ============ ターゲット別 ファイル群生成 ============ */
+function cordovaConfig(spec){var id="io.github.badagpt."+(spec.title.replace(/[^a-z0-9]/gi,"").toLowerCase()||"app");
+  return '<?xml version=\'1.0\' encoding=\'utf-8\'?>\n<widget id="'+id+'" version="1.0.0" xmlns="http://www.w3.org/ns/widgets">\n  <name>'+spec.title+'</name>\n  <description>Generated by BadaGPT (概念実証)</description>\n  <content src="index.html" />\n  <preference name="android-minSdkVersion" value="24" />\n  <platform name="android"><preference name="AndroidXEnabled" value="true" /></platform>\n</widget>\n';}
+function electronMain(){return 'const {app,BrowserWindow}=require("electron");const path=require("path");\nfunction w(){const win=new BrowserWindow({width:480,height:800,webPreferences:{contextIsolation:true}});win.setMenuBarVisibility(false);win.loadFile(app.isPackaged?path.join(process.resourcesPath,"www","index.html"):path.join(__dirname,"..","www","index.html"));}\napp.whenReady().then(w);app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit();});\n';}
+function electronPkg(spec){var nm=(spec.title.replace(/[^a-z0-9]/gi,"-").toLowerCase()||"bada-app");
+  return JSON.stringify({name:nm,productName:spec.title,version:"1.0.0",main:"main.js",scripts:{start:"electron .",dist:"electron-builder --win --x64"},devDependencies:{electron:"^31.0.0","electron-builder":"^24.13.3"},build:{appId:"io.github.badagpt."+nm.replace(/-/g,""),files:["main.js","package.json"],extraResources:[{from:"../www",to:"www"}],win:{target:["nsis","portable"]}}},null,2)+"\n";}
+
+/* 最小の有効PDFを生成 (ASCII) */
+function makePDF(spec){
+  var lines=["BadaGPT generated document","","Title: "+ascii(spec.title),""].concat(
+    ascii(spec.raw).match(/.{1,90}/g)||[]);
+  var content="BT /F1 11 Tf 50 790 Td 14 TL\n";
+  lines.slice(0,52).forEach(function(l){content+="("+l.replace(/([()\\])/g,"\\$1")+") Tj T*\n";});
+  content+="ET";
+  var objs=[
+    "<</Type/Catalog/Pages 2 0 R>>",
+    "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    "<</Length "+content.length+">>\nstream\n"+content+"\nendstream"
+  ];
+  var pdf="%PDF-1.4\n",off=[];
+  for(var i=0;i<objs.length;i++){off.push(pdf.length);pdf+=(i+1)+" 0 obj\n"+objs[i]+"\nendobj\n";}
+  var xref=pdf.length;pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";
+  off.forEach(function(o){pdf+=String(o).padStart(10,"0")+" 00000 n \n";});
+  pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
+  return pdf;
+}
+function ascii(s){return (s||"").replace(/[^\x20-\x7e]/g,function(c){return "?";});}
+
+function generate(spec){
+  var files=[];
+  if(spec.target==="pdf"){
+    files.push({name:spec.title.replace(/\W/g,"_")+".pdf",lang:"pdf",content:makePDF(spec)});
+    files.push({name:"print.html",lang:"html",content:"<!DOCTYPE html><meta charset=utf-8><title>"+spec.title+"</title><body style='font-family:Meiryo,sans-serif;padding:40px'><h1>"+spec.title+"</h1><pre style='white-space:pre-wrap'>"+spec.raw.replace(/</g,"&lt;")+"</pre><button onclick='print()'>PDFで保存(印刷)</button></body>"});
+    return files;
+  }
+  var www=genWebApp(spec);
+  if(spec.target==="web"){files.push({name:"index.html",lang:"html",content:www});return files;}
+  if(spec.target==="apk"){
+    files.push({name:"www/index.html",lang:"html",content:www});
+    files.push({name:"config.xml",lang:"xml",content:cordovaConfig(spec)});
+    files.push({name:"BUILD.md",lang:"md",content:"# APK ビルド\ncordova create app "+( "io.github.badagpt."+(spec.title.replace(/[^a-z0-9]/gi,"").toLowerCase()||"app") )+" \""+spec.title+"\"\n# config.xml と www/ を置換 → cordova platform add android@12.0.1 → cordova build android\n# (Java17 / SDK android-33 / build-tools 33.0.2 / Gradle 7.6.4)\n"});
+    return files;
+  }
+  if(spec.target==="windows"){
+    files.push({name:"www/index.html",lang:"html",content:www});
+    files.push({name:"electron/main.js",lang:"js",content:electronMain()});
+    files.push({name:"electron/package.json",lang:"json",content:electronPkg(spec)});
+    files.push({name:"BUILD.md",lang:"md",content:"# Windows EXE ビルド\ncd electron && npm install && npm run dist  # → dist/*.exe (electron-builder)\n"});
+    return files;
+  }
+  return files;
+}
+
+/* ============ ダウンロード ============ */
+function download(name,content,mime){
+  var blob;
+  if(mime==="application/pdf"){var bytes=new Uint8Array(content.length);for(var i=0;i<content.length;i++)bytes[i]=content.charCodeAt(i)&0xff;blob=new Blob([bytes],{type:mime});}
+  else blob=new Blob([content],{type:mime||"text/plain"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name.split("/").pop();a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+}
+
+/* ============ OpenAI (任意・chatGPT版) ============ */
+async function callOpenAI(key,model,prompt){
+  var sys="You are BadaGPT, a code generator. Output ONLY the full source code for the requested target (APK/Windows/PDF/web app) as fenced code blocks, each preceded by a line '// FILE: <path>'. No prose.";
+  var res=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+    body:JSON.stringify({model:model,messages:[{role:"system",content:sys},{role:"user",content:prompt}],temperature:0.3})});
+  if(!res.ok)throw new Error("OpenAI "+res.status+" "+(await res.text()).slice(0,200));
+  var j=await res.json();return j.choices[0].message.content;
+}
+
+/* ============ 送信処理 ============ */
+function renderFiles(container,files){
+  files.forEach(function(f){
+    var wrap=document.createElement("div");wrap.className="file";
+    var mime=f.lang==="pdf"?"application/pdf":(f.lang==="json"?"application/json":"text/plain");
+    wrap.innerHTML='<div class="fh"><span>📄 '+f.name+'</span><button class="dl">⬇ DL</button></div><pre></pre>';
+    wrap.querySelector("pre").textContent=(f.lang==="pdf"?"[binary PDF — "+f.content.length+" bytes]":f.content);
+    wrap.querySelector(".dl").onclick=function(){download(f.name,f.content,mime);};
+    container.appendChild(wrap);
+  });
+  chat.scrollTop=chat.scrollHeight;
+}
+async function onSend(){
+  var text=document.getElementById("in").value.trim();if(!text)return;
+  add("u",text);document.getElementById("in").value="";
+  var key=document.getElementById("apikey").value.trim(),model=document.getElementById("model").value.trim()||"gpt-4o-mini";
+  var spec=parseSpec(text);
+  var m=addHTML("b",'<b>BadaGPT</b> が処理中…');
+  // Bada パイプライン開示
+  var toks=tokenize(text);
+  var pipe="【Bada pipeline】\n① tokenize: "+toks.slice(0,12).join(" · ")+(toks.length>12?" …":"")+
+    "\n② intent: target="+spec.target+" / kind="+spec.kind+
+    "\n③ plan: タイトル=\""+spec.title+"\" / フィールド="+(spec.fields.join(",")||"(自動)")+
+    "\n④ generate → ⑤ verify";
+  if(key){
+    try{
+      var out=await callOpenAI(key,model,"Target="+spec.target+"\n要件(思考入力):\n"+text);
+      m.innerHTML='<b>BadaGPT</b>(ChatGPT '+model+')<div class="pipe">'+pipe.replace(/</g,"&lt;")+'\n⑥ engine: OpenAI</div>';
+      // FILE: パスでファイル分割、無ければ単一
+      var files=[],re=/\/\/\s*FILE:\s*(.+)\n([\s\S]*?)(?=\/\/\s*FILE:|$)/g,mm;
+      while((mm=re.exec(out))){files.push({name:mm[1].trim(),lang:(mm[1].split(".").pop()||"txt"),content:mm[2].replace(/^```[a-z]*\n?|```$/gm,"").trim()+"\n"});}
+      if(!files.length)files=[{name:"output.txt",lang:"txt",content:out}];
+      renderFiles(m,files);
+    }catch(e){m.innerHTML='<b>BadaGPT</b> OpenAIエラー: '+String(e.message)+'\nオフラインBada生成に切替えます。<div class="pipe">'+pipe.replace(/</g,"&lt;")+'</div>';renderFiles(m,generate(spec));}
+  } else {
+    var files=generate(spec);
+    m.innerHTML='<b>BadaGPT</b>(オフラインBada生成) — '+spec.target.toUpperCase()+' の雛形 '+files.length+' ファイルを生成しました。<div class="pipe">'+pipe.replace(/</g,"&lt;")+'\n⑥ engine: Bada決定論</div>';
+    renderFiles(m,files);
+  }
+}
+document.getElementById("send").onclick=onSend;
+document.getElementById("in").addEventListener("keydown",function(e){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))onSend();});
+document.getElementById("useThought").onclick=function(){var t=document.getElementById("thought").value.trim();if(!t)return;document.getElementById("in").value=t;document.getElementById("in").focus();};
+
+add("b","こんにちは。BadaGPT 改良版です。\n左の「思考入力」に Ω-Telepathy の出力やイメージした要件を入れて取り込むか、下の入力欄に依頼を書いて「生成」を押してください。\n例: 「ToDoメモのAndroidアプリ(APK)」「タイマーのWindowsアプリ」「仕様書のPDF」。\nOpenAIキーを入れれば実ChatGPT生成、空ならオフラインBada生成です。");
+</script>
+</body>
+</html>
