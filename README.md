@@ -135,6 +135,22 @@
 
 ---
 
+## ✨ ダウンロード — BadaGPT改(イメージから APK / Windows EXE / PDF / ソースコードを生成)
+
+**頭に描いたイメージを文章・音声・スケッチ・写真で渡すと、Claude がコードに変換し、Android APK と Windows 10/11 EXE 用プロジェクト、PDF 文書、任意言語のソースコードとして出力するアプリ。** 生成したプロジェクトは自分のリポジトリへワンタップでプッシュでき、同梱のワークフローが APK と EXE を自動でビルドします。指先の脈波 (カメラ) と呼吸音 (マイク) から心拍・心拍変動・呼吸数を測るバイオフィードバック (音とガンマ関数 Γ(z) の模様で返す) を内蔵。思考を直接読み取る機能ではなく、入力はあなたが表したイメージです。
+
+[Releases → `badagptkai-latest`](https://github.com/masaaki-avnturle/Bada/releases/tag/badagptkai-latest) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-gpt-kai-debug.apk` |
+| **Windows 10 / 11** | `BadaGPTKai-*-x64.exe` (インストーラ) / `BadaGPTKai-*-portable.exe` |
+| **Ubuntu** | `BadaGPTKai-*-x86_64.AppImage` / `BadaGPTKai-*-amd64.deb` |
+
+ビルドは [`badagptkai-app-build.yml`](.github/workflows/badagptkai-app-build.yml) が実行します。使い方・しくみ・できないことは [`bada_gpt_kai/`](bada_gpt_kai/) を参照。
+
+---
+
 ## ⛩ ダウンロード — BadaGPT道場(ChatGPTの技を伝授する技術伝授アプリ)
 
 **ChatGPT が「応答し、アプリケーションを作る」ときに試行している技を、量子プログラミング言語 Bada の上でユーザーに伝授するアプリケーション。** BadaGPT は応答のたびに自分のパイプライン(**トークン化 → 意図解析 → 計画 → 生成 → 検証 → 応答**)を開示し、道場カリキュラムで七つの技(トークン化 / 自己注意 self-attention / 次トークン予測 / 意図解析 / 計画と生成=アプリ錬成 / 検証と自己修正 / 量子 Bada)をひとつずつ稽古 → 印可 → **免許皆伝**。日本語の依頼文からアプリを錬成する **🛠 アプリ錬成**(Bada on Rails scaffold / GUI / 量子デモ)、本物の self-attention 順伝播、量子 Bada 実行系(qubit / H / X / Z / CNOT / measure)を搭載。依存ゼロ・単一 HTML・オフライン動作。

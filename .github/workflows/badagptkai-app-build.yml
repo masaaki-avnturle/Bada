@@ -1,0 +1,199 @@
+name: BadaGPT Kai app build (Android APK + Windows EXE + Ubuntu)
+
+# bada_gpt_kai/ の「BadaGPT改」— イメージ (文章・音声・スケッチ・写真) と
+# 心拍・呼吸のバイオフィードバックから、Claude で
+# Android APK / Windows EXE 用プロジェクト・PDF・任意のソースコードを生成するアプリを
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は bada_gpt_kai/index.html の自己完結 HTML
+# (src/ から tools/build.js で組み立てたもの) で、これを www として各ラッパーに同梱します。
+#
+# 公開先:
+#   - bada_gpt_kai/ を変更して push → Release「badagptkai-latest」(プレリリース) を更新
+#   - badagptkai-v* タグを push      → そのタグの Release
+#   - workflow_dispatch               → release_tag を指定したときだけ Release、空欄なら Actions アーティファクトのみ
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: badagptkai-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    paths:
+      - 'bada_gpt_kai/**'
+      - '.github/workflows/badagptkai-app-build.yml'
+    tags:
+      - 'badagptkai-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: index.html is built from src/
+        run: node bada_gpt_kai/tools/build.js --check
+      - name: Engine tests (ZIP / PDF / Markdown / Claude request + SSE / scaffolds / PPG / breath / Γ(z))
+        run: node bada_gpt_kai/tools/engine-test.js
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は廃止済みのため packages を空にし、
+      # 必要な物は次のステップで明示的に入れる。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_gpt_kai/app/www
+          cp bada_gpt_kai/index.html bada_gpt_kai/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          APP="bada_gpt_kai/app"
+          cordova create cordova-build io.github.masaaki_avnturle.badagptkai BadaGPTKai
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          # 実行時のカメラ/マイク許可・ZIP/PDF の端末保存・外部リンクを既定ブラウザで開く
+          cordova plugin add cordova-plugin-android-permissions@1.1.5
+          cordova plugin add cordova-plugin-file@8.1.0
+          cordova plugin add cordova-plugin-inappbrowser@6.0.0
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-gpt-kai-debug.apk
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: badagptkai-android
+          path: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p bada_gpt_kai/app/www
+          cp bada_gpt_kai/index.html bada_gpt_kai/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: bada_gpt_kai/app/electron
+        run: |
+          npm install
+          npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: badagptkai-windows
+          path: bada_gpt_kai/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_gpt_kai/app/www
+          cp bada_gpt_kai/index.html bada_gpt_kai/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: bada_gpt_kai/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: badagptkai-linux
+          path: |
+            bada_gpt_kai/app/electron/dist/*.AppImage
+            bada_gpt_kai/app/electron/dist/*.deb
+
+  # 3 つのビルドが揃ってから 1 回だけ Release に添付する (並列に作ると Release が重複するため)
+  publish:
+    runs-on: ubuntu-latest
+    needs: [android-apk, windows-exe, linux-app]
+    steps:
+      - name: Decide release tag
+        id: tag
+        shell: bash
+        env:
+          INPUT_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          elif [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=badagptkai-latest" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.tag.outputs.tag != ''
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Attach builds to Release
+        if: steps.tag.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: BadaGPT改 (${{ steps.tag.outputs.tag }})
+          prerelease: ${{ steps.tag.outputs.tag == 'badagptkai-latest' }}
+          body: |
+            BadaGPT改 — イメージ (文章・音声・スケッチ・写真) と心拍・呼吸のバイオフィードバックから、
+            Claude で Android APK / Windows EXE 用プロジェクト・PDF・任意のソースコードを生成するアプリ。
+
+            | プラットフォーム | ファイル |
+            |:--|:--|
+            | Android (APK) | `bada-gpt-kai-debug.apk` (「提供元不明のアプリ」を許可してインストール) |
+            | Windows 10 / 11 | `BadaGPTKai-*-x64.exe` (インストーラ) / `BadaGPTKai-*-portable.exe` (インストール不要) |
+            | Ubuntu | `BadaGPTKai-*-x86_64.AppImage` / `BadaGPTKai-*-amd64.deb` |
+
+            commit ${{ github.sha }}
+          files: |
+            dist/*.apk
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb

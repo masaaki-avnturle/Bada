@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BadaGPT改</title>
+<style>
+:root{
+  --bg:#0b0e14;--panel:#131824;--panel2:#1a2132;--fg:#e6e9f0;--dim:#8b93a7;
+  --ac:#6cc4ff;--ac2:#b48cff;--ok:#5ad19a;--warn:#ffb454;--err:#ff6b6b;--line:#273049;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif}
+header{padding:14px 16px 6px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:1.35rem;background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin:4px 0 0;color:var(--dim);font-size:.85rem}
+nav{display:flex;gap:4px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+nav button{flex:0 0 auto;background:transparent;color:var(--dim);border:1px solid transparent;border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}
+nav button.on{color:var(--fg);border-color:var(--line);background:var(--panel)}
+main{max-width:980px;margin:0 auto;padding:12px 16px 60px}
+section.tab{display:none}section.tab.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.card h2{margin:0 0 8px;font-size:1.05rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grow{flex:1 1 220px}
+label.f{display:block;font-size:.85rem;color:var(--dim);margin:8px 0 4px}
+input[type=text],input[type=password],select,textarea{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit}
+textarea{min-height:120px;resize:vertical}
+button.b{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
+button.b:hover{border-color:var(--ac)}
+button.p{background:linear-gradient(90deg,var(--ac),var(--ac2));color:#0b0e14;border:0;font-weight:600}
+button.b:disabled{opacity:.5;cursor:default}
+.note{color:var(--dim);font-size:.82rem}
+.warn{color:var(--warn)}.err{color:var(--err)}.ok{color:var(--ok)}
+canvas{max-width:100%;border-radius:10px;border:1px solid var(--line);background:#05070b;touch-action:none}
+#sketch{background:#fff;cursor:crosshair}
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.meter{background:var(--panel2);border-radius:10px;padding:10px}
+.meter .k{color:var(--dim);font-size:.78rem}.meter .v{font-size:1.5rem;font-weight:600}
+pre{background:#05070b;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:360px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+.files{list-style:none;padding:0;margin:0}
+.files li{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.files li code{flex:1 1 200px;word-break:break-all}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}.thumbs img{width:120px;border-radius:8px;border:1px solid var(--line)}
+#pdfPages img{width:100%;max-width:420px;display:block;margin:8px auto;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <h1>BadaGPT改</h1>
+  <p>イメージ (文章・音声・スケッチ・写真) と身体のリズム (心拍・呼吸) から、APK / Windows EXE / PDF / 任意のソースコードを生成するアプリ</p>
+</header>
+<nav id="tabs">
+  <button data-tab="input" class="on">① イメージ入力</button>
+  <button data-tab="bio">② バイオフィードバック</button>
+  <button data-tab="output">③ 生成結果</button>
+  <button data-tab="settings">④ 設定</button>
+  <button data-tab="about">ⓘ このアプリについて</button>
+</nav>
+<main>
+
+<section class="tab on" id="tab-input">
+  <div class="card">
+    <h2>何を作りますか</h2>
+    <div class="row">
+      <div class="grow"><label class="f" for="name">名前</label><input type="text" id="name" placeholder="例: 瞑想タイマー"></div>
+      <div class="grow"><label class="f" for="target">出力</label>
+        <select id="target">
+          <option value="both">Android APK + Windows 10/11 EXE</option>
+          <option value="apk">Android APK のみ</option>
+          <option value="exe">Windows 10/11 EXE のみ</option>
+          <option value="pdf">PDF 文書</option>
+          <option value="source">任意のソースコード</option>
+        </select></div>
+      <div class="grow" id="langBox" style="display:none"><label class="f" for="lang">言語・フレームワーク</label><input type="text" id="lang" placeholder="例: Python / Rust / C# WinForms"></div>
+    </div>
+    <label class="f" for="req">イメージを言葉で (音声入力も使えます)</label>
+    <textarea id="req" placeholder="例: 呼吸に合わせて円が膨らんだり縮んだりする瞑想アプリ。4秒吸って6秒吐く。終わったら記録を残す。"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="b" id="voiceBtn">🎙 音声入力</button>
+      <span class="note" id="voiceState"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>イメージをスケッチ</h2>
+    <canvas id="sketch" width="640" height="400"></canvas>
+    <div class="row" style="margin-top:8px">
+      <input type="color" id="penColor" value="#222222" aria-label="ペンの色">
+      <select id="penSize" style="width:auto"><option value="3">細</option><option value="6" selected>中</option><option value="14">太</option></select>
+      <button class="b" id="sketchClear">消す</button>
+      <label class="note"><input type="checkbox" id="useSketch" checked> スケッチを添える</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>参考写真・画像</h2>
+    <input type="file" id="photo" accept="image/*" multiple>
+    <div class="thumbs" id="thumbs" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <label class="note"><input type="checkbox" id="useBio" checked> 生体データ (② で測定した心拍・呼吸) を雰囲気のヒントとして添える</label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="b p" id="genBtn">✨ 生成する</button>
+      <span id="genState" class="note"></span>
+    </div>
+    <p class="note" id="modeNote"></p>
+  </div>
+</section>
+
+<section class="tab" id="tab-bio">
+  <div class="card">
+    <h2>バイオフィードバック</h2>
+    <p class="note">心拍: 背面カメラ (ライト) に人差し指の先をそっと当て、15 秒ほど静止してください。<br>
+    呼吸: マイクを口元から 10〜20cm に置き、ゆっくり呼吸してください (静かな場所で)。<br>
+    測った心拍・呼吸は音とガンマ関数の模様に変換して返します (バイオフィードバック)。</p>
+    <div class="row">
+      <button class="b" id="camBtn">❤ 心拍を測る (カメラ)</button>
+      <button class="b" id="micBtn">🌬 呼吸を測る (マイク)</button>
+      <button class="b" id="soundBtn">🔈 音を鳴らす</button>
+    </div>
+    <p class="note" id="bioState"></p>
+    <div class="meters" style="margin-top:10px">
+      <div class="meter"><div class="k">心拍</div><div class="v" id="mBpm">—</div></div>
+      <div class="meter"><div class="k">心拍変動 RMSSD</div><div class="v" id="mRmssd">—</div></div>
+      <div class="meter"><div class="k">呼吸</div><div class="v" id="mBreath">—</div></div>
+      <div class="meter"><div class="k">落ち着き指数</div><div class="v" id="mCalm">—</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>脈波</h2>
+    <canvas id="wave" width="640" height="140"></canvas>
+  </div>
+  <div class="card">
+    <h2>ガンマ関数の模様 |Γ(z)| と arg Γ(z)</h2>
+    <canvas id="gamma" width="320" height="200" style="width:100%;image-rendering:pixelated"></canvas>
+    <p class="note">複素平面 −4 ≤ Re z ≤ 4, −2.5 ≤ Im z ≤ 2.5 の Γ(z) を、色 = 偏角、明るさ = 大きさ で描いています。拍動ごとに色相が回り、落ち着き指数で彩度が変わります (数学アートです)。</p>
+  </div>
+</section>
+
+<section class="tab" id="tab-output">
+  <div class="card">
+    <h2>生成ログ</h2>
+    <pre id="log">(まだ生成していません)</pre>
+  </div>
+  <div class="card">
+    <h2>ファイル</h2>
+    <ul class="files" id="files"></ul>
+    <div class="row" style="margin-top:10px">
+      <button class="b p" id="zipBtn" disabled>📦 ZIP で保存</button>
+      <button class="b" id="pdfBtn" disabled style="display:none">📄 PDF を保存</button>
+      <button class="b" id="pushBtn" disabled>⬆ GitHub にプッシュしてビルド</button>
+    </div>
+    <p class="note" id="outState"></p>
+  </div>
+  <div class="card" id="previewCard" style="display:none">
+    <h2 id="previewTitle">プレビュー</h2>
+    <div id="pdfPages"></div>
+    <pre id="preview"></pre>
+  </div>
+</section>
+
+<section class="tab" id="tab-settings">
+  <div class="card">
+    <h2>Claude API</h2>
+    <p class="note">API キーを入れると Claude が本格的なコードを生成します。空欄のときは端末内の簡易生成 (オフライン) になります。キーは この端末の中だけに保存され、api.anthropic.com 以外へは送りません。</p>
+    <label class="f" for="apiKey">API キー</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
+    <div class="row">
+      <div class="grow"><label class="f" for="model">モデル</label><select id="model"></select></div>
+      <div class="grow"><label class="f" for="effort">思考の深さ (effort)</label>
+        <select id="effort"><option value="low">low (速い)</option><option value="medium">medium</option><option value="high" selected>high (既定)</option><option value="xhigh">xhigh</option><option value="max">max (最も丁寧)</option></select></div>
+    </div>
+    <label class="note"><input type="checkbox" id="rememberKey"> この端末に記憶する (オフ = アプリを閉じると消える)</label>
+  </div>
+  <div class="card">
+    <h2>GitHub (APK / EXE の自動ビルド)</h2>
+    <p class="note">生成したプロジェクトを自分のリポジトリにプッシュすると、同梱の GitHub Actions が APK と Windows EXE をビルドし、Releases (<code>&lt;名前&gt;-latest</code>) に添付します。
+    トークンは Fine-grained token で対象リポジトリに <b>Contents: Read and write</b> と <b>Workflows: Read and write</b> を付けてください。</p>
+    <div class="row">
+      <div class="grow"><label class="f" for="ghRepo">リポジトリ (owner/name)</label><input type="text" id="ghRepo" placeholder="masaaki-avnturle/Bada"></div>
+      <div class="grow"><label class="f" for="ghBranch">ブランチ</label><input type="text" id="ghBranch" value="badagpt-kai-apps"></div>
+    </div>
+    <label class="f" for="ghToken">トークン</label>
+    <input type="password" id="ghToken" placeholder="github_pat_..." autocomplete="off">
+    <label class="note"><input type="checkbox" id="rememberGh"> この端末に記憶する</label>
+  </div>
+</section>
+
+<section class="tab" id="tab-about">
+  <div class="card">
+    <h2>このアプリでできること・できないこと</h2>
+    <ul>
+      <li><b>できること</b>: 文章・音声・スケッチ・写真で伝えたイメージを Claude (または端末内の簡易生成) がコードに変換し、Android APK / Windows 10・11 EXE 用プロジェクト、PDF 文書、任意言語のソースコードとして出力します。GitHub にプッシュすれば APK と EXE が自動でビルドされます。</li>
+      <li><b>できること</b>: カメラ (指先の脈波) とマイク (呼吸音) で心拍・心拍変動・呼吸数を測り、音とガンマ関数の模様で返すバイオフィードバック。</li>
+      <li><b>できないこと</b>: 頭の中の思考を直接読み取ること (Neuralink の Telepathy は脳に埋め込む電極が必要です)、アカシックレコードへのアクセスや未来予知、体内・脳内の熱の流れの観測。心拍・呼吸は身体の状態であって思考の内容ではありません。</li>
+      <li>医療機器ではありません。測定値は目安です。</li>
+    </ul>
+    <p class="note">BadaGPT改 v<span id="ver"></span> — Bada リポジトリ</p>
+  </div>
+</section>
+
+</main>
+<script id="engine">
+/*@ENGINE@*/
+</script>
+<script id="ui">
+/*@UI@*/
+</script>
+</body>
+</html>

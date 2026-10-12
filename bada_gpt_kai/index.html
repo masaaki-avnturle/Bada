@@ -1,0 +1,1535 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BadaGPT改</title>
+<style>
+:root{
+  --bg:#0b0e14;--panel:#131824;--panel2:#1a2132;--fg:#e6e9f0;--dim:#8b93a7;
+  --ac:#6cc4ff;--ac2:#b48cff;--ok:#5ad19a;--warn:#ffb454;--err:#ff6b6b;--line:#273049;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif}
+header{padding:14px 16px 6px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:1.35rem;background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin:4px 0 0;color:var(--dim);font-size:.85rem}
+nav{display:flex;gap:4px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+nav button{flex:0 0 auto;background:transparent;color:var(--dim);border:1px solid transparent;border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}
+nav button.on{color:var(--fg);border-color:var(--line);background:var(--panel)}
+main{max-width:980px;margin:0 auto;padding:12px 16px 60px}
+section.tab{display:none}section.tab.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.card h2{margin:0 0 8px;font-size:1.05rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grow{flex:1 1 220px}
+label.f{display:block;font-size:.85rem;color:var(--dim);margin:8px 0 4px}
+input[type=text],input[type=password],select,textarea{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit}
+textarea{min-height:120px;resize:vertical}
+button.b{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
+button.b:hover{border-color:var(--ac)}
+button.p{background:linear-gradient(90deg,var(--ac),var(--ac2));color:#0b0e14;border:0;font-weight:600}
+button.b:disabled{opacity:.5;cursor:default}
+.note{color:var(--dim);font-size:.82rem}
+.warn{color:var(--warn)}.err{color:var(--err)}.ok{color:var(--ok)}
+canvas{max-width:100%;border-radius:10px;border:1px solid var(--line);background:#05070b;touch-action:none}
+#sketch{background:#fff;cursor:crosshair}
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.meter{background:var(--panel2);border-radius:10px;padding:10px}
+.meter .k{color:var(--dim);font-size:.78rem}.meter .v{font-size:1.5rem;font-weight:600}
+pre{background:#05070b;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:360px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+.files{list-style:none;padding:0;margin:0}
+.files li{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.files li code{flex:1 1 200px;word-break:break-all}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}.thumbs img{width:120px;border-radius:8px;border:1px solid var(--line)}
+#pdfPages img{width:100%;max-width:420px;display:block;margin:8px auto;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <h1>BadaGPT改</h1>
+  <p>イメージ (文章・音声・スケッチ・写真) と身体のリズム (心拍・呼吸) から、APK / Windows EXE / PDF / 任意のソースコードを生成するアプリ</p>
+</header>
+<nav id="tabs">
+  <button data-tab="input" class="on">① イメージ入力</button>
+  <button data-tab="bio">② バイオフィードバック</button>
+  <button data-tab="output">③ 生成結果</button>
+  <button data-tab="settings">④ 設定</button>
+  <button data-tab="about">ⓘ このアプリについて</button>
+</nav>
+<main>
+
+<section class="tab on" id="tab-input">
+  <div class="card">
+    <h2>何を作りますか</h2>
+    <div class="row">
+      <div class="grow"><label class="f" for="name">名前</label><input type="text" id="name" placeholder="例: 瞑想タイマー"></div>
+      <div class="grow"><label class="f" for="target">出力</label>
+        <select id="target">
+          <option value="both">Android APK + Windows 10/11 EXE</option>
+          <option value="apk">Android APK のみ</option>
+          <option value="exe">Windows 10/11 EXE のみ</option>
+          <option value="pdf">PDF 文書</option>
+          <option value="source">任意のソースコード</option>
+        </select></div>
+      <div class="grow" id="langBox" style="display:none"><label class="f" for="lang">言語・フレームワーク</label><input type="text" id="lang" placeholder="例: Python / Rust / C# WinForms"></div>
+    </div>
+    <label class="f" for="req">イメージを言葉で (音声入力も使えます)</label>
+    <textarea id="req" placeholder="例: 呼吸に合わせて円が膨らんだり縮んだりする瞑想アプリ。4秒吸って6秒吐く。終わったら記録を残す。"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="b" id="voiceBtn">🎙 音声入力</button>
+      <span class="note" id="voiceState"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>イメージをスケッチ</h2>
+    <canvas id="sketch" width="640" height="400"></canvas>
+    <div class="row" style="margin-top:8px">
+      <input type="color" id="penColor" value="#222222" aria-label="ペンの色">
+      <select id="penSize" style="width:auto"><option value="3">細</option><option value="6" selected>中</option><option value="14">太</option></select>
+      <button class="b" id="sketchClear">消す</button>
+      <label class="note"><input type="checkbox" id="useSketch" checked> スケッチを添える</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>参考写真・画像</h2>
+    <input type="file" id="photo" accept="image/*" multiple>
+    <div class="thumbs" id="thumbs" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <label class="note"><input type="checkbox" id="useBio" checked> 生体データ (② で測定した心拍・呼吸) を雰囲気のヒントとして添える</label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="b p" id="genBtn">✨ 生成する</button>
+      <span id="genState" class="note"></span>
+    </div>
+    <p class="note" id="modeNote"></p>
+  </div>
+</section>
+
+<section class="tab" id="tab-bio">
+  <div class="card">
+    <h2>バイオフィードバック</h2>
+    <p class="note">心拍: 背面カメラ (ライト) に人差し指の先をそっと当て、15 秒ほど静止してください。<br>
+    呼吸: マイクを口元から 10〜20cm に置き、ゆっくり呼吸してください (静かな場所で)。<br>
+    測った心拍・呼吸は音とガンマ関数の模様に変換して返します (バイオフィードバック)。</p>
+    <div class="row">
+      <button class="b" id="camBtn">❤ 心拍を測る (カメラ)</button>
+      <button class="b" id="micBtn">🌬 呼吸を測る (マイク)</button>
+      <button class="b" id="soundBtn">🔈 音を鳴らす</button>
+    </div>
+    <p class="note" id="bioState"></p>
+    <div class="meters" style="margin-top:10px">
+      <div class="meter"><div class="k">心拍</div><div class="v" id="mBpm">—</div></div>
+      <div class="meter"><div class="k">心拍変動 RMSSD</div><div class="v" id="mRmssd">—</div></div>
+      <div class="meter"><div class="k">呼吸</div><div class="v" id="mBreath">—</div></div>
+      <div class="meter"><div class="k">落ち着き指数</div><div class="v" id="mCalm">—</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>脈波</h2>
+    <canvas id="wave" width="640" height="140"></canvas>
+  </div>
+  <div class="card">
+    <h2>ガンマ関数の模様 |Γ(z)| と arg Γ(z)</h2>
+    <canvas id="gamma" width="320" height="200" style="width:100%;image-rendering:pixelated"></canvas>
+    <p class="note">複素平面 −4 ≤ Re z ≤ 4, −2.5 ≤ Im z ≤ 2.5 の Γ(z) を、色 = 偏角、明るさ = 大きさ で描いています。拍動ごとに色相が回り、落ち着き指数で彩度が変わります (数学アートです)。</p>
+  </div>
+</section>
+
+<section class="tab" id="tab-output">
+  <div class="card">
+    <h2>生成ログ</h2>
+    <pre id="log">(まだ生成していません)</pre>
+  </div>
+  <div class="card">
+    <h2>ファイル</h2>
+    <ul class="files" id="files"></ul>
+    <div class="row" style="margin-top:10px">
+      <button class="b p" id="zipBtn" disabled>📦 ZIP で保存</button>
+      <button class="b" id="pdfBtn" disabled style="display:none">📄 PDF を保存</button>
+      <button class="b" id="pushBtn" disabled>⬆ GitHub にプッシュしてビルド</button>
+    </div>
+    <p class="note" id="outState"></p>
+  </div>
+  <div class="card" id="previewCard" style="display:none">
+    <h2 id="previewTitle">プレビュー</h2>
+    <div id="pdfPages"></div>
+    <pre id="preview"></pre>
+  </div>
+</section>
+
+<section class="tab" id="tab-settings">
+  <div class="card">
+    <h2>Claude API</h2>
+    <p class="note">API キーを入れると Claude が本格的なコードを生成します。空欄のときは端末内の簡易生成 (オフライン) になります。キーは この端末の中だけに保存され、api.anthropic.com 以外へは送りません。</p>
+    <label class="f" for="apiKey">API キー</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
+    <div class="row">
+      <div class="grow"><label class="f" for="model">モデル</label><select id="model"></select></div>
+      <div class="grow"><label class="f" for="effort">思考の深さ (effort)</label>
+        <select id="effort"><option value="low">low (速い)</option><option value="medium">medium</option><option value="high" selected>high (既定)</option><option value="xhigh">xhigh</option><option value="max">max (最も丁寧)</option></select></div>
+    </div>
+    <label class="note"><input type="checkbox" id="rememberKey"> この端末に記憶する (オフ = アプリを閉じると消える)</label>
+  </div>
+  <div class="card">
+    <h2>GitHub (APK / EXE の自動ビルド)</h2>
+    <p class="note">生成したプロジェクトを自分のリポジトリにプッシュすると、同梱の GitHub Actions が APK と Windows EXE をビルドし、Releases (<code>&lt;名前&gt;-latest</code>) に添付します。
+    トークンは Fine-grained token で対象リポジトリに <b>Contents: Read and write</b> と <b>Workflows: Read and write</b> を付けてください。</p>
+    <div class="row">
+      <div class="grow"><label class="f" for="ghRepo">リポジトリ (owner/name)</label><input type="text" id="ghRepo" placeholder="masaaki-avnturle/Bada"></div>
+      <div class="grow"><label class="f" for="ghBranch">ブランチ</label><input type="text" id="ghBranch" value="badagpt-kai-apps"></div>
+    </div>
+    <label class="f" for="ghToken">トークン</label>
+    <input type="password" id="ghToken" placeholder="github_pat_..." autocomplete="off">
+    <label class="note"><input type="checkbox" id="rememberGh"> この端末に記憶する</label>
+  </div>
+</section>
+
+<section class="tab" id="tab-about">
+  <div class="card">
+    <h2>このアプリでできること・できないこと</h2>
+    <ul>
+      <li><b>できること</b>: 文章・音声・スケッチ・写真で伝えたイメージを Claude (または端末内の簡易生成) がコードに変換し、Android APK / Windows 10・11 EXE 用プロジェクト、PDF 文書、任意言語のソースコードとして出力します。GitHub にプッシュすれば APK と EXE が自動でビルドされます。</li>
+      <li><b>できること</b>: カメラ (指先の脈波) とマイク (呼吸音) で心拍・心拍変動・呼吸数を測り、音とガンマ関数の模様で返すバイオフィードバック。</li>
+      <li><b>できないこと</b>: 頭の中の思考を直接読み取ること (Neuralink の Telepathy は脳に埋め込む電極が必要です)、アカシックレコードへのアクセスや未来予知、体内・脳内の熱の流れの観測。心拍・呼吸は身体の状態であって思考の内容ではありません。</li>
+      <li>医療機器ではありません。測定値は目安です。</li>
+    </ul>
+    <p class="note">BadaGPT改 v<span id="ver"></span> — Bada リポジトリ</p>
+  </div>
+</section>
+
+</main>
+<script id="engine">
+/*
+ * engine.js — BadaGPT改 の純ロジック (DOM 非依存・Node でテスト可能)
+ *
+ *   - ZIP 書き出し (無圧縮 / UTF-8 ファイル名)
+ *   - PDF 書き出し (JPEG ページ画像を DCTDecode で埋め込む)
+ *   - Markdown → ブロック列 / HTML
+ *   - Claude API リクエスト本体と SSE ストリームの解析
+ *   - 生成テキスト → ファイル群の解析 (=== FILE: path === 形式)
+ *   - APK (Cordova) / Windows EXE (Electron) / GitHub Actions の雛形生成
+ *   - バイオフィードバック: PPG 心拍 / RMSSD / 呼吸数 / 落ち着き指数
+ *   - 複素ガンマ関数 Γ(z) (Lanczos 近似 + 相反公式)
+ *
+ * 正直な範囲: 生体信号は「心拍・呼吸」という身体の状態であり、
+ * 思考の内容は読み取れません。生成への入力はあくまで文章・音声・スケッチ・
+ * 写真で、生体信号はデザインの雰囲気 (色・テンポ) のヒントとしてのみ使います。
+ */
+"use strict";
+
+var KAI_VERSION = "1.0.0";
+
+/* ───────────── バイト列ユーティリティ ───────────── */
+
+function utf8(str) { return new TextEncoder().encode(String(str)); }
+
+function concatBytes(chunks) {
+  var n = 0, i;
+  for (i = 0; i < chunks.length; i++) n += chunks[i].length;
+  var out = new Uint8Array(n), off = 0;
+  for (i = 0; i < chunks.length; i++) { out.set(chunks[i], off); off += chunks[i].length; }
+  return out;
+}
+
+var CRC_TABLE = (function () {
+  var t = new Uint32Array(256);
+  for (var n = 0; n < 256; n++) {
+    var c = n;
+    for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes) {
+  var c = 0xFFFFFFFF;
+  for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function bytesToBase64(bytes) {
+  var s = "", CH = 0x8000;
+  for (var i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(s);
+}
+
+function base64ToBytes(b64) {
+  var s = atob(b64), out = new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
+
+/* ───────────── ZIP (無圧縮 store) ───────────── */
+
+function zipBuild(files) {
+  var locals = [], centrals = [], offset = 0;
+  function u16(v) { return [v & 0xFF, (v >>> 8) & 0xFF]; }
+  function u32(v) { return [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF]; }
+  files.forEach(function (f) {
+    var name = utf8(f.path);
+    var data = typeof f.data === "string" ? utf8(f.data) : f.data;
+    var crc = crc32(data);
+    /* DOS 日時は固定 (1980-01-01) — 再現性のある ZIP にする */
+    var head = [].concat(u16(20), u16(0x0800), u16(0), u16(0), u16(0x21),
+                         u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0));
+    var local = concatBytes([new Uint8Array([0x50, 0x4B, 0x03, 0x04].concat(head)), name, data]);
+    locals.push(local);
+    var central = concatBytes([new Uint8Array([0x50, 0x4B, 0x01, 0x02].concat(u16(20), head,
+                              u16(0), u16(0), u16(0), u32(0), u32(offset))), name]);
+    centrals.push(central);
+    offset += local.length;
+  });
+  var cd = concatBytes(centrals);
+  var end = new Uint8Array([0x50, 0x4B, 0x05, 0x06].concat(u16(0), u16(0), u16(files.length),
+                           u16(files.length), u32(cd.length), u32(offset), u16(0)));
+  return concatBytes(locals.concat([cd, end]));
+}
+
+/* ───────────── PDF (JPEG ページ画像) ───────────── */
+
+/* pages: [{ jpeg: Uint8Array, w: 画素幅, h: 画素高 }] → A4 (595×842pt) の PDF */
+function pdfFromJpegs(pages, title) {
+  var PW = 595, PH = 842;
+  var parts = [], offsets = [], pos = 0;
+  function push(b) { parts.push(b); pos += b.length; }
+  function obj(num, bodyBytes) { offsets[num] = pos; push(bodyBytes); }
+  push(utf8("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"));
+  var n = pages.length;
+  /* 1: Catalog, 2: Pages, 3: Info, 以降 ページごとに (Page, Content, Image) */
+  var kids = [];
+  for (var i = 0; i < n; i++) kids.push((4 + i * 3) + " 0 R");
+  obj(1, utf8("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"));
+  obj(2, utf8("2 0 obj\n<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + n + " >>\nendobj\n"));
+  var t = String(title || "BadaGPT Kai").replace(/[^\x20-\x7E]/g, "?").replace(/[()\\]/g, "");
+  obj(3, utf8("3 0 obj\n<< /Title (" + t + ") /Producer (BadaGPT Kai " + KAI_VERSION + ") >>\nendobj\n"));
+  pages.forEach(function (p, i) {
+    var pn = 4 + i * 3, cn = pn + 1, im = pn + 2;
+    obj(pn, utf8(pn + " 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] " +
+                 "/Resources << /XObject << /Im" + i + " " + im + " 0 R >> >> /Contents " + cn + " 0 R >>\nendobj\n"));
+    var content = "q " + PW + " 0 0 " + PH + " 0 0 cm /Im" + i + " Do Q";
+    obj(cn, utf8(cn + " 0 obj\n<< /Length " + content.length + " >>\nstream\n" + content + "\nendstream\nendobj\n"));
+    offsets[im] = pos;
+    push(utf8(im + " 0 obj\n<< /Type /XObject /Subtype /Image /Width " + p.w + " /Height " + p.h +
+              " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + p.jpeg.length + " >>\nstream\n"));
+    push(p.jpeg);
+    push(utf8("\nendstream\nendobj\n"));
+  });
+  var total = 4 + n * 3;
+  var xref = pos;
+  var x = "xref\n0 " + total + "\n0000000000 65535 f \n";
+  for (var k = 1; k < total; k++) x += ("0000000000" + offsets[k]).slice(-10) + " 00000 n \n";
+  x += "trailer\n<< /Size " + total + " /Root 1 0 R /Info 3 0 R >>\nstartxref\n" + xref + "\n%%EOF\n";
+  push(utf8(x));
+  return concatBytes(parts);
+}
+
+/* ───────────── Markdown ───────────── */
+
+function mdBlocks(md) {
+  var lines = String(md || "").replace(/\r\n?/g, "\n").split("\n");
+  var out = [], para = [], i = 0;
+  function flush() { if (para.length) { out.push({ type: "p", text: para.join(" ") }); para = []; } }
+  while (i < lines.length) {
+    var l = lines[i];
+    if (/^```/.test(l)) {
+      flush();
+      var code = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) { code.push(lines[i]); i++; }
+      out.push({ type: "code", text: code.join("\n") }); i++; continue;
+    }
+    var h = l.match(/^(#{1,3})\s+(.*)$/);
+    if (h) { flush(); out.push({ type: "h" + h[1].length, text: h[2].trim() }); i++; continue; }
+    var li = l.match(/^\s*(?:[-*+]|\d+[.)])\s+(.*)$/);
+    if (li) { flush(); out.push({ type: "li", text: li[1].trim() }); i++; continue; }
+    if (/^\s*(?:---+|\*\*\*+)\s*$/.test(l)) { flush(); out.push({ type: "hr", text: "" }); i++; continue; }
+    if (/^\s*$/.test(l)) { flush(); i++; continue; }
+    para.push(l.trim()); i++;
+  }
+  flush();
+  return out;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function stripInline(s) { return String(s).replace(/\*\*(.+?)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1"); }
+
+function mdToHtml(md) {
+  var html = [], inList = false;
+  mdBlocks(md).forEach(function (b) {
+    if (b.type !== "li" && inList) { html.push("</ul>"); inList = false; }
+    var t = escapeHtml(b.text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
+    if (b.type === "li") { if (!inList) { html.push("<ul>"); inList = true; } html.push("<li>" + t + "</li>"); }
+    else if (b.type === "code") html.push("<pre>" + escapeHtml(b.text) + "</pre>");
+    else if (b.type === "hr") html.push("<hr>");
+    else if (b.type === "p") html.push("<p>" + t + "</p>");
+    else html.push("<" + b.type + ">" + t + "</" + b.type + ">");
+  });
+  if (inList) html.push("</ul>");
+  return html.join("\n");
+}
+
+/* ───────────── 名前・パス ───────────── */
+
+function slugify(name) {
+  var s = String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  if (s.length >= 3) return s;
+  /* 日本語名など ASCII が残らない場合は名前のハッシュで安定した識別子にする */
+  return "app-" + crc32(utf8(String(name || "app"))).toString(16);
+}
+
+function safePath(p) {
+  var s = String(p || "").trim().replace(/\\/g, "/").replace(/^\.?\/+/, "");
+  if (!s || s.length > 200) return null;
+  var segs = s.split("/");
+  for (var i = 0; i < segs.length; i++) {
+    if (segs[i] === "" || segs[i] === "." || segs[i] === "..") return null;
+    if (/[\x00-\x1F:*?"<>|]/.test(segs[i])) return null;
+  }
+  return s;
+}
+
+/* 生成テキスト中の
+ *   === FILE: path ===
+ *   ...内容...
+ *   === END FILE ===
+ * を抜き出す。未閉じの最終ファイル (max_tokens 打ち切り) は truncated として返す。 */
+function parseFiles(text) {
+  var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  var files = [], cur = null, notes = [];
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i];
+    var m = l.match(/^\s*===\s*FILE:\s*(.+?)\s*===\s*$/);
+    if (m && !cur) { cur = { path: safePath(m[1]), raw: m[1], body: [] }; continue; }
+    if (cur && /^\s*===\s*END FILE\s*===\s*$/.test(l)) {
+      if (cur.path) files.push({ path: cur.path, content: cur.body.join("\n") });
+      else notes.push("不正なパスを無視しました: " + cur.raw);
+      cur = null; continue;
+    }
+    if (cur) cur.body.push(l); else if (l.trim()) notes.push(l);
+  }
+  var truncated = false;
+  if (cur) { truncated = true; if (cur.path) files.push({ path: cur.path, content: cur.body.join("\n"), truncated: true }); }
+  /* ```lang ... ``` で包まれていたら外す */
+  files.forEach(function (f) {
+    var mm = f.content.match(/^\s*```[\w+-]*\n([\s\S]*?)\n```\s*$/);
+    if (mm) f.content = mm[1];
+  });
+  return { files: files, notes: notes.join("\n").trim(), truncated: truncated };
+}
+
+/* ───────────── 生成ターゲット ───────────── */
+
+var TARGETS = {
+  both:   { label: "Android APK + Windows 10/11 EXE", packaging: true },
+  apk:    { label: "Android APK",                     packaging: true },
+  exe:    { label: "Windows 10/11 EXE",               packaging: true },
+  pdf:    { label: "PDF 文書",                         packaging: false },
+  source: { label: "任意のソースコード",                packaging: false }
+};
+
+function buildSystemPrompt(target, lang) {
+  var common = [
+    "あなたは BadaGPT改 のコード生成エンジンです。ユーザーの依頼文・スケッチ・写真から、動く成果物を作ります。",
+    "出力は必ず次の形式のファイルの並びにしてください (説明文はファイルの外に短く書いてよい):",
+    "=== FILE: 相対パス ===",
+    "ファイルの内容 (コードフェンスで囲まない)",
+    "=== END FILE ===",
+    "相対パスに .. や絶対パスを使わないこと。",
+    "生体データ (心拍・呼吸・落ち着き指数) が添えられている場合、それは利用者の身体の状態であり思考の内容ではありません。配色やテンポなど雰囲気のヒントとしてだけ使ってください。",
+    "UI の言語は依頼文の言語に合わせてください。"
+  ];
+  var spec;
+  if (target === "pdf") {
+    spec = [
+      "成果物は PDF 文書です。document.md を 1 つだけ Markdown で書いてください。",
+      "使える記法: # 見出し / ## / ### / 段落 / - 箇条書き / 1. 番号付き / ``` コード ``` / **太字** / ---。表や画像は使わないこと。"
+    ];
+  } else if (target === "source") {
+    spec = [
+      "成果物は任意のソースコードのプロジェクトです。言語・フレームワーク: " + (lang || "依頼文から最適なものを選ぶ") + "。",
+      "ビルド・実行手順を書いた README.md を必ず含め、そのまま動く完全なコードを書いてください (省略記号や TODO で済ませない)。"
+    ];
+  } else {
+    spec = [
+      "成果物は Android APK (Cordova の WebView) と Windows 10/11 EXE (Electron) で同じ中身として動くアプリです。",
+      "www/index.html を 1 つだけ書いてください。CSS と JavaScript はすべてインラインにし、外部 URL (CDN・フォント・画像) を一切読み込まずオフラインで動くこと。",
+      "スマートフォン縦画面とデスクトップの両方で使えるレスポンシブなレイアウトにし、データを保存する場合は localStorage を使うこと。",
+      "パッケージ設定 (config.xml / package.json / main.js / ワークフロー) は BadaGPT改 が別途生成するので書かないこと。",
+      "必要なら README.md (使い方) を追加してよい。"
+    ];
+  }
+  return common.concat(spec).join("\n");
+}
+
+/* bio: { bpm, rmssd, breath, calm } (どれも省略可) */
+function bioSummary(bio) {
+  if (!bio) return "";
+  var parts = [];
+  if (isFinite(bio.bpm)) parts.push("心拍 " + Math.round(bio.bpm) + " bpm");
+  if (isFinite(bio.rmssd)) parts.push("心拍変動 RMSSD " + Math.round(bio.rmssd) + " ms");
+  if (isFinite(bio.breath)) parts.push("呼吸 " + bio.breath.toFixed(1) + " 回/分");
+  if (isFinite(bio.calm)) parts.push("落ち着き指数 " + Math.round(bio.calm) + "/100");
+  return parts.length ? "生体データ (雰囲気のヒント): " + parts.join("、") : "";
+}
+
+function dataUrlToImageBlock(dataUrl) {
+  var m = String(dataUrl || "").match(/^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/);
+  if (!m) return null;
+  return { type: "image", source: { type: "base64", media_type: m[1], data: m[2] } };
+}
+
+/* input: { text, name, target, lang, images: [dataUrl], bio } */
+function buildUserContent(input) {
+  var content = [];
+  (input.images || []).forEach(function (u) { var b = dataUrlToImageBlock(u); if (b) content.push(b); });
+  var lines = [];
+  if (input.name) lines.push("成果物の名前: " + input.name);
+  lines.push("ターゲット: " + (TARGETS[input.target] || TARGETS.both).label);
+  if (input.images && input.images.length) lines.push("添付画像は利用者が描いたスケッチ/写真です。画面構成や雰囲気の参考にしてください。");
+  var b = bioSummary(input.bio);
+  if (b) lines.push(b);
+  lines.push("");
+  lines.push("依頼:");
+  lines.push(String(input.text || "").trim() || "(依頼文なし — 添付画像から意図を汲み取ってください)");
+  content.push({ type: "text", text: lines.join("\n") });
+  return content;
+}
+
+var MODELS = [
+  { id: "claude-opus-5-5",   label: "Claude Opus 5.5 (既定)", fallback: true },
+  { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5",      fallback: true },
+  { id: "claude-fable-5-1",  label: "Claude Fable 5.1",       fallback: true },
+  { id: "claude-haiku-5-5",  label: "Claude Haiku 5.5",       fallback: false }
+];
+
+function claudeRequest(opts) {
+  var model = opts.model || "claude-opus-5-5";
+  var info = MODELS.filter(function (m) { return m.id === model; })[0];
+  var headers = {
+    "content-type": "application/json",
+    "x-api-key": opts.apiKey,
+    "anthropic-version": "2023-06-01",
+    /* Cordova WebView / Electron から直接呼ぶため (キーは利用者自身のもの) */
+    "anthropic-dangerous-direct-browser-access": "true"
+  };
+  var body = {
+    model: model,
+    max_tokens: 64000,
+    stream: true,
+    output_config: { effort: opts.effort || "high" },
+    system: opts.system,
+    messages: [{ role: "user", content: opts.content }]
+  };
+  if (info && info.fallback) {
+    /* 安全分類器が拒否したときに既定の代替モデルへ自動で回す */
+    headers["anthropic-beta"] = "server-side-fallback-2026-07-01";
+    body.fallbacks = "default";
+  }
+  return { url: "https://api.anthropic.com/v1/messages", headers: headers, body: body };
+}
+
+/* SSE の逐次パーサ。state = sseNew(); sseFeed(state, chunk) を繰り返す */
+function sseNew() { return { buf: "", text: "", stop: null, error: null, stopDetails: null, outTokens: 0 }; }
+
+function sseFeed(state, chunk) {
+  state.buf += chunk;
+  var idx;
+  while ((idx = state.buf.indexOf("\n\n")) >= 0) {
+    var evt = state.buf.slice(0, idx); state.buf = state.buf.slice(idx + 2);
+    var data = evt.split("\n").filter(function (l) { return l.indexOf("data:") === 0; })
+                  .map(function (l) { return l.slice(5).trim(); }).join("");
+    if (!data) continue;
+    var j; try { j = JSON.parse(data); } catch (e) { continue; }
+    if (j.type === "content_block_delta" && j.delta && j.delta.type === "text_delta") state.text += j.delta.text;
+    else if (j.type === "message_delta") {
+      if (j.delta && j.delta.stop_reason) state.stop = j.delta.stop_reason;
+      if (j.delta && j.delta.stop_details) state.stopDetails = j.delta.stop_details;
+      if (j.usage && j.usage.output_tokens) state.outTokens = j.usage.output_tokens;
+    } else if (j.type === "error") state.error = (j.error && j.error.message) || "stream error";
+  }
+  return state;
+}
+
+/* ───────────── ローカル (オフライン) 生成 ───────────── */
+
+/* API キーがないときの代替。依頼文から機能の箇条を拾い、
+ * チェックリスト + メモ + 記録 を持つ自己完結アプリを組み立てる。 */
+function localFeatures(text) {
+  var t = String(text || "");
+  var items = t.split(/[\n。、,.・]+/).map(function (s) { return s.trim(); })
+               .filter(function (s) { return s.length >= 2 && s.length <= 60; });
+  return items.slice(0, 8);
+}
+
+function localGenerateApp(input) {
+  var name = input.name || "マイアプリ";
+  var feats = localFeatures(input.text);
+  var hue = input.bio && isFinite(input.bio.calm) ? Math.round(200 - input.bio.calm) : 200;
+  var featJson = JSON.stringify(feats).replace(/</g, "\\u003c");
+  var key = "kai_" + slugify(name);
+  var html = [
+    "<!doctype html>",
+    "<html lang=\"ja\"><head><meta charset=\"utf-8\">",
+    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">",
+    "<title>" + escapeHtml(name) + "</title>",
+    "<style>",
+    ":root{--h:" + hue + ";--bg:hsl(var(--h) 30% 8%);--fg:hsl(var(--h) 20% 92%);--ac:hsl(var(--h) 80% 60%);--card:hsl(var(--h) 25% 14%)}",
+    "*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--fg)}",
+    "main{max-width:720px;margin:0 auto;padding:16px}h1{color:var(--ac);font-size:1.5rem}",
+    ".card{background:var(--card);border-radius:12px;padding:14px;margin:12px 0}",
+    "label{display:flex;gap:8px;align-items:center;padding:6px 0}",
+    "textarea,input{width:100%;background:transparent;color:var(--fg);border:1px solid var(--ac);border-radius:8px;padding:8px;font:inherit}",
+    "button{background:var(--ac);color:#000;border:0;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}",
+    "ul{padding-left:20px}",
+    "</style></head><body><main>",
+    "<h1>" + escapeHtml(name) + "</h1>",
+    "<p>" + escapeHtml(String(input.text || "").slice(0, 300)) + "</p>",
+    "<section class=\"card\"><h2>機能チェックリスト</h2><div id=\"feats\"></div></section>",
+    "<section class=\"card\"><h2>メモ</h2><textarea id=\"memo\" rows=\"6\"></textarea></section>",
+    "<section class=\"card\"><h2>記録</h2><input id=\"entry\" placeholder=\"記録を追加\"> <p><button id=\"add\">追加</button></p><ul id=\"log\"></ul></section>",
+    "</main><script>",
+    "var FEATS=" + featJson + ",KEY=" + JSON.stringify(key) + ";",
+    "function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return {}}}",
+    "function save(s){try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){}}",
+    "var st=load();st.done=st.done||{};st.log=st.log||[];",
+    "var fd=document.getElementById('feats');",
+    "FEATS.forEach(function(f,i){var l=document.createElement('label');var c=document.createElement('input');c.type='checkbox';c.style.width='auto';c.checked=!!st.done[i];c.onchange=function(){st.done[i]=c.checked;save(st)};l.appendChild(c);l.appendChild(document.createTextNode(f));fd.appendChild(l)});",
+    "if(!FEATS.length)fd.textContent='(依頼文から機能を抽出できませんでした)';",
+    "var memo=document.getElementById('memo');memo.value=st.memo||'';memo.oninput=function(){st.memo=memo.value;save(st)};",
+    "function render(){var ul=document.getElementById('log');ul.innerHTML='';st.log.forEach(function(x){var li=document.createElement('li');li.textContent=x;ul.appendChild(li)})}",
+    "document.getElementById('add').onclick=function(){var e=document.getElementById('entry');if(!e.value.trim())return;st.log.unshift(new Date().toLocaleString()+' — '+e.value.trim());e.value='';save(st);render()};",
+    "render();",
+    "<\/script></body></html>"
+  ].join("\n");
+  return [{ path: "www/index.html", content: html }];
+}
+
+function localGenerateDoc(input) {
+  var name = input.name || "文書";
+  var md = ["# " + name, "", String(input.text || "").trim() || "(本文なし)", ""];
+  var b = bioSummary(input.bio);
+  if (b) md.push("---", "", b, "");
+  md.push("---", "", "BadaGPT改 (オフライン生成) — " + new Date().toISOString().slice(0, 10));
+  return [{ path: "document.md", content: md.join("\n") }];
+}
+
+/* ───────────── パッケージング雛形 (APK / EXE / Actions) ───────────── */
+
+function scaffoldPackaging(o) {
+  var name = o.name, slug = o.slug, root = "apps/" + slug;
+  var pkgId = "io.github.badagptkai." + slug.replace(/-/g, "_");
+  var product = slug.replace(/(^|-)([a-z0-9])/g, function (_, a, c) { return c.toUpperCase(); }).replace(/^[0-9]/, "A$&");
+  var want = o.target === "both" ? ["apk", "exe"] : [o.target];
+  var files = [];
+  var xmlName = escapeHtml(name);
+
+  if (want.indexOf("apk") >= 0) {
+    files.push({ path: root + "/cordova/config.xml", content: [
+      "<?xml version='1.0' encoding='utf-8'?>",
+      "<!-- BadaGPT改 が生成した Cordova 設定 (Android APK) -->",
+      "<widget id=\"" + pkgId + "\" version=\"1.0.0\"",
+      "        xmlns=\"http://www.w3.org/ns/widgets\" xmlns:cdv=\"http://cordova.apache.org/ns/1.0\">",
+      "  <name>" + xmlName + "</name>",
+      "  <description>" + xmlName + " (generated by BadaGPT Kai)</description>",
+      "  <content src=\"index.html\" />",
+      "  <access origin=\"*\" />",
+      "  <allow-intent href=\"http://*/*\" />",
+      "  <allow-intent href=\"https://*/*\" />",
+      "  <preference name=\"android-minSdkVersion\" value=\"24\" />",
+      "  <platform name=\"android\">",
+      "    <preference name=\"AndroidXEnabled\" value=\"true\" />",
+      "  </platform>",
+      "</widget>", ""].join("\n") });
+  }
+
+  if (want.indexOf("exe") >= 0) {
+    files.push({ path: root + "/electron/package.json", content: JSON.stringify({
+      name: slug, productName: product, version: "1.0.0",
+      description: name + " (generated by BadaGPT Kai)", author: "BadaGPT Kai", license: "MIT",
+      main: "main.js",
+      scripts: { start: "electron .", dist: "electron-builder --win --x64" },
+      devDependencies: { electron: "^31.0.0", "electron-builder": "^24.13.3" },
+      build: {
+        appId: pkgId, productName: product, publish: null,
+        files: ["main.js", "package.json"],
+        extraResources: [{ from: "../www", to: "www" }],
+        directories: { output: "dist" },
+        win: { target: ["nsis", "portable"], artifactName: product + "-${version}-${arch}.${ext}" },
+        nsis: { oneClick: false, allowToChangeInstallationDirectory: true },
+        portable: { artifactName: product + "-${version}-portable.${ext}" }
+      }
+    }, null, 2) + "\n" });
+    files.push({ path: root + "/electron/main.js", content: [
+      "/* BadaGPT改 が生成した Electron ラッパー (Windows 10/11 EXE) */",
+      "const { app, BrowserWindow, shell } = require(\"electron\");",
+      "const path = require(\"path\");",
+      "function indexPath() {",
+      "  return app.isPackaged",
+      "    ? path.join(process.resourcesPath, \"www\", \"index.html\")",
+      "    : path.join(__dirname, \"..\", \"www\", \"index.html\");",
+      "}",
+      "function createWindow() {",
+      "  const win = new BrowserWindow({ width: 1200, height: 820, title: " + JSON.stringify(name) + ",",
+      "    webPreferences: { contextIsolation: true, nodeIntegration: false } });",
+      "  win.setMenuBarVisibility(false);",
+      "  win.webContents.setWindowOpenHandler(({ url }) => {",
+      "    if (/^https?:\\/\\//i.test(url)) shell.openExternal(url);",
+      "    return { action: \"deny\" };",
+      "  });",
+      "  win.loadFile(indexPath());",
+      "}",
+      "app.whenReady().then(createWindow);",
+      "app.on(\"window-all-closed\", () => { if (process.platform !== \"darwin\") app.quit(); });",
+      "app.on(\"activate\", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });",
+      ""].join("\n") });
+  }
+
+  var E = "${{ ";  /* GitHub Actions の式。JS のテンプレートと混ざらないよう連結で組む */
+  var wf = [
+    "name: " + slug + " build (BadaGPT Kai)",
+    "",
+    "# BadaGPT改 が生成したアプリ " + name.replace(/\n/g, " ") + " をビルドします。",
+    "# apps/" + slug + "/ を push すると自動で走り、Release '" + slug + "-latest' に添付します。",
+    "",
+    "on:",
+    "  push:",
+    "    paths:",
+    "      - 'apps/" + slug + "/**'",
+    "      - '.github/workflows/" + slug + "-build.yml'",
+    "  workflow_dispatch:",
+    "",
+    "permissions:",
+    "  contents: write",
+    "",
+    "jobs:"
+  ];
+  if (want.indexOf("apk") >= 0) wf = wf.concat([
+    "  android-apk:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - uses: actions/checkout@v4",
+    "      - uses: actions/setup-java@v4",
+    "        with:",
+    "          distribution: temurin",
+    "          java-version: '17'",
+    "      - uses: actions/setup-node@v4",
+    "        with:",
+    "          node-version: 20",
+    "      - uses: android-actions/setup-android@v3",
+    "        with:",
+    "          packages: ''",
+    "      - name: Install Android SDK packages",
+    "        run: |",
+    "          yes | sdkmanager --licenses > /dev/null 2>&1 || true",
+    "          sdkmanager \"platform-tools\" \"platforms;android-33\" \"build-tools;33.0.2\"",
+    "      - name: Pin Gradle 7.6.4 (cordova-android 12)",
+    "        run: |",
+    "          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o \"$HOME/gradle.zip\"",
+    "          unzip -q \"$HOME/gradle.zip\" -d \"$HOME/gradle-dist\"",
+    "          echo \"$HOME/gradle-dist/gradle-7.6.4/bin\" >> \"$GITHUB_PATH\"",
+    "          echo \"CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip\" >> \"$GITHUB_ENV\"",
+    "      - name: Build debug APK (Cordova)",
+    "        run: |",
+    "          set -e",
+    "          npm install -g cordova@12.0.0",
+    "          cordova create cordova-build " + pkgId + " " + product,
+    "          rm -rf cordova-build/www",
+    "          cp -r apps/" + slug + "/www cordova-build/www",
+    "          cp apps/" + slug + "/cordova/config.xml cordova-build/config.xml",
+    "          cd cordova-build",
+    "          cordova platform add android@12.0.1",
+    "          cordova build android",
+    "          mkdir -p ../out",
+    "          cp platforms/android/app/build/outputs/apk/debug/*.apk ../out/" + slug + "-debug.apk",
+    "      - uses: actions/upload-artifact@v4",
+    "        with:",
+    "          name: " + slug + "-android",
+    "          path: out/*.apk",
+    "      - uses: softprops/action-gh-release@v2",
+    "        with:",
+    "          tag_name: " + slug + "-latest",
+    "          prerelease: true",
+    "          files: out/*.apk"
+  ]);
+  if (want.indexOf("exe") >= 0) wf = wf.concat([
+    "  windows-exe:",
+    "    runs-on: windows-latest",
+    "    steps:",
+    "      - uses: actions/checkout@v4",
+    "      - uses: actions/setup-node@v4",
+    "        with:",
+    "          node-version: 20",
+    "      - name: Build Windows EXE (Electron)",
+    "        working-directory: apps/" + slug + "/electron",
+    "        run: |",
+    "          npm install",
+    "          npm run dist",
+    "        env:",
+    "          GH_TOKEN: " + E + "secrets.GITHUB_TOKEN }}",
+    "      - uses: actions/upload-artifact@v4",
+    "        with:",
+    "          name: " + slug + "-windows",
+    "          path: apps/" + slug + "/electron/dist/*.exe",
+    "      - uses: softprops/action-gh-release@v2",
+    "        with:",
+    "          tag_name: " + slug + "-latest",
+    "          prerelease: true",
+    "          files: apps/" + slug + "/electron/dist/*.exe"
+  ]);
+  files.push({ path: ".github/workflows/" + slug + "-build.yml", content: wf.join("\n") + "\n" });
+  return files;
+}
+
+/* 生成ファイル (プロジェクト相対) をリポジトリ配置へまとめる */
+function assembleProject(o, generated) {
+  var root = "apps/" + o.slug + "/";
+  var out = [], seen = {};
+  function add(path, content) { if (!seen[path]) { seen[path] = 1; out.push({ path: path, data: content }); } }
+  if (TARGETS[o.target] && TARGETS[o.target].packaging) {
+    scaffoldPackaging(o).forEach(function (f) { add(f.path, f.content); });
+    var hasIndex = generated.some(function (f) { return f.path === "www/index.html"; });
+    if (!hasIndex) {
+      /* 生成側が別名で HTML を返したら www/index.html として使う */
+      var anyHtml = generated.filter(function (f) { return /\.html?$/i.test(f.path); })[0];
+      if (anyHtml) add(root + "www/index.html", anyHtml.content);
+    }
+  }
+  generated.forEach(function (f) {
+    /* パッケージ設定は雛形を優先 (生成側の上書きで壊さない) */
+    if (TARGETS[o.target] && TARGETS[o.target].packaging && /^(cordova|electron)\//.test(f.path)) return;
+    add(root + f.path, f.data !== undefined ? f.data : f.content);
+  });
+  return out;
+}
+
+/* ───────────── バイオフィードバック ───────────── */
+
+function movingAverage(xs, w) {
+  var out = new Array(xs.length), s = 0, q = [];
+  for (var i = 0; i < xs.length; i++) {
+    q.push(xs[i]); s += xs[i];
+    if (q.length > w) s -= q.shift();
+    out[i] = s / q.length;
+  }
+  return out;
+}
+
+function median(xs) {
+  if (!xs.length) return NaN;
+  var a = xs.slice().sort(function (p, q) { return p - q; }), m = a.length >> 1;
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+/* samples: [{t: 秒, v: 輝度}] (指先をカメラに当てた PPG) → { bpm, rmssd, peaks } */
+function ppgAnalyze(samples) {
+  if (samples.length < 30) return { bpm: NaN, rmssd: NaN, peaks: [] };
+  var dur = samples[samples.length - 1].t - samples[0].t;
+  if (dur < 4) return { bpm: NaN, rmssd: NaN, peaks: [] };
+  var fs = (samples.length - 1) / dur;
+  /* 血液は光を吸収するので輝度を反転し、ゆっくりした変動を除いて平滑化 */
+  var v = samples.map(function (s) { return -s.v; });
+  var base = movingAverage(v, Math.max(3, Math.round(fs * 1.0)));
+  var d = v.map(function (x, i) { return x - base[i]; });
+  var sm = movingAverage(d, Math.max(1, Math.round(fs * 0.12)));
+  var sd = Math.sqrt(sm.reduce(function (a, x) { return a + x * x; }, 0) / sm.length) || 1;
+  var minGap = 0.33, peaks = [];
+  for (var i = 2; i < sm.length - 2; i++) {
+    if (sm[i] > 0.3 * sd && sm[i] >= sm[i - 1] && sm[i] >= sm[i - 2] && sm[i] > sm[i + 1] && sm[i] >= sm[i + 2]) {
+      var t = samples[i].t;
+      if (peaks.length && t - peaks[peaks.length - 1].t < minGap) {
+        if (sm[i] > peaks[peaks.length - 1].a) peaks[peaks.length - 1] = { t: t, a: sm[i] };
+      } else peaks.push({ t: t, a: sm[i] });
+    }
+  }
+  var ibis = [];
+  for (var k = 1; k < peaks.length; k++) {
+    var ibi = peaks[k].t - peaks[k - 1].t;
+    if (ibi >= 0.33 && ibi <= 1.5) ibis.push(ibi);
+  }
+  if (ibis.length < 3) return { bpm: NaN, rmssd: NaN, peaks: peaks };
+  var med = median(ibis);
+  /* 中央値から大きく外れた拍間隔 (誤検出) を除外 */
+  var good = ibis.filter(function (x) { return Math.abs(x - med) < 0.25 * med; });
+  /* 平均を使う (中央値だとフレーム周期 1/30 秒に量子化された値に張り付く) */
+  var bpm = 60 / (good.reduce(function (a, x) { return a + x; }, 0) / good.length);
+  var diffs = [];
+  for (var j = 1; j < good.length; j++) diffs.push(Math.pow((good[j] - good[j - 1]) * 1000, 2));
+  var rmssd = diffs.length ? Math.sqrt(diffs.reduce(function (a, x) { return a + x; }, 0) / diffs.length) : NaN;
+  return { bpm: bpm, rmssd: rmssd, peaks: peaks };
+}
+
+/* samples: [{t: 秒, v: マイク音量 (RMS)}] → 呼吸数 (回/分)。
+ * 包絡を 0.6 秒で平滑化し 8 秒の基線を引いて、ヒステリシス付きの上向き交差を数える。 */
+function breathAnalyze(samples) {
+  if (samples.length < 30) return NaN;
+  var dur = samples[samples.length - 1].t - samples[0].t;
+  if (dur < 12) return NaN;
+  var fs = (samples.length - 1) / dur;
+  var v = movingAverage(samples.map(function (s) { return s.v; }), Math.max(1, Math.round(fs * 0.6)));
+  var base = movingAverage(v, Math.max(3, Math.round(fs * 8)));
+  var d = v.map(function (x, i) { return x - base[i]; });
+  var sd = Math.sqrt(d.reduce(function (a, x) { return a + x * x; }, 0) / d.length);
+  if (!(sd > 1e-6)) return NaN;
+  var hi = 0.3 * sd, lo = -0.3 * sd, state = d[0] > 0 ? 1 : -1, ups = [];
+  for (var i = 1; i < d.length; i++) {
+    if (state < 0 && d[i] > hi) { state = 1; ups.push(samples[i].t); }
+    else if (state > 0 && d[i] < lo) state = -1;
+  }
+  if (ups.length < 2) return NaN;
+  var span = ups[ups.length - 1] - ups[0];
+  var rate = (ups.length - 1) / span * 60;
+  return rate >= 2 && rate <= 40 ? rate : NaN;
+}
+
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+/* 落ち着き指数 0..100: 心拍変動 (RMSSD) が大きく、呼吸が毎分 6 回 (共鳴呼吸) に近いほど高い */
+function calmIndex(rmssd, breath) {
+  var parts = [];
+  if (isFinite(rmssd)) parts.push(clamp01(rmssd / 80));
+  if (isFinite(breath)) parts.push(clamp01(1 - Math.abs(breath - 6) / 12));
+  if (!parts.length) return NaN;
+  return 100 * parts.reduce(function (a, x) { return a + x; }, 0) / parts.length;
+}
+
+/* ───────────── 複素ガンマ関数 ───────────── */
+
+var LANCZOS = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+  -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+
+function cmul(a, b) { return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]]; }
+function cdiv(a, b) { var d = b[0] * b[0] + b[1] * b[1]; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; }
+function cexp(a) { var e = Math.exp(a[0]); return [e * Math.cos(a[1]), e * Math.sin(a[1])]; }
+function clog(a) { return [Math.log(Math.hypot(a[0], a[1])), Math.atan2(a[1], a[0])]; }
+function cpow(a, b) { return cexp(cmul(b, clog(a))); }
+function csin(a) { return [Math.sin(a[0]) * Math.cosh(a[1]), Math.cos(a[0]) * Math.sinh(a[1])]; }
+
+/* Γ(z) — Lanczos (g=7) と相反公式 Γ(z)Γ(1−z) = π / sin(πz) */
+function gammaC(re, im) {
+  if (re < 0.5) {
+    var s = csin([Math.PI * re, Math.PI * im]);
+    var g1 = gammaC(1 - re, -im);
+    return cdiv([Math.PI, 0], cmul(s, g1));
+  }
+  var z = [re - 1, im], x = [LANCZOS[0], 0];
+  for (var i = 1; i < 9; i++) x = addC(x, cdiv([LANCZOS[i], 0], [z[0] + i, z[1]]));
+  var t = [z[0] + 7.5, z[1]];
+  var r = cmul(cmul([Math.sqrt(2 * Math.PI), 0], cpow(t, [z[0] + 0.5, z[1]])), cexp([-t[0], -t[1]]));
+  return cmul(r, x);
+}
+function addC(a, b) { return [a[0] + b[0], a[1] + b[1]]; }
+
+/* 実数 Γ(x) (検証用) */
+function gammaR(x) { return gammaC(x, 0)[0]; }
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    KAI_VERSION: KAI_VERSION, utf8: utf8, crc32: crc32, zipBuild: zipBuild, pdfFromJpegs: pdfFromJpegs,
+    bytesToBase64: bytesToBase64, base64ToBytes: base64ToBytes,
+    mdBlocks: mdBlocks, mdToHtml: mdToHtml, stripInline: stripInline, escapeHtml: escapeHtml,
+    slugify: slugify, safePath: safePath, parseFiles: parseFiles, TARGETS: TARGETS, MODELS: MODELS,
+    buildSystemPrompt: buildSystemPrompt, buildUserContent: buildUserContent, bioSummary: bioSummary,
+    claudeRequest: claudeRequest, sseNew: sseNew, sseFeed: sseFeed,
+    localGenerateApp: localGenerateApp, localGenerateDoc: localGenerateDoc,
+    scaffoldPackaging: scaffoldPackaging, assembleProject: assembleProject,
+    ppgAnalyze: ppgAnalyze, breathAnalyze: breathAnalyze, calmIndex: calmIndex,
+    gammaC: gammaC, gammaR: gammaR
+  };
+}
+
+</script>
+<script id="ui">
+/*
+ * ui.js — BadaGPT改 の画面・センサー・通信 (engine.js の上で動く)
+ */
+"use strict";
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var isCordova = !!window.cordova;
+
+  /* ───────────── 保存 (記憶するときだけ localStorage) ───────────── */
+  function store(remember) { try { return remember ? localStorage : sessionStorage; } catch (e) { return null; } }
+  function getPref(k) {
+    try { return localStorage.getItem(k) || sessionStorage.getItem(k) || ""; } catch (e) { return ""; }
+  }
+  function setPref(k, v, remember) {
+    try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch (e) {}
+    var s = store(remember); if (s && v) try { s.setItem(k, v); } catch (e) {}
+  }
+
+  /* ───────────── タブ ───────────── */
+  function showTab(name) {
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function (b) {
+      b.classList.toggle("on", b.getAttribute("data-tab") === name);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("section.tab"), function (s) {
+      s.classList.toggle("on", s.id === "tab-" + name);
+    });
+    if (name === "bio") drawGamma();
+  }
+  $("tabs").addEventListener("click", function (e) {
+    var t = e.target.getAttribute && e.target.getAttribute("data-tab");
+    if (t) showTab(t);
+  });
+
+  /* ───────────── 設定 ───────────── */
+  MODELS.forEach(function (m) {
+    var o = document.createElement("option"); o.value = m.id; o.textContent = m.label; $("model").appendChild(o);
+  });
+  $("ver").textContent = KAI_VERSION;
+  $("apiKey").value = getPref("kai_api_key");
+  $("rememberKey").checked = (function () { try { return !!localStorage.getItem("kai_api_key"); } catch (e) { return false; } })();
+  $("model").value = getPref("kai_model") || "claude-opus-5-5";
+  $("effort").value = getPref("kai_effort") || "high";
+  $("ghRepo").value = getPref("kai_gh_repo");
+  $("ghBranch").value = getPref("kai_gh_branch") || "badagpt-kai-apps";
+  $("ghToken").value = getPref("kai_gh_token");
+  $("rememberGh").checked = (function () { try { return !!localStorage.getItem("kai_gh_token"); } catch (e) { return false; } })();
+  function saveSettings() {
+    setPref("kai_api_key", $("apiKey").value.trim(), $("rememberKey").checked);
+    setPref("kai_model", $("model").value, true);
+    setPref("kai_effort", $("effort").value, true);
+    setPref("kai_gh_repo", $("ghRepo").value.trim(), true);
+    setPref("kai_gh_branch", $("ghBranch").value.trim(), true);
+    setPref("kai_gh_token", $("ghToken").value.trim(), $("rememberGh").checked);
+    updateModeNote();
+  }
+  ["apiKey", "model", "effort", "ghRepo", "ghBranch", "ghToken", "rememberKey", "rememberGh"].forEach(function (id) {
+    $(id).addEventListener("change", saveSettings);
+  });
+  function updateModeNote() {
+    $("modeNote").textContent = $("apiKey").value.trim()
+      ? "Claude (" + $("model").value + ", effort " + $("effort").value + ") で生成します。安全上の理由で拒否された場合は代替モデルへ自動で切り替わります。"
+      : "API キー未設定のため、端末内の簡易生成 (オフライン) で作ります。本格的な生成は ④ 設定 で API キーを入れてください。";
+  }
+  updateModeNote();
+
+  $("target").addEventListener("change", function () {
+    $("langBox").style.display = $("target").value === "source" ? "" : "none";
+  });
+
+  /* ───────────── 音声入力 ───────────── */
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null;
+  $("voiceBtn").addEventListener("click", function () {
+    if (!SR) { $("voiceState").textContent = "この端末の WebView は音声認識に対応していません。キーボードの音声入力 (マイクキー) をお使いください。"; return; }
+    if (rec) { rec.stop(); return; }
+    rec = new SR(); rec.lang = "ja-JP"; rec.interimResults = true; rec.continuous = true;
+    var base = $("req").value;
+    rec.onresult = function (e) {
+      var s = "";
+      for (var i = 0; i < e.results.length; i++) s += e.results[i][0].transcript;
+      $("req").value = (base ? base + "\n" : "") + s;
+    };
+    rec.onerror = function (e) { $("voiceState").textContent = "音声認識エラー: " + e.error; };
+    rec.onend = function () { rec = null; $("voiceBtn").textContent = "🎙 音声入力"; $("voiceState").textContent = ""; };
+    rec.start(); $("voiceBtn").textContent = "■ 止める"; $("voiceState").textContent = "聞き取り中…";
+  });
+
+  /* ───────────── スケッチ ───────────── */
+  var sk = $("sketch"), sctx = sk.getContext("2d"), drawing = false, sketched = false;
+  function clearSketch() { sctx.fillStyle = "#fff"; sctx.fillRect(0, 0, sk.width, sk.height); sketched = false; }
+  clearSketch();
+  function pos(e) {
+    var r = sk.getBoundingClientRect();
+    return [(e.clientX - r.left) * sk.width / r.width, (e.clientY - r.top) * sk.height / r.height];
+  }
+  sk.addEventListener("pointerdown", function (e) {
+    drawing = true; sk.setPointerCapture(e.pointerId);
+    var p = pos(e); sctx.beginPath(); sctx.moveTo(p[0], p[1]);
+  });
+  sk.addEventListener("pointermove", function (e) {
+    if (!drawing) return;
+    var p = pos(e);
+    sctx.strokeStyle = $("penColor").value; sctx.lineWidth = +$("penSize").value;
+    sctx.lineCap = "round"; sctx.lineJoin = "round";
+    sctx.lineTo(p[0], p[1]); sctx.stroke(); sketched = true;
+  });
+  ["pointerup", "pointercancel"].forEach(function (ev) { sk.addEventListener(ev, function () { drawing = false; }); });
+  $("sketchClear").addEventListener("click", clearSketch);
+
+  /* ───────────── 写真 (長辺 1024px の JPEG に縮小) ───────────── */
+  var photos = [];
+  $("photo").addEventListener("change", function () {
+    photos = []; $("thumbs").innerHTML = "";
+    Array.prototype.slice.call($("photo").files, 0, 4).forEach(function (f) {
+      var img = new Image(), url = URL.createObjectURL(f);
+      img.onload = function () {
+        var s = Math.min(1, 1024 / Math.max(img.width, img.height));
+        var c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        var d = c.toDataURL("image/jpeg", 0.85); photos.push(d);
+        var t = new Image(); t.src = d; $("thumbs").appendChild(t);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    });
+  });
+
+  /* ───────────── Android の実行時権限 ───────────── */
+  function androidPerms(list) {
+    return new Promise(function (resolve) {
+      var P = isCordova && window.cordova.plugins && window.cordova.plugins.permissions;
+      if (!P) return resolve(true);
+      P.requestPermissions(list.map(function (n) { return P[n]; }), function (s) { resolve(!!(s && s.hasPermission)); },
+                           function () { resolve(false); });
+    });
+  }
+
+  /* ───────────── バイオフィードバック ───────────── */
+  var bio = { bpm: NaN, rmssd: NaN, breath: NaN, calm: NaN };
+  var ppg = [], breathS = [], camStream = null, micStream = null, audio = null, sound = null, lastBeat = 0, hueShift = 0;
+
+  function ensureAudio() {
+    if (!audio) { var AC = window.AudioContext || window.webkitAudioContext; audio = AC ? new AC() : null; }
+    if (audio && audio.state === "suspended") audio.resume();
+    return audio;
+  }
+
+  function fmt(x, d, unit) { return isFinite(x) ? x.toFixed(d) + unit : "—"; }
+  function updateMeters() {
+    bio.calm = calmIndex(bio.rmssd, bio.breath);
+    $("mBpm").textContent = fmt(bio.bpm, 0, " bpm");
+    $("mRmssd").textContent = fmt(bio.rmssd, 0, " ms");
+    $("mBreath").textContent = fmt(bio.breath, 1, " /分");
+    $("mCalm").textContent = fmt(bio.calm, 0, "");
+    if (sound) {
+      /* 呼吸が遅く落ち着くほど、ドローンの唸り (両耳の周波数差) をゆっくりにする */
+      var beat = isFinite(bio.calm) ? 10 - 6 * bio.calm / 100 : 8;
+      sound.r.frequency.setTargetAtTime(sound.base + beat, audio.currentTime, 0.5);
+    }
+  }
+
+  function beep() {
+    if (!sound) return;
+    var t = audio.currentTime, o = audio.createOscillator(), g = audio.createGain();
+    o.type = "sine";
+    o.frequency.value = 330 + (isFinite(bio.calm) ? bio.calm * 2 : 100);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.3);
+  }
+
+  $("soundBtn").addEventListener("click", function () {
+    var a = ensureAudio(); if (!a) return;
+    if (sound) {
+      sound.l.stop(); sound.r.stop(); sound = null; $("soundBtn").textContent = "🔈 音を鳴らす"; return;
+    }
+    var base = 174, merger = a.createChannelMerger(2), g = a.createGain();
+    var l = a.createOscillator(), r = a.createOscillator();
+    l.frequency.value = base; r.frequency.value = base + 8;
+    l.connect(merger, 0, 0); r.connect(merger, 0, 1);
+    g.gain.value = 0.06; merger.connect(g).connect(a.destination);
+    l.start(); r.start();
+    sound = { l: l, r: r, g: g, base: base };
+    $("soundBtn").textContent = "🔇 音を止める";
+    updateMeters();
+  });
+
+  /* 心拍 (カメラ PPG) */
+  var vid = document.createElement("video"); vid.muted = true; vid.setAttribute("playsinline", "");
+  var small = document.createElement("canvas"); small.width = 40; small.height = 30;
+  var smallCtx = small.getContext("2d", { willReadFrequently: true });
+
+  $("camBtn").addEventListener("click", function () {
+    if (camStream) { stopCam(); return; }
+    ensureAudio();
+    androidPerms(["CAMERA"]).then(function () {
+      return navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 }, audio: false });
+    }).then(function (s) {
+      camStream = s; vid.srcObject = s; vid.play();
+      var track = s.getVideoTracks()[0];
+      if (track.applyConstraints) track.applyConstraints({ advanced: [{ torch: true }] }).catch(function () {});
+      ppg = []; $("camBtn").textContent = "■ 心拍の測定を止める";
+      $("bioState").textContent = "指先をカメラとライトに当ててください…";
+      requestAnimationFrame(camLoop);
+    }).catch(function (e) { $("bioState").textContent = "カメラを使えません: " + (e && e.message || e); });
+  });
+  function stopCam() {
+    camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null;
+    $("camBtn").textContent = "❤ 心拍を測る (カメラ)";
+  }
+  var lastPpgAnalysis = 0;
+  function camLoop() {
+    if (!camStream) return;
+    if (vid.readyState >= 2) {
+      smallCtx.drawImage(vid, 0, 0, small.width, small.height);
+      var d = smallCtx.getImageData(10, 7, 20, 16).data, r = 0, g = 0;
+      for (var i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; }
+      var n = d.length / 4; r /= n; g /= n;
+      var t = performance.now() / 1000, finger = r > 60 && r > g * 1.4;
+      if (finger) {
+        ppg.push({ t: t, v: r });
+        while (ppg.length && t - ppg[0].t > 20) ppg.shift();
+      } else if (ppg.length) { ppg = []; }
+      if (t - lastPpgAnalysis > 0.5) {
+        lastPpgAnalysis = t;
+        if (!finger) $("bioState").textContent = "指先がカメラを覆っていないようです (画面が赤く明るくなる位置に)。";
+        else {
+          var res = ppgAnalyze(ppg);
+          if (isFinite(res.bpm)) { bio.bpm = res.bpm; bio.rmssd = res.rmssd; $("bioState").textContent = "測定中 — 静止したまま続けると精度が上がります。"; }
+          else $("bioState").textContent = "脈波を集めています… (" + Math.round(ppg.length ? t - ppg[0].t : 0) + " 秒)";
+          var pk = res.peaks[res.peaks.length - 1];
+          if (pk && pk.t > lastBeat + 0.3) { lastBeat = pk.t; beep(); hueShift += 25; drawGamma(); }
+          updateMeters();
+        }
+      }
+      drawWave();
+    }
+    requestAnimationFrame(camLoop);
+  }
+  function drawWave() {
+    var c = $("wave"), x = c.getContext("2d"), W = c.width, H = c.height;
+    x.fillStyle = "#05070b"; x.fillRect(0, 0, W, H);
+    if (ppg.length < 10) return;
+    var tEnd = ppg[ppg.length - 1].t, pts = ppg.filter(function (p) { return tEnd - p.t < 6; });
+    var vs = pts.map(function (p) { return -p.v; }), mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
+    x.strokeStyle = "#ff6b8a"; x.lineWidth = 2; x.beginPath();
+    pts.forEach(function (p, i) {
+      var px = W - (tEnd - p.t) / 6 * W, py = H - 10 - ((-p.v - mn) / ((mx - mn) || 1)) * (H - 20);
+      if (i) x.lineTo(px, py); else x.moveTo(px, py);
+    });
+    x.stroke();
+  }
+
+  /* 呼吸 (マイク) */
+  $("micBtn").addEventListener("click", function () {
+    if (micStream) { micStream.getTracks().forEach(function (t) { t.stop(); }); micStream = null; $("micBtn").textContent = "🌬 呼吸を測る (マイク)"; return; }
+    var a = ensureAudio(); if (!a) return;
+    androidPerms(["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"]).then(function () {
+      return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    }).then(function (s) {
+      micStream = s; breathS = [];
+      var src = a.createMediaStreamSource(s), an = a.createAnalyser(); an.fftSize = 1024;
+      /* 呼吸音は主に低〜中域の息のノイズ。高域を落として声や環境音の影響を減らす */
+      var lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1500;
+      src.connect(lp).connect(an);
+      var buf = new Float32Array(an.fftSize), lastA = 0;
+      $("micBtn").textContent = "■ 呼吸の測定を止める";
+      (function loop() {
+        if (!micStream) return;
+        an.getFloatTimeDomainData(buf);
+        var s2 = 0; for (var i = 0; i < buf.length; i++) s2 += buf[i] * buf[i];
+        var t = performance.now() / 1000;
+        breathS.push({ t: t, v: Math.sqrt(s2 / buf.length) });
+        while (breathS.length && t - breathS[0].t > 45) breathS.shift();
+        if (t - lastA > 2) {
+          lastA = t;
+          var br = breathAnalyze(breathS);
+          if (isFinite(br)) bio.breath = br;
+          if (!camStream) $("bioState").textContent = isFinite(br) ? "呼吸を測定中…" : "呼吸のリズムを集めています… (" + Math.round(breathS.length ? t - breathS[0].t : 0) + " 秒)";
+          updateMeters();
+        }
+        requestAnimationFrame(loop);
+      })();
+    }).catch(function (e) { $("bioState").textContent = "マイクを使えません: " + (e && e.message || e); });
+  });
+
+  /* ガンマ関数の模様 (Γ(z) の値は一度だけ計算してキャッシュ) */
+  var gammaCache = null;
+  function drawGamma() {
+    var c = $("gamma"), x = c.getContext("2d"), W = c.width, H = c.height;
+    if (!gammaCache) {
+      gammaCache = new Float32Array(W * H * 2);
+      for (var j = 0; j < H; j++) for (var i = 0; i < W; i++) {
+        var re = -4 + 8 * i / (W - 1), im = 2.5 - 5 * j / (H - 1);
+        var g = gammaC(re, im), k = (j * W + i) * 2;
+        gammaCache[k] = Math.atan2(g[1], g[0]);
+        gammaCache[k + 1] = Math.log(Math.hypot(g[0], g[1]) + 1e-12);
+      }
+    }
+    var img = x.createImageData(W, H), sat = isFinite(bio.calm) ? 0.35 + 0.65 * bio.calm / 100 : 0.8;
+    for (var p = 0; p < W * H; p++) {
+      var hue = ((gammaCache[p * 2] / (2 * Math.PI) + 0.5) * 360 + hueShift) % 360;
+      var light = 1 / (1 + Math.exp(-gammaCache[p * 2 + 1] / 1.5));
+      var rgb = hsl(hue, sat, 0.12 + 0.7 * light);
+      img.data[p * 4] = rgb[0]; img.data[p * 4 + 1] = rgb[1]; img.data[p * 4 + 2] = rgb[2]; img.data[p * 4 + 3] = 255;
+    }
+    x.putImageData(img, 0, 0);
+  }
+  function hsl(h, s, l) {
+    var c = (1 - Math.abs(2 * l - 1)) * s, hp = h / 60, xx = c * (1 - Math.abs(hp % 2 - 1)), m = l - c / 2, r = 0, g = 0, b = 0;
+    if (hp < 1) { r = c; g = xx; } else if (hp < 2) { r = xx; g = c; } else if (hp < 3) { g = c; b = xx; }
+    else if (hp < 4) { g = xx; b = c; } else if (hp < 5) { r = xx; b = c; } else { r = c; b = xx; }
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+
+  /* ───────────── 生成 ───────────── */
+  var project = null, pdfBytes = null, busy = false;
+
+  function log(s) { $("log").textContent = s; $("log").scrollTop = $("log").scrollHeight; }
+
+  function collectInput() {
+    var text = $("req").value.trim(), name = $("name").value.trim();
+    if (!name) name = (text.split(/[\n。.!?！？]/)[0] || "BadaGPT改アプリ").slice(0, 24);
+    var images = [];
+    if ($("useSketch").checked && sketched) images.push(sk.toDataURL("image/png"));
+    images = images.concat(photos);
+    var b = $("useBio").checked && (isFinite(bio.bpm) || isFinite(bio.breath)) ? bio : null;
+    return { text: text, name: name, target: $("target").value, lang: $("lang").value.trim(), images: images, bio: b };
+  }
+
+  async function generateWithClaude(input) {
+    var req = claudeRequest({
+      apiKey: $("apiKey").value.trim(), model: $("model").value, effort: $("effort").value,
+      system: buildSystemPrompt(input.target, input.lang), content: buildUserContent(input)
+    });
+    var res = await fetch(req.url, { method: "POST", headers: req.headers, body: JSON.stringify(req.body) });
+    if (!res.ok) {
+      var msg = res.status + " " + res.statusText;
+      try { var j = await res.json(); if (j.error && j.error.message) msg += " — " + j.error.message; } catch (e) {}
+      throw new Error("Claude API エラー: " + msg);
+    }
+    var st = sseNew(), reader = res.body.getReader(), dec = new TextDecoder(), lastPaint = 0;
+    for (;;) {
+      var r = await reader.read();
+      if (r.done) break;
+      sseFeed(st, dec.decode(r.value, { stream: true }));
+      if (st.error) throw new Error("Claude API エラー: " + st.error);
+      var now = Date.now();
+      if (now - lastPaint > 150) { lastPaint = now; log(st.text || "(考え中…)"); $("genState").textContent = "生成中… " + st.text.length + " 文字"; }
+    }
+    log(st.text);
+    if (st.stop === "refusal") {
+      throw new Error("この依頼は安全上の理由で生成されませんでした" +
+        (st.stopDetails && st.stopDetails.explanation ? " (" + st.stopDetails.explanation + ")" : "") + "。");
+    }
+    var parsed = parseFiles(st.text);
+    if (st.stop === "max_tokens" || parsed.truncated) parsed.warn = "出力が長すぎて途中で切れました。依頼を小さく分けてください。";
+    return parsed;
+  }
+
+  $("genBtn").addEventListener("click", async function () {
+    if (busy) return;
+    saveSettings();
+    var input = collectInput();
+    if (!input.text && !input.images.length) { $("genState").textContent = "イメージを言葉かスケッチで入力してください。"; return; }
+    busy = true; $("genBtn").disabled = true; project = null; pdfBytes = null;
+    $("genState").textContent = "生成を開始…"; $("outState").textContent = "";
+    showTab("output"); log("(生成中…)");
+    try {
+      var parsed;
+      if ($("apiKey").value.trim()) parsed = await generateWithClaude(input);
+      else {
+        var files = input.target === "pdf" ? localGenerateDoc(input)
+                  : input.target === "source" ? [{ path: "README.md", content: "# " + input.name + "\n\n" + input.text + "\n\n(任意言語のソースコード生成には ④ 設定 で Claude API キーが必要です。)\n" }]
+                  : localGenerateApp(input);
+        parsed = { files: files, notes: "端末内の簡易生成 (オフライン) で作りました。", truncated: false };
+        log(parsed.notes + "\n\n" + files.map(function (f) { return "=== FILE: " + f.path + " ===\n" + f.content + "\n=== END FILE ==="; }).join("\n"));
+      }
+      if (!parsed.files.length) throw new Error("ファイルが生成されませんでした。依頼を具体的にして再試行してください。");
+      var generated = parsed.files.slice();
+      if (input.target === "pdf") {
+        var md = (generated.filter(function (f) { return /\.md$/i.test(f.path); })[0] || generated[0]).content;
+        var pages = renderDocPages(md);
+        pdfBytes = pdfFromJpegs(pages, slugify(input.name));
+        generated.push({ path: "document.pdf", data: pdfBytes });
+        showPdfPreview(pages);
+      }
+      var slug = slugify(input.name);
+      project = { name: input.name, slug: slug, target: input.target,
+                  files: assembleProject({ name: input.name, slug: slug, target: input.target }, generated) };
+      renderFiles();
+      $("genState").textContent = "完了 — ③ 生成結果 を見てください。";
+      $("outState").innerHTML = (parsed.warn ? "<span class=warn>" + escapeHtml(parsed.warn) + "</span><br>" : "") +
+        (TARGETS[input.target].packaging
+          ? "APK / EXE を作るには「GitHub にプッシュしてビルド」を押すか、ZIP をリポジトリに入れて push してください (Actions が自動でビルドします)。"
+          : "ZIP で保存できます。");
+    } catch (e) {
+      $("genState").innerHTML = "<span class=err>" + escapeHtml(e.message || String(e)) + "</span>";
+      $("outState").innerHTML = "<span class=err>" + escapeHtml(e.message || String(e)) + "</span>";
+    } finally { busy = false; $("genBtn").disabled = false; }
+  });
+
+  function renderFiles() {
+    var ul = $("files"); ul.innerHTML = "";
+    project.files.forEach(function (f) {
+      var li = document.createElement("li"), code = document.createElement("code");
+      var size = typeof f.data === "string" ? utf8(f.data).length : f.data.length;
+      code.textContent = f.path + "  (" + size.toLocaleString() + " B)";
+      li.appendChild(code);
+      if (typeof f.data === "string") {
+        var pv = document.createElement("button"); pv.className = "b"; pv.textContent = "見る";
+        pv.onclick = function () {
+          $("previewCard").style.display = ""; $("previewTitle").textContent = f.path;
+          $("pdfPages").innerHTML = ""; $("preview").style.display = ""; $("preview").textContent = f.data;
+        };
+        var cp = document.createElement("button"); cp.className = "b"; cp.textContent = "コピー";
+        cp.onclick = function () {
+          (navigator.clipboard ? navigator.clipboard.writeText(f.data) : Promise.reject()).then(
+            function () { cp.textContent = "コピー済"; }, function () { cp.textContent = "コピー不可"; });
+        };
+        li.appendChild(pv); li.appendChild(cp);
+      }
+      ul.appendChild(li);
+    });
+    $("zipBtn").disabled = false;
+    $("pushBtn").disabled = false;
+    $("pdfBtn").style.display = pdfBytes ? "" : "none"; $("pdfBtn").disabled = !pdfBytes;
+  }
+
+  /* ───────────── PDF のページ描画 (日本語も端末のフォントで描ける) ───────────── */
+  function renderDocPages(md) {
+    var W = 1190, H = 1684, M = 100, pages = [], c, x, y;
+    var styles = {
+      h1: { f: "bold 46px sans-serif", lh: 66, before: 24 }, h2: { f: "bold 36px sans-serif", lh: 52, before: 20 },
+      h3: { f: "bold 30px sans-serif", lh: 44, before: 14 }, p: { f: "26px sans-serif", lh: 40, before: 10 },
+      li: { f: "26px sans-serif", lh: 40, before: 4, indent: 36 }, code: { f: "21px monospace", lh: 30, before: 10, indent: 20 },
+      hr: { f: "26px sans-serif", lh: 30, before: 10 }
+    };
+    function newPage() {
+      c = document.createElement("canvas"); c.width = W; c.height = H; x = c.getContext("2d");
+      x.fillStyle = "#fff"; x.fillRect(0, 0, W, H); x.fillStyle = "#111"; x.textBaseline = "top"; y = M;
+      pages.push(c);
+    }
+    function wrap(text, maxW) {
+      var out = [];
+      String(text).split("\n").forEach(function (para) {
+        var line = "";
+        for (var i = 0; i < para.length; i++) {
+          var ch = para[i];
+          if (x.measureText(line + ch).width > maxW && line) {
+            /* 英単語の途中で切らない (空白まで戻る) */
+            var sp = line.lastIndexOf(" ");
+            if (/[A-Za-z0-9]/.test(ch) && sp > 0 && line.length - sp < 20) { out.push(line.slice(0, sp)); line = line.slice(sp + 1); }
+            else { out.push(line); line = ""; }
+          }
+          line += ch;
+        }
+        out.push(line);
+      });
+      return out;
+    }
+    newPage();
+    mdBlocks(md).forEach(function (b) {
+      var s = styles[b.type] || styles.p, ind = s.indent || 0;
+      x.font = s.f; y += s.before;
+      if (b.type === "hr") {
+        if (y + s.lh > H - M) newPage();
+        x.fillRect(M, y + 12, W - 2 * M, 2); y += s.lh; return;
+      }
+      var text = b.type === "code" ? b.text : stripInline(b.text);
+      var lines = wrap(text, W - 2 * M - ind - (b.type === "code" ? 20 : 0));
+      lines.forEach(function (ln, i) {
+        if (y + s.lh > H - M) { newPage(); x.font = s.f; }
+        if (b.type === "code") { x.fillStyle = "#f1f3f7"; x.fillRect(M + ind - 10, y - 4, W - 2 * M - ind + 10, s.lh); x.fillStyle = "#111"; }
+        if (b.type === "li" && i === 0) x.fillText("•", M + 8, y);
+        x.fillText(ln, M + ind, y); y += s.lh;
+      });
+    });
+    pages.forEach(function (pc, i) {
+      var px = pc.getContext("2d"); px.font = "20px sans-serif"; px.fillStyle = "#888";
+      px.fillText((i + 1) + " / " + pages.length, W / 2 - 20, H - 60);
+    });
+    return pages.map(function (pc) {
+      return { canvas: pc, w: W, h: H, jpeg: base64ToBytes(pc.toDataURL("image/jpeg", 0.9).split(",")[1]) };
+    });
+  }
+  function showPdfPreview(pages) {
+    $("previewCard").style.display = ""; $("previewTitle").textContent = "PDF プレビュー (" + pages.length + " ページ)";
+    $("preview").style.display = "none"; $("pdfPages").innerHTML = "";
+    pages.forEach(function (p) { var im = new Image(); im.src = p.canvas.toDataURL("image/jpeg", 0.7); $("pdfPages").appendChild(im); });
+  }
+
+  /* ───────────── ファイル保存 ───────────── */
+  function saveBytes(name, bytes, mime) {
+    if (isCordova && window.resolveLocalFileSystemURL && window.cordova.file) {
+      var dir = window.cordova.file.externalDataDirectory || window.cordova.file.dataDirectory;
+      return new Promise(function (resolve, reject) {
+        window.resolveLocalFileSystemURL(dir, function (d) {
+          d.getFile(name, { create: true }, function (fe) {
+            fe.createWriter(function (w) {
+              w.onwriteend = function () { resolve("保存しました: " + fe.nativeURL.replace(/^file:\/\//, "")); };
+              w.onerror = reject; w.write(new Blob([bytes], { type: mime }));
+            }, reject);
+          }, reject);
+        }, reject);
+      });
+    }
+    var a = document.createElement("a"), url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    return Promise.resolve("保存しました: " + name);
+  }
+  function reportSave(p) {
+    p.then(function (m) { $("outState").textContent = m; },
+           function (e) { $("outState").innerHTML = "<span class=err>保存に失敗: " + escapeHtml(e && (e.message || e.code) || String(e)) + "</span>"; });
+  }
+  $("zipBtn").addEventListener("click", function () {
+    if (project) reportSave(saveBytes(project.slug + ".zip", zipBuild(project.files), "application/zip"));
+  });
+  $("pdfBtn").addEventListener("click", function () {
+    if (pdfBytes) reportSave(saveBytes(project.slug + ".pdf", pdfBytes, "application/pdf"));
+  });
+
+  /* ───────────── GitHub へ 1 コミットでプッシュ ───────────── */
+  async function gh(method, path, token, body) {
+    var res = await fetch("https://api.github.com" + path, {
+      method: method,
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
+                 "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    var j = null; try { j = await res.json(); } catch (e) {}
+    if (!res.ok) { var err = new Error("GitHub " + res.status + ": " + (j && j.message || res.statusText) + " (" + method + " " + path + ")"); err.status = res.status; throw err; }
+    return j;
+  }
+  $("pushBtn").addEventListener("click", async function () {
+    if (!project) return;
+    saveSettings();
+    var repo = $("ghRepo").value.trim(), branch = $("ghBranch").value.trim() || "badagpt-kai-apps", token = $("ghToken").value.trim();
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !token) { $("outState").innerHTML = "<span class=warn>④ 設定 で GitHub のリポジトリとトークンを入れてください。</span>"; return; }
+    $("pushBtn").disabled = true;
+    try {
+      var R = "/repos/" + repo, ref;
+      $("outState").textContent = "ブランチを確認中…";
+      try { ref = await gh("GET", R + "/git/ref/heads/" + encodeURIComponent(branch), token); }
+      catch (e) {
+        if (e.status !== 404) throw e;
+        var info = await gh("GET", R, token);
+        var baseRef = await gh("GET", R + "/git/ref/heads/" + encodeURIComponent(info.default_branch), token);
+        ref = await gh("POST", R + "/git/refs", token, { ref: "refs/heads/" + branch, sha: baseRef.object.sha });
+      }
+      var parent = await gh("GET", R + "/git/commits/" + ref.object.sha, token);
+      var tree = [];
+      for (var i = 0; i < project.files.length; i++) {
+        var f = project.files[i];
+        $("outState").textContent = "アップロード中… " + (i + 1) + " / " + project.files.length;
+        var bytes = typeof f.data === "string" ? utf8(f.data) : f.data;
+        var blob = await gh("POST", R + "/git/blobs", token, { content: bytesToBase64(bytes), encoding: "base64" });
+        tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
+      }
+      var t = await gh("POST", R + "/git/trees", token, { base_tree: parent.tree.sha, tree: tree });
+      var commit = await gh("POST", R + "/git/commits", token, {
+        message: "BadaGPT改: " + project.name + " (" + TARGETS[project.target].label + ") を生成", tree: t.sha, parents: [parent.sha] });
+      await gh("PATCH", R + "/git/refs/heads/" + encodeURIComponent(branch), token, { sha: commit.sha });
+      var base = "https://github.com/" + repo;
+      $("outState").innerHTML = "<span class=ok>プッシュしました。</span> " +
+        "<a href=\"" + base + "/commit/" + commit.sha + "\" target=\"_blank\" rel=\"noopener\">コミット</a> ・ " +
+        (TARGETS[project.target].packaging
+          ? "<a href=\"" + base + "/actions\" target=\"_blank\" rel=\"noopener\">ビルドの進行 (Actions)</a> ・ " +
+            "<a href=\"" + base + "/releases/tag/" + project.slug + "-latest\" target=\"_blank\" rel=\"noopener\">完成した APK / EXE (Releases)</a>"
+          : "<a href=\"" + base + "/tree/" + encodeURIComponent(branch) + "/apps/" + project.slug + "\" target=\"_blank\" rel=\"noopener\">ファイル</a>");
+    } catch (e) {
+      $("outState").innerHTML = "<span class=err>" + escapeHtml(e.message || String(e)) + "</span>" +
+        (/(403|404)/.test(e.message) ? "<br>トークンの権限 (Contents / Workflows の書き込み) と対象リポジトリを確認してください。" : "");
+    } finally { $("pushBtn").disabled = false; }
+  });
+
+  /* Cordova: 外部リンクは既定ブラウザで開く */
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a[target=_blank]");
+    if (a && isCordova && window.cordova.InAppBrowser) { e.preventDefault(); window.cordova.InAppBrowser.open(a.href, "_system"); }
+  });
+})();
+
+</script>
+</body>
+</html>
