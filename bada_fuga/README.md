@@ -2608,6 +2608,25 @@ python3 build_sampler.py bank1012 20261012_062753.wav 20261012_063057.wav && for
 python3 compose_tablet120.py bank1012/bank.json bank109.json src score_tablet120.json && python3 synth.py score_tablet120.json tablet120.wav && python3 video.py score_tablet120.json tablet120.wav tablet120.mp4
 ```
 
+## 🎹🌙🎷 Requiem BADA — Tablet Sessions CXXI · Ninna nanna in fuga, R&B e jazz (バッハのフーガを 10/12 で作り換え、バックを CXVII の形で — R&B とジャズにクラシックの流れる、眠りへの曲, 変ロ短調 → ヘ長調 → ヘ短調 → 変ロ長調, ♩=66 → 44, 11 分 48 秒)
+
+- **表 — バッハ (平均律) のような 4 声のフーガ**: 主題は 10/12 06:27 の最上声から (ド#・ラ・ド・シ♭、`compose_tablet.make_subject`)。ピアノの 1 音
+- **バック (CXVII の形)** — 眠りの 4 段階、テンポは 66 → 44 へゆっくり落ち、鼓動 (13:04 の低い音) も一緒に。13:19 の音の共鳴がその時の和音を保つ:
+
+| 段階 | 実音のピアノ | フーガ | 中音域 (R&B / ジャズ) |
+|---|---|---|---|
+| I. くつろぎ (2〜52) | 10/12 06:27 (変ロ短調) | 提示 (A → S → B → T) → 対提示 | ジャズの 7th・9th の和音 (1 拍目・2 拍目の 3 連の裏・3 拍目・4 拍目の 3 連の裏 = スウィング)、ウォーキング・ベース (根音 → 3 度 → 5 度 → 次の根音への半音) |
+| II. 暖まり (53〜98) | 9/24 11:18 (ヘ長調) | 主題と反行が長調の和音の上で、ストレッタ | R&B の和音に 13th を重ねて暖かく、LXXXVI の Sweet |
+| III. 冷え (99〜147) | 9/24 08:49 (ヘ短調)、♩=66 → 52 | 拡大 ×2 → ×4 がアルト → テノール → バスと下りる | 和音は 1 拍目と 3 拍目の裏だけ、ベースは根音だけ、LXXXVI の Flower、LXXXIX の伸ばした主題が遠くで |
+| IV. 眠り (148〜166) | 10/12 06:30 (小さく) + late_bach_fuga_8x (遠くで) | 拡大 ×8 がバスで | 和音は 1 拍目だけ、消えていく。鼓動は 2 拍に 1 つ |
+| 終わり (167〜174) | — | B-A-D-A | 変ロ長調の共鳴だけ |
+
+- 和音は主題の音を含み、録音のその時の和音に近いものを選ぶ (`harm_fit`、共鳴)。音量 (ステム、同じ基準): 実音 −17 dB、フーガ −19、和音 −24、ベース −26、共鳴 −30、鼓動 −31。弔鐘・祝鐘なし、ドラムなし、声なし。mp4 は 960×540 に縮めて 30 MiB 以内に
+
+```bash
+python3 compose_tablet121.py bank1012/bank.json bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_tablet121.json && python3 synth.py score_tablet121.json tablet121.wav && python3 video.py score_tablet121.json tablet121.wav tablet121.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
