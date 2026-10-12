@@ -2639,6 +2639,20 @@ CXXI と同じ枠 (眠りの 4 段階、ジャズ/R&B の中音域、鼓動と�
 python3 compose_tablet122.py bank1012/bank.json bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_tablet122.json && python3 synth.py score_tablet122.json tablet122.wav && python3 video.py score_tablet122.json tablet122.wav tablet122.mp4
 ```
 
+## 🎹🎄 Requiem BADA — Tablet Sessions CXXIII · Requiem di Natale (10/03・10/12 の録音で — レクイエムをクリスマスイブの讃美歌として、フーガの醸す雰囲気の中に, ト長調 / 変ロ短調, ♩=60, 10 分 31 秒)
+
+- **讃美歌**: 10/12 13:06 の録音 (ト長調、1 分 15 秒 — 明るい) の最上声の音を、讃美歌のリズム (♩ ♩ ♩ ♩ 𝅗𝅥 𝅗𝅥 × 4 句、各句の終わりはレ・ラ・レ・ソ) に乗せた 4 句の旋律 (`hymn_tune`)。4 声のコラールで歌う (ピアノの 1 音、`hold`)
+- **フーガの主題**: 讃美歌の第 1 句を変ロ短調に移したもの + 10/03 13:27 の主題 (対主題) の二重フーガ
+- I. Introitus (0〜22): 13:06 の実音の上で讃美歌 (2 回) ／ II. Kyrie (22〜80): 13:03 → 10/03 13:24 の実音 (変ロ短調) の上で、主題の提示 → 13:27 の主題の提示 → 二重 → ストレッタ・拡大・反行 ／
+  III. Sanctus (80〜102): 13:06 の実音 (再び) の上で讃美歌がソプラノとテノールのカノンに、クリスマスの鐘が小さく ／ IV. Agnus Dei (102〜136): 13:07 の実音の上で B-A-D-A の合唱に主題が重なる ／
+  V. Lux aeterna (136〜156): 13:19 の音の共鳴の上で讃美歌の拡大 (×2) と主題 (ト長調に) のストレッタ、鐘 — ト長調の和音で閉じる
+- 和音は旋律・主題の音を含み、録音のその時の和音に近いものを選ぶ (`harm_fit`)。音量 (ステム): 実音 −17〜−21 dB、合唱・フーガ −15〜−19、共鳴 −27〜−32、鐘 −25 (Sanctus) / −20 (Lux)。声なし。`compose_tablet123.py`
+
+```bash
+python3 build_sampler.py bank1012b 20261012_130315.wav 20261012_130635.wav 20261012_130752.wav && for r in 130315 130635 130752; do python3 dip_breath.py 20261012_$r.wav src/20261012_${r}_clean.wav; done
+python3 compose_tablet123.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet123.json && python3 synth.py score_tablet123.json tablet123.wav && python3 video.py score_tablet123.json tablet123.wav tablet123.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
