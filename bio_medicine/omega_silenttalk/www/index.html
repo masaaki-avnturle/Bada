@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<!--
+  Ω-SilentTalk → BadaGPT — サイレントトーク(無音・非キーボード)入力で BadaGPT にイメージを渡し
+  アプリ(APK/Win/Linux)と論文PDFを生成するアプリ
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_silenttalk
+
+  入力(いずれも音声なし・キーボード/ペンなしの代替):
+   ・サイレントトーク: Webカメラで口・顔の動きエネルギーを感知 → 候補語を提示
+   ・思考入力(ドウェル): Ω-Telepathy 方式の注視グリッド
+   ・イメージ入力: 画像を特徴量化
+  認識: Γ大域的部分積分多様体 + Jones多項式で「熱エネルギー経路」として特徴をルーティングし、
+        本物の self-attention(transformer) で語列を組み立てる。
+  生成: 認識したイメージ(仕様)を BadaGPT が受けて APK/Windows/Linux のソース一式と論文PDFを生成。
+
+  ⚠⚠ これは概念デモ/アートです。思考も無音発話も「読み取れません」。カメラは口の動きの
+     エネルギーを疑似的に記号化するだけで、実際の読唇・読心・サイレント音声認識ではありません。
+     生成物は雛形/概念です。OpenAIキーを入れた場合のみ送信先は api.openai.com (端末内のみ)。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-SilentTalk → BadaGPT</title>
+<style>
+  :root{--bg:#0b0e14;--bg2:#101623;--bg3:#161e2e;--line:#233047;--fg:#dce6f5;--dim:#8194b0;--gold:#c8a44a;--cyan:#40b8c0;--green:#48c08a;--violet:#9060d0;--mono:Consolas,Menlo,monospace}
+  *{box-sizing:border-box}html,body{margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.5}
+  header{padding:12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0e1420,#0b0e14)}
+  h1{margin:0;font-size:18px}h1 b{color:var(--gold)}.sub{color:var(--dim);font-size:12px}
+  .disc{margin:8px 16px 0;padding:8px 11px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:#e0b020;font-size:11.5px}
+  main{display:flex;gap:14px;flex-wrap:wrap;padding:14px 16px 50px}
+  .col{flex:1;min-width:320px}
+  .card{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+  .card h3{margin:0 0 8px;font-size:13px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:5px}
+  video,canvas{background:#05070d;border:1px solid var(--line);border-radius:8px;display:block;width:100%}
+  .kbd{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px}
+  .key{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#0d1320;border:1px solid var(--line);border-radius:6px;font:12px var(--mono);cursor:pointer;position:relative;overflow:hidden}
+  .key .f{position:absolute;bottom:0;left:0;width:100%;background:rgba(200,164,74,.35);height:0}
+  .chip{display:inline-block;background:#0e1626;border:1px solid var(--line);border-radius:12px;padding:3px 10px;margin:2px;cursor:pointer;font:13px var(--mono)}
+  .chip:hover{border-color:var(--cyan);color:var(--cyan)}
+  textarea,input[type=text],input[type=password],select{width:100%;background:#06090f;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px;font-family:var(--mono)}
+  textarea{resize:vertical}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:9px 13px;cursor:pointer;font-weight:700;font-size:13px}
+  button.sec{color:var(--cyan);border-color:var(--cyan)}
+  label{display:block;font-size:12px;color:var(--dim);margin:8px 0 4px}
+  .stat{font:11.5px var(--mono);color:var(--dim)}
+  .phrase{font-size:18px;color:var(--cyan);min-height:28px;background:#06090f;border:1px solid var(--line);border-radius:6px;padding:8px;font-family:var(--mono)}
+  .file{margin-top:8px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .file .fh{display:flex;justify-content:space-between;background:#0e1626;padding:4px 8px;font:12px var(--mono);color:var(--cyan)}
+  .file pre{margin:0;padding:8px;font:10px var(--mono);color:#cfe3ff;max-height:200px;overflow:auto;white-space:pre}
+  .dl{background:#132235;color:var(--green);border:1px solid #2a567d;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:11px}
+  code{font-family:var(--mono);color:var(--violet)}
+  footer{color:var(--dim);font-size:11px;padding:12px;text-align:center;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <h1><b>Ω</b>-SilentTalk → <b>Bada</b>GPT</h1>
+  <div class="sub">無音・非キーボードの思考/口形入力 → Γ多様体+Jones+transformer で認識 → BadaGPTがアプリ&論文PDFを生成</div>
+</header>
+<div class="disc">⚠ <b>概念デモ/アート・非医療</b>: 思考も無音発話も<b>読み取れません</b>。カメラは口の動きの<b>エネルギーを疑似記号化</b>するだけで、実際の読唇・読心・サイレント音声認識ではありません。生成物は雛形/概念。OpenAIキー入力時のみ `api.openai.com` へ端末内から送信。</div>
+
+<main>
+  <!-- 入力 -->
+  <div class="col">
+    <div class="card">
+      <h3>① サイレントトーク入力 (音声なし)</h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="sec" id="cam">📷 口形センシング開始</button>
+        <button class="sec" id="imgbtn">🖼 イメージ入力</button>
+        <input type="file" id="imgfile" accept="image/*" style="display:none"/>
+      </div>
+      <video id="video" playsinline muted style="display:none"></video>
+      <canvas id="roi" width="220" height="120" style="margin-top:8px"></canvas>
+      <div class="stat" id="camstat">口の動きエネルギーを感知して候補語を提示します（概念デモ）。</div>
+      <h3 style="margin-top:12px">②a 思考入力 (ドウェル注視グリッド)</h3>
+      <div class="kbd" id="kbd"></div>
+      <div class="stat">キーに注視(ホバー)を続けると確定。キーボード/ペン不要の代替入力です。</div>
+    </div>
+    <div class="card">
+      <h3>③ 認識パイプライン (Γ多様体 + Jones + transformer)</h3>
+      <div class="stat" id="pipe">—</div>
+      <canvas id="attn" width="220" height="120" style="margin-top:8px"></canvas>
+      <div class="stat">self-attention 行列 (Q·Kᵀ/√d → softmax, 各行の和=1)</div>
+    </div>
+  </div>
+
+  <!-- 認識結果 → BadaGPT -->
+  <div class="col">
+    <div class="card">
+      <h3>④ 認識イメージ (候補 → 仕様)</h3>
+      <div id="cands" style="margin-bottom:6px"></div>
+      <div class="phrase" id="phrase"></div>
+      <div style="display:flex;gap:6px;margin-top:6px"><button class="sec" id="space">␣ 確定/区切り</button><button class="sec" id="bs">⌫</button><button class="sec" id="clr">クリア</button></div>
+      <label>またはイメージ要件を直接入力</label>
+      <textarea id="spec" rows="2" placeholder="例: タイマーのAndroidアプリ / 仕様の論文PDF"></textarea>
+    </div>
+    <div class="card">
+      <h3>⑤ BadaGPT 生成</h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="target" style="flex:1">
+          <option value="web">Web アプリ(HTML)</option>
+          <option value="apk">Android APK 一式</option>
+          <option value="windows">Windows10/11 EXE 一式</option>
+          <option value="linux">Linux AppImage/deb 一式</option>
+          <option value="paper">論文 PDF</option>
+        </select>
+        <button id="gen">生成 ▶</button>
+      </div>
+      <label>OpenAI APIキー(空=オフラインBada生成)</label>
+      <input type="password" id="apikey" placeholder="sk-... 任意・端末内のみ"/>
+      <div id="out" style="margin-top:8px"></div>
+    </div>
+  </div>
+</main>
+<footer>Ω-SilentTalk → BadaGPT · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念デモ/アート・非医療・非読心</footer>
+
+<script>
+"use strict";
+/* ===== 未知事前エンジン(LUTファブリック) ===== */
+var CFG={inbits:6,layers:3,width:8,outbits:3},CB=6;
+var GENOME="a3b77311438a66c00cbbae927e1ca5ea6061348e00fe47f075f2e1bdd444c082000a5287d5b76843d76f21afcfb2af3b6d7c5e325c8600ad63b36df86724dc9f950461b3cd15bf114b60be96a3f7704aa105b5d3e85ba2c72d74c845e3c01e47d0a79a8659a44375b56919af8b4d545bf54243c677820cbce313b79716de80e68ddb055c7804e4294017664276afb05e";
+function h2b(h){var n=h.length>>1,b=new Uint8Array(n);for(var i=0;i<n;i++)b[i]=parseInt(h.substr(i*2,2),16);return b;}
+var G=h2b(GENOME);
+function infer(x){var prev=x&63,src=6,cur=0;for(var L=0;L<3;L++){cur=0;for(var w=0;w<8;w++){var cl=L*8+w,p=cl*CB,a=0;for(var k=0;k<4;k++){var se=G[p+k]%Math.max(1,(L===0?6:8));if(se>=src)se=src?se%src:0;a|=((prev>>se)&1)<<k;}cur|=(((G[p+4]|(G[p+5]<<8))>>a)&1)<<w;}prev=cur;src=8;}return cur&7;}
+function fnv(s){var h=2166136261>>>0;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+
+/* ===== Jones多項式 V_{T(2,n)} (Γ多様体の熱エネルギー経路認識に使用) ===== */
+function jonesT2n(n){if(n<2)n=3;if(n%2===0)n++;var r={0:1,3:-1};r[n+1]=(r[n+1]||0)-1;r[n+2]=(r[n+2]||0)+1;var q={};
+ for(var p=0;p<=n;p++){var c=r[p]||0;if(c){q[p]=(q[p]||0)+c;r[p]-=c;r[p+2]=(r[p+2]||0)+c;}}var sh=(n-1)/2,o={};
+ for(var k in q)if(Math.abs(q[k])>1e-9)o[(+k)+sh]=q[k];return o;}
+function jonesAbs(poly,th){var re=0,im=0;for(var k in poly){re+=poly[k]*Math.cos(th*k);im+=poly[k]*Math.sin(th*k);}return Math.hypot(re,im);}
+/* 特徴 feat(0..1) → 熱エネルギー経路スコア(0..1) */
+function thermalPath(feat){var n=3+2*Math.round(feat*7);var v=jonesAbs(jonesT2n(n),2*Math.PI/5);return {n:n,score:Math.min(1,v/3)};}
+
+/* ===== 語彙 & トークン認識 ===== */
+var VOCAB=["the","app","timer","memo","todo","note","calc","form","make","android","windows","linux","pdf","paper","title","hello","yes","no","start","stop","list","add","image","data","report","spec","game","clock"];
+function tokenFromFeat(feat,ctx){ // 特徴→語彙トークン(Jones/engineでゲート)
+  var tp=thermalPath(feat);var code=(fnv(ctx)+Math.round(feat*63)+tp.n)&63;var idx=(infer(code)*8+Math.round(feat*31))%VOCAB.length;
+  return {word:VOCAB[idx],thermal:tp,code:code};}
+
+/* ===== 本物の self-attention (transformer) ===== */
+function attention(tokens){ // tokens:文字列配列 → 重み行列(行和=1)と文脈ベクトル
+  var n=tokens.length;if(!n)return {A:[],d:0};var d=8;
+  function emb(w){var v=new Float64Array(d),s=fnv(w);for(var i=0;i<d;i++){s=(Math.imul(s,1664525)+1013904223)>>>0;v[i]=(s/4294967296)*2-1;}return v;}
+  var E=tokens.map(emb);
+  var A=[];for(var i=0;i<n;i++){var row=[],mx=-1e9;for(var j=0;j<n;j++){var dot=0;for(var k=0;k<d;k++)dot+=E[i][k]*E[j][k];dot/=Math.sqrt(d);row.push(dot);if(dot>mx)mx=dot;}
+    var sum=0;for(var j2=0;j2<n;j2++){row[j2]=Math.exp(row[j2]-mx);sum+=row[j2];}for(var j3=0;j3<n;j3++)row[j3]/=sum;A.push(row);}
+  return {A:A,d:d};
+}
+function drawAttn(A){var c=document.getElementById("attn"),ctx=c.getContext("2d"),W=c.width,H=c.height;ctx.fillStyle="#05070d";ctx.fillRect(0,0,W,H);
+  var n=A.length;if(!n)return;var cw=W/n,ch=H/n;for(var i=0;i<n;i++)for(var j=0;j<n;j++){var v=A[i][j];ctx.fillStyle="hsla(190,70%,"+(20+v*55)+"%,1)";ctx.fillRect(j*cw,i*ch,cw-1,ch-1);}}
+
+/* ===== 認識フレーズ状態 ===== */
+var TOKENS=[],PHRASE="";
+function pushCand(word,feat){
+  var cands=document.getElementById("cands");var ch=document.createElement("span");ch.className="chip";ch.textContent=word;
+  ch.onclick=function(){TOKENS.push(word);refresh();};cands.innerHTML="";cands.appendChild(ch);
+  // 近傍候補も
+  for(var k=1;k<4;k++){var w2=VOCAB[(VOCAB.indexOf(word)+k)%VOCAB.length];var c2=document.createElement("span");c2.className="chip";c2.style.opacity=.6;c2.textContent=w2;c2.onclick=(function(w){return function(){TOKENS.push(w);refresh();};})(w2);cands.appendChild(c2);}
+}
+function refresh(){
+  PHRASE=TOKENS.join(" ");document.getElementById("phrase").textContent=PHRASE||"　";
+  var at=attention(TOKENS);drawAttn(at.A);
+  var last=TOKENS[TOKENS.length-1]||"";var tp=thermalPath((fnv(last)&63)/63);
+  document.getElementById("pipe").textContent="tokens="+TOKENS.length+" | Jones T(2,"+tp.n+") |V|-score="+tp.score.toFixed(3)+" | attention "+TOKENS.length+"×"+TOKENS.length;
+  document.getElementById("spec").value=PHRASE;
+}
+document.getElementById("space").onclick=function(){refresh();};
+document.getElementById("bs").onclick=function(){TOKENS.pop();refresh();};
+document.getElementById("clr").onclick=function(){TOKENS=[];document.getElementById("cands").innerHTML="";refresh();};
+
+/* ===== サイレントトーク: カメラ口形センシング ===== */
+var camOn=false,prevGray=null;
+document.getElementById("cam").onclick=async function(){if(camOn)return;
+  try{var s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false});var v=document.getElementById("video");v.srcObject=s;await v.play();camOn=true;document.getElementById("cam").textContent="🟢 センシング中";camLoop();}
+  catch(e){document.getElementById("camstat").textContent="カメラ不可: "+e.name+"（思考入力/画像/テキストで代替可）";}};
+var frames=0,energyAcc=0;
+function camLoop(){requestAnimationFrame(camLoop);if(!camOn)return;var v=document.getElementById("video"),c=document.getElementById("roi"),ctx=c.getContext("2d"),W=c.width,H=c.height;if(v.readyState<2)return;
+  // 顔中央下部(口付近)ROIを拡大描画
+  var vw=v.videoWidth,vh=v.videoHeight;ctx.drawImage(v, vw*0.3, vh*0.55, vw*0.4, vh*0.3, 0,0,W,H);
+  var d=ctx.getImageData(0,0,W,H),px=d.data,gray=new Float32Array(W*H),dark=0,motion=0;
+  for(var i=0;i<W*H;i++){var g=(0.299*px[i*4]+0.587*px[i*4+1]+0.114*px[i*4+2])/255;gray[i]=g;if(g<0.35)dark++;if(prevGray)motion+=Math.abs(g-prevGray[i]);}
+  motion/=(W*H);var openness=dark/(W*H);
+  // 熱エネルギー風オーバーレイ
+  for(var j=0;j<W*H;j++){var e=prevGray?Math.min(1,Math.abs(gray[j]-prevGray[j])*4+gray[j]*0.3):gray[j];var r=Math.min(255,e*300),gg=Math.max(0,e*300-120),b=Math.max(0,e*200-150);px[j*4]=r;px[j*4+1]=gg;px[j*4+2]=b;}
+  ctx.putImageData(d,0,0);prevGray=gray;
+  energyAcc+=motion;frames++;
+  if(frames%12===0){ // 約0.2sごとに候補更新
+    var feat=Math.min(1,openness*2+energyAcc*1.5);energyAcc=0;
+    var t=tokenFromFeat(feat,PHRASE);pushCand(t.word,feat);
+    document.getElementById("camstat").textContent="openness="+openness.toFixed(2)+" motion="+motion.toFixed(3)+" → 候補\""+t.word+"\" (Jones T(2,"+t.thermal.n+"))  ※概念記号化";
+  }
+}
+/* 画像入力 */
+document.getElementById("imgbtn").onclick=function(){document.getElementById("imgfile").click();};
+document.getElementById("imgfile").onchange=function(e){var f=e.target.files[0];if(!f)return;var img=new Image();img.onload=function(){var c=document.createElement("canvas");c.width=32;c.height=32;var x=c.getContext("2d");x.drawImage(img,0,0,32,32);var d=x.getImageData(0,0,32,32).data,s=0;for(var i=0;i<d.length;i+=4)s+=(d[i]+d[i+1]+d[i+2]);var feat=((s/ (32*32*3))/255);var t=tokenFromFeat(feat,"image");pushCand(t.word,feat);document.getElementById("camstat").textContent="画像特徴 "+feat.toFixed(3)+" → 候補\""+t.word+"\"";URL.revokeObjectURL(img.src);};img.src=URL.createObjectURL(f);};
+
+/* ===== 思考入力(ドウェル) ===== */
+var KEYS="ABCDEFGHIJKLMNOPQRSTUVWXYZ _".split("");var kbd=document.getElementById("kbd");
+KEYS.forEach(function(ch){var d=document.createElement("div");d.className="key";d.dataset.ch=ch;d.innerHTML="<span>"+(ch===" "?"␣":ch)+"</span><span class='f'></span>";kbd.appendChild(d);});
+var hoverK=null,hoverT=0;
+kbd.querySelectorAll(".key").forEach(function(k){k.addEventListener("pointerenter",function(){hoverK=k;hoverT=performance.now();});k.addEventListener("pointerleave",function(){if(hoverK===k){hoverK=null;k.querySelector(".f").style.height="0";}});k.addEventListener("click",function(){typeCh(k.dataset.ch);});});
+function typeCh(ch){if(ch==="_"||ch===" "){refresh();return;}if(!TOKENS.length||/\s$/.test(PHRASE))TOKENS.push("");TOKENS[TOKENS.length-1]=(TOKENS[TOKENS.length-1]||"")+ch.toLowerCase();refresh();}
+(function dwell(){requestAnimationFrame(dwell);kbd.querySelectorAll(".key").forEach(function(k){if(k!==hoverK)k.querySelector(".f").style.height="0";});if(hoverK){var p=Math.min(1,(performance.now()-hoverT)/800);hoverK.querySelector(".f").style.height=(p*100)+"%";if(p>=1){var ch=hoverK.dataset.ch;hoverK.querySelector(".f").style.height="0";hoverK=null;typeCh(ch);}}})();
+
+/* ===== BadaGPT 生成 (オフライン雛形 + 論文PDF) ===== */
+function genWebApp(title,kind){ // 簡易(計算/メモ/タイマー/汎用)
+  var body;
+  if(kind==="timer")body='<h2>'+title+'</h2><div id=t style="font:48px monospace;text-align:center;margin:20px">00:00.0</div><button id=s>Start</button> <button id=p>Stop</button> <button id=r>Reset</button><scr'+'ipt>var e=document.getElementById("t"),st=0,a=0,iv=null;function f(m){return String(Math.floor(m/60000)).padStart(2,"0")+":"+String(Math.floor(m/1000)%60).padStart(2,"0")+"."+Math.floor(m%1000/100);}function u(){e.textContent=f(a+Date.now()-st);}s.onclick=function(){if(iv)return;st=Date.now();iv=setInterval(u,100);};p.onclick=function(){if(iv){clearInterval(iv);iv=null;a+=Date.now()-st;}};r.onclick=function(){clearInterval(iv);iv=null;a=0;e.textContent="00:00.0";};</scr'+'ipt>';
+  else body='<h2>'+title+'</h2><div style="display:flex;gap:6px"><input id=i placeholder="項目" style="flex:1;padding:8px"/><button id=a>追加</button></div><ul id=l></ul><scr'+'ipt>var K="'+(title.replace(/\W/g,"")||"x")+'",L=document.getElementById("l");function ld(){return JSON.parse(localStorage.getItem(K)||"[]");}function sv(x){localStorage.setItem(K,JSON.stringify(x));}function r(){var x=ld();L.innerHTML="";x.forEach(function(v,n){var li=document.createElement("li");li.textContent=v;var b=document.createElement("button");b.textContent="×";b.onclick=function(){x.splice(n,1);sv(x);r();};li.appendChild(b);L.appendChild(li);});}document.getElementById("a").onclick=function(){var i=document.getElementById("i");if(!i.value.trim())return;var x=ld();x.push(i.value.trim());sv(x);i.value="";r();};r();</scr'+'ipt>';
+  return "<!DOCTYPE html><html lang=ja><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>"+title+"</title><style>body{margin:0;font-family:Meiryo,sans-serif;background:#0b0e14;color:#dce6f5;padding:16px}button{background:#1a2740;color:#c8a44a;border:1px solid #c8a44a;border-radius:8px;cursor:pointer;padding:8px}h2{color:#c8a44a}</style></head><body>"+body+"<!-- generated by BadaGPT from Silent-Talk input --></body></html>";
+}
+function ascii(s){return (s||"").replace(/[^\x20-\x7e]/g,"?");}
+function makePaperPDF(title,spec){
+  var abs="Abstract: A conceptual pipeline recognizes silent (no-audio) mouth/face motion and thought input, routes features via a gamma global partial-integration manifold and the Jones polynomial V_{T(2,n)} as a thermal-energy path, assembles tokens with self-attention, and drives BadaGPT to synthesize an application.";
+  var lines=["Omega-SilentTalk / BadaGPT -- Technical Note","Author: Masaaki Yamaguchi (Bada)","",ascii(abs)].concat(
+    ("1. Spec (recognized image): "+ascii(spec)).match(/.{1,88}/g)||[]).concat(
+    ["","2. Method: openness+motion energy -> feat in [0,1]; n=3+2*round(7*feat);",
+     "   Jones |V_{T(2,n)}(e^{2pi i/5})| gates token selection; self-attention",
+     "   softmax(QK^T/sqrt(d)) assembles the phrase; BadaGPT emits source.",
+     "3. Result: generated app scaffold (APK/Windows/Linux) + this note.",
+     "","Note: conceptual/educational. No real mind/lip reading or thermography."]);
+  var content="BT /F1 11 Tf 50 800 Td 13 TL\n";lines.slice(0,56).forEach(function(l){content+="("+l.replace(/([()\\])/g,"\\$1")+") Tj T*\n";});content+="ET";
+  var objs=["<</Type/Catalog/Pages 2 0 R>>","<</Type/Pages/Kids[3 0 R]/Count 1>>","<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>","<</Length "+content.length+">>\nstream\n"+content+"\nendstream"];
+  var pdf="%PDF-1.4\n",off=[];for(var i=0;i<objs.length;i++){off.push(pdf.length);pdf+=(i+1)+" 0 obj\n"+objs[i]+"\nendobj\n";}
+  var xref=pdf.length;pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";off.forEach(function(o){pdf+=String(o).padStart(10,"0")+" 00000 n \n";});
+  pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";return pdf;
+}
+function paperHTML(title,spec){return "<!DOCTYPE html><meta charset=utf-8><title>"+title+" 論文</title><body style='font-family:Meiryo,serif;max-width:760px;margin:40px auto;line-height:1.8'><h1>"+title+"</h1><p><b>著者</b> 山口 雅旭 (Bada)</p><h2>要旨</h2><p>無音(音声なし)の口・顔の動きと思考入力を感知し、Γ大域的部分積分多様体と Jones多項式 V<sub>T(2,n)</sub> を『熱エネルギー経路』として特徴をルーティング、self-attention で語を組み立て、BadaGPT がアプリを合成する概念的パイプラインを示す。</p><h2>手法</h2><p>口の開き(暗部率)と動きエネルギーから feat∈[0,1] を得、n=3+2·round(7·feat) の (2,n) トーラスノットの Jones多項式 |V(e<sup>2πi/5</sup>)| で候補語をゲートし、softmax(QKᵀ/√d) の自己注意で語列を構成する。</p><h2>認識した仕様</h2><pre style='white-space:pre-wrap'>"+spec.replace(/</g,"&lt;")+"</pre><h2>結果</h2><p>APK/Windows/Linux のアプリ雛形と本ノートを生成した。</p><h2>注記</h2><p>本研究は概念実証/教育用であり、実際の読心・読唇・サーモグラフィ計測ではない。</p><button onclick=print()>PDFで保存(印刷)</button></body>";}
+
+function parseSpec(text){var t=(text||"").toLowerCase();var target=document.getElementById("target").value;
+  if(/android|apk/.test(t))target="apk";else if(/windows|exe/.test(t))target="windows";else if(/linux|appimage|deb/.test(t))target="linux";else if(/pdf|論文|paper|仕様|文書/.test(t))target="paper";
+  var kind=/タイマー|timer|clock|時計/.test(t)?"timer":"notes";
+  var title=(text.trim().split(/[\n。.]/)[0]||"Bada App").slice(0,36).replace(/[^\wぁ-んァ-ヶ一-龠 \-]/g,"").trim()||"BadaApp";
+  return {target:target,kind:kind,title:title,raw:text};}
+function cordovaCfg(s){var id="io.github.badagpt."+(s.title.replace(/[^a-z0-9]/gi,"").toLowerCase()||"app");return "<?xml version='1.0' encoding='utf-8'?>\n<widget id=\""+id+"\" version=\"1.0.0\" xmlns=\"http://www.w3.org/ns/widgets\">\n  <name>"+s.title+"</name>\n  <content src=\"index.html\"/>\n  <preference name=\"android-minSdkVersion\" value=\"24\"/>\n  <platform name=\"android\"><preference name=\"AndroidXEnabled\" value=\"true\"/></platform>\n</widget>\n";}
+function electronMain(){return 'const {app,BrowserWindow}=require("electron");const path=require("path");function w(){const win=new BrowserWindow({width:480,height:800,webPreferences:{contextIsolation:true}});win.setMenuBarVisibility(false);win.loadFile(app.isPackaged?path.join(process.resourcesPath,"www","index.html"):path.join(__dirname,"..","www","index.html"));}app.whenReady().then(w);app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit();});\n';}
+function electronPkg(s,linux){var nm=(s.title.replace(/[^a-z0-9]/gi,"-").toLowerCase()||"bada-app");var b={appId:"io.github.badagpt."+nm.replace(/-/g,""),files:["main.js","package.json"],extraResources:[{from:"../www",to:"www"}],win:{target:["nsis","portable"]}};if(linux)b.linux={target:["AppImage","deb"],category:"Utility",maintainer:"masaaki-avnturle"};return JSON.stringify({name:nm,productName:s.title,version:"1.0.0",main:"main.js",scripts:{start:"electron .",dist:"electron-builder --win --x64","dist:linux":"electron-builder --linux --x64"},devDependencies:{electron:"^31.0.0","electron-builder":"^24.13.3"},build:b},null,2)+"\n";}
+
+function offlineGenerate(spec){
+  var files=[];
+  if(spec.target==="paper"){files.push({name:spec.title.replace(/\W/g,"_")+".pdf",lang:"pdf",content:makePaperPDF(spec.title,spec.raw)});files.push({name:"paper.html",lang:"html",content:paperHTML(spec.title,spec.raw)});return files;}
+  var www=genWebApp(spec.title,spec.kind);
+  if(spec.target==="web"){files.push({name:"index.html",lang:"html",content:www});}
+  else if(spec.target==="apk"){files.push({name:"www/index.html",lang:"html",content:www});files.push({name:"config.xml",lang:"xml",content:cordovaCfg(spec)});files.push({name:"BUILD.md",lang:"md",content:"cordova create app <id> \""+spec.title+"\"; www/ と config.xml を置換; cordova platform add android@12.0.1; cordova build android (Java17/SDK android-33/Gradle 7.6.4)"});}
+  else {files.push({name:"www/index.html",lang:"html",content:www});files.push({name:"electron/main.js",lang:"js",content:electronMain()});files.push({name:"electron/package.json",lang:"json",content:electronPkg(spec,spec.target==="linux")});files.push({name:"BUILD.md",lang:"md",content:spec.target==="linux"?"cd electron && npm i && npm run dist:linux  # dist/*.AppImage, *.deb":"cd electron && npm i && npm run dist  # dist/*.exe"});}
+  // 論文も同梱
+  files.push({name:spec.title.replace(/\W/g,"_")+"_paper.pdf",lang:"pdf",content:makePaperPDF(spec.title,spec.raw)});
+  return files;
+}
+function download(name,content,mime){var blob;if(mime==="application/pdf"){var b=new Uint8Array(content.length);for(var i=0;i<content.length;i++)b[i]=content.charCodeAt(i)&0xff;blob=new Blob([b],{type:mime});}else blob=new Blob([content],{type:mime||"text/plain"});var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name.split("/").pop();a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);}
+function renderFiles(files){var out=document.getElementById("out");out.innerHTML="";files.forEach(function(f){var w=document.createElement("div");w.className="file";var mime=f.lang==="pdf"?"application/pdf":"text/plain";w.innerHTML="<div class=fh><span>📄 "+f.name+"</span><button class=dl>⬇</button></div><pre></pre>";w.querySelector("pre").textContent=f.lang==="pdf"?"[binary PDF — "+f.content.length+" bytes]":f.content.slice(0,1200);w.querySelector(".dl").onclick=function(){download(f.name,f.content,mime);};out.appendChild(w);});}
+async function callOpenAI(key,prompt){var r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+key},body:JSON.stringify({model:"gpt-4o-mini",messages:[{role:"system",content:"You are BadaGPT. Output full source files as '// FILE: path' blocks. No prose."},{role:"user",content:prompt}],temperature:0.3})});if(!r.ok)throw new Error("OpenAI "+r.status);var j=await r.json();return j.choices[0].message.content;}
+document.getElementById("gen").onclick=async function(){
+  var text=document.getElementById("spec").value.trim()||PHRASE;if(!text){document.getElementById("out").textContent="先に入力(サイレントトーク/思考/画像/テキスト)してください。";return;}
+  var spec=parseSpec(text);var key=document.getElementById("apikey").value.trim();
+  if(key){try{var out=await callOpenAI(key,"Target="+spec.target+"\n要件:\n"+text);var files=[],re=/\/\/\s*FILE:\s*(.+)\n([\s\S]*?)(?=\/\/\s*FILE:|$)/g,m;while((m=re.exec(out)))files.push({name:m[1].trim(),lang:(m[1].split(".").pop()||"txt"),content:m[2].replace(/^```[a-z]*\n?|```$/gm,"").trim()});if(!files.length)files=[{name:"output.txt",lang:"txt",content:out}];renderFiles(files);return;}catch(e){document.getElementById("out").textContent="OpenAIエラー→オフライン生成: "+e.message;}}
+  renderFiles(offlineGenerate(spec));
+};
+refresh();
+</script>
+</body>
+</html>
