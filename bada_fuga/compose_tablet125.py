@@ -212,6 +212,8 @@ def post(P, events, ex):
     while q < TOTAL * BPB:
         h = P.harm[q]; q1 = q
         while q1 < TOTAL * BPB and P.harm[q1] == h: q1 += 1
+        for cut in (6 * BPB, INTRO * BPB):                                                      # Inno の区切り (1 句目は重ねない / 2 句目から高い 5 度)
+            if q < cut < q1: q1 = cut
         bar = q // BPB
         if bar < 6: pass                                                                            # Inno の 1 句目: 何も重ねない (身に着ける寒さ)
         elif bar < INTRO:                                                                           # Inno の 2 句目から: 高い開いた 5 度 (シ・ファ#) だけ
