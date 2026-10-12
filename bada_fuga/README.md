@@ -2666,6 +2666,18 @@ python3 compose_tablet123.py bank1012b/bank.json bank1012/bank.json bank112/bank
 python3 compose_tablet124.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet124.json && python3 synth.py score_tablet124.json tablet124.wav && python3 video.py score_tablet124.json tablet124.wav tablet124.mp4
 ```
 
+## 🎹🥋⛪ Requiem BADA — Tablet Sessions CXXV · Inno e Requiem in Si minore (10/13 06:41・06:42 の録音を CXXIV をベースに — 剣道の試合会場の体育館に国歌が響く、身に着ける寒さが一緒になって、そこから荘厳さへ, ロ短調, ♩=56, 12 分 42 秒)
+
+- **Inno (国歌のように、0〜20 小節)**: 10/13 06:41 の最上声の音 (半音上げてロ短調に) をロ短調の五音音階に寄せ、国歌のようなリズム (𝅗𝅥 ♩ ♩ 𝅗𝅥 𝅗𝅥 ♩ ♩ 𝅝 × 4 句、句の終わりはレ/シ・ミ/ファ#・レ/シ・シ) に乗せた旋律 (`anthem_tune`) を、
+  4 声のユニゾン (オクターヴ) で、句のあいだに息をつく間を置いて。**1 句目は何も重ねず** (身に着ける寒さ)、2 句目から高い開いた 5 度 (シ 5・ファ# 6) の共鳴だけ。06:41 の実音 (半音上げて) が裏に小さく (0.4)
+- その響きから CXXIV の Requiem へ (Introitus → Kyrie 二重フーガ → Sanctus カノン → Agnus Dei B-A-D-A → Lux aeterna)。Lux aeterna では 06:42 の実音 (半音上げて) の上で、讃美歌の拡大につづいて Inno の第 4 句の拡大がソプラノに、主題が下の 3 声でストレッタ — 開いた 5 度のユニゾンで閉じる
+- 10/13 の 2 本は息のような所なし (dip_breath で 0 か所)。`compose_tablet125.py` (CXXIV を差し替え、bank1013 は環境変数 `BANK1013` か t125/bank1013/bank.json)
+
+```bash
+python3 build_sampler.py bank1013 20261013_064129.wav 20261013_064238.wav
+BANK1013=bank1013/bank.json python3 compose_tablet125.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet125.json && python3 synth.py score_tablet125.json tablet125.wav && python3 video.py score_tablet125.json tablet125.wav tablet125.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
