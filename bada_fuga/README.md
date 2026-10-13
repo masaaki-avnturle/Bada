@@ -2678,6 +2678,23 @@ python3 build_sampler.py bank1013 20261013_064129.wav 20261013_064238.wav
 BANK1013=bank1013/bank.json python3 compose_tablet125.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet125.json && python3 synth.py score_tablet125.json tablet125.wav && python3 video.py score_tablet125.json tablet125.wav tablet125.mp4
 ```
 
+## 🎹🥋🕯 Requiem BADA — Tablet Sessions CXXVI · Inno nel palazzetto (10/13 の 2 曲を、剣道の試合の前座、総合体育館に静かに流れる国歌の、冷たい空気の漂う礼拝のような曲に — acceptance・LXXXVI・LXXXIX・子守歌・piano_solo_8x・CXXV をベースに, ロ短調, ♩=52, 7 分 52 秒)
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| 1. Inno I | 0〜22 | 10/13 06:41 の実音 (半音上げてロ短調に、小さく) の上で、CXXV の Inno (06:41 の音の国歌のような旋律) を 4 声のユニゾンで静かに。句のあいだに間。1 句目は何も重ねず、2 句目から高い開いた 5 度 (シ 5・ファ# 6) の共鳴 |
+| 2. Preghiera | 22〜50 | 礼拝: 讃美歌 (13:06 の音、ロ短調の五音音階) を開いた 5 度のコラールで。テノールに acceptance のタブレットの主題 (シ・ラ・ソ・ラ・ソ・ファ#) の拡大。LXXXVI の Flower (+7) が小さく、LXXXIX の伸ばした主題 (−3) と piano_solo_8x のロ短調の窓 (2160 秒〜、XCI と同じ) が遠くで |
+| 3. Inno II | 50〜68 | 10/13 06:42 の実音 (半音上げて) の上で、Inno がソプラノとテノール (1 小節遅れ、オクターヴ下) のカノンに、コラールが包む |
+| 4. Silenzio | 68〜82 | 冷たい空気: 共鳴と piano_solo_8x だけ。子守歌 (ninna nanna 10・12) の大黒柱の主題 (+1) が 4 倍に伸びて低く |
+| 5. Inno III | 82〜100 | Inno の第 1 句と第 4 句の拡大 (×2) を 4 声のユニゾンで、高い開いた 5 度と低い 5 度。讃美歌の第 4 句が答え、開いた 5 度 (シ・ファ#) のユニゾンで閉じる。深い鐘 |
+
+- 鼓動なし、ドラムなし。鐘は始めと終わりに深いもの (シ 1) がひとつ。7th なし、開いた 5 度。残響 10 秒。声なし。`compose_tablet126.py` (CXXV の Inno・讃美歌・音源を使う)
+
+```bash
+ffmpeg -ss 2100 -t 400 -i piano_solo_8x.mp4 -vn -ac 1 -ar 44100 src/piano_solo_8x_bm.wav
+BANK1013=bank1013/bank.json python3 compose_tablet126.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_tablet126.json && python3 synth.py score_tablet126.json tablet126.wav && python3 video.py score_tablet126.json tablet126.wav tablet126.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
