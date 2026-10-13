@@ -2695,6 +2695,17 @@ ffmpeg -ss 2100 -t 400 -i piano_solo_8x.mp4 -vn -ac 1 -ar 44100 src/piano_solo_8
 BANK1013=bank1013/bank.json python3 compose_tablet126.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json score_tablet89.json score_tablet86.json src score_tablet126.json && python3 synth.py score_tablet126.json tablet126.wav && python3 video.py score_tablet126.json tablet126.wav tablet126.mp4
 ```
 
+## 🎹🥋🎌 Requiem BADA — Tablet Sessions CXXVII · Inno nazionale nel palazzetto (10/13 の曲を、LXXXIX を基点に中音域のベースとして、CXXV で全体をまとめて — 剣道の大会の会場で全員で聞く国歌の雰囲気, ロ短調, ♩=56, 13 分 45 秒)
+
+- **基点 = LXXXIX をベースに (中音域)**: LXXXIX (Requiem e Fuga, recto e verso、ニ短調 96 小節) を −3 でロ短調に移し、ファ 3 より低い音は 1 オクターヴ上げて中音域に集め、4 声の音もピアノの 1 音として小さく全曲に敷く (Inno の 1 句目は除く、96 小節を繰り返す)。`merge_base_events`
+- **全体は CXXV の形**: Inno (10/13 06:41、ユニゾン) → I. Introitus (08:53) → II. Kyrie (13:03 → **10/03 13:24** (+1)、二重フーガ、対主題は 10/03 13:27) → III. Sanctus (11:23、讃美歌のカノン、**子守歌の大黒柱の主題 (+1) が低く**) → IV. Agnus Dei (13:07) → V. Lux aeterna (06:42) →
+  **Inno tutti** (全員で: 06:41 の実音と LXXXIX の Amen の上で、Inno の第 1 句と第 4 句の拡大を 4 声のユニゾンで — 開いた 5 度のユニゾンで閉じ、深い鐘がひとつ)
+- 10/03: 13:19 = 共鳴、13:27 = 対主題、13:24 = Kyrie の実音。子守歌 (10・12)・CXVII = 大黒柱の主題。piano_solo_8x は使わない (LXXXIX がその役)。`compose_tablet127.py` (CXXV を差し替え)
+
+```bash
+BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet127.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet127.json && python3 synth.py score_tablet127.json tablet127.wav && python3 video.py score_tablet127.json tablet127.wav tablet127.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
