@@ -960,7 +960,7 @@ def main(score='score.json', out='fuga.wav'):
     for ex in d.get('extras', []):
         if ex['v'] == 'VO': continue
         freq = 440.0 * 2 ** ((ex['m'] - 69) / 12.0)
-        if (concerto or symphony or pconcerto) and ex['v'] in ('V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP', 'TR', 'TB', 'CL'):
+        if (concerto or symphony or pconcerto or d.get('meta', {}).get('orchestra')) and ex['v'] in ('V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP', 'TR', 'TB', 'CL'):   # meta orchestra: 録音サンプラーの曲でも管弦楽を
             v = ex['v']; vel = ex.get('gain', 0.4)
             if v in ('V1', 'V2'): y = string_tone(freq, ex['d'], vel, dark=0.0)
             elif v == 'VA': y = string_tone(freq, ex['d'], vel, dark=0.4)

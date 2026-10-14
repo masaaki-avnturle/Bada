@@ -2706,6 +2706,19 @@ BANK1013=bank1013/bank.json python3 compose_tablet126.py bank1012b/bank.json ban
 BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet127.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet127.json && python3 synth.py score_tablet127.json tablet127.wav && python3 video.py score_tablet127.json tablet127.wav tablet127.mp4
 ```
 
+## 🎹🎺🇺🇸 Requiem BADA — Tablet Sessions CXXVIII · Inno americano sinfonico (CXXVII をベースに、アメリカ国歌 The Star-Spangled Banner を交響曲の編成でカバー, ロ短調 / ニ長調, ♩=56 / 72, 11 分 45 秒)
+
+- **旋律**: The Star-Spangled Banner (John Stafford Smith の旋律、1773 年; パブリックドメイン) — music21 の収録譜 (`miscFolk/americanfifeopus.abc`、ニ長調、3/4、75 音・70.5 拍) をそのまま `ssb_melody.json` に書き出して使う。
+  この環境からは譜面サイトに届かないので、`pip install music21` の収録譜を使った。ニ長調は CXXVII のロ短調の平行長調なので、LXXXIX の土台 (−3、ロ短調、中音域) の上にそのまま乗る
+- **形**: Inno (10/13 06:41、ユニゾン) → **国歌 I** (弦だけ: Vn I が旋律、Vn II が旋律の下の和音の音、Va が和音、Vc・Cb が根音; ♩=72) → Introitus (08:53、讃美歌) → Kyrie (13:03、二重フーガ、短く) → Agnus Dei (13:07、B-A-D-A) →
+  **国歌 II** (総奏: トランペットと Vn I が旋律、フルートが 1 オクターヴ上、ホルンが和音、トロンボーン・Vc・Cb が根音、ティンパニ (レ・ラ) が句の終わりに — 10/13 06:42 の実音と LXXXIX の Amen の上で) → ニ長調の和音と深い鐘
+- 和音は旋律の音を含むニ長調の和音 (D・G・A・A7・Bm・Em・F#m・転回形・sus4) を選ぶ (`harm_fit`)。`synth.py` に meta `orchestra` を足し、録音サンプラーの曲でも管弦楽 (弦・木管・金管・ティンパニの合成) を鳴らせるようにした。`compose_tablet128.py`
+
+```bash
+python3 -c "from music21 import corpus; ..."   # → ssb_melody.json (リポジトリに同梱)
+BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet128.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet128.json && python3 synth.py score_tablet128.json tablet128.wav && python3 video.py score_tablet128.json tablet128.wav tablet128.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
