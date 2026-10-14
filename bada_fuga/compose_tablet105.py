@@ -37,67 +37,73 @@ def source_events(d):
             rid = str(e.get('rid', '')).replace('.wav', '')
             if rid not in bank: continue
             first = True; t0, d0 = B(e, 't', 'beat'), B(e, 'd', 'dbeats'); sc = d0 / float(e['d']) if e['d'] else 1.0   # 秒 → 拍
+            sm = int(e.get('semis', 0) or 0); rate = 2 ** (sm / 12.0)                                                   # テープの移調 (半音上げ) は採譜の音の高さと時間にも
             for sg in bank[rid]['segs']:
-                t = t0 + (sg['t'] - e.get('off', 0.0)) * sc
+                t = t0 + (sg['t'] - e.get('off', 0.0)) / rate * sc
                 if t < t0 or t >= t0 + d0: continue
                 for m in sg['m']:
-                    ev.append((t, min(max(0.5, sg['d'] * sc), t0 + d0 - t), m, rec_g * float(e.get('gain', 0.8)) / 0.8 * (1.2 if m < 48 else 1.0), ('録音 %s:%s の採譜 (実音の代わり)' % (rid[9:11], rid[11:13])) if first else None, 'PF', rid)); first = False
+                    m += sm
+                    ev.append((t, min(max(0.5, sg['d'] / rate * sc), t0 + d0 - t), m, rec_g * float(e.get('gain', 0.8)) / 0.8 * (1.2 if m < 48 else 1.0), ('録音 %s:%s の採譜 (実音の代わり)' % (rid[9:11], rid[11:13])) if first else None, 'PF', rid)); first = False
     return sorted(ev, key=lambda x: x[0])
 
 def build(d):
+    SB = int(d.get('beats_per_bar', 4))                                            # 元の拍子 (3/4 の CXXXI も)。窓は 12 拍 = 4/4 なら 3 小節、3/4 なら 4 小節
     ev_all = []                                                                    # 窓 (12 拍) をまたぐ長い音は窓ごとに分けて、次の窓でも続ける (終わりの長い共鳴が消えないように)
     for t, dd, m, g, lab, v, rid in source_events(d):
         while dd > 0.05:
             end = (int(t // WIN) + 1) * WIN; piece = min(dd, end - t)
             ev_all.append((t, piece, m, g, lab, v, rid)); lab = None; t += piece; dd -= piece
     bells = [dict(e, t=float(e.get('beat', e['t']))) for e in d['extras'] if e['v'] == 'X']
+    dbl = any(e.get('layer') == 'theme' for e in d['extras'])                        # 元が声部をピアノで重ねていた曲 (CXXXI など) は ×16 の声部もピアノで重ねる (声部の音量の上限を補う)
     notes, extras, entries, harm, sections = [], [], [], [], []
     sec_src = sorted(d['sections'], key=lambda s: s['t']); nb = 0
-    for w0 in range(0, d['nbars'] * 4, WIN):
-        L = min(WIN, d['nbars'] * 4 - w0); f = nb
+    for w0 in range(0, d['nbars'] * SB, WIN):
+        L = min(WIN, d['nbars'] * SB - w0); f = nb
         for s in sec_src:
-            if w0 <= s['t'] < w0 + L:
-                sections.append(dict(t=float(f * 4 + K * (s['t'] - w0)), bar=f + int(K * (s['t'] - w0)) // 4 + 1, title=s['title'] + ' ×16', sub=s['sub'] + ' — 全音符を 16 倍に (×16 の骨組みの中で ×4 が 4 回、×1 が 8 回)'))
+            sb_ = (s['bar'] - 1) * SB
+            if w0 <= sb_ < w0 + L:
+                sections.append(dict(t=float(f * SB + K * (sb_ - w0)), bar=f + int(K * (sb_ - w0)) // SB + 1, title=s['title'] + ' ×16', sub=s['sub'] + ' — 全音符を 16 倍に (×16 の骨組みの中で ×4 が 4 回、×1 が 8 回)'))
         for x in bells:
             if w0 <= x['t'] < w0 + L:
-                b = f * 4 + K * (x['t'] - w0)
+                b = f * SB + K * (x['t'] - w0)
                 extras.append(dict(x, t=float(b), d=float(x['d']), beat=float(b), dbeats=float(x['dbeats'])))
         ev = [(t - w0, min(dd, w0 + L - t), m, g, lab, v, rid) for t, dd, m, g, lab, v, rid in ev_all if w0 <= t < w0 + L]
         for q in range(L): harm += [d['harm'][w0 + q]] * K
         for s, dd, m, g, lab, v, rid in ev:                                         # ×16
             S0, D = K * s, K * dd; step = 4.0 if m < 48 else 2.0; n_ = max(1, int(round(D / step))); first = True
             for i in range(n_):
-                b = f * 4 + S0 + i * step
+                b = f * SB + S0 + i * step
                 amp = 1.0 if i == 0 else 0.6 + 0.25 * math.sin(math.pi * i / max(1, n_ - 1))
                 if v in ORCH:
-                    extras.append(dict(v=v, t=float(b), d=step + 0.4, beat=float(b), dbeats=step, m=m, gain=round(g * amp, 4), label=(lab + ' ×16') if (first and lab) else None, layer='x16'))
+                    extras.append(dict(v=v, t=float(b), d=step + 0.4, beat=float(b), dbeats=step, m=m, gain=round(0.8 * g * amp, 4), label=(lab + ' ×16') if (first and lab) else None, layer='x16'))
                 elif v == 'PF':
                     extras.append(dict(v='PF', t=float(b), d=step + 0.4, beat=float(b), dbeats=step, m=m, gain=round(0.22 * g * amp, 4), rid=rid, rel=0.6,
                                        label=(lab + ' ×16') if (first and lab) else None, layer='x16'))
                 else:
                     notes.append(dict(v=v, t=float(b), d=step - 0.05, m=m, label=(lab + ' ×16') if (first and lab) else None, beat=float(b),
                                       dyn=round(0.95 * amp, 4), det=1.0, role='', src=rid))
-                if first and lab: entries.append(dict(t=float(b), label=lab + ' ×16', v=v if v != 'PF' else 'S', bar=int(b // 4) + 1))
+                    if dbl: extras.append(dict(v='PF', t=float(b), d=step - 0.05, beat=float(b), dbeats=step - 0.05, m=m, gain=round(0.3 * g * amp, 4), rid=rid, rel=0.5, label=None, layer='x16'))
+                if first and lab: entries.append(dict(t=float(b), label=lab + ' ×16', v=v if v != 'PF' else 'S', bar=int(b // SB) + 1))
                 first = False
         for rep in range(4):                                                        # ×4
             for s, dd, m, g, lab, v, rid in ev:
-                b = f * 4 + rep * 4 * L + 4 * s
-                if v in ORCH: extras.append(dict(v=v, t=float(b), d=round(4 * dd + 0.2, 3), beat=float(b), dbeats=round(4 * dd, 3), m=m, gain=round(0.6 * g, 4), label=(lab + ' ×4') if (lab and rep == 0) else None, layer='x4')); continue
+                b = f * SB + rep * 4 * L + 4 * s
+                if v in ORCH: extras.append(dict(v=v, t=float(b), d=round(4 * dd + 0.2, 3), beat=float(b), dbeats=round(4 * dd, 3), m=m, gain=round(0.5 * g, 4), label=(lab + ' ×4') if (lab and rep == 0) else None, layer='x4')); continue
                 extras.append(dict(v='PF', t=float(b), d=round(4 * dd + 0.2, 3), beat=float(b), dbeats=round(4 * dd, 3), m=m, gain=round(0.2 * g, 4), rid=rid, rel=0.5,
                                    label=(lab + ' ×4') if (lab and rep == 0) else None, layer='x4'))
         for rep in range(8):                                                        # ×1
             for s, dd, m, g, lab, v, rid in ev:
-                b = f * 4 + rep * 2 * L + s
-                if v in ORCH: extras.append(dict(v=v, t=float(b), d=round(dd + 0.15, 3), beat=float(b), dbeats=round(dd, 3), m=m, gain=round(0.35 * g, 4), label=(lab + ' ×1') if (lab and rep == 0) else None, layer='x1')); continue
+                b = f * SB + rep * 2 * L + s
+                if v in ORCH: extras.append(dict(v=v, t=float(b), d=round(dd + 0.15, 3), beat=float(b), dbeats=round(dd, 3), m=m, gain=round(0.3 * g, 4), label=(lab + ' ×1') if (lab and rep == 0) else None, layer='x1')); continue
                 extras.append(dict(v='PF', t=float(b), d=round(dd + 0.15, 3), beat=float(b), dbeats=round(dd, 3), m=m, gain=round(0.11 * g, 4), rid=rid, rel=0.4,
                                    label=(lab + ' ×1') if (lab and rep == 0) else None, layer='x1'))
-        nb += K * L // 4
+        nb += K * L // SB
     entries.sort(key=lambda e: e['t']); notes.sort(key=lambda n: n['t']); extras.sort(key=lambda e: e['t'])
-    return dict(bpm=60, beats_per_bar=4, nbars=nb, duration=float(nb * 4), bar_times=[4.0 * i for i in range(nb + 1)], notes=notes, extras=extras,
+    return dict(bpm=60, beats_per_bar=SB, nbars=nb, duration=float(nb * SB), bar_times=[float(SB) * i for i in range(nb + 1)], notes=notes, extras=extras,
                 entries=entries, sections=sections, harm=harm)
 
-def equalize(out, block=32):
-    """声部の少ない曲 (Vox) のために、8 小節ごとの音の量 (音量² × 長さ、低い音は重く) をそろえる — 0.5〜1.8 倍、隣の区画となめらかに"""
+def equalize(out, block=32, orch=False):
+    """声部の少ない曲 (Vox) のために、8 小節ごとの音の量 (音量² × 長さ、低い音は重く) をそろえる — 0.5〜1.8 倍、隣の区画となめらかに。orch: 管弦楽の層も数えて、総奏の区画を抑える (0.5〜1.5 倍)"""
     nblk = int(math.ceil(out['duration'] / block)); E = [0.0] * nblk
     def addE(t, d, amp, m):
         for k in range(int(t // block), min(nblk, int((t + d) // block) + 1)):
@@ -108,18 +114,25 @@ def equalize(out, block=32):
         addE(n['t'], n['d'], (0.62 * n['dyn'] + 0.08) / 0.67 * (5.0 if n['m'] < 48 else 1.0), n['m'])
     for e in out['extras']:
         if e['v'] == 'PF': addE(e['t'], e['d'], 2.5 * e['gain'], e['m'])
+        elif orch and e['v'] in ORCH: addE(e['t'], e['d'], 12.0 * e['gain'], e['m'])       # 管弦楽の合成は同じ gain でピアノよりずっと大きい (測って: 約 5 倍)
     med = sorted(x for x in E if x > 0)[len([x for x in E if x > 0]) // 2]
-    f = [min(1.8, max(0.5, (med / x) ** 0.5)) if x > 0 else 1.0 for x in E]
+    hi, lo = (1.5, 0.4) if orch else (1.8, 0.5)
+    f = [min(hi, max(lo, (med / x) ** 0.5)) if x > 0 else 1.0 for x in E]
     f = [(f[max(0, k - 1)] + 2 * f[k] + f[min(nblk - 1, k + 1)]) / 4.0 for k in range(nblk)]
     for n in out['notes']: n['dyn'] = round(min(1.45 if n['m'] >= 48 else 0.5, n['dyn'] * f[min(nblk - 1, int(n['t'] // block))]), 4)
     for e in out['extras']:
-        if e['v'] == 'PF': e['gain'] = round(e['gain'] * f[min(nblk - 1, int(e['t'] // block))], 4)
+        if e['v'] == 'PF' or (orch and e['v'] in ORCH): e['gain'] = round(e['gain'] * f[min(nblk - 1, int(e['t'] // block))], 4)
     print('equalize: factors %.2f..%.2f' % (min(f), max(f)))
 
 if __name__ == '__main__':
     d = json.load(open(SRC)); out = build(d)
     h, rem = divmod(out['duration'], 3600); dur_s = '%d 時間 %d 分' % (h, rem // 60)
-    if 'Sinfonia' in d['meta'].get('title', ''):
+    if 'Amazing Grace' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXXXII · Amazing Grace nel palazzetto XVI',
+                    subtitle='CXXXI をまるごと 16 倍に (%s) — すべての 12 拍 (3/4 の 4 小節) を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。実音のピアノの 4 声と管弦楽はそのまま 16 倍に (2 拍ごとに打ち直す)、10/13 の録音は採譜のピアノに (3/4, ♩=60)' % dur_s,
+                    footer=['CXXXI の 146 小節 × 16 = 2336 小節: Introduzione ×16 → Amazing Grace I ×16 → Inno ×16 → Amazing Grace II ×16 → Fugato ×16 → Amazing Grace III ×16 → Coda ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 が遠くで 8 回。Amazing Grace (1835 年の旋律、ニ長調) は 16 倍で 256 小節の讃美歌に。声なし。'])
+    elif 'Sinfonia' in d['meta'].get('title', ''):
         meta = dict(title='Requiem BADA — CXXX · Sinfonia sull\'inno americano XVI',
                     subtitle='CXXIX をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。管弦楽はその楽器のまま (2 拍ごとに弓を返すように打ち直す)、10/13 の録音は採譜のピアノに (♩=60)' % dur_s,
                     footer=['CXXIX の 134 小節 × 16 = 2144 小節: Introduzione ×16 → Inno ×16 → Tema (国歌) ×16 → Sviluppo ×16 → Finale ×16 → Coda ×16',
@@ -160,8 +173,9 @@ if __name__ == '__main__':
                     footer=['CXIV の 100 小節 × 16 = 1600 小節: Praeludium ×16 → Interludium ×16 → Fuga (二重フーガ) ×16 → 締めくくり ×16 — 大黒柱の主題と 3 分目の主題',
                             '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。裏 (LXXXIX)・共鳴・鼓動・録音の採譜も 16 倍に。声なし。'])
     elif 'Fuga senza voce' in d['meta'].get('title', '') or 'ninne nanne' in d['meta'].get('title', ''): equalize(out)
-    orch = 'Sinfonia' in d['meta'].get('title', '')
-    out['meta'] = dict(d['meta'], fps=15, fixed_peak=(0.8 if BANKP else 0.35), legend=(d['meta'].get('legend', []) + ['PF']) if orch else ['PF', 'X'], vname=(dict(d['meta'].get('vname', {}), PF='録音の採譜') if orch else {'PF': '×16 / ×4 / ×1 の層', 'X': '鐘'}), **meta)
+    orch = bool(d['meta'].get('orchestra'))
+    if orch: equalize(out, block=48, orch=True)                                    # 管弦楽の曲: 総奏の区画を抑え、静かな区画を少し上げる (0.5〜1.5 倍)
+    out['meta'] = dict(d['meta'], fps=15, fixed_peak=(0.8 if BANKP else 0.35), legend=(list(dict.fromkeys(d['meta'].get('legend', []) + ['PF']))) if orch else ['PF', 'X'], vname=(dict(d['meta'].get('vname', {}), PF='録音の採譜 / 共鳴の層') if orch else {'PF': '×16 / ×4 / ×1 の層', 'X': '鐘'}), **meta)
     json.dump(out, open(OUT, 'w'), ensure_ascii=False)
     h, rem = divmod(out['duration'], 3600)
     print('bars', out['nbars'], 'duration %d:%02d:%02d' % (h, rem // 60, rem % 60), 'notes', len(out['notes']), 'extras', Counter(e.get('layer', e['v']) for e in out['extras']))

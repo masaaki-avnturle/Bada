@@ -2744,7 +2744,8 @@ CXXIX (134 小節、♩=60 / 72) をまるごと 16 倍に (`compose_tablet105.p
 - 管弦楽の層 (V1・V2・VA・VC・CB・FL・WW・CL・HN・TR・TB・TP) はピアノに写さず、**その楽器のまま** 16 倍に (`ORCH`): ×16 は元の大きさ、×4 は 0.6 倍、×1 は 0.35 倍。弦の長い音は 2 拍ごとに弓を返すように打ち直される
 - 10/13 06:41・06:42 の実音 (REC) は 16 倍には伸ばせないので、bank1013 の採譜をピアノで (`rec_g`)。テンポの違い (60 / 72) は拍で写す (♩=60 固定)。鐘は始めと終わりの深いものだけ
 - 楽章はそのまま 16 倍に: Introduzione ×16 (0〜256) → Inno ×16 (256〜576) → Tema (国歌) ×16 (576〜928) → Sviluppo ×16 (928〜1568) → Finale ×16 (1568〜1920) → Coda ×16 (1920〜2144)
-- 要所を短く合成して測った音量 (rms): 序奏 −19 dB、Inno −16〜−25、Tema −13〜−17、Sviluppo −12〜−14、Finale −6〜−10 (総奏の頂点)、Coda −18〜−23 (静かに)
+- 録音の採譜はテープの移調 (半音上げ) を音の高さと時間にも反映する (これがないと採譜が半音ずれる)。管弦楽の曲は 48 拍ごとの音の量 (管弦楽の層は重く数える) をそろえる (`equalize(orch=True)`, 0.4〜1.5 倍) — 総奏の区画が 10 dB ほど大きくなるのを抑える
+- 要所を短く合成して測った音量 (rms): 序奏 −16 dB、Inno −14、Tema −15、Sviluppo −15、Finale −12 (総奏の頂点)、Coda −17 (静かに)
 
 ```bash
 python3 compose_tablet105.py score_tablet129.json score_tablet130.json bank1013/bank.json && python3 render_long.py score_tablet130.json out130 192 3
@@ -2769,6 +2770,18 @@ python3 compose_tablet105.py score_tablet129.json score_tablet130.json bank1013/
 
 ```bash
 BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet131.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet131.json && python3 synth.py score_tablet131.json tablet131.wav && python3 video.py score_tablet131.json tablet131.wav tablet131.mp4
+```
+
+## 🎹🙏🌀 Requiem BADA — Tablet Sessions CXXXII · Amazing Grace nel palazzetto XVI (CXXXI を 16 倍に伸ばして、フーガを醸す曲に, 3/4, ニ長調 / ロ短調, ♩=60, 1 時間 56 分 48 秒)
+
+CXXXI (146 小節、3/4) をまるごと 16 倍に (`compose_tablet105.py`)。146 × 16 = 2336 小節。すべての 12 拍 (3/4 の 4 小節) を ×16 (2 拍ごとの打ち直し)・×4 (4 回)・×1 (遠くで 8 回) の 3 つの速さで同時に鳴らし、フーガを醸す。
+- 3/4 の曲を初めて 16 倍に: 窓は拍で切る (12 拍 = 4 小節) ので、出来上がりも 3/4 (`beats_per_bar` を元の曲から引き継ぐ)。Amazing Grace の 16 小節は 256 小節 (12 分 48 秒) の讃美歌に
+- 実音のピアノの 4 声はそのまま声部として 16 倍に (元が声部をピアノで重ねていた曲なので、×16 の声部もピアノで重ねて声部の音量の上限を補う)。管弦楽の層はその楽器のまま、10/13 の実音は採譜のピアノに (半音上げを反映)、共鳴も 16 倍に
+- 楽章はそのまま 16 倍に: Introduzione ×16 (0〜352) → Amazing Grace I ×16 (352〜640) → Inno ×16 (640〜960) → Amazing Grace II ×16 (960〜1248) → Fugato ×16 (1248〜1664) → Amazing Grace III ×16 (1664〜1952) → Coda ×16 (1952〜2336)
+- 要所を短く合成して測った音量 (rms): 序奏 −16 dB、Amazing Grace I −14、Inno −14、II −12、Fugato −16、III −12 (総奏)、Coda −16。鐘は始めと終わりに深いものだけ
+
+```bash
+python3 compose_tablet105.py score_tablet131.json score_tablet132.json bank1013/bank.json && python3 render_long.py score_tablet132.json out132 192 3
 ```
 
 ## 作り方 (再現)
