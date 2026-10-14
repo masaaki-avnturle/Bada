@@ -2815,6 +2815,25 @@ CXXXIII (181 小節、3/4) をまるごと 16 倍に (`compose_tablet105.py`)。
 python3 compose_tablet105.py score_tablet133.json score_tablet134.json bank1013/bank.json && python3 render_long.py score_tablet134.json out134 192 3
 ```
 
+## 🎹🕯⛪ Requiem BADA — Tablet Sessions CXXXV · Missa pro defunctis nel palazzetto (10/13 の 2 曲をベースに、ミサ曲 — 死者のためのミサ — をベースと主題にして, ロ短調 / ニ長調, ♩=56, 13 分 41 秒)
+
+10/13 06:41・06:42 の実音 (半音上げてロ短調に) の雰囲気 (冷たい空気の体育館、礼拝) の上に、ミサの形と主題を重ねる。主題はグレゴリオ聖歌 (パブリックドメイン) の「Requiem aeternam」(Introitus) と「Dies irae」(続唱) をロ短調に、Kyrie の主題は 06:41 の音 (CXXV の Inno の第 1 句)、Sanctus の旋律は 06:42 の音から。4 声は実音のピアノ (9/24 08:53 の音)、管弦楽は synth の合成
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| Introitus (ロ短調) | 0〜24 | 06:41 の実音。「Requiem aeternam」(レ・レ・ミ・レ・ド#・シ・レ・ミ・ファ#・ミ・レ・ド#・シ) を 4 声のユニゾンで 2 度、高い開いた 5 度の弦が pp、コントラバスの保続、共鳴、深い鐘 |
+| Kyrie (ロ短調) | 24〜64 | 06:42 の実音の上で、06:41 の音から作った主題のフーガ: 提示 (アルト → ソプラノ 答唱 → バス → テノール 答唱) → Christe (反行、2 声と保続) → Kyrie (ストレッタ)。弦も主題を追いかける |
+| Dies irae (ロ短調) | 64〜104 | 続唱の頭 (レ・ド#・レ・シ・ド#・ラ・シ・シ) のフガート (バス → テノール → アルト → ソプラノ)、反行、ストレッタ、4 声のユニゾンの拡大。弦のフガート (Vc → Va → Vn II → Vn I)、トロンボーンとホルンの拡大 (×2)、トランペットの頭、ティンパニが高まる |
+| Sanctus (ニ長調) | 104〜136 | 06:42 の音から作った旋律を讃美歌のリズム (♩ ♩ ♩ ♩ 𝅗𝅥 𝅗𝅥) で、4 声のコラールに (和声の下書き D G D A / Bm G D A / D G A D / G A D D)。Hosanna は高いラと高い開いた 5 度 (Vn・Fl) |
+| Agnus Dei (ロ短調) | 136〜164 | B-A-D-A の唱え (アルト) に「Requiem aeternam」がソプラノに 2 度重なる、バスの保続 (シ)、低い弦の和音、深い鐘 |
+| Lux aeterna (ニ長調 → ロ短調) | 164〜190 | 06:41 の実音、ホルンが「Requiem aeternam」の頭、高い開いた 5 度、ニ長調の和音 (レ・ラ・ファ#、弦とフルート)、最後はロ短調の冷たい空気に戻り深い鐘 |
+
+- 測った音量 (rms): Introitus −18〜−20 dB、Kyrie −15〜−19、Dies irae −13〜−17 (頂点)、Sanctus −15、Agnus Dei −17、Lux aeterna −20〜−27 (静かに)。mp4 は 30 MiB に収めるため 960×540・235 kbps に。`compose_tablet135.py` (CXXVII の録音・bank・和声の関数を使う)
+
+```bash
+BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet135.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet135.json && python3 synth.py score_tablet135.json tablet135.wav && python3 video.py score_tablet135.json tablet135.wav tablet135.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
