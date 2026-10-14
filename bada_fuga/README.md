@@ -2750,6 +2750,27 @@ CXXIX (134 小節、♩=60 / 72) をまるごと 16 倍に (`compose_tablet105.p
 python3 compose_tablet105.py score_tablet129.json score_tablet130.json bank1013/bank.json && python3 render_long.py score_tablet130.json out130 192 3
 ```
 
+## 🎹🙏🎻 Requiem BADA — Tablet Sessions CXXXI · Amazing Grace nel palazzetto (Amazing Grace を、10/13 の 2 曲の雰囲気 — 冷たい空気の体育館に静かに流れる国歌、礼拝 — に合わせて, 3/4, ニ長調 / ロ短調, ♩=60, 7 分 25 秒)
+
+旋律は Amazing Grace (New Britain、1835 年の旋律、パブリックドメイン): 3/4、五音音階、16 小節 + アナクルーシス。ニ長調は 10/13 の録音 (半音上げてロ短調) の平行長調なので、録音の雰囲気の上にそのまま乗る。この曲集で初めての 3/4 (`compose.BPB = 3`)
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| I. Introduzione (ロ短調) | 0〜22 | 10/13 06:41 の実音 (半音上げて)。高い開いた 5 度 (シ 5・ファ# 6) の弦が pp、コントラバスの保続、ホルンが Amazing Grace の頭をロ短調 (ファ#・シ・レ・シ・レ・ド#・シ・ソ・ファ#) で静かに。共鳴 (13:19 の音) |
+| II. Amazing Grace I (ニ長調) | 22〜40 | 実音のピアノ (9/24 08:53 の音) の 4 声で、讃美歌として: ソプラノが旋律 (3 拍目から)、ほかの声部は和音から (`hold`)。弦の和音が薄く |
+| III. Inno (ロ短調) | 40〜60 | 06:42 の実音の上で、06:41 の音から作った国歌のような旋律を 3/4 の讃美歌のリズム (𝅗𝅥 ♩ 𝅗𝅥 ♩ ♩ ♩ ♩ 𝅗𝅥.) にして、4 声のユニゾンと弦のユニゾンで |
+| IV. Amazing Grace II (ニ長調) | 60〜78 | Vn I とフルート (1 オクターヴ上) が旋律に重なり、Vn II・Va が和音、Vc・Cb が根音 |
+| V. Fugato (ロ短調) | 78〜104 | 頭をロ短調の主題にして、アルト → ソプラノ (答唱) → バス → テノール、弦も Vn I → Vn II → Va → Vc と追いかける。後半は反行 |
+| VI. Amazing Grace III (ニ長調) | 104〜122 | 総奏: ホルンが旋律、トロンボーン・Vc・Cb が根音、弦とオーボエ・フルート、4 声。最後の句 (was blind, but now I see) は 4 声のユニゾン。Amen (ソ → レ)、ティンパニ |
+| VII. Coda (ロ短調) | 122〜146 | 06:41 の実音、高い開いた 5 度、ホルンの頭、深い鐘 |
+
+- 和音は小節ごとに、讃美歌の和声の下書き (`AG_RH`: D D G A D D A D D Bm D D D D D D) を優先しつつ旋律の音を含む和音を選び、3 拍目の音が合わなければ 3 拍目だけ別の和音 (ミには A)
+- 測った音量 (rms): 序奏 −21 dB、Amazing Grace I −17、Inno −13〜−18、II −16、Fugato −22〜−16、III −14、Coda −23。鐘は始めと終わりに深いものがひとつ。声なし。`compose_tablet131.py` (CXXVII・CXXVIII の録音・bank・管弦楽の関数を使う)
+
+```bash
+BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet131.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet131.json && python3 synth.py score_tablet131.json tablet131.wav && python3 video.py score_tablet131.json tablet131.wav tablet131.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
