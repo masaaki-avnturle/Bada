@@ -2719,6 +2719,25 @@ python3 -c "from music21 import corpus; ..."   # → ssb_melody.json (リポジ�
 BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet128.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet128.json && python3 synth.py score_tablet128.json tablet128.wav && python3 video.py score_tablet128.json tablet128.wav tablet128.mp4
 ```
 
+## 🎻🇺🇸 Requiem BADA — Tablet Sessions CXXIX · Sinfonia sull'inno americano (10/13 の雰囲気で、アメリカ国歌を主題にした交響曲 — acceptance を参考に, ロ短調 / ニ長調, ♩=60 / 72, 9 分 20 秒)
+
+管弦楽だけ (synth の合成: 弦・フルート・オーボエ・ホルン・トランペット・トロンボーン・ティンパニ、meta `orchestra`)。4 声 (ピアノ) は使わない。10/13 06:41・06:42 の実音 (半音上げてロ短調に) は序奏・Inno・結尾に小さく
+
+| 楽章 | 小節 | 内容 |
+|---|---|---|
+| I. Introduzione (ロ短調) | 0〜16 | 冷たい空気: 高い開いた 5 度 (シ 5・ファ# 6) の弦が pp、コントラバスの保続 (シ 1)。ホルンが国歌の頭 (ソ・ミ・ド・ミ・ソ・ド) をロ短調 (ファ#・レ・シ・レ・ファ#・シ) で静かに。06:41 の実音 |
+| II. Inno | 16〜36 | 10/13 06:41 の音から作った国歌のような旋律 (CXXV の Inno) を弦のユニゾン (オクターヴ、Cb まで) で、句のあいだに間。06:42 の実音 |
+| III. Tema (ニ長調, ♩=72) | 36〜58 | The Star-Spangled Banner を弦と木管で: Vn I が旋律、フルートが 1 オクターヴ上、Vn II・Va が和音、Vc・Cb が根音、オーボエが句を受ける |
+| IV. Sviluppo (ロ短調) | 58〜98 | 主題の頭のフガート (Vn I → Vn II → Va → Vc、反行も)、「rockets' red glare, the bombs bursting in air」の句の拡大 (×2) をトロンボーンとホルンで、acceptance のタブレットの主題 (シ・ラ・ソ・ラ・ソ・ファ#) がホルンに、トランペットの頭、ティンパニが高まる |
+| V. Finale (ニ長調, ♩=72) | 98〜120 | 国歌の総奏 (CXXVIII の総奏と同じ: トランペット・Vn I・フルート・ホルン・トロンボーン・ティンパニ) |
+| VI. Coda (ロ短調) | 120〜134 | 冷たい空気に戻る: 06:41 の実音、高い開いた 5 度の弦、ホルンの頭、深い鐘 |
+
+- 和音は旋律の音を含むニ長調 / ロ短調の和音を選ぶ (`harm_fit`)。鐘は始めと終わりに深いものがひとつ。声なし。`compose_tablet129.py` (CXXVIII の管弦楽の関数を使う)
+
+```bash
+BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet129.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet129.json && python3 synth.py score_tablet129.json tablet129.wav && python3 video.py score_tablet129.json tablet129.wav tablet129.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
