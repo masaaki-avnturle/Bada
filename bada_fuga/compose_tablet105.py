@@ -17,6 +17,7 @@ SRC = sys.argv[1]; OUT = sys.argv[2] if len(sys.argv) > 2 else 'score_tablet105.
 BANKP = sys.argv[3] if len(sys.argv) > 3 else None                                # 録音 (REC) を採譜に置き換えるための bank (CVI → CVII)
 REC_G = 1.6                                                                       # 採譜の音の大きさ (録音の代わり、表として)
 K = 16; WIN = 12
+ORCH = ('V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP')                       # 管弦楽の層はその楽器のまま 16 倍に (CXXIX)
 
 def source_events(d):
     ev = []; vox = 'Fuga senza voce' in d['meta'].get('title', ''); lull = 'ninne nanne' in d['meta'].get('title', '')
@@ -27,6 +28,7 @@ def source_events(d):
             ev.append((B(n, 't', 'beat'), B(n, 'd', 'dbeats'), n['m'], 0.62 * float(n.get('dyn', 1.0)) + 0.08, n['label'], 'PF', n.get('src'))); continue
         ev.append((B(n, 't', 'beat'), B(n, 'd', 'dbeats'), n['m'], float(n.get('dyn', 1.0)), n['label'], n['v'], n.get('src')))
     for e in d['extras']:
+        if e['v'] in ORCH: ev.append((B(e, 't', 'beat'), B(e, 'd', 'dbeats'), e['m'], float(e['gain']), e.get('label'), e['v'], None)); continue
         if e['v'] in ('PF', 'PK', 'OS', 'DN') and e.get('layer') != 'theme': ev.append((B(e, 't', 'beat'), B(e, 'd', 'dbeats'), e['m'], float(e['gain']) / 0.5 * (1.0 if e['v'] == 'PF' else aux), e.get('label'), 'PF', e.get('rid')))   # 'theme' (声部の重ね) は声部そのものがあるので除く   # 鼓動・オスティナート・持続音もピアノの 1 音
     if BANKP:                                                                     # 録音の実音 → その採譜をピアノで (16 倍には伸ばせないので)
         bank = json.load(open(BANKP))['recordings']
@@ -67,7 +69,9 @@ def build(d):
             for i in range(n_):
                 b = f * 4 + S0 + i * step
                 amp = 1.0 if i == 0 else 0.6 + 0.25 * math.sin(math.pi * i / max(1, n_ - 1))
-                if v == 'PF':
+                if v in ORCH:
+                    extras.append(dict(v=v, t=float(b), d=step + 0.4, beat=float(b), dbeats=step, m=m, gain=round(g * amp, 4), label=(lab + ' ×16') if (first and lab) else None, layer='x16'))
+                elif v == 'PF':
                     extras.append(dict(v='PF', t=float(b), d=step + 0.4, beat=float(b), dbeats=step, m=m, gain=round(0.22 * g * amp, 4), rid=rid, rel=0.6,
                                        label=(lab + ' ×16') if (first and lab) else None, layer='x16'))
                 else:
@@ -78,11 +82,13 @@ def build(d):
         for rep in range(4):                                                        # ×4
             for s, dd, m, g, lab, v, rid in ev:
                 b = f * 4 + rep * 4 * L + 4 * s
+                if v in ORCH: extras.append(dict(v=v, t=float(b), d=round(4 * dd + 0.2, 3), beat=float(b), dbeats=round(4 * dd, 3), m=m, gain=round(0.6 * g, 4), label=(lab + ' ×4') if (lab and rep == 0) else None, layer='x4')); continue
                 extras.append(dict(v='PF', t=float(b), d=round(4 * dd + 0.2, 3), beat=float(b), dbeats=round(4 * dd, 3), m=m, gain=round(0.2 * g, 4), rid=rid, rel=0.5,
                                    label=(lab + ' ×4') if (lab and rep == 0) else None, layer='x4'))
         for rep in range(8):                                                        # ×1
             for s, dd, m, g, lab, v, rid in ev:
                 b = f * 4 + rep * 2 * L + s
+                if v in ORCH: extras.append(dict(v=v, t=float(b), d=round(dd + 0.15, 3), beat=float(b), dbeats=round(dd, 3), m=m, gain=round(0.35 * g, 4), label=(lab + ' ×1') if (lab and rep == 0) else None, layer='x1')); continue
                 extras.append(dict(v='PF', t=float(b), d=round(dd + 0.15, 3), beat=float(b), dbeats=round(dd, 3), m=m, gain=round(0.11 * g, 4), rid=rid, rel=0.4,
                                    label=(lab + ' ×1') if (lab and rep == 0) else None, layer='x1'))
         nb += K * L // 4
@@ -113,7 +119,12 @@ def equalize(out, block=32):
 if __name__ == '__main__':
     d = json.load(open(SRC)); out = build(d)
     h, rem = divmod(out['duration'], 3600); dur_s = '%d 時間 %d 分' % (h, rem // 60)
-    if 'ninne nanne' in d['meta'].get('title', ''):
+    if 'Sinfonia' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXXX · Sinfonia sull\'inno americano XVI',
+                    subtitle='CXXIX をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。管弦楽はその楽器のまま (2 拍ごとに弓を返すように打ち直す)、10/13 の録音は採譜のピアノに (♩=60)' % dur_s,
+                    footer=['CXXIX の 134 小節 × 16 = 2144 小節: Introduzione ×16 → Inno ×16 → Tema (国歌) ×16 → Sviluppo ×16 → Finale ×16 → Coda ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 が遠くで 8 回。元のテンポの違い (60 / 72) は拍で写す。声なし。'])
+    elif 'ninne nanne' in d['meta'].get('title', ''):
         meta = dict(title='Requiem BADA — CXIX · Ninna nanna ultima XVI',
                     subtitle='CXVIII の No. 12 をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。録音は採譜のピアノに、共鳴・鼓動も 16 倍に。鐘なし (♩=60)' % dur_s,
                     footer=['No. 12 の 185 小節 × 16 = 2960 小節: くつろぎ (08:49) ×16 → 暖まり (11:18) ×16 → 冷え (13:22) ×16 → 眠り (15:16) ×16 → 長調の共鳴と B-A-D-A ×16',
@@ -149,7 +160,8 @@ if __name__ == '__main__':
                     footer=['CXIV の 100 小節 × 16 = 1600 小節: Praeludium ×16 → Interludium ×16 → Fuga (二重フーガ) ×16 → 締めくくり ×16 — 大黒柱の主題と 3 分目の主題',
                             '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 のフーガが遠くで 8 回。裏 (LXXXIX)・共鳴・鼓動・録音の採譜も 16 倍に。声なし。'])
     elif 'Fuga senza voce' in d['meta'].get('title', '') or 'ninne nanne' in d['meta'].get('title', ''): equalize(out)
-    out['meta'] = dict(d['meta'], fps=15, fixed_peak=(0.8 if BANKP else 0.35), legend=['PF', 'X'], vname={'PF': '×16 / ×4 / ×1 の層', 'X': '鐘'}, **meta)
+    orch = 'Sinfonia' in d['meta'].get('title', '')
+    out['meta'] = dict(d['meta'], fps=15, fixed_peak=(0.8 if BANKP else 0.35), legend=(d['meta'].get('legend', []) + ['PF']) if orch else ['PF', 'X'], vname=(dict(d['meta'].get('vname', {}), PF='録音の採譜') if orch else {'PF': '×16 / ×4 / ×1 の層', 'X': '鐘'}), **meta)
     json.dump(out, open(OUT, 'w'), ensure_ascii=False)
     h, rem = divmod(out['duration'], 3600)
     print('bars', out['nbars'], 'duration %d:%02d:%02d' % (h, rem // 60, rem % 60), 'notes', len(out['notes']), 'extras', Counter(e.get('layer', e['v']) for e in out['extras']))

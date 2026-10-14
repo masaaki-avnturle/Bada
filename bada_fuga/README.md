@@ -2738,6 +2738,18 @@ BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet12
 BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet129.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet129.json && python3 synth.py score_tablet129.json tablet129.wav && python3 video.py score_tablet129.json tablet129.wav tablet129.mp4
 ```
 
+## 🎻🇺🇸🌀 Requiem BADA — Tablet Sessions CXXX · Sinfonia sull'inno americano XVI (CXXIX を 16 倍に伸ばして、フーガを醸す曲に, ロ短調 / ニ長調, ♩=60, 2 時間 22 分 56 秒)
+
+CXXIX (134 小節、♩=60 / 72) をまるごと 16 倍に (`compose_tablet105.py`)。134 × 16 = 2144 小節。すべての 3 小節を ×16 (2 拍ごとの打ち直し)・×4 (4 回)・×1 (遠くで 8 回) の 3 つの速さで同時に鳴らし、フーガを醸す。
+- 管弦楽の層 (V1・V2・VA・VC・CB・FL・WW・CL・HN・TR・TB・TP) はピアノに写さず、**その楽器のまま** 16 倍に (`ORCH`): ×16 は元の大きさ、×4 は 0.6 倍、×1 は 0.35 倍。弦の長い音は 2 拍ごとに弓を返すように打ち直される
+- 10/13 06:41・06:42 の実音 (REC) は 16 倍には伸ばせないので、bank1013 の採譜をピアノで (`rec_g`)。テンポの違い (60 / 72) は拍で写す (♩=60 固定)。鐘は始めと終わりの深いものだけ
+- 楽章はそのまま 16 倍に: Introduzione ×16 (0〜256) → Inno ×16 (256〜576) → Tema (国歌) ×16 (576〜928) → Sviluppo ×16 (928〜1568) → Finale ×16 (1568〜1920) → Coda ×16 (1920〜2144)
+- 要所を短く合成して測った音量 (rms): 序奏 −19 dB、Inno −16〜−25、Tema −13〜−17、Sviluppo −12〜−14、Finale −6〜−10 (総奏の頂点)、Coda −18〜−23 (静かに)
+
+```bash
+python3 compose_tablet105.py score_tablet129.json score_tablet130.json bank1013/bank.json && python3 render_long.py score_tablet130.json out130 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash
