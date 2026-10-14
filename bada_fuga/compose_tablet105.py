@@ -127,7 +127,12 @@ def equalize(out, block=32, orch=False):
 if __name__ == '__main__':
     d = json.load(open(SRC)); out = build(d)
     h, rem = divmod(out['duration'], 3600); dur_s = '%d 時間 %d 分' % (h, rem // 60)
-    if 'Amazing Grace' in d['meta'].get('title', ''):
+    if 'Stille Nacht' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXXXIV · Stille Nacht — Requiem nel palazzetto XVI',
+                    subtitle='CXXXIII をまるごと 16 倍に (%s) — すべての 12 拍 (3/4 の 4 小節) を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。実音のピアノの 4 声と管弦楽はそのまま 16 倍に (2 拍ごとに打ち直す)、10/13 の録音は採譜のピアノに (3/4, ♩=60)' % dur_s,
+                    footer=['CXXXIII の 181 小節 × 16 = 2896 小節: Introitus ×16 → Stille Nacht I ×16 → Kyrie ×16 → Stille Nacht II ×16 → Agnus Dei ×16 → Lux aeterna ×16 → Coda ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 が遠くで 8 回。きよしこの夜 (1818 年の旋律、ニ長調) は 16 倍で 384 小節の聖歌に。B-A-D-A は 1 音 16 小節。声なし。'])
+    elif 'Amazing Grace' in d['meta'].get('title', ''):
         meta = dict(title='Requiem BADA — CXXXII · Amazing Grace nel palazzetto XVI',
                     subtitle='CXXXI をまるごと 16 倍に (%s) — すべての 12 拍 (3/4 の 4 小節) を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。実音のピアノの 4 声と管弦楽はそのまま 16 倍に (2 拍ごとに打ち直す)、10/13 の録音は採譜のピアノに (3/4, ♩=60)' % dur_s,
                     footer=['CXXXI の 146 小節 × 16 = 2336 小節: Introduzione ×16 → Amazing Grace I ×16 → Inno ×16 → Amazing Grace II ×16 → Fugato ×16 → Amazing Grace III ×16 → Coda ×16',

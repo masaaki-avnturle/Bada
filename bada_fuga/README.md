@@ -2805,6 +2805,16 @@ python3 compose_tablet105.py score_tablet131.json score_tablet132.json bank1013/
 BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet133.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet133.json && python3 synth.py score_tablet133.json tablet133.wav && python3 video.py score_tablet133.json tablet133.wav tablet133.mp4
 ```
 
+## 🎹🕯🌀 Requiem BADA — Tablet Sessions CXXXIV · Stille Nacht — Requiem nel palazzetto XVI (CXXXIII を 16 倍に伸ばして、フーガを醸す曲に, 3/4, ニ長調 / ロ短調, ♩=60, 2 時間 24 分 48 秒)
+
+CXXXIII (181 小節、3/4) をまるごと 16 倍に (`compose_tablet105.py`)。181 × 16 = 2896 小節。すべての 12 拍 (3/4 の 4 小節) を ×16 (2 拍ごとの打ち直し)・×4 (4 回)・×1 (遠くで 8 回) の 3 つの速さで同時に鳴らし、フーガを醸す。CXXXII と同じ作り (3/4 のまま、4 声はピアノで重ねて、管弦楽はその楽器のまま、10/13 の実音は採譜のピアノに、48 拍ごとの音の量をそろえる)
+- 楽章はそのまま 16 倍に: Introitus ×16 (0〜384) → Stille Nacht I ×16 (384〜800) → Kyrie ×16 (800〜1280) → Stille Nacht II ×16 (1280〜1696) → Agnus Dei ×16 (1696〜2080) → Lux aeterna ×16 (2080〜2512) → Coda ×16 (2512〜2896)
+- きよしこの夜の 24 小節は 384 小節 (19 分 12 秒) の聖歌に、B-A-D-A の唱えは 1 音 16 小節に。鐘は始め・Agnus Dei・終わりの深いものだけ
+
+```bash
+python3 compose_tablet105.py score_tablet133.json score_tablet134.json bank1013/bank.json && python3 render_long.py score_tablet134.json out134 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash
