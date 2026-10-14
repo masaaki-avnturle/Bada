@@ -2834,6 +2834,26 @@ python3 compose_tablet105.py score_tablet133.json score_tablet134.json bank1013/
 BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet135.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet135.json && python3 synth.py score_tablet135.json tablet135.wav && python3 video.py score_tablet135.json tablet135.wav tablet135.mp4
 ```
 
+## 🎹⛪🎻 Requiem BADA — Tablet Sessions CXXXVI · Missa nel palazzetto (10/13・10/12・10/03 の 11 曲をベースに、雰囲気に合うように、キリスト教会のミサ曲を主題に, ロ短調 / ニ長調, ♩=56, 16 分 41 秒)
+
+11 の録音 (半音上げてロ短調に; 13:06 は全音上げてニ長調に; 長いものは始めの 55〜60 秒) を段落ごとに敷き、その上にミサ通常文 (Kyrie・Gloria・Credo・Sanctus・Benedictus・Agnus Dei) の形で、録音の音から作った聖歌風の主題を実音のピアノの 4 声と管弦楽で。主題はすべて録音の音から (聖歌の引用はなし)
+
+| 段落 | 小節 | 録音 | 内容 |
+|---|---|---|---|
+| Kyrie (ロ短調) | 0〜48 | 10/13 06:41 → 10/12 06:27 → 10/13 06:42 | 06:41 の音から作った主題 (CXXV の Inno の第 1 句) のフーガ (アルト → ソプラノ 答唱 → バス → テノール 答唱) → Christe (反行の 2 声と保続) → Kyrie II (2 重のストレッタ、弦も追う)。高い開いた 5 度、深い鐘 |
+| Gloria (ニ長調) | 48〜96 | 10/03 13:27 → 13:24 → 13:22 | 13:27 の主題 (CXXVII の第 2 主題) のフガート、弦・フルート・トランペット → Et in terra pax (13:24 の音の唱えをユニゾンで静かに) → Amen (ストレッタ、トランペット、トロンボーンの拡大、ティンパニ) |
+| Credo (ロ短調) | 96〜150 | 10/12 13:03 → 13:06 → 13:07 | 13:03 の音の唱え (ユニゾン、ほぼ 1 音のレチタティーヴォ風) → Et incarnatus est (13:06 の讃美歌をニ長調のコラールで、弦) → Et resurrexit (子守歌の大黒柱の主題のフガート、反行、ホルン・トロンボーンの拡大、ティンパニ) |
+| Sanctus (ニ長調) | 150〜190 | 10/12 06:30 → 10/03 13:19 | 06:42 の音から作った旋律の 4 声のコラール (和声の下書き D G D A / Bm G D A / …) → Benedictus (06:27 の音の旋律をソプラノが独唱、フルート、13:19 の共鳴) → Hosanna (高いラ、高い開いた 5 度) |
+| Agnus Dei (ロ短調 → ニ長調) | 190〜232 | 10/13 06:41 → 06:42 | B-A-D-A の唱え (アルト) に Kyrie の主題がソプラノに重なる、バスの保続、深い鐘 → Dona nobis pacem (Sanctus の旋律のコラール、Vn I・フルート) → pacem (ニ長調の和音、弦・ホルン、深い鐘) |
+
+- 測った音量 (rms): Kyrie −16〜−21 dB、Gloria −13〜−21、Credo −15〜−16 (唱えのあとに 2 小節の間)、Sanctus −15〜−21、Agnus Dei −17〜−18
+- mp4 は 30 MiB に収めるため 2 つに (Kyrie〜Credo 10 分 43 秒、Sanctus〜Agnus Dei 5 分 58 秒; 960×540)。10/03 13:19 の喘ぎ処理済み wav は `dip_breath.py` で作る。`compose_tablet136.py` (CXXVII の録音・bank・和声の関数を使う)
+
+```bash
+python3 dip_breath.py src/20261003_131932.wav src/20261003_131932_clean.wav
+BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet136.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet136.json && python3 synth.py score_tablet136.json tablet136.wav && python3 video.py score_tablet136.json tablet136.wav tablet136.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
