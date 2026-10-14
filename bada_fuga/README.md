@@ -2784,6 +2784,27 @@ CXXXI (146 小節、3/4) をまるごと 16 倍に (`compose_tablet105.py`)。14
 python3 compose_tablet105.py score_tablet131.json score_tablet132.json bank1013/bank.json && python3 render_long.py score_tablet132.json out132 192 3
 ```
 
+## 🎹🕯🎄 Requiem BADA — Tablet Sessions CXXXIII · Stille Nacht — Requiem nel palazzetto (きよしこの夜の聖歌を、10/13 の 2 曲の雰囲気の上で requiem の雰囲気に被せて, 3/4 = 6/8, ニ長調 / ロ短調, ♩=60, 9 分 10 秒)
+
+旋律は Stille Nacht (Franz Xaver Gruber、1818 年、パブリックドメイン): 6/8 を 3/4 (♩ = 8 分音符 2 つ) で書いて 24 小節。ニ長調は 10/13 の録音 (半音上げてロ短調) の平行長調。requiem の形 (Introitus → Kyrie → Agnus Dei → Lux aeterna) に聖歌を 3 度、B-A-D-A の唱えを重ねる。`compose_tablet131.py` (Amazing Grace) の枠組み
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| I. Introitus (ロ短調) | 0〜24 | 10/13 06:41 の実音 (半音上げて)。高い開いた 5 度の弦が pp、コントラバスの保続、ホルンが Stille Nacht の頭 (ファ#・ソ・ファ#・レ) をロ短調で。B-A-D-A の唱え (アルト、1 音 1 小節) が静かに |
+| II. Stille Nacht I (ニ長調) | 24〜50 | 実音のピアノ (9/24 08:53 の音) の 4 声で、聖歌として: ソプラノが旋律、ほかの声部は和音から。弦の和音が薄く |
+| III. Kyrie (ロ短調) | 50〜80 | 06:42 の実音の上で、頭をロ短調の主題にしたフガート: アルト → ソプラノ (答唱) → バス → テノール、弦も Vn I → Vn II → Va → Vc。後半は音階の中での反行 (ファ#・ミ・ファ#・ラ) |
+| IV. Stille Nacht II (ニ長調) | 80〜106 | Vn I とフルート (1 オクターヴ上) が旋律に重なり、Vn II・Va が和音、Vc・Cb が根音 |
+| V. Agnus Dei (ロ短調) | 106〜130 | B-A-D-A の唱え (アルト) に、Stille Nacht の頭がロ短調でソプラノに重なる。バスの保続 (シ)、低い弦の和音、深い鐘 |
+| VI. Lux aeterna — Stille Nacht III (ニ長調) | 130〜157 | 総奏: ホルンが旋律、トロンボーン・Vc・Cb が根音、弦とオーボエ・フルート、4 声。最後の「Sleep in heavenly peace」は 4 声のユニゾン。Amen (ソ → レ)、ティンパニ |
+| VII. Coda (ロ短調) | 157〜181 | 06:41 の実音、高い開いた 5 度、ホルンの頭、深い鐘 |
+
+- 和音は小節ごとに、聖歌の和声の下書き (D D D D A A D D G G D D G G D D A A D D D A D D) を優先しつつ旋律の音を含む和音を選ぶ
+- 測った音量 (rms): Introitus −19 dB、聖歌 I −16、Kyrie −15、II −14、Agnus Dei −17、Lux aeterna −13、Coda −21。鐘は始め・Agnus Dei・終わりに深いもの。声なし。`compose_tablet133.py`
+
+```bash
+BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet133.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet133.json && python3 synth.py score_tablet133.json tablet133.wav && python3 video.py score_tablet133.json tablet133.wav tablet133.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
