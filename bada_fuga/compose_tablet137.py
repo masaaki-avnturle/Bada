@@ -30,7 +30,7 @@ def tempo_of(bar): return 72.0 if (CHRISTE <= bar < KYRIE2 or GLORIA <= bar < CR
 def key_of(bar): return 'D' if (CHRISTE <= bar < KYRIE2 or GLORIA <= bar < TERRA or RESURR <= bar < AGNUS or bar >= DONA) else 'Bm'
 RATE = lambda semis: 2 ** (semis / 12.0)
 PLAYS = [(R41, 1, 0.42, 1), (R42, CHRISTE + 1, 0.36, 1), (R41, AGNUS + 1, 0.4, 1), (R42, DONA + 1, 0.3, 1)]
-extras = []; RH = []
+extras = []; RH = []; RECQ = set()                                                                 # RECQ: 録音が鳴っている拍 (その和音を優先する)
 def add(v, beat, dbeats, m, gain, label=None, **kw): extras.append(dict(v=v, beat=round(beat, 4), dbeats=round(dbeats, 4), m=int(m), gain=round(gain, 4), label=label, **kw))
 OG = 0.34
 def oadd(v, beat, dbeats, m, gain, label=None): add(v, beat, dbeats, m, gain * OG, label)
@@ -44,10 +44,10 @@ def harm_fit(P, b0, b1, entries, cands):
                     ov = min(a + 2, t + d) - max(a, t)
                     if ov > 0: notes.append((ov * (2 if t <= a < t + d else 1), m))
                     t += d
-            rc = set(chord(RH[a])['pcs'])
+            rc = set(chord(RH[a])['pcs']); rec = a in RECQ; prev = P.harm[a - 1] if a > 0 else None
             def score(c):
                 cc = set(chord(c)['pcs'])
-                return sum(w * (1 if m % 12 in cc else -0.8) for w, m in notes) + 1.5 * len(cc & rc) / max(1, len(cc)) + (1.2 if c == RH[a] else 0)
+                return sum(w * (1 if m % 12 in cc else -0.8) for w, m in notes) + (1.5 if rec else 0.4) * len(cc & rc) / max(1, len(cc)) + ((1.2 if rec else 0.2) if c == RH[a] else 0) - (0.3 if (c == prev and notes) else 0)
             cs = max(cands, key=score)
             for q in range(2): P.harm[a + q] = cs
 def invert(mat): m0 = mat[0][1]; return [(d, 2 * m0 - m) for d, m in mat]
@@ -129,7 +129,7 @@ def build():
                 frac = (q - t0) * 60.0 / tempo_of(bar) * RATE(sm); cur = rec['segs'][0]['ch']
                 for s in rec['segs']:
                     if s['t'] <= frac: cur = s['ch']
-                cur = transpose_h([[cur]], sm)[0][0]
+                cur = transpose_h([[cur]], sm)[0][0]; RECQ.add(q)
         if cur is None: cur = key_of(q // BPB)
         RH.append(cur); P.harm[q] = cur
     for v in VOICES: P.rest_bars(v, 0, TOTAL)                                                       # 4 声 (ピアノ) は使わない — 管弦楽だけ

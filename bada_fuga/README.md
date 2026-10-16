@@ -2854,6 +2854,34 @@ python3 dip_breath.py src/20261003_131932.wav src/20261003_131932_clean.wav
 BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet136.py bank1012b/bank.json bank1012/bank.json bank112/bank.json bank109.json src score_tablet136.json && python3 synth.py score_tablet136.json tablet136.wav && python3 video.py score_tablet136.json tablet136.wav tablet136.mp4
 ```
 
+## 🎻🇺🇸⛪ Requiem BADA — Tablet Sessions CXXXVII · Missa in si minore sull'inno americano (10/13 の 2 曲を雰囲気に、バッハのミサ曲の形に、モーツァルトのレクイエムを舞台にして、アメリカ国歌を主題に, ロ短調 / ニ長調, ♩=56 / 72, 18 分 10 秒)
+
+形はバッハのロ短調ミサ、舞台 (音の情景) はモーツァルトのレクイエム、主題はアメリカ国歌 The Star-Spangled Banner (music21 の収録譜、ニ長調; `ssb_melody.json`)。バッハ・モーツァルトの旋律の引用はなく、形と様式 (フーガ・古様式・固執低音・歩く低音・ため息・トレモロ・独唱) だけ。管弦楽だけ (synth の合成; クラリネットがバセットホルンの代わり)。10/13 06:41・06:42 の実音 (半音上げてロ短調に) が Kyrie I・Christe・Agnus Dei・Dona nobis pacem に小さく。4 声 (ピアノ) は使わないので、bank1013 (10/13 の 2 曲から) と喘ぎ処理済みの wav だけで作れる
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| Kyrie I (ロ短調, ♩=56) | 0〜40 | Introitus の舞台: 06:41 の実音、歩く低音 (Cb・Vc、根音と 5 度を 1 拍ずつ)、低いクラリネット、トロンボーンの和音。国歌の頭をロ短調にした主題 (ファ#・レ・シ・レ・ファ#・シ) のフーガ: Vn II → Vn I (答唱) → Va → Vc、下行の対主題、2 回目の提示、ストレッタ、ティンパニ、開いた 5 度で閉じる |
+| Christe (ニ長調, ♩=72) | 40〜64 | 二重唱: フルートとオーボエ、のちに Vn I・Vn II が国歌の第 2 句を 1 小節遅れのカノンで。06:42 の実音、Vc・Cb の根音 |
+| Kyrie II (ロ短調, ♩=56) | 64〜88 | 古様式: 主題の拡大 (×2) が Vc・トロンボーン → Va・ホルン → Vn II → Vn I と長い音で重なる、クラリネット、開いた 5 度 |
+| Gloria (ニ長調, ♩=72) | 88〜108 | トランペットとティンパニの頭、弦のトレモロ、「rockets' red glare」の句のフガート (Vn I → Vn II → Va → Vc)、フルート、トランペット |
+| Et in terra pax (ロ短調) | 108〜124 | 静かに: クラリネットの頭 (ロ短調)、オーボエの反行、低い弦、トロンボーン、ティンパニの小さな拍 |
+| Crucifixus (ロ短調, ♩=56) | 124〜152 | 半音で下る固執低音 (シ・ラ#・ラ・ソ#・ソ・ファ#・ファ#・シ、2 小節; 和音 Bm・F#/A#・D/A・Em/G・G・F#7・Bm) を 14 回。その上に国歌の最後の句 (O say does that star-spangled banner) の拡大 (×2) がオーボエ → ホルン → Vn I に、弦のため息 (上の隣の音 → 和音の音の 2 音のスラー) |
+| Et resurrexit (ニ長調, ♩=72) | 152〜172 | 国歌の第 1・2 句を総奏で 2 度 (トランペット・Vn I・フルート・ホルン)、Vn II・Va の 8 分音符、Vc・Cb・トロンボーンの根音、ティンパニ |
+| Sanctus (ニ長調, ♩=56) | 172〜184 | 弦のトレモロ、トランペット・ホルン・Vn I の頭の拡大、トロンボーン・Cb の和音、ティンパニ |
+| Hosanna (ニ長調, ♩=72) | 184〜196 | 頭のフガート (Vn I → Vn II → Va → Vc)、フルート・トランペット・トロンボーン |
+| Benedictus (ニ長調, ♩=56) | 196〜216 | フルート → オーボエ → クラリネット → ホルンの四重奏が第 2 句を模倣で、弦は短い根音 (ピツィカートのように) |
+| Agnus Dei (ロ短調, ♩=56) | 216〜244 | 独唱: クラリネットが最後の句をロ短調の上で (2 度、オーボエが寄り添う)、弦のため息、歩く低音、トロンボーン、ホルンの頭の拡大、06:41 の実音、深い鐘。ファ# の属和音からニ長調へ |
+| Dona nobis pacem (ニ長調, ♩=72) | 244〜280 | 国歌の全曲を総奏で (CXXVIII の総奏と同じ作り)、06:42 の実音、ニ長調の和音 (弦・ホルン・トランペット・フルート)、深い鐘 |
+
+- 和音は旋律の音を含む和音を半小節ごとに選ぶ。録音が鳴っている拍はその録音の和音を優先し、鳴っていない拍は同じ和音の繰り返しを少し避けて動かす (`harm_fit`, `RECQ`)
+- mp4 は 30 MiB に収めるため 2 つに (Kyrie I〜Et resurrexit 11 分 1 秒、Sanctus〜Dona nobis pacem 7 分 1 秒; 960×540)。`compose_tablet137.py` (ほかの bank に依存しない)
+
+```bash
+python3 build_sampler.py bank1013 20261013_064129.mp3 20261013_064238.mp3   # 録音の採譜 (和音) のため
+ffmpeg -i 20261013_064129.mp3 -ac 1 -ar 44100 src/20261013_064129.wav && python3 dip_breath.py src/20261013_064129.wav src/20261013_064129_clean.wav   # 06:42 も同じく
+python3 compose_tablet137.py bank1013/bank.json src score_tablet137.json && python3 synth.py score_tablet137.json tablet137.wav && python3 video.py score_tablet137.json tablet137.wav tablet137.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
