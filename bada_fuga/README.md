@@ -2874,7 +2874,8 @@ BANK1013=bank1013/bank.json SCORE89=score_tablet89.json python3 compose_tablet13
 | Dona nobis pacem (ニ長調, ♩=72) | 244〜280 | 国歌の全曲を総奏で (CXXVIII の総奏と同じ作り)、06:42 の実音、ニ長調の和音 (弦・ホルン・トランペット・フルート)、深い鐘 |
 
 - 和音は旋律の音を含む和音を半小節ごとに選ぶ。録音が鳴っている拍はその録音の和音を優先し、鳴っていない拍は同じ和音の繰り返しを少し避けて動かす (`harm_fit`, `RECQ`)
-- mp4 は 30 MiB に収めるため 2 つに (Kyrie I〜Et resurrexit 11 分 1 秒、Sanctus〜Dona nobis pacem 7 分 1 秒; 960×540)。`compose_tablet137.py` (ほかの bank に依存しない)
+- 段落ごとの音量を均す (総奏の Dona nobis pacem に合わせて正規化されるとほかが −25 dB ほどになるので、総奏を 0.75 倍、静かな段落を 1.5〜2.4 倍に)。測った音量 (rms): Kyrie I −21 dB、Christe −20、Kyrie II −18〜−24、Gloria −17〜−23、Et in terra pax −20、Crucifixus −19、Et resurrexit −17、Sanctus −16、Hosanna −19、Benedictus −19、Agnus Dei −19〜−23、Dona nobis pacem −13 (頂点)
+- mp4 は 30 MiB に収めるため 2 つに (Kyrie I〜Et resurrexit 11 分 1 秒、Sanctus〜Dona nobis pacem 7 分 9 秒; 960×540)。`compose_tablet137.py` (ほかの bank に依存しない)
 
 ```bash
 python3 build_sampler.py bank1013 20261013_064129.mp3 20261013_064238.mp3   # 録音の採譜 (和音) のため
