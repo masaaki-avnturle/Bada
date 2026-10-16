@@ -282,6 +282,12 @@ def post(P, events, ex):
     for i, m in enumerate((38, 50, 57, 62, 66, 74, 78)): oadd(('CB', 'VC', 'TB', 'HN', 'VA', 'V2', 'V1')[i], (DONA + 2 + SSB_BARS) * BPB + 0.03 * i, (TOTAL - DONA - 2 - SSB_BARS) * BPB - 1.0, m, 0.22, 'ニ長調の和音 (レ・ラ・ファ#)' if i == 0 else None)
     oadd('TR', (DONA + 2 + SSB_BARS) * BPB, 4 * BPB, 74, 0.26, None); oadd('FL', (DONA + 2 + SSB_BARS) * BPB, 6 * BPB, 86, 0.16, None); oadd('TP', (DONA + 2 + SSB_BARS) * BPB, 4.0, 38, 0.5, None)
     add('X', 0, 10, 35, 0.3, '深い鐘 (ひとつ)'); add('X', (TOTAL - 3) * BPB, 14, 38, 0.4, None)
+    # 段落ごとの音量 (ステムで測って: 総奏の Dona nobis pacem に合わせて正規化されるとほかが −25 dB ほどになるので、総奏を下げ、静かな段落を上げる)
+    GAIN = [(KYRIE1, 1.5), (CHRISTE, 1.5), (KYRIE2, 2.0), (GLORIA, 1.6), (TERRA, 1.6), (CRUC, 1.5), (RESURR, 1.1), (SANCTUS, 1.1), (HOSANNA, 2.4), (BENED, 2.2), (AGNUS, 1.5), (DONA, 0.75), (TOTAL, 1.0)]
+    for e in extras:
+        if e['v'] in ('REC', 'X'): continue
+        for (b0, g0), (b1, _) in zip(GAIN, GAIN[1:]):
+            if b0 * BPB <= e['beat'] < b1 * BPB: e['gain'] = round(e['gain'] * g0, 4); break
 
 META = {'style': 'recsampler', 'bank': BANKP, 'rec_order': [R41, R42], 'piano_decay': 2.6, 'reverb': [8.0, 3.0, 0.5], 'orchestra': True,
         'title': 'Requiem BADA — CXXXVII · Missa in si minore sull\'inno americano',
