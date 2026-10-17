@@ -2883,6 +2883,26 @@ ffmpeg -i 20261013_064129.mp3 -ac 1 -ar 44100 src/20261013_064129.wav && python3
 python3 compose_tablet137.py bank1013/bank.json src score_tablet137.json && python3 synth.py score_tablet137.json tablet137.wav && python3 video.py score_tablet137.json tablet137.wav tablet137.mp4
 ```
 
+## 🎌🎻❄ Requiem BADA — Tablet Sessions CXXXVIII · Kimigayo nel palazzetto (10/13 の 2 曲を雰囲気に、ニ長調の君が代を — 剣道の県大会の試合会場で全員が聞く、冷たい空気の会場に静かに流れる曲に, ニ長調 / ロ短調, ♩=52, 6 分 54 秒)
+
+旋律は君が代 (林廣守、公有; XXIX の採譜、主音レ、44 拍 = 11 小節)。ニ長調の和音 (D・G・A・Bm・Em、ド♮の所は C・Am) で、館内放送のように遠く静かに。舞台は冷たい空気の総合体育館: 10/13 06:41・06:42 の実音 (半音上げてロ短調に)、高い開いた 5 度の弦が pp、コントラバスの保続、低いクラリネット、深い鐘。管弦楽だけ (synth の合成)、長めの残響
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| Introduzione (ロ短調) | 0〜20 | 06:41 の実音、高い開いた 5 度 (Vn・Va, pp)、コントラバスの保続、低いクラリネット — ホルンが「君が代は」を遠くで 2 度、深い鐘がひとつ |
+| Kimigayo I (ニ長調) | 20〜32 | 君が代の全曲: Vn I が旋律 (pp)、クラリネットが 1 オクターヴ下、Vn II・Va の和音、Vc・Cb の根音 — 全員が立って聞く静けさ |
+| Interludio (ロ短調) | 32〜50 | 06:42 の実音。「千代に八千代に」「さざれ石の」の句がホルン → オーボエ → クラリネット → Vc と静かに追いかける (フーガの気配)、高い開いた 5 度、ラの属音からニ長調へ |
+| Kimigayo II (ニ長調) | 50〜64 | 2 度目: フルート (1 オクターヴ上) とホルンが加わる、トロンボーンの根音、「巌となりて」にティンパニの小さなロール — それでも静かに |
+| ユニゾンのレ | 64〜72 | 「君が代は」を弦のオクターヴのユニゾンで pp、最後はレだけ (国歌の終わりの斉唱のように) |
+| Coda (ロ短調) | 72〜88 | 06:41 の実音、高い開いた 5 度、ホルンの「君が代は」、低いクラリネット — 深い鐘 |
+
+- 和音は旋律の音を含む和音を半小節ごとに (録音が鳴っている拍はその和音を優先、鳴っていない拍は同じ和音の繰り返しを少し避ける)。sus4 は使わず、ニ長調をはっきりと
+- 測った音量 (rms): Introduzione −15〜−18 dB、Kimigayo I −15、Interludio −14〜−18、Kimigayo II −12 (いちばん大きい所でも静か)、ユニゾン −15〜−17、Coda −16〜−19。`compose_tablet138.py` (CXXXVII と同じく bank1013 と 10/13 の wav だけで作れる)
+
+```bash
+python3 compose_tablet138.py bank1013/bank.json src score_tablet138.json && python3 synth.py score_tablet138.json tablet138.wav && python3 video.py score_tablet138.json tablet138.wav tablet138.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
