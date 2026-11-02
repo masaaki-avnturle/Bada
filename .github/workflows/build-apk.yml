@@ -17,6 +17,11 @@ on:
       - ".github/workflows/build-apk.yml"
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release のタグ名 (例: badaxp-v1.0.0)。空欄なら従来どおり app-latest (上書き)。'
+        required: false
+        default: ''
 
 permissions:
   contents: write   # needed to create/update the Release and upload the APK
@@ -55,8 +60,9 @@ jobs:
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'app-latest' }}
-          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Bada XP (latest build)' }}
+          tag_name: ${{ github.event.inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || 'app-latest' }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ github.event.inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || 'Bada XP (latest build)' }}
           body: |
             Bada XP — ChatGPT 分派 Android アプリ。
 

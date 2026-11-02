@@ -13,6 +13,11 @@ on:
       - "bada_webos/apps/hologram/**"
       - ".github/workflows/android-apk.yml"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release のタグ名 (例: hologram-v1.0.0)。空欄なら従来どおり hologram-apk (上書き)。'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -66,8 +71,9 @@ jobs:
       - name: Publish APK to a downloadable release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: hologram-apk
-          name: Bada Hologram APK
+          tag_name: ${{ github.event.inputs.release_tag || 'hologram-apk' }}
+          target_commitish: ${{ github.sha }}
+          name: Bada Hologram APK${{ github.event.inputs.release_tag != '' && format(' {0}', github.event.inputs.release_tag) || '' }}
           body: |
             The Bada Hologram Android app (WebView) bundling:
             - Hologram Display (reflection pyramid / free view)

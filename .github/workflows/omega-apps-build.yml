@@ -8,6 +8,11 @@ name: Ω apps build (APK + Windows EXE + Linux)
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: apps-v1.6.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
   push:
     tags:
       - 'apps-v*'
@@ -38,9 +43,11 @@ jobs:
           name: ${{ matrix.app }}-windows
           path: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
       - name: Attach EXE to Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
 
   linux-app:
@@ -67,9 +74,11 @@ jobs:
             bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
             bio_medicine/${{ matrix.app }}/electron/dist/*.deb
       - name: Attach Linux builds to Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: |
             bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
             bio_medicine/${{ matrix.app }}/electron/dist/*.deb
@@ -132,7 +141,9 @@ jobs:
           name: ${{ matrix.app }}-android
           path: out/*.apk
       - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: out/*.apk
