@@ -7,6 +7,8 @@ name: 🗄 Artifact Vault (Actions のアーティファクトを永久保存)
 # ファイルは期限がないため、Actions に投稿された成果物が二度と消えなくなります。
 #
 #   自動:   下の `workflows:` にあるワークフローが完了 → そのランの成果物を保存
+#   毎日:   03:17 UTC に全ワークフロー (ブランチ・名前を問わず) の生きている
+#           アーティファクトを総ざらいして保存 (保存済みのランは飛ばす)
 #   手動:   Run workflow → backfill=true で、まだ期限切れになっていない
 #           過去のアーティファクトを全ランぶん一括で Release に移します。
 #           run_id を指定すると、そのランだけ保存します。
@@ -33,6 +35,10 @@ on:
       - "ZoneBrowser app build (Windows EXE + Ubuntu + Android APK)"
       - "zone:// distribution (downloadable bundle)"
     types: [completed]
+  # 毎日 1 回、リポジトリ内の全ワークフロー (ブランチ・名前を問わず) の
+  # まだ生きているアーティファクトを総ざらいして Release へ移す (冪等: 保存済みは飛ばす)
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
       backfill:
@@ -117,7 +123,7 @@ jobs:
             vault_run "$TRIG_RUN_ID"
           elif [ -n "$IN_RUN_ID" ]; then
             vault_run "$IN_RUN_ID"
-          elif [ "$BACKFILL" = "true" ]; then
+          elif [ "$BACKFILL" = "true" ] || [ "$EVENT" = "schedule" ]; then
             runs=$(gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
                    --jq '.artifacts[] | select(.expired==false) | .workflow_run.id' | sort -u)
             cnt=$(echo "$runs" | grep -c . || true)
