@@ -1,0 +1,589 @@
+<title>D-brane 宇宙図</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the 3D cosmos fills the stage; a narrow field-notebook panel on the left
+   (stacked under the stage on phones) holds the genealogy, layers, controls, the
+   eight child universes and the report's equations. Single dark look by choice. */
+:root{
+  --void:#04050c; --panel:#0a0c18; --line:#1d2240; --ink:#e7e9f6; --muted:#8c92b3;
+  --brane:#5cc8ff; --anti:#ff5c9d; --jones:#ffc95a; --cy:#a08cff; --child:#6fe3c1; --bulk:#7d86ff;
+  --f-display:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--void);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.7}
+.app{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);height:100%}
+.panel{overflow-y:auto;background:var(--panel);border-right:1px solid var(--line);
+  padding-block:26px 44px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:20px;
+  display:flex;flex-direction:column;gap:26px;min-width:0}
+.stage{position:relative;min-width:0;overflow:hidden;background:var(--void)}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none}
+@media (max-width:760px){
+  html,body{height:auto}
+  .app{display:flex;flex-direction:column;height:auto}
+  .stage{height:70vh;min-height:420px;order:-1}
+  .panel{border-right:0;border-top:1px solid var(--line);overflow:visible;
+    padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:800;font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:.02em;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:600;font-size:16px;margin:0 0 10px;letter-spacing:.04em;color:var(--ink)}
+p{margin:0}
+.lead{color:#c9cce3;max-width:65ch}
+.lead b{color:var(--jones);font-weight:500}
+section{display:flex;flex-direction:column;min-width:0}
+.chain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.chain li{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;position:relative;padding-bottom:10px}
+.chain li::before{content:"";position:absolute;left:10px;top:18px;bottom:-2px;width:1px;background:var(--line)}
+.chain li:last-child::before{display:none}
+.chain .dot{width:11px;height:11px;border-radius:50%;margin:6px 0 0 5px;box-shadow:0 0 10px currentColor;background:currentColor}
+.chain .t{font-weight:500}
+.chain .s{color:var(--muted);font-size:12.5px;display:block;line-height:1.55}
+.layers{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+label.chk{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;min-width:0}
+label.chk input{accent-color:var(--brane);width:15px;height:15px;margin:0;flex:none}
+.sw{width:10px;height:10px;border-radius:2px;flex:none}
+.ctrl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;margin-bottom:10px}
+.ctrl label{font-size:13px}
+.ctrl output{font-family:var(--f-mono);font-size:12px;color:var(--brane);font-variant-numeric:tabular-nums}
+.ctrl input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--brane)}
+.ctrl small{grid-column:1/-1;color:var(--muted);font-size:12px;line-height:1.5}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;font-size:12.5px;color:var(--ink);background:#121633;border:1px solid var(--line);border-radius:4px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--brane)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--brane);outline-offset:2px}
+button[aria-pressed=true]{border-color:var(--brane);color:var(--brane)}
+.pairs{display:flex;flex-direction:column;gap:8px}
+.pair{display:grid;grid-template-columns:4px 1fr;gap:10px}
+.pair .bar{border-radius:2px}
+.pair .nm{font-size:12px;color:var(--muted);margin-bottom:4px}
+.pair .row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pair button{text-align:left;padding:5px 8px;min-width:0}
+.pair button span{display:block;font-size:11px;color:var(--muted);line-height:1.35}
+.eq{font-family:var(--f-mono);font-size:12px;line-height:1.6;background:#070914;border:1px solid var(--line);border-radius:4px;padding:8px 10px;overflow-x:auto;white-space:pre;color:#d9dcf2}
+.eqs{display:flex;flex-direction:column;gap:8px}
+.eqs .cap{font-size:12px;color:var(--muted)}
+.src{font-size:12px;color:var(--muted);line-height:1.6}
+.src code{font-family:var(--f-mono);font-size:11.5px;color:#b9bedb}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;font-size:11.5px;letter-spacing:.03em;
+  padding:1px 6px;border-radius:3px;background:rgba(4,5,12,.62);color:var(--ink);transform:translate(-50%,-50%);will-change:transform}
+.lbl small{color:var(--muted);font-size:10.5px;margin-left:4px}
+.hint{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:10px;font-size:11.5px;color:var(--muted);
+  background:rgba(4,5,12,.6);padding:3px 8px;border-radius:3px;pointer-events:none}
+.err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="app">
+  <aside class="panel">
+    <header>
+      <div class="eyebrow">Kauffman_omega / reports より</div>
+      <h1>D-brane 宇宙図</h1>
+      <p class="lead">レポートのあらまし「<b>宇宙と異次元が、D-braneを柱として、生み出された</b>」を立体化した図です。母なる Jones 多項式から D-brane の柱が立ち上がり、我々の宇宙（無限の D-brane）と反ド・ジッター AdS<sub>5</sub> のバルク、有限の anti-D-brane を貫きます。宇宙の各点にはカラビ・ヤウ多様体の余剰次元が畳まれ、ブレーンから8つの子宇宙（サーストンの8幾何）が芽吹き、2つずつ4つの宇宙にまとまって1つの宇宙へ統合されます。</p>
+    </header>
+
+    <section aria-labelledby="h-chain">
+      <h2 id="h-chain">生成の系譜</h2>
+      <ol class="chain">
+        <li style="color:#cfd3ea"><i class="dot"></i><div><span class="t">無（ゼータ関数）</span><span class="s">無限の時間の無が、場の理論として存在していた</span></div></li>
+        <li style="color:#ffe3a3"><i class="dot"></i><div><span class="t">ガンマ関数（父）</span><span class="s">オイラーの定数の大域的積分多様体</span></div></li>
+        <li style="color:var(--jones)"><i class="dot"></i><div><span class="t">Jones 多項式（母）</span><span class="s">質量差エネルギーとして生まれた三葉結び目</span></div></li>
+        <li style="color:var(--brane)"><i class="dot"></i><div><span class="t">D-brane の柱</span><span class="s">ゼータ関数を Z 軸に束ねたシリンダー。ねじれは Seifert 多様体の第5次元</span></div></li>
+        <li style="color:var(--cy)"><i class="dot"></i><div><span class="t">宇宙と異次元</span><span class="s">D-brane（無限）と anti-D-brane（有限）、AdS<sub>5</sub> バルク、各点のカラビ・ヤウ</span></div></li>
+        <li style="color:var(--child)"><i class="dot"></i><div><span class="t">8つの子宇宙 → 4つの宇宙</span><span class="s">8種類のサーストン幾何を2種類ずつまとめる</span></div></li>
+        <li style="color:#ffffff"><i class="dot"></i><div><span class="t">統一宇宙（共時性）</span><span class="s">4つの宇宙が1つの宇宙へ統合される</span></div></li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="h-layers">
+      <h2 id="h-layers">表示レイヤー</h2>
+      <div class="layers">
+        <label class="chk"><input type="checkbox" id="L-origin" checked><i class="sw" style="background:var(--jones)"></i>無・父・母</label>
+        <label class="chk"><input type="checkbox" id="L-pillars" checked><i class="sw" style="background:var(--brane)"></i>D-brane の柱</label>
+        <label class="chk"><input type="checkbox" id="L-brane" checked><i class="sw" style="background:var(--brane)"></i>我々の宇宙</label>
+        <label class="chk"><input type="checkbox" id="L-anti" checked><i class="sw" style="background:var(--anti)"></i>anti-D-brane</label>
+        <label class="chk"><input type="checkbox" id="L-bulk" checked><i class="sw" style="background:var(--bulk)"></i>AdS<sub>5</sub> バルク</label>
+        <label class="chk"><input type="checkbox" id="L-seifert" checked><i class="sw" style="background:#9fe0ff"></i>Seifert ファイバー</label>
+        <label class="chk"><input type="checkbox" id="L-cy" checked><i class="sw" style="background:var(--cy)"></i>カラビ・ヤウ</label>
+        <label class="chk"><input type="checkbox" id="L-child" checked><i class="sw" style="background:var(--child)"></i>子宇宙</label>
+        <label class="chk"><input type="checkbox" id="L-labels" checked><i class="sw" style="background:#fff"></i>ラベル</label>
+        <label class="chk"><input type="checkbox" id="L-rotate" checked><i class="sw" style="background:var(--muted)"></i>自動回転</label>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-param">
+      <h2 id="h-param">パラメータ</h2>
+      <div class="ctrl">
+        <label for="T">ブレーン張力 T（AdS<sub>5</sub> の歪み）</label><output id="Tv">0.18</output>
+        <input type="range" id="T" min="0.02" max="0.6" step="0.01" value="0.18">
+        <small>歪み因子 e<sup>−2πT|ψ|</sup>。T を上げるとバルクが絞られ、anti-D-brane が小さく（有限に）なります。</small>
+      </div>
+      <div class="ctrl">
+        <label for="A">カラビ・ヤウ射影角 α</label><output id="Av">0.79</output>
+        <input type="range" id="A" min="0" max="3.14" step="0.01" value="0.79">
+        <small>5次フェルマー曲面の複素 2 次元断面を 3 次元へ射影する角度。25 枚のパッチの色は (k₁,k₂)。</small>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-view">
+      <h2 id="h-view">視点</h2>
+      <div class="btns" id="views">
+        <button type="button" data-view="all" aria-pressed="true">全体</button>
+        <button type="button" data-view="origin">母と柱</button>
+        <button type="button" data-view="bulk">AdS₅ バルク</button>
+        <button type="button" data-view="cy">カラビ・ヤウ</button>
+        <button type="button" data-view="unity">統一宇宙</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-child">
+      <h2 id="h-child">子宇宙（サーストンの8幾何）</h2>
+      <div class="pairs" id="pairs"></div>
+    </section>
+
+    <section aria-labelledby="h-eq">
+      <h2 id="h-eq">レポートの式</h2>
+      <div class="eqs">
+        <div class="cap">AdS<sub>5</sub> 計量（AdS5.tex, Kalabi-Yau.tex）</div>
+        <div class="eq">‖ds²‖ = e^(−2πT‖ψ‖) [η_μν + h̄_μν(x)] dx^μ dx^ν + T² d²ψ</div>
+        <div class="cap">フェルマー型カラビ・ヤウ多様体（Kalabi-Yau.tex）</div>
+        <div class="eq">x⁵ + y⁵ + z⁵ + u⁵ + v⁵ − 5ψ·xyzuv = 0</div>
+        <div class="cap">D-brane と anti-D-brane の方程式（output_file.tex）</div>
+        <div class="eq">dV(τ)/dL = d/df ∬_M 1/(x log x)² dx_m
+         + d/df ∬_M 1/(y log y)^(1/2) dy_m</div>
+        <div class="cap">鏡映理論（anti-D-brane は鏡像の曲率）</div>
+        <div class="eq">R′_ij = −R_ij</div>
+        <div class="cap">ガンマ関数から Jones 多項式へ</div>
+        <div class="eq">∫Γ(γ)′ dx_m = e^f + e^(−f) ≥ e^f − e^(−f)</div>
+      </div>
+    </section>
+
+    <section>
+      <p class="src">出典：<code>reports/output_file.tex</code>（dazanier あらまし、「Imaginary equation in AdS5 space time」節、D-brane と anti-D-brane の相対性）、<code>reports/Kalabi-Yau.tex</code>、<code>reports/AdS5.tex</code>。レポートの記述を図像に置き換えたもので、物理シミュレーションではありません。カラビ・ヤウ断面は Hanson の射影法で計算しています。</p>
+    </section>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="labels" id="labels"></div>
+    <div class="hint">ドラッグで回転 · ホイール／ピンチでズーム</div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const stage = document.getElementById('stage');
+if (!window.THREE || !THREE.OrbitControls) {
+  const e = document.createElement('div'); e.className = 'err';
+  e.textContent = '3D ライブラリを読み込めませんでした。ネットワーク接続を確認して再読み込みしてください。';
+  stage.appendChild(e); return;
+}
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const V = THREE.Vector3, TAU = Math.PI * 2;
+const COL = {brane:0x5cc8ff, anti:0xff5c9d, jones:0xffc95a, cy:0xa08cff, child:0x6fe3c1, bulk:0x7d86ff, seif:0x9fe0ff};
+
+/* ---------- renderer / camera ---------- */
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x04050c, 1);
+stage.insertBefore(renderer.domElement, stage.firstChild);
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x04050c, 0.011);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 700);
+camera.position.set(22, 8, 26);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, -0.3, 0);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.autoRotate = !reduce; controls.autoRotateSpeed = 0.35;
+controls.minDistance = 1; controls.maxDistance = 95;
+document.getElementById('L-rotate').checked = !reduce;
+
+function resize(){
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.fov = camera.aspect < 1 ? Math.min(68, 42 / Math.max(camera.aspect, 0.5) * 0.82) : 42;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage); resize();
+
+scene.add(new THREE.AmbientLight(0x8890c0, 0.6));
+const dl = new THREE.DirectionalLight(0xffffff, 0.75); dl.position.set(6, 12, 8); scene.add(dl);
+const pj = new THREE.PointLight(COL.jones, 1.6, 26); pj.position.set(0, -7.4, 0); scene.add(pj);
+const pu = new THREE.PointLight(0xcfe9ff, 1.1, 40); pu.position.set(0, 10.6, 0); scene.add(pu);
+
+/* ---------- helpers ---------- */
+const glowTex = (()=>{ const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const r = g.createRadialGradient(32,32,0,32,32,32); r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(.25,'rgba(255,255,255,.45)'); r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
+function glow(color, size, opacity){ const s = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color, transparent:true, opacity:opacity ?? 1, blending:THREE.AdditiveBlending, depthWrite:false}));
+  s.scale.set(size, size, 1); return s; }
+function lineMat(color, opacity){ return new THREE.LineBasicMaterial({color, transparent:true, opacity, blending:THREE.AdditiveBlending, depthWrite:false}); }
+function polyLines(polys, color, opacity){ // merge polylines into one LineSegments
+  const pos = [];
+  for (const p of polys) for (let i = 0; i < p.length - 1; i++) pos.push(p[i].x,p[i].y,p[i].z,p[i+1].x,p[i+1].y,p[i+1].z);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  return new THREE.LineSegments(g, lineMat(color, opacity));
+}
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const layers = {};
+function layer(name){ const g = new THREE.Group(); scene.add(g); layers[name] = g; return g; }
+
+/* ---------- stars ---------- */
+{ const n = 2600, p = new Float32Array(n*3), c = new Float32Array(n*3);
+  for (let i = 0; i < n; i++){ const u = rnd()*2-1, th = rnd()*TAU, r = 90 + rnd()*120, s = Math.sqrt(1-u*u);
+    p.set([r*s*Math.cos(th), r*u, r*s*Math.sin(th)], i*3);
+    const k = 0.55 + rnd()*0.45, tint = rnd(); c.set([k*(tint>.8?1:.8), k*.85, k*(tint<.3?1:.9)], i*3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p,3)); g.setAttribute('color', new THREE.BufferAttribute(c,3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({size:0.7, vertexColors:true, transparent:true, opacity:.85, depthWrite:false, fog:false}))); }
+
+/* ---------- origin: 無 → Γ → Jones ---------- */
+const Y_ZETA = -10.7, Y_GAMMA = -9.5, Y_KNOT = -7.8, Y_TOP = 10.6, Y_ANTI = -4.6;
+{ const g = layer('origin');
+  const z = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), new THREE.MeshBasicMaterial({color:0xdfe3ff}));
+  z.position.y = Y_ZETA; g.add(z); const zg = glow(0x9aa4ff, 1.4, .7); zg.position.y = Y_ZETA; g.add(zg);
+  const gam = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1), new THREE.MeshBasicMaterial({color:0xffe3a3, wireframe:true, transparent:true, opacity:.8}));
+  gam.position.y = Y_GAMMA; gam.name = 'gamma'; g.add(gam);
+  g.add(polyLines([[new V(0,Y_ZETA,0), new V(0,Y_GAMMA-0.42,0)], [new V(0,Y_GAMMA+0.42,0), new V(0,Y_KNOT-0.5,0)]], 0xffe3a3, .5));
+  class Trefoil extends THREE.Curve { getPoint(t, o = new V()){ const a = t*TAU, s = 0.5;
+    return o.set(s*(Math.sin(a)+2*Math.sin(2*a)), Y_KNOT + s*0.55*(-Math.sin(3*a)), s*(Math.cos(a)-2*Math.cos(2*a))); } }
+  const knot = new THREE.Mesh(new THREE.TubeGeometry(new Trefoil(), 260, 0.14, 14, true),
+    new THREE.MeshPhongMaterial({color:COL.jones, emissive:0x5a3a08, shininess:90, specular:0xffffff}));
+  knot.name = 'knot'; g.add(knot);
+  const kg = glow(COL.jones, 6, .35); kg.position.y = Y_KNOT; g.add(kg);
+}
+
+/* ---------- D-brane pillars (bundled cylinders along the zeta axis) ---------- */
+const HELIX_R = 0.55, HELIX_W = 0.42, NPIL = 6;
+function pillarPoint(k, y, o = new V()){
+  if (k === NPIL) return o.set(0, y, 0);
+  const a = k/NPIL*TAU + HELIX_W*(y - Y_KNOT);
+  return o.set(HELIX_R*Math.cos(a), y, HELIX_R*Math.sin(a));
+}
+const pulses = [];
+{ const g = layer('pillars');
+  const mat = new THREE.MeshBasicMaterial({color:COL.brane, transparent:true, opacity:.8});
+  for (let k = 0; k <= NPIL; k++){
+    const pts = []; for (let i = 0; i <= 140; i++) pts.push(pillarPoint(k, Y_KNOT + (Y_TOP - Y_KNOT)*i/140));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 280, k === NPIL ? 0.07 : 0.045, 6), mat));
+  }
+  for (let i = 0; i < 22; i++){ const s = glow(i%3 ? COL.brane : 0xffffff, 0.55, .95); s.userData = {k:i % (NPIL+1), ph:rnd()}; pulses.push(s); g.add(s); }
+}
+
+/* ---------- Seifert fibration (fifth dimension) ---------- */
+{ const g = layer('seifert'), R = 1.55, r = 0.55, yc = -2.2, polys = [];
+  for (let k = 0; k < 9; k++){ const pts = [];
+    for (let i = 0; i <= 220; i++){ const s = i/220*TAU, L = 2*s, m = 3*s + k/9*TAU/3;
+      pts.push(new V((R + r*Math.cos(m))*Math.cos(L), yc + r*Math.sin(m), (R + r*Math.cos(m))*Math.sin(L))); }
+    polys.push(pts); }
+  g.add(polyLines(polys, COL.seif, .55));
+}
+
+/* ---------- child universes: positions first (the brane bumps under them) ---------- */
+const PAIRS = [
+  {name:'球面系', color:0xffc95a, css:'#ffc95a', members:[['s3','S³','球面'],['s2r','S²×ℝ','球×直線']]},
+  {name:'平坦・冪零系', color:0x6fe3c1, css:'#6fe3c1', members:[['e3','E³','ユークリッド'],['nil','Nil','ハイゼンベルク群']]},
+  {name:'双曲系', color:0x8fb4ff, css:'#8fb4ff', members:[['h3','H³','双曲空間'],['h2r','H²×ℝ','双曲面×直線']]},
+  {name:'ねじれ系', color:0xff8fc4, css:'#ff8fc4', members:[['sol','Sol','可解群'],['sl2r','SL̃₂ℝ','普遍被覆']]},
+];
+const CHILD_R = 7.3, BUB = 1.2, children = [];
+PAIRS.forEach((p, j) => p.members.forEach((m, i) => {
+  const ang = (j*90 + 45 + (i ? 15 : -15)) * Math.PI/180;
+  children.push({id:m[0], sym:m[1], ja:m[2], pair:j, color:p.color,
+    x:CHILD_R*Math.cos(ang), z:CHILD_R*Math.sin(ang), y:5.0 + (i ? 0.55 : 0)});
+}));
+
+/* ---------- our universe: the D-brane sheet ---------- */
+const R_BRANE = 11.5;
+let T = 0.18, alpha = 0.79, rippleAmp = reduce ? 0 : 1;
+function braneH(x, z, t){
+  const r2 = x*x + z*z, r = Math.sqrt(r2);
+  let h = -1.7*Math.exp(-r2/5.5);
+  for (const c of children){ const dx = x - c.x, dz = z - c.z; h += 1.0*Math.exp(-(dx*dx + dz*dz)/0.55); }
+  return h + 0.13*rippleAmp*Math.sin(r*1.5 - t*1.3)*Math.exp(-r/9);
+}
+const warp = s => Math.exp(-TAU*T*s); // e^{-2πT|ψ|}
+
+function polarGrid(nRing, nSeg, nSpoke, nStep, rMin, rMax){
+  const xz = [], idx = [];
+  for (let i = 0; i < nRing; i++){ const r = rMin + (rMax - rMin)*i/(nRing-1), b = xz.length/2;
+    for (let s = 0; s < nSeg; s++){ const a = s/nSeg*TAU; xz.push(r*Math.cos(a), r*Math.sin(a)); idx.push(b+s, b+(s+1)%nSeg); } }
+  for (let k = 0; k < nSpoke; k++){ const a = k/nSpoke*TAU, b = xz.length/2;
+    for (let s = 0; s < nStep; s++){ const r = rMin + (rMax - rMin)*s/(nStep-1); xz.push(r*Math.cos(a), r*Math.sin(a)); if (s) idx.push(b+s-1, b+s); } }
+  const n = xz.length/2, g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*3), 3));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n*3), 3));
+  g.setIndex(idx);
+  return {g, xz:new Float32Array(xz), n};
+}
+function polarSurface(nR, nA, rMin){
+  const xz = [], idx = [];
+  for (let i = 0; i <= nR; i++) for (let s = 0; s <= nA; s++){ const r = rMin + (1 - rMin)*i/nR, a = s/nA*TAU; xz.push(r*Math.cos(a), r*Math.sin(a)); }
+  for (let i = 0; i < nR; i++) for (let s = 0; s < nA; s++){ const a = i*(nA+1) + s, b = a + nA + 1; idx.push(a, b, a+1, b, b+1, a+1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(xz.length/2*3), 3)); g.setIndex(idx);
+  return {g, xz:new Float32Array(xz), n:xz.length/2};
+}
+const brane = polarGrid(22, 160, 72, 46, 0.35, R_BRANE);
+const braneSurf = polarSurface(30, 160, 0.03);
+{ const g = layer('brane');
+  g.add(new THREE.LineSegments(brane.g, new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:.95, blending:THREE.AdditiveBlending, depthWrite:false})));
+  g.add(new THREE.Mesh(braneSurf.g, new THREE.MeshBasicMaterial({color:COL.brane, transparent:true, opacity:.055, side:THREE.DoubleSide, depthWrite:false})));
+}
+function colorBrane(){
+  const c = brane.g.attributes.color.array, base = new THREE.Color(COL.brane);
+  for (let i = 0; i < brane.n; i++){ const x = brane.xz[i*2], z = brane.xz[i*2+1], r = Math.hypot(x, z);
+    const edge = 1 - THREE.MathUtils.smoothstep(r, 8.8, R_BRANE), k = (0.16 + 0.84*warp(r/R_BRANE))*edge;
+    c[i*3] = base.r*k; c[i*3+1] = base.g*k; c[i*3+2] = base.b*k; }
+  brane.g.attributes.color.needsUpdate = true;
+}
+
+/* ---------- anti-D-brane (finite, mirrored curvature) ---------- */
+const anti = polarGrid(12, 120, 48, 20, 0.02, 1);   // normalized radius, scaled by rAnti()
+const antiSurf = polarSurface(16, 120, 0.02);
+const rAnti = () => 1.6 + 7.6*warp(1);
+{ const g = layer('anti');
+  g.add(new THREE.LineSegments(anti.g, new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:.9, blending:THREE.AdditiveBlending, depthWrite:false})));
+  g.add(new THREE.Mesh(antiSurf.g, new THREE.MeshBasicMaterial({color:COL.anti, transparent:true, opacity:.07, side:THREE.DoubleSide, depthWrite:false})));
+  const c = anti.g.attributes.color.array, base = new THREE.Color(COL.anti);
+  for (let i = 0; i < anti.n; i++){ const r = Math.hypot(anti.xz[i*2], anti.xz[i*2+1]), k = 0.35 + 0.65*(1 - r*r*0.5);
+    c[i*3] = base.r*k; c[i*3+1] = base.g*k; c[i*3+2] = base.b*k; }
+}
+const antiH = (r, t) => Y_ANTI + 1.1*Math.exp(-r*r/4) - 0.1*rippleAmp*Math.sin(r*1.8 - t*1.3); // R'_ij = -R_ij : bump mirrors the well
+
+/* ---------- AdS5 bulk: warped funnel between the two branes ---------- */
+const BULK_R0 = 10.2, BULK_RINGS = 15, BULK_GEN = 40, BULK_SEG = 120;
+const bulkGeom = new THREE.BufferGeometry();
+{ const n = BULK_RINGS*BULK_SEG + BULK_GEN*24, idx = [];
+  for (let i = 0; i < BULK_RINGS; i++) for (let s = 0; s < BULK_SEG; s++) idx.push(i*BULK_SEG + s, i*BULK_SEG + (s+1)%BULK_SEG);
+  const o = BULK_RINGS*BULK_SEG; for (let k = 0; k < BULK_GEN; k++) for (let s = 1; s < 24; s++) idx.push(o + k*24 + s - 1, o + k*24 + s);
+  bulkGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*3), 3));
+  bulkGeom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n*3), 3));
+  bulkGeom.setIndex(idx);
+  layer('bulk').add(new THREE.LineSegments(bulkGeom, new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:.8, blending:THREE.AdditiveBlending, depthWrite:false})));
+}
+function bulkR(s){ const ra = rAnti(), w1 = warp(1); return ra + (BULK_R0 - ra)*(warp(s) - w1)/(1 - w1); }
+function buildBulk(){
+  const p = bulkGeom.attributes.position.array, c = bulkGeom.attributes.color.array, base = new THREE.Color(COL.bulk);
+  let v = 0;
+  const put = (s, a) => { const R = bulkR(s), k = 0.12 + 0.55*warp(s);
+    p[v*3] = R*Math.cos(a); p[v*3+1] = Y_ANTI*s + 0.02; p[v*3+2] = R*Math.sin(a);
+    c[v*3] = base.r*k; c[v*3+1] = base.g*k; c[v*3+2] = base.b*k; v++; };
+  for (let i = 0; i < BULK_RINGS; i++){ const s = (i + 0.5)/BULK_RINGS; for (let q = 0; q < BULK_SEG; q++) put(s, q/BULK_SEG*TAU); }
+  for (let k = 0; k < BULK_GEN; k++) for (let q = 0; q < 24; q++) put(q/23, k/BULK_GEN*TAU);
+  bulkGeom.attributes.position.needsUpdate = true; bulkGeom.attributes.color.needsUpdate = true;
+  bulkGeom.computeBoundingSphere();
+}
+
+/* ---------- Calabi–Yau: Fermat quintic cross-section (Hanson projection) ---------- */
+const CY_N = 5, CY_SEG = 10;
+const cyGeom = new THREE.BufferGeometry();
+{ const per = (CY_SEG+1)**2, nv = CY_N*CY_N*per, col = new Float32Array(nv*3), idx = [];
+  for (let k = 0; k < CY_N*CY_N; k++){ const c = new THREE.Color().setHSL((0.62 + 0.42*k/(CY_N*CY_N-1)) % 1, 0.72, 0.62);
+    for (let i = 0; i < per; i++) col.set([c.r, c.g, c.b], (k*per + i)*3);
+    for (let i = 0; i < CY_SEG; i++) for (let j = 0; j < CY_SEG; j++){ const a = k*per + i*(CY_SEG+1) + j, b = a + CY_SEG + 1; idx.push(a, b, a+1, b, b+1, a+1); } }
+  cyGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv*3), 3));
+  cyGeom.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  cyGeom.setIndex(idx);
+}
+function cpow(re, im, p){ const r = Math.pow(Math.hypot(re, im), p), a = Math.atan2(im, re)*p; return [r*Math.cos(a), r*Math.sin(a)]; }
+function buildCY(){
+  const P = cyGeom.attributes.position.array, ca = Math.cos(alpha), sa = Math.sin(alpha); let v = 0;
+  for (let k1 = 0; k1 < CY_N; k1++) for (let k2 = 0; k2 < CY_N; k2++){
+    const p1 = TAU*k1/CY_N, p2 = TAU*k2/CY_N;
+    for (let i = 0; i <= CY_SEG; i++) for (let j = 0; j <= CY_SEG; j++){
+      const x = -1 + 2*i/CY_SEG, y = (Math.PI/2)*j/CY_SEG;
+      const ch = cpow(Math.cosh(x)*Math.cos(y), Math.sinh(x)*Math.sin(y), 2/CY_N);           // cosh(z)^(2/n)
+      const sh = cpow(Math.cosh(x)*Math.sin(y), -Math.sinh(x)*Math.cos(y), 2/CY_N);          // (-i sinh z)^(2/n)
+      const z1r = ch[0]*Math.cos(p1) - ch[1]*Math.sin(p1), z1i = ch[0]*Math.sin(p1) + ch[1]*Math.cos(p1);
+      const z2r = sh[0]*Math.cos(p2) - sh[1]*Math.sin(p2), z2i = sh[0]*Math.sin(p2) + sh[1]*Math.cos(p2);
+      P[v++] = z1r; P[v++] = ca*z1i + sa*z2i; P[v++] = z2r;
+    }
+  }
+  cyGeom.attributes.position.needsUpdate = true; cyGeom.computeVertexNormals(); cyGeom.computeBoundingSphere();
+}
+const cySpots = [];
+[[2.7, 6, 0.3], [4.4, 10, 0.1], [5.9, 14, 0.25], [9.0, 18, 0.05]].forEach(([r, n, off]) => {
+  for (let i = 0; i < n; i++){ const a = (i + off)/n*TAU, x = r*Math.cos(a), z = r*Math.sin(a);
+    if (children.some(c => Math.hypot(c.x - x, c.z - z) < 1.6)) continue;
+    cySpots.push({x, z, s: r > 8 ? 0.26 : 0.33, ph: rnd()*TAU}); }
+});
+const cyMesh = new THREE.InstancedMesh(cyGeom, new THREE.MeshPhongMaterial({vertexColors:true, side:THREE.DoubleSide, shininess:70, specular:0x444466}), cySpots.length);
+layer('cy').add(cyMesh);
+const dummy = new THREE.Object3D();
+
+/* ---------- Thurston geometries inside the child universes ---------- */
+function circleXZ(r, y, n){ const p = []; for (let i = 0; i <= n; i++){ const a = i/n*TAU; p.push(new V(r*Math.cos(a), y, r*Math.sin(a))); } return p; }
+function geodesicArc(p1, p2, u, w, rad){ // arc orthogonal to the unit circle in plane (u,w)
+  let d = p2 - p1; d = Math.atan2(Math.sin(d), Math.cos(d)); const D = Math.abs(d);
+  if (D > Math.PI - 0.05) return [u.clone().multiplyScalar(Math.cos(p1)*rad).addScaledVector(w, Math.sin(p1)*rad), u.clone().multiplyScalar(-Math.cos(p1)*rad).addScaledVector(w, -Math.sin(p1)*rad)];
+  const m = p1 + d/2, cd = 1/Math.cos(D/2), rr = Math.tan(D/2), cx = cd*Math.cos(m), cy = cd*Math.sin(m);
+  let a1 = Math.atan2(Math.sin(p1) - cy, Math.cos(p1) - cx), a2 = Math.atan2(Math.sin(p2) - cy, Math.cos(p2) - cx);
+  let da = a2 - a1; da = Math.atan2(Math.sin(da), Math.cos(da));
+  const pts = []; for (let i = 0; i <= 24; i++){ const a = a1 + da*i/24, X = (cx + rr*Math.cos(a))*rad, Y = (cy + rr*Math.sin(a))*rad;
+    pts.push(u.clone().multiplyScalar(X).addScaledVector(w, Y)); }
+  return pts;
+}
+const ex = new V(1,0,0), ey = new V(0,1,0), ez = new V(0,0,1);
+const THURSTON = {
+  s3(){ const polys = []; let mx = 0;
+    [-0.82, -0.45, -0.05].forEach((c, li) => { for (let k = 0; k < 7; k++){ const ph = k/7*TAU + li*0.45, s = Math.sqrt(1 - c*c), a = s*Math.cos(ph), b = s*Math.sin(ph), f = 1/Math.sqrt(2*(1 + c)), pts = [];
+      for (let i = 0; i <= 90; i++){ const t = i/90*TAU, x4 = f*(1 + c)*Math.sin(t), d = 1 - x4;
+        const q = new V(f*(1 + c)*Math.cos(t)/d, f*(a*Math.cos(t) + b*Math.sin(t))/d, f*(a*Math.sin(t) - b*Math.cos(t))/d); mx = Math.max(mx, q.length()); pts.push(q); }
+      polys.push(pts); } });
+    polys.forEach(p => p.forEach(q => q.multiplyScalar(0.92/mx))); return polys; },
+  e3(){ const polys = [], g = [-0.54, -0.18, 0.18, 0.54];
+    for (const a of g) for (const b of g){ polys.push([new V(-.54,a,b), new V(.54,a,b)], [new V(a,-.54,b), new V(a,.54,b)], [new V(a,b,-.54), new V(a,b,.54)]); } return polys; },
+  h3(){ const polys = [circleXZ(.92,0,80)]; const tilt = new THREE.Matrix4();
+    polys.push(circleXZ(.92,0,80).map(p => p.clone().applyAxisAngle(ex, Math.PI/2)), circleXZ(.92,0,80).map(p => p.clone().applyAxisAngle(ez, Math.PI/2)));
+    for (let i = 0; i < 26; i++){ const u = new V(rnd()-.5, rnd()-.5, rnd()-.5).normalize(), w = new V(rnd()-.5, rnd()-.5, rnd()-.5).cross(u).normalize();
+      const p1 = rnd()*TAU, p2 = p1 + 0.5 + rnd()*2.2; polys.push(geodesicArc(p1, p2, u, w, .92)); } return polys; },
+  s2r(){ const polys = [[new V(0,-.95,0), new V(0,.95,0)]];
+    [-.72,-.36,0,.36,.72].forEach(y => { const r = .27; polys.push(circleXZ(r,y,40));
+      polys.push(circleXZ(r,0,40).map(p => p.clone().applyAxisAngle(ex, Math.PI/2).add(new V(0,y,0))), circleXZ(r,0,40).map(p => p.clone().applyAxisAngle(ez, Math.PI/2).add(new V(0,y,0)))); });
+    return polys; },
+  h2r(){ const polys = [];
+    [-.7,-.23,.23,.7].forEach((y, l) => { polys.push(circleXZ(.78,y,64)); const off = new V(0,y,0);
+      for (let i = 0; i < 7; i++){ const p1 = i/7*TAU + l*.3; polys.push(geodesicArc(p1, p1 + 2.1, ex, ez, .78).map(p => p.add(off))); } });
+    for (let i = 0; i < 8; i++){ const a = i/8*TAU; polys.push([new V(.78*Math.cos(a),-.7,.78*Math.sin(a)), new V(.78*Math.cos(a),.7,.78*Math.sin(a))]); }
+    return polys; },
+  nil(){ const polys = [];
+    [-.5, 0, .5].forEach(c => { for (let i = 0; i < 6; i++){ const z0 = -.6 + 1.2*i/5, a = [], b = [];
+      for (let s = 0; s <= 16; s++){ const t = -.6 + 1.2*s/16; a.push(new V(t, c + .9*t*z0, z0)); b.push(new V(z0, c + .9*z0*t, t)); }
+      polys.push(a, b); } });
+    return polys; },
+  sol(){ const polys = [], L = [-.75,-.25,.25,.75];
+    L.forEach(h => { const ax = .42*Math.exp(1.05*h), az = .42*Math.exp(-1.05*h);
+      for (let i = 0; i <= 3; i++){ const fx = -ax + 2*ax*i/3, fz = -az + 2*az*i/3; polys.push([new V(fx,h,-az), new V(fx,h,az)], [new V(-ax,h,fz), new V(ax,h,fz)]); } });
+    for (const sx of [-1,1]) for (const sz of [-1,1]){ const p = []; for (let s = 0; s <= 20; s++){ const h = -.85 + 1.7*s/20; p.push(new V(sx*.42*Math.exp(1.05*h), h, sz*.42*Math.exp(-1.05*h))); } polys.push(p); }
+    return polys; },
+  sl2r(){ const polys = [circleXZ(.85,-.85,64), circleXZ(.85,.85,64)];
+    [.22,.46,.7].forEach(r => { const w = 2.4/Math.sqrt(1 - r*r*1.1); for (let k = 0; k < 6; k++){ const p = [];
+      for (let s = 0; s <= 60; s++){ const y = -.85 + 1.7*s/60, a = k/6*TAU + w*y; p.push(new V(r*Math.cos(a), y, r*Math.sin(a))); } polys.push(p); } });
+    return polys; },
+};
+const unityPos = new V(0, Y_TOP, 0);
+{ const g = layer('child');
+  for (const c of children){
+    const grp = new THREE.Group(); grp.position.set(c.x, c.y, c.z); g.add(grp); c.group = grp;
+    grp.add(new THREE.Mesh(new THREE.SphereGeometry(BUB, 40, 26), new THREE.MeshPhongMaterial({color:c.color, emissive:c.color, emissiveIntensity:.08, transparent:true, opacity:.12, shininess:120, specular:0xffffff, depthWrite:false})));
+    grp.add(polyLines([circleXZ(BUB, 0, 72)], c.color, .45));
+    const gl = glow(c.color, 3.6, .22); grp.add(gl);
+    const th = polyLines(THURSTON[c.id](), c.color, .9); th.scale.setScalar(BUB*0.88); grp.add(th); c.inner = th;
+    // throat (Einstein–Rosen neck) from the brane bump up to the bubble
+    const y0 = 0.78, y1 = c.y - BUB*0.93, prof = [];
+    for (let i = 0; i <= 28; i++){ const t = i/28; prof.push(new THREE.Vector2(0.15 + 0.8*Math.pow(1 - t, 3) + 0.3*Math.pow(t, 6), y0 + (y1 - y0)*t)); }
+    const neck = new THREE.Mesh(new THREE.LatheGeometry(prof, 28), new THREE.MeshBasicMaterial({color:c.color, wireframe:true, transparent:true, opacity:.28, depthWrite:false}));
+    neck.position.set(c.x, 0, c.z); g.add(neck);
+  }
+  // pairs (2 geometries -> 1 universe) and the 4 universes -> 1 universe
+  const arcs = [];
+  PAIRS.forEach((p, j) => { const a = children[j*2], b = children[j*2+1];
+    const A = new V(a.x, a.y + BUB, a.z), B = new V(b.x, b.y + BUB, b.z), mid = A.clone().add(B).multiplyScalar(.5).add(new V(0, 1.4, 0));
+    const pts = new THREE.QuadraticBezierCurve3(A, mid, B).getPoints(30); g.add(polyLines([pts], p.color, .7));
+    const M = pts[15]; const up = new THREE.QuadraticBezierCurve3(M, new V(M.x*.45, M.y + 2.6, M.z*.45), unityPos).getPoints(40);
+    const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints(up), new THREE.LineDashedMaterial({color:p.color, dashSize:.25, gapSize:.18, transparent:true, opacity:.75}));
+    ln.computeLineDistances(); g.add(ln); p.mid = M;
+  });
+}
+{ const g = layer('unity');
+  const core = new THREE.Mesh(new THREE.SphereGeometry(.32, 24, 16), new THREE.MeshBasicMaterial({color:0xffffff}));
+  core.position.copy(unityPos); g.add(core);
+  const u1 = glow(0xcfe9ff, 5, .8); u1.position.copy(unityPos); g.add(u1);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.9, .02, 8, 90), new THREE.MeshBasicMaterial({color:0xcfe9ff, transparent:true, opacity:.7}));
+  ring.position.copy(unityPos); ring.rotation.x = Math.PI/2; ring.name = 'uring'; g.add(ring);
+}
+
+/* ---------- labels ---------- */
+const labelBox = document.getElementById('labels'), labels = [];
+function label(html, getPos, color){ const d = document.createElement('div'); d.className = 'lbl'; d.innerHTML = html; if (color) d.style.color = color; labelBox.appendChild(d); labels.push({d, getPos}); }
+label('無<small>ζ 関数</small>', () => new V(0.9, Y_ZETA, 0), '#cfd3ea');
+label('ガンマ関数<small>父</small>', () => new V(1.3, Y_GAMMA, 0), '#ffe3a3');
+label('Jones 多項式<small>母</small>', () => new V(2.6, Y_KNOT - 0.2, 0), 'var(--jones)');
+label('D-brane の柱', () => new V(0, 3.2, 0), 'var(--brane)');
+label('Seifert<small>第5次元</small>', () => new V(2.5, -2.2, 0), '#9fe0ff');
+label('我々の宇宙<small>D-brane・無限</small>', () => new V(10.4, 0.25, 0), 'var(--brane)');
+label('anti-D-brane<small>有限</small>', () => new V(rAnti() + 0.6, Y_ANTI, 0.8), 'var(--anti)');
+label('AdS₅ バルク<small>e^(−2πT|ψ|)</small>', () => { const R = bulkR(.55); return new V(-R*.72, Y_ANTI*.55, R*.72); }, '#aeb4ff');
+const cyLabelSpot = cySpots.find(s => Math.hypot(s.x, s.z) > 4 && s.x > 0) || cySpots[0];
+label('カラビ・ヤウ<small>余剰6次元</small>', () => new V(cyLabelSpot.x, 1.05, cyLabelSpot.z), 'var(--cy)');
+children.forEach(c => label(`${c.sym}<small>${c.ja}</small>`, () => new V(c.x, c.y + BUB + 0.45, c.z), '#' + c.color.toString(16).padStart(6,'0')));
+label('統一宇宙<small>共時性</small>', () => new V(0, Y_TOP + 1.1, 0), '#ffffff');
+const tmp = new V();
+function placeLabels(){
+  const show = document.getElementById('L-labels').checked, w = stage.clientWidth, h = stage.clientHeight;
+  for (const L of labels){ if (!show){ L.d.hidden = true; continue; }
+    tmp.copy(L.getPos()).project(camera);
+    const off = tmp.z > 1 || Math.abs(tmp.x) > 1.1 || Math.abs(tmp.y) > 1.1; L.d.hidden = off;
+    if (!off) L.d.style.transform = `translate(${(tmp.x*.5 + .5)*w}px, ${(-tmp.y*.5 + .5)*h}px) translate(-50%,-50%)`; }
+}
+
+/* ---------- panel wiring ---------- */
+const layerMap = {origin:['origin'], pillars:['pillars'], brane:['brane'], anti:['anti'], bulk:['bulk'], seifert:['seifert'], cy:['cy'], child:['child','unity']};
+Object.entries(layerMap).forEach(([id, names]) => { const el = document.getElementById('L-' + id);
+  const apply = () => names.forEach(n => layers[n].visible = el.checked); el.addEventListener('change', apply); apply(); });
+document.getElementById('L-rotate').addEventListener('change', e => controls.autoRotate = e.target.checked);
+const Tin = document.getElementById('T'), Ain = document.getElementById('A');
+Tin.addEventListener('input', () => { T = +Tin.value; document.getElementById('Tv').value = T.toFixed(2); colorBrane(); buildBulk(); });
+Ain.addEventListener('input', () => { alpha = +Ain.value; document.getElementById('Av').value = alpha.toFixed(2); buildCY(); });
+
+let fly = null;
+function flyTo(pos, target){ fly = {p0:camera.position.clone(), t0:controls.target.clone(), p1:pos, t1:target, s:performance.now()}; }
+const VIEWS = {
+  all: () => [new V(22, 8, 26), new V(0, -0.3, 0)],
+  origin: () => [new V(5.5, -6.2, 7.5), new V(0, -7.6, 0)],
+  bulk: () => [new V(15, -1.5, 15), new V(0, -2.4, 0)],
+  cy: () => { const s = cyLabelSpot; const t = new V(s.x, braneH(s.x, s.z, 0) + .42, s.z); return [t.clone().add(new V(2.3, 1.5, 2.6)), t]; },
+  unity: () => [new V(9, 15, 11), new V(0, 7.5, 0)],
+};
+const views = document.getElementById('views');
+function press(btn){ document.querySelectorAll('#views button, #pairs button').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false')); }
+views.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; press(b); const [p, t] = VIEWS[b.dataset.view](); flyTo(p, t); });
+const pairsEl = document.getElementById('pairs');
+PAIRS.forEach((p, j) => { const row = document.createElement('div'); row.className = 'pair';
+  row.innerHTML = `<i class="bar" style="background:${p.css}"></i><div><div class="nm">宇宙 ${j+1} · ${p.name}</div><div class="row"></div></div>`;
+  p.members.forEach((m, i) => { const c = children[j*2 + i], b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed','false');
+    b.innerHTML = `${m[1]}<span>${m[2]}</span>`;
+    b.addEventListener('click', () => { press(b); const t = new V(c.x, c.y, c.z), out = new V(c.x, 0, c.z).normalize();
+      flyTo(t.clone().addScaledVector(out, 5).add(new V(0, 1.4, 0)).addScaledVector(new V(-out.z, 0, out.x), 1.6), t); });
+    row.querySelector('.row').appendChild(b); });
+  pairsEl.appendChild(row); });
+
+/* ---------- animate ---------- */
+colorBrane(); buildBulk(); buildCY();
+const clock = new THREE.Clock(), pp = new V();
+function frame(){
+  const t = clock.getElapsedTime(), sp = reduce ? 0.15 : 1;
+  // brane
+  { const P = brane.g.attributes.position.array; for (let i = 0; i < brane.n; i++){ const x = brane.xz[i*2], z = brane.xz[i*2+1]; P[i*3] = x; P[i*3+1] = braneH(x, z, t); P[i*3+2] = z; }
+    brane.g.attributes.position.needsUpdate = true;
+    const S = braneSurf.g.attributes.position.array; for (let i = 0; i < braneSurf.n; i++){ const x = braneSurf.xz[i*2]*R_BRANE*.8, z = braneSurf.xz[i*2+1]*R_BRANE*.8; S[i*3] = x; S[i*3+1] = braneH(x, z, t) - .01; S[i*3+2] = z; }
+    braneSurf.g.attributes.position.needsUpdate = true; }
+  // anti-brane
+  { const ra = rAnti(), P = anti.g.attributes.position.array; for (let i = 0; i < anti.n; i++){ const x = anti.xz[i*2]*ra, z = anti.xz[i*2+1]*ra; P[i*3] = x; P[i*3+1] = antiH(Math.hypot(x, z), t); P[i*3+2] = z; }
+    anti.g.attributes.position.needsUpdate = true; anti.g.computeBoundingSphere();
+    const S = antiSurf.g.attributes.position.array; for (let i = 0; i < antiSurf.n; i++){ const x = antiSurf.xz[i*2]*ra, z = antiSurf.xz[i*2+1]*ra; S[i*3] = x; S[i*3+1] = antiH(Math.hypot(x, z), t) - .01; S[i*3+2] = z; }
+    antiSurf.g.attributes.position.needsUpdate = true; antiSurf.g.computeBoundingSphere(); }
+  // Calabi–Yau at each point of space
+  cySpots.forEach((s, i) => { dummy.position.set(s.x, braneH(s.x, s.z, t) + s.s*1.25, s.z); dummy.rotation.set(t*.25*sp + s.ph, t*.18*sp + s.ph*.5, .4); dummy.scale.setScalar(s.s); dummy.updateMatrix(); cyMesh.setMatrixAt(i, dummy.matrix); });
+  cyMesh.instanceMatrix.needsUpdate = true;
+  // energy pulses rising along the D-brane pillars
+  pulses.forEach(s => { const u = (s.userData.ph + t*.05*sp) % 1; pillarPoint(s.userData.k, Y_KNOT + (Y_TOP - Y_KNOT)*u, pp); s.position.copy(pp); s.material.opacity = Math.sin(u*Math.PI); });
+  children.forEach((c, i) => { c.inner.rotation.y = t*.22*sp*(i % 2 ? -1 : 1); c.group.position.y = c.y + .08*Math.sin(t*.7 + i); });
+  const g = layers.origin.getObjectByName('gamma'); if (g) g.rotation.y = t*.4*sp;
+  const k = layers.origin.getObjectByName('knot'); if (k){ k.rotation.y = t*.3*sp; }
+  const ur = layers.unity.getObjectByName('uring'); if (ur) ur.rotation.z = t*.5*sp;
+  if (fly){ const u = Math.min(1, (performance.now() - fly.s)/1300), e = u < .5 ? 4*u*u*u : 1 - Math.pow(-2*u + 2, 3)/2;
+    camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e); if (u >= 1) fly = null; }
+  controls.update(); renderer.render(scene, camera); placeLabels();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
