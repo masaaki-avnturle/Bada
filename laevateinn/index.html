@@ -15,6 +15,11 @@
          (Jones/zone 系 AEAD 封筒で検証) + 推測航法 + ランドマーク補正
       🛰 人工衛星モード — 4 機の衛星の擬似距離から最小二乗で測位
   ・経路計画: A* / 障害物で自動減速・停止・再発進
+  ・v2.0 🌡 熱画像知覚: 赤外線カメラ × 温度計 (OBD-II PID 0146 / BLE) の温度場から
+    ガンマ関数の大域的部分積分多様体エントロピー Ξ を方位ごとに求め、16 レイへ融合
+    (熱放射は無音の対象も写す)
+  ・v2.0 🤫 サイレントトーク操縦: 前面カメラの口形 (無発声) → 口形素 → 走行コマンド
+    (安全ゲートつき。操縦そのものは常にトランスフォーマー制御ヘッド)
   依存ゼロ・単一 HTML・オフライン動作 (地図受信・衛星はシミュレーション)。
   APK / EXE / AppImage は .github/workflows/laevateinn-app-build.yml が
   ビルドします。エンジンは tools/engine-test.js で単体テストされます。
@@ -79,6 +84,12 @@ input:focus{outline:none;border-color:var(--cyan)}
 #tiles div{height:26px;border-radius:5px;background:#101830;display:flex;align-items:center;justify-content:center;font-size:10.5px;color:var(--dim);font-family:var(--mono)}
 #tiles div.got{background:#123a24;color:#7ce0a3}
 #tiles div.bad{background:#3a1614;color:#f2a49b}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.btnrow select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--edge);border-radius:7px;padding:4px 6px;max-width:180px}
+#thcv,#stcv{width:100%;max-width:480px;height:auto;display:block;border-radius:8px;background:#05070d;image-rendering:pixelated;margin-bottom:6px}
+#stcv{image-rendering:auto;max-width:320px}
+button.chip{font-size:11.5px;padding:3px 9px;border-radius:99px}
+#stpad button{min-width:38px;font-weight:700}
 #statusbar{flex:none;display:flex;gap:16px;padding:5px 14px;background:#050810;border-top:1px solid var(--edge);font-size:11.5px;color:var(--dim);overflow-x:auto;white-space:nowrap}
 #statusbar b{color:var(--gold)}
 </style>
@@ -110,6 +121,24 @@ input:focus{outline:none;border-color:var(--cyan)}
       <div id="rays"></div>
       <p style="font-size:11px;color:var(--dim);margin-top:6px">操舵角・加減速はトランスフォーマーの出力そのものです(車体はこの2値だけで動きます)。実車の操縦系には送りません。</p>
     </div>
+    <div class="card" style="margin-top:12px">
+      <h2>🌡 熱画像知覚 — 赤外線カメラ × 温度計 × Γ 多様体エントロピー Ξ (🔇 無音でも映像化)</h2>
+      <div class="btnrow">
+        <button id="thcam" class="primary">赤外線カメラ接続</button>
+        <button id="thdemo">デモ熱画像</button>
+        <button id="thoff" class="danger" style="display:none">停止</button>
+        <select id="thdev" title="カメラ選択 (外付け UVC 赤外線カメラ)"><option value="">既定のカメラ</option></select>
+      </div>
+      <canvas id="thcv" width="320" height="240"></canvas>
+      <div class="kv"><b>状態</b><span id="thstate">停止中</span></div>
+      <div class="kv"><b>外気温 (温度計・基準)</b><span><input id="thamb" type="number" step="0.5" value="20" style="width:70px"/> °C · <i id="thambsrc">手動</i></span></div>
+      <div class="kv"><b>熱画像の温度スパン</b><span><input id="thspan" type="number" step="5" value="40" style="width:70px"/> °C</span></div>
+      <div class="kv"><b>Ξ = B(H+1, M+1) / log(N+1)</b><span id="thxi">—</span></div>
+      <div class="kv"><b>H (シャノン) / M (∬ 1/(x log x)² dμ)</b><span id="thh">—</span></div>
+      <div class="kv"><b>慎重度 → 巡航速度</b><span id="thcaution">—</span></div>
+      <div class="kv"><b>熱源 (16レイへ融合)</b><span id="thhot">—</span></div>
+      <p style="font-size:11px;color:var(--dim);margin-top:6px">熱放射は音を出さない対象(静かに立つ歩行者・停車中の車)も写します。周囲の温度分布のヒストグラムを測度として、ガンマ関数 Γ(Lanczos) によるベータ関数で大域的部分積分多様体のエントロピー不変量 Ξ を方位セクタごとに求め、熱源はレイセンサと融合してトランスフォーマーへ入力します。温度計は OBD-II の外気温 (PID 0146)・BLE 温度計・手入力のいずれかです。タブレット内蔵カメラは熱を写せないため、実機では外付け UVC 赤外線カメラ (white-hot 出力) を使ってください。</p>
+    </div>
   </div>
 
   <div id="alpanel">
@@ -117,9 +146,26 @@ input:focus{outline:none;border-color:var(--cyan)}
       <h2>アル (Al) — レーヴァテインのアシスタントAI</h2>
       <div id="allog"></div>
       <div id="alrow">
-        <input id="alin" placeholder="アルに話す: 状態 / どこ / 地図 / 停止 / 発進 / help"/>
+        <input id="alin" placeholder="アルに話す: 状態 / どこ / 地図 / 停止 / 発進 / help (サイレントトークも可)"/>
         <button id="alsend">送信</button>
       </div>
+    </div>
+    <div class="card">
+      <h2>🤫 サイレントトーク操縦 — 声を出さず口の形で指示</h2>
+      <div class="btnrow">
+        <button id="ststart" class="primary">前面カメラで開始</button>
+        <button id="ststop" class="danger" style="display:none">停止</button>
+      </div>
+      <canvas id="stcv" width="240" height="180"></canvas>
+      <div class="kv"><b>口形素</b><span id="stv">—</span></div>
+      <div class="kv"><b>口の特徴</b><span id="stfeat">—</span></div>
+      <div class="kv"><b>単語 (畳み込み中)</b><span id="stword">—</span></div>
+      <div class="kv"><b>認識コマンド</b><span id="stcmd">—</span></div>
+      <div class="kv"><b>確認待ち</b><span id="stpend">—</span></div>
+      <div class="kv"><b>速度係数</b><span id="stspeed">×1.0</span></div>
+      <div id="stpad" class="btnrow" style="margin-top:8px"></div>
+      <div id="stlex" class="btnrow"></div>
+      <p style="font-size:11px;color:var(--dim);margin-top:6px">日本語の母音がそのまま口形になります(発進=AI・停止=EI・左=IAI・右へ=IE・減速=EOU・加速=AOU・戻る=OU・状態=OUAI)。「停止」は即時、「発進」「戻る」「加速」は 5 秒以内にもう一度で確定。指示は目的・意図だけで、ハンドルとブレーキは常にトランスフォーマーが握り、障害物があれば指示より制動が優先されます。脳の思考そのものはタブレットでは読み取れないため、無発声の口の動き (サイレントスピーチ) を思考の出力として使います。</p>
     </div>
     <div class="card">
       <h2>測位</h2>
@@ -139,12 +185,14 @@ input:focus{outline:none;border-color:var(--cyan)}
         <button id="btconnect" class="primary">OBD-II に接続 (BLE)</button>
         <button id="btdemo">デモ接続</button>
         <button id="btdisc" style="display:none" class="danger">切断</button>
+        <button id="btthermo">🌡 BLE温度計</button>
       </div>
       <div class="kv"><b>状態</b><span id="btstate">未接続</span></div>
       <div class="kv"><b>デバイス</b><span id="btdev">—</span></div>
       <div class="kv"><b>実速度</b><span id="btspeed">—</span></div>
       <div class="kv"><b>回転数</b><span id="btrpm">—</span></div>
       <div class="kv"><b>水温 / 電圧</b><span id="btmisc">—</span></div>
+      <div class="kv"><b>外気温 (PID 0146)</b><span id="btamb">—</span></div>
       <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12.5px;color:var(--dim)">
         <input type="checkbox" id="btvoice" style="width:auto"/> 🔊 アルの音声案内 (カーナビとBT接続済みの端末なら車のスピーカーから流れます)
       </label>
@@ -154,7 +202,7 @@ input:focus{outline:none;border-color:var(--cyan)}
 </div>
 
 <div id="statusbar">
-  <span><b>Laevateinn</b> v1.0</span>
+  <span><b>Laevateinn</b> v2.0</span>
   <span>assistant: <b>アル</b> (BadaGPT系意図エンジン)</span>
   <span id="st-mode">mode: web</span>
   <span id="st-msg"></span>
@@ -429,6 +477,290 @@ function alReply(text, ctx){
 }
 
 /* =====================================================================
+ * 🌡 ガンマ関数・大域的部分積分多様体エントロピー (bada_ruby Manifold の移植)
+ *   Γ(x)        : Lanczos 近似 (g=7, 9 係数) / 反射公式
+ *   B(p,q)      : Γ(p)Γ(q)/Γ(p+q)  (対数空間で計算)
+ *   ζ-gauge     : B(p,q) / log x          (レポートの ζ = β / log x)
+ *   dμ(x)       : 1 / (x log x)²          (多様体の線素)
+ *   H           : シャノンエントロピー (bit)
+ *   M           : Σ pᵢ · dμ(rankᵢ + 2)    (大域的部分積分 ∬ 1/(x log x)² dμ)
+ *   Ξ           : ζ-gauge(H+1, M+1, N+1)  (エントロピー不変量)
+ * ここでは「周囲の温度分布 (熱画像のヒストグラム)」を測度として Ξ を求める。
+ * ===================================================================== */
+const LZ_G = 7;
+const LZ_C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+              -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6,
+              1.5056327351493116e-7];
+function lvGamma(x){
+  if (x === 0) return Infinity;
+  if (x < 0.5) return Math.PI / (Math.sin(Math.PI * x) * lvGamma(1 - x));
+  x -= 1;
+  let a = LZ_C[0];
+  const t = x + LZ_G + 0.5;
+  for (let i = 1; i < LZ_G + 2; i++) a += LZ_C[i] / (x + i);
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
+}
+function lvLogGamma(x){
+  if (x < 0.5) return Math.log(Math.abs(lvGamma(x)));
+  x -= 1;
+  let a = LZ_C[0];
+  const t = x + LZ_G + 0.5;
+  for (let i = 1; i < LZ_G + 2; i++) a += LZ_C[i] / (x + i);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+function lvBeta(p, q){ return Math.exp(lvLogGamma(p) + lvLogGamma(q) - lvLogGamma(p + q)); }
+function zetaGauge(p, q, x){ const lx = Math.log(x); return Math.abs(lx) < 1e-15 ? Infinity : lvBeta(p, q) / lx; }
+function manifoldElement(x){
+  if (x <= 1) return 1;
+  const xl = x * Math.log(x);
+  return Math.abs(xl) < 1e-9 ? 1 : 1 / (xl * xl);
+}
+/* counts: ヒストグラム (非負の度数配列) → { H, M, N, beta, xi } */
+function manifoldInvariant(counts){
+  let n = 0;
+  for (const c of counts) if (c > 0) n += c;
+  if (n <= 0) return { H: 0, M: 0, N: 0, beta: lvBeta(1, 1), xi: 0 };
+  const ps = [];
+  for (const c of counts) if (c > 0) ps.push(c / n);
+  ps.sort(function(a, b){ return b - a; });
+  let H = 0, M = 0;
+  for (let i = 0; i < ps.length; i++){
+    H -= ps[i] * Math.log2(ps[i]);
+    M += ps[i] * manifoldElement(i + 2);
+  }
+  return { H: H, M: M, N: n, beta: lvBeta(H + 1, M + 1), xi: zetaGauge(H + 1, M + 1, n + 1) };
+}
+
+/* =====================================================================
+ * 🔇 熱画像知覚 — 赤外線カメラ × 温度計 (音に頼らず周囲を映像化)
+ *   熱放射は音を出さない対象 (無音で立つ歩行者・停車中の車) も写す。
+ *   温度計 (OBD-II PID 0146 外気温 / BLE 温度計 / 手動) が絶対温度の基準。
+ *   white-hot 熱画像の輝度 Y → T = T_amb + (Y − Y_median)/255 · span
+ *   画面の列 → 方位角 (水平画角 fov)、熱源の最下端の行 → 距離 (地面平面仮定)
+ *   各方位セクタの温度ヒストグラムから Ξ を求め、16 レイへ融合する。
+ * ===================================================================== */
+const THERMAL = { w: 64, h: 48, fov: Math.PI / 2, bin: 0.5, hotDelta: 4, range: 150 };
+
+function lumaToTemps(luma, ambient, span){
+  /* 中央値の輝度 = 外気温 (背景の大半は外気温に近い) */
+  const hist = new Array(256).fill(0);
+  for (let i = 0; i < luma.length; i++) hist[luma[i] | 0]++;
+  let acc = 0, med = 0;
+  for (let v = 0; v < 256; v++){ acc += hist[v]; if (acc * 2 >= luma.length){ med = v; break; } }
+  const out = new Float32Array(luma.length);
+  for (let i = 0; i < luma.length; i++) out[i] = ambient + (luma[i] - med) / 255 * span;
+  return out;
+}
+/* 画面の列 c → 自車正面基準の方位 (rad, +右) */
+function thermalColAngle(c, w){ return ((c + 0.5) / w - 0.5) * THERMAL.fov; }
+/* 方位 → 16 レイのインデックス (rayAngle の逆) */
+function angleToRay(a){ return Math.max(0, Math.min(15, Math.floor(a / (2 * Math.PI) * 16 + 8))); }
+/* 熱源の最下端の行 → 距離 (地平線 = 画面中央 = range、最下行 = 至近) */
+function thermalRowDist(r, h){
+  const horizon = h / 2;
+  const k = Math.max(0.03, Math.min(1, (h - 1 - r) / horizon));
+  return THERMAL.range * k;
+}
+function thermalDistRow(d, h){ return Math.round(h - 1 - (d / THERMAL.range) * (h / 2)); }
+
+/* temps (w×h) → 方位セクタごとの Ξ と熱源検出 */
+function thermalAnalyze(temps, w, h, ambient){
+  const nb = 64, lo = ambient - 16;
+  const binOf = function(t){ return Math.max(0, Math.min(nb - 1, Math.floor((t - lo) / THERMAL.bin))); };
+  const global = new Array(nb).fill(0);
+  const sectors = {};
+  for (let c = 0; c < w; c++){
+    const ray = angleToRay(thermalColAngle(c, w));
+    const s = sectors[ray] || (sectors[ray] = { ray: ray, hist: new Array(nb).fill(0), hotBottom: -1, maxT: -Infinity, hot: 0 });
+    for (let r = 0; r < h; r++){
+      const t = temps[r * w + c];
+      const b = binOf(t);
+      s.hist[b]++; global[b]++;
+      if (r >= h / 2 - 2 && t - ambient >= THERMAL.hotDelta){   /* 地平線より下の熱源のみ (空・太陽を除外) */
+        s.hot++;
+        if (r > s.hotBottom) s.hotBottom = r;
+        if (t > s.maxT) s.maxT = t;
+      }
+    }
+  }
+  const list = [];
+  for (const k in sectors){
+    const s = sectors[k];
+    const inv = manifoldInvariant(s.hist);
+    let dist = Infinity, type = "none";
+    if (s.hot >= 3){
+      dist = thermalRowDist(s.hotBottom, h);
+      type = s.maxT >= 45 ? "car" : (s.maxT >= 28 && s.maxT <= 42 ? "walker" : "heat");
+    }
+    list.push({ ray: s.ray, H: inv.H, M: inv.M, xi: inv.xi, dist: dist, type: type, maxT: s.maxT, hot: s.hot });
+  }
+  list.sort(function(a, b){ return a.ray - b.ray; });
+  const g = manifoldInvariant(global);
+  /* 慎重度: 温度分布のエントロピーが高い (雑多な熱環境) ほど 1 に近い */
+  const caution = Math.max(0, Math.min(1, g.H / Math.log2(nb)));
+  return { sectors: list, H: g.H, M: g.M, xi: g.xi, beta: g.beta, caution: caution };
+}
+
+/* レイセンサ (LiDAR 相当) と熱画像セクタを融合: 近い方を採用 */
+function fuseRays(rays, thermal){
+  const out = rays.map(function(r){ return { dist: r.dist, type: r.type, src: "ray" }; });
+  if (!thermal) return out;
+  for (const s of thermal.sectors){
+    if (s.type !== "none" && s.dist < out[s.ray].dist) out[s.ray] = { dist: s.dist, type: s.type, src: "thermal" };
+  }
+  return out;
+}
+
+/* デモ熱画像: シミュレーション世界を自車前方の赤外線カメラで見た像 (white-hot の温度場) */
+function thermalSynth(car, obstacles, ambient, w, h, rnd){
+  const t = new Float32Array(w * h);
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++){
+    const sky = r < h / 2;
+    const base = sky ? ambient - 6 - (h / 2 - r) * 0.15 : ambient + (r - h / 2) / (h / 2) * 1.5;
+    t[r * w + c] = base + (rnd ? (rnd() - 0.5) * 0.6 : 0);
+  }
+  for (const o of obstacles){
+    const dx = o.x - car.x, dy = o.y - car.y;
+    const d = Math.hypot(dx, dy);
+    if (d > THERMAL.range || d < 2) continue;
+    let a = Math.atan2(dy, dx) - car.heading;
+    while (a > Math.PI) a -= 2 * Math.PI;
+    while (a < -Math.PI) a += 2 * Math.PI;
+    if (Math.abs(a) > THERMAL.fov / 2) continue;
+    const cc = (a / THERMAL.fov + 0.5) * w;
+    const bottom = Math.min(h - 1, thermalDistRow(d, h));
+    const scale = Math.min(h, 260 / d);
+    const hh = Math.max(2, Math.round(o.type === "car" ? scale * 0.8 : scale));
+    const ww = Math.max(2, Math.round(o.type === "car" ? scale * 1.5 : scale * 0.4));
+    for (let r = bottom - hh + 1; r <= bottom; r++) for (let c = Math.round(cc - ww / 2); c < Math.round(cc + ww / 2); c++){
+      if (r < 0 || c < 0 || r >= h || c >= w) continue;
+      let temp;
+      if (o.type === "car") temp = (r >= bottom - 1) ? 70 : 50;          /* 排気・エンジン */
+      else temp = (r < bottom - hh * 0.8) ? 35 : 32;                      /* 顔 / 着衣 */
+      t[r * w + c] = temp;
+    }
+  }
+  return t;
+}
+
+/* =====================================================================
+ * 🤫 サイレントトーク操縦 — 声を出さずに口の形だけで指示する
+ *   bada_silent_vim/silenttalk (lipfeatures / decoder) の JS 移植。
+ *   前面カメラの口元 ROI → 暗部の外接矩形 → 開口 aperture / 横幅 spread
+ *   → 口形素 (viseme) A I U O E / C(休止) → 連続重複を畳み込み、
+ *   休止で区切って単語化 → 走行コマンド辞書で意味へ。
+ *   日本語の母音列がそのまま口形になる:
+ *     発進 (h-a-ss-i-n)  → AI     停止 (t-e-i-sh-i) → EI
+ *     左   (h-i-d-a-r-i) → IAI    右へ (m-i-g-i-e)  → IE
+ *     減速 (g-e-n-s-o-k-u)→ EOU   加速 (k-a-s-o-k-u)→ AOU
+ *     戻る (m-o-d-o-r-u) → OU     状態 (j-o-u-t-a-i)→ OUAI
+ * ===================================================================== */
+const ST_LEX = { "AI": "START", "EI": "STOP", "IAI": "LEFT", "IE": "RIGHT",
+                 "EOU": "SLOW", "AOU": "FAST", "OU": "HOME", "OUAI": "STATUS" };
+const ST_LABEL = { START: "発進", STOP: "停止", LEFT: "左へ", RIGHT: "右へ", SLOW: "減速",
+                   FAST: "加速", HOME: "戻る", STATUS: "状態" };
+
+/* luma: Uint8 配列 (w×h の口元 ROI)。暗部しきい値は ROI 平均の割合で照明に追従 */
+function stLipFeatures(luma, w, h, darkRatio){
+  let mean = 0;
+  for (let i = 0; i < luma.length; i++) mean += luma[i];
+  mean /= Math.max(1, luma.length);
+  const th = mean * (darkRatio || 0.55);
+  let minR = h, maxR = -1, minC = w, maxC = -1, dark = 0;
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++){
+    if (luma[r * w + c] < th){
+      dark++;
+      if (r < minR) minR = r; if (r > maxR) maxR = r;
+      if (c < minC) minC = c; if (c > maxC) maxC = c;
+    }
+  }
+  if (maxR < 0) return { aperture: 0, spread: 0, energy: 0 };
+  return { aperture: (maxR - minR + 1) / h, spread: (maxC - minC + 1) / w, energy: dark / (w * h) };
+}
+function stClassify(f){
+  const a = f.aperture, s = f.spread;
+  if (f.energy < 0.02 || (a < 0.12 && s < 0.20)) return "C";
+  const tall = a >= 0.34, wide = s >= 0.45;
+  if (tall && wide) return "A";
+  if (!tall && wide) return "I";
+  if (tall && !wide) return "O";
+  if (a < 0.22 && !wide) return "U";
+  return "E";
+}
+/* 口形素ストリームの逐次デコーダ。
+ *   stable: 同じ口形が何フレーム続けば確定とみなすか (瞬きやノイズ除去)
+ *   restFrames: 休止 C が何フレーム続けば単語の区切りとするか */
+function StDecoder(opts){
+  opts = opts || {};
+  this.stable = opts.stable || 3;
+  this.restFrames = opts.restFrames || 4;
+  this.lex = opts.lex || ST_LEX;
+  this.cand = null; this.candN = 0;
+  this.word = ""; this.lastV = "C"; this.restN = 0;
+}
+/* 1 フレームの口形素を入れる → 単語が確定したら {word, cmd} を返す */
+StDecoder.prototype.push = function(v){
+  if (v === this.cand) this.candN++; else { this.cand = v; this.candN = 1; }
+  if (this.candN < this.stable) return null;
+  if (v === "C"){
+    this.restN++;
+    this.lastV = "C";
+    if (this.restN >= this.restFrames && this.word){
+      const w = this.word;
+      this.word = "";
+      return { word: w, cmd: this.lex[w] || null };
+    }
+    return null;
+  }
+  this.restN = 0;
+  if (v !== this.lastV){ this.word += v; this.lastV = v; }
+  return null;
+};
+StDecoder.prototype.reset = function(){ this.cand = null; this.candN = 0; this.word = ""; this.lastV = "C"; this.restN = 0; };
+
+/* 安全ゲート — サイレントトークの指示をそのまま車に流さない。
+ *   STOP   : 即時実行 (誤認識でも止まる側は安全)
+ *   START / HOME / FAST : 確認が必要 (5 秒以内に同じ口形をもう一度)
+ *   その他 : 即時 (走行中の左右・減速は危険側に倒れない)
+ *   いずれの場合も、操縦そのものは常にトランスフォーマー制御ヘッドが行い、
+ *   障害物があれば発進指示があっても制動が優先される。 */
+const ST_CONFIRM = { START: true, HOME: true, FAST: true };
+function stGate(gate, cmd, now){
+  if (!cmd) return { act: false, msg: "unknown" };
+  if (cmd === "STOP"){ gate.pending = null; return { act: true, cmd: cmd }; }
+  if (ST_CONFIRM[cmd]){
+    if (gate.pending && gate.pending.cmd === cmd && now - gate.pending.t <= 5000){
+      gate.pending = null;
+      return { act: true, cmd: cmd, confirmed: true };
+    }
+    gate.pending = { cmd: cmd, t: now };
+    return { act: false, cmd: cmd, needConfirm: true };
+  }
+  gate.pending = null;
+  return { act: true, cmd: cmd };
+}
+
+/* 左右指示 → 経路上の次の交差点で左/右に曲がる地点を探す。
+ *   path の各区間の進行方向を基準に、右 = 画面座標で時計回り (dx,dy)->(-dy,dx)。
+ *   戻り値 { turnAt, into } (曲がる交差点と、曲がった先のセル) */
+function turnRoute(path, wp, heading, dir){
+  for (let i = Math.max(0, wp); i < path.length; i++){
+    const p = path[i];
+    let fx, fy;
+    if (i + 1 < path.length){ fx = path[i+1][0] - p[0]; fy = path[i+1][1] - p[1]; }
+    else if (i > 0){ fx = p[0] - path[i-1][0]; fy = p[1] - path[i-1][1]; }
+    else {
+      const hx = Math.cos(heading), hy = Math.sin(heading);
+      if (Math.abs(hx) >= Math.abs(hy)){ fx = Math.sign(hx) || 1; fy = 0; } else { fx = 0; fy = Math.sign(hy) || 1; }
+    }
+    const tx = dir === "RIGHT" ? -fy : fy, ty = dir === "RIGHT" ? fx : -fx;
+    const side = [p[0] + tx, p[1] + ty];
+    if (isRoad(side[0], side[1])) return { turnAt: p, into: side };
+  }
+  return null;
+}
+
+/* =====================================================================
  * ここから UI / シミュレーション (ブラウザのみ)
  * ===================================================================== */
 const S = {
@@ -578,7 +910,9 @@ function stepDrive(dt){
   }
   /* 目標方位 (自車 heading 基準の相対角) をトランスフォーマーへ */
   const goalBearing = angleWrap(Math.atan2(ty - S.car.y, tx - S.car.x) - S.car.heading);
-  const ctrl = alControl(senseRays(), goalBearing);
+  const ctrl = alControl(perceiveRays(), goalBearing);
+  /* サイレントトークの速度係数 × 熱画像エントロピーの慎重度で巡航を抑える (加速側のみ) */
+  if (ctrl.throttle > 0) ctrl.throttle *= ST.speedFactor * (1 - 0.35 * (TH.last ? TH.last.caution : 0));
   S.threat = ctrl.threat; S.focus = ctrl.focus; S.lastAttn = ctrl; S.lastCtrl = ctrl;
   /* 制御出力を UI へ */
   const sEl = document.getElementById("ctrl-steer"), tEl = document.getElementById("ctrl-throttle");
@@ -646,6 +980,12 @@ function draw(){
   cx.save(); cx.translate(S.car.x, S.car.y); cx.rotate(S.car.heading);
   cx.fillStyle = "#4ac077"; cx.beginPath(); cx.moveTo(12, 0); cx.lineTo(-9, -7); cx.lineTo(-9, 7); cx.closePath(); cx.fill();
   cx.restore();
+  /* 赤外線カメラの視野 (前方 90°) */
+  if (typeof TH !== "undefined" && TH.src){
+    cx.fillStyle = "rgba(255,120,40,.10)"; cx.beginPath(); cx.moveTo(S.car.x, S.car.y);
+    cx.arc(S.car.x, S.car.y, THERMAL.range, S.car.heading - THERMAL.fov / 2, S.car.heading + THERMAL.fov / 2);
+    cx.closePath(); cx.fill();
+  }
   /* 衛星モードなら衛星の方位線 */
   if (S.mode === "sat"){
     cx.strokeStyle = "rgba(74,128,208,.35)";
@@ -685,7 +1025,8 @@ function loop(ts){
   stepTiles(dt);
   stepDrive(dt);
   stepPos(dt);
-  if (!S.driving){ const per = alControl(senseRays(), 0); S.threat = per.threat; S.focus = per.focus; S.lastAttn = per; }
+  thStep(dt); stStep(dt);
+  if (!S.driving){ const per = alControl(perceiveRays(), 0); S.threat = per.threat; S.focus = per.focus; S.lastAttn = per; }
   obsTimer += dt;
   if (obsTimer > 4 && S.obstacles.length < 6){ obsTimer = 0; spawnObstacle(); }
   for (const o of S.obstacles) o.ttl -= dt;
@@ -752,7 +1093,7 @@ document.getElementById("alin").addEventListener("keydown", function(e){ if (e.k
  *   ここは tools/engine-test.js で単体テストされる。
  * ===================================================================== */
 const ELM_INIT = ["ATZ", "ATE0", "ATL0", "ATS0", "ATSP0"];
-const ELM_POLL = ["010D", "010C", "0105", "ATRV"];
+const ELM_POLL = ["010D", "010C", "0105", "0146", "ATRV"];   /* 0146 = 外気温 (車の温度計) */
 
 function elmParseLine(line){
   const t = String(line).replace(/[\r\n>]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
@@ -768,6 +1109,7 @@ function elmParseLine(line){
     if (pid === "0D" && h.length >= 6) return { type: "speed", kmh: parseInt(h.slice(4, 6), 16) };
     if (pid === "0C" && h.length >= 8) return { type: "rpm", rpm: parseInt(h.slice(4, 8), 16) / 4 };
     if (pid === "05" && h.length >= 6) return { type: "coolant", c: parseInt(h.slice(4, 6), 16) - 40 };
+    if (pid === "46" && h.length >= 6) return { type: "ambient", c: parseInt(h.slice(4, 6), 16) - 40 };
     return { type: "raw", raw: t };
   }
   if (/^(01[0-9A-F]{2}|AT[A-Z0-9]*)$/.test(h)) return { type: "echo", raw: t };
@@ -816,7 +1158,7 @@ ElmSession.prototype.feed = function(chunk){
     for (const ln of lines){
       const ev = elmParseLine(ln);
       if (!ev) continue;
-      if (ev.type === "speed" || ev.type === "rpm" || ev.type === "coolant" || ev.type === "volt")
+      if (ev.type === "speed" || ev.type === "rpm" || ev.type === "coolant" || ev.type === "volt" || ev.type === "ambient")
         this.onTelemetry(ev);
       if (ev.type === "nodata") this.onTelemetry({ type: "nodata", raw: ev.raw, cmd: this.lastSent });
     }
@@ -851,6 +1193,7 @@ DemoAdapter.prototype.respond = function(cmd){
     return "41 0C " + rpm.toString(16).padStart(4, "0").toUpperCase().replace(/(..)(..)/, "$1 $2") + "\r>";
   }
   if (c === "0105") return "41 05 " + (0x28 + 40).toString(16).toUpperCase() + "\r>";
+  if (c === "0146") return "41 46 " + (22 + 40).toString(16).toUpperCase() + "\r>";
   return "NO DATA\r>";
 };
 
@@ -876,6 +1219,11 @@ function btTelemetry(ev){
   }
   if (ev.type === "rpm"){ BT.real.rpm = ev.rpm; document.getElementById("btrpm").textContent = Math.round(ev.rpm) + " rpm"; }
   if (ev.type === "coolant") BT.real.coolant = ev.c;
+  if (ev.type === "ambient"){
+    BT.real.ambient = ev.c;
+    document.getElementById("btamb").textContent = ev.c + "°C" + (BT.kind === "demo" ? " (デモ)" : "");
+    if (typeof thSetAmbient === "function") thSetAmbient(ev.c, "OBD-II 外気温 PID 0146" + (BT.kind === "demo" ? " (デモ)" : ""));
+  }
   if (ev.type === "volt") BT.real.volt = ev.v;
   if (ev.type === "coolant" || ev.type === "volt")
     document.getElementById("btmisc").textContent =
@@ -1011,6 +1359,326 @@ function sayAl(text){ say("al", text); }
 document.getElementById("btconnect").addEventListener("click", function(){ btConnectReal(); });
 document.getElementById("btdemo").addEventListener("click", btConnectDemo);
 document.getElementById("btdisc").addEventListener("click", btDisconnect);
+document.getElementById("btthermo").addEventListener("click", thConnectBleThermo);
+document.getElementById("thcam").addEventListener("click", thStartCamera);
+document.getElementById("thdemo").addEventListener("click", thStartDemo);
+document.getElementById("thoff").addEventListener("click", thStop);
+document.getElementById("thamb").addEventListener("change", function(){ thSetAmbient(parseFloat(this.value), "手動"); });
+document.getElementById("thspan").addEventListener("change", function(){ const v = parseFloat(this.value); if (v > 0) TH.span = v; });
+document.getElementById("ststart").addEventListener("click", stStart);
+document.getElementById("ststop").addEventListener("click", stStop);
+(function(){
+  const pad = document.getElementById("stpad");
+  ["A", "I", "U", "O", "E"].forEach(function(v){
+    const b = document.createElement("button"); b.textContent = v; b.title = "口形 " + v;
+    b.addEventListener("click", function(){ stPadViseme(v); }); pad.appendChild(b);
+  });
+  const r = document.createElement("button"); r.textContent = "・ 区切り"; r.title = "口を閉じて一拍 (単語の終わり)";
+  r.addEventListener("click", stPadRest); pad.appendChild(r);
+  const lex = document.getElementById("stlex");
+  Object.keys(ST_LEX).forEach(function(w){
+    const b = document.createElement("button"); b.className = "chip";
+    b.textContent = ST_LABEL[ST_LEX[w]] + " = " + w;
+    b.title = "口形 " + w.split("").join("→") + " を入力";
+    b.addEventListener("click", function(){ stPadWord(w); }); lex.appendChild(b);
+  });
+})();
+
+/* =====================================================================
+ * 🌡 熱画像知覚 UI — 赤外線カメラ (UVC/getUserMedia) またはデモ熱画像
+ * ===================================================================== */
+const TH = { src: null, stream: null, video: null, grab: null, last: null, temps: null,
+             ambient: 20, ambientSrc: "手動", span: 40, rnd: lvRand(31337), timer: 0 };
+const thcv = document.getElementById("thcv");
+const thcx = thcv.getContext("2d");
+function thIron(u){
+  /* ironbow 風の疑似カラー (u: 0..1) */
+  u = Math.max(0, Math.min(1, u));
+  const r = Math.round(255 * Math.min(1, u * 1.9));
+  const g = Math.round(255 * Math.max(0, Math.min(1, (u - 0.35) * 1.9)));
+  const b = Math.round(255 * (u < 0.35 ? u * 2.4 : Math.max(0, 0.84 - (u - 0.35) * 2.6)));
+  return [r, g, b];
+}
+function thSetAmbient(c, src){
+  if (!isFinite(c)) return;
+  TH.ambient = c; TH.ambientSrc = src;
+  const el = document.getElementById("thamb");
+  if (el && document.activeElement !== el) el.value = c.toFixed(1);
+  document.getElementById("thambsrc").textContent = src;
+}
+function thUi(){
+  const on = !!TH.src;
+  document.getElementById("thoff").style.display = on ? "" : "none";
+  document.getElementById("thcam").style.display = on ? "none" : "";
+  document.getElementById("thdemo").style.display = on ? "none" : "";
+  document.getElementById("thstate").textContent = on ? (TH.src === "demo" ? "デモ熱画像 (シミュレーション世界を前方カメラで見た温度場)" : "赤外線カメラ (実機)") : "停止中";
+}
+async function thStartCamera(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    sayAl("この環境ではカメラ API が使えません。デモ熱画像で全経路を試せます。"); return;
+  }
+  try {
+    await platformCameraPermission();
+    const sel = document.getElementById("thdev");
+    const c = sel.value ? { deviceId: { exact: sel.value } } : { facingMode: "environment" };
+    const stream = await navigator.mediaDevices.getUserMedia({ video: c, audio: false });
+    TH.stream = stream;
+    TH.video = document.createElement("video");
+    TH.video.muted = true; TH.video.playsInline = true; TH.video.srcObject = stream;
+    await TH.video.play();
+    TH.grab = document.createElement("canvas"); TH.grab.width = THERMAL.w; TH.grab.height = THERMAL.h;
+    TH.src = "camera"; thUi();
+    /* カメラ一覧 (外付け UVC 赤外線カメラを選べるように) */
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const cur = stream.getVideoTracks()[0].getSettings().deviceId;
+    sel.innerHTML = "";
+    for (const d of devs) if (d.kind === "videoinput"){
+      const o = document.createElement("option"); o.value = d.deviceId; o.textContent = d.label || ("camera " + (sel.length + 1));
+      if (d.deviceId === cur) o.selected = true;
+      sel.appendChild(o);
+    }
+    sayAl("赤外線カメラに接続しました。white-hot の熱画像として読み、外気温 " + TH.ambient.toFixed(1) + "°C を基準に温度へ換算します。音のしない対象も熱で映像化します。");
+  } catch (e) {
+    sayAl("カメラに接続できませんでした: " + (e && e.message ? e.message : e));
+  }
+}
+function thStartDemo(){ TH.src = "demo"; thUi(); sayAl("デモ熱画像を開始。前方 90° の温度場からガンマ関数の多様体エントロピー Ξ を計算し、16レイに融合します。"); }
+function thStop(){
+  if (TH.stream) TH.stream.getTracks().forEach(function(t){ t.stop(); });
+  TH.stream = null; TH.video = null; TH.src = null; TH.last = null; TH.temps = null;
+  thUi(); thcx.clearRect(0, 0, thcv.width, thcv.height);
+}
+function thStep(dt){
+  if (!TH.src) return;
+  TH.timer += dt;
+  if (TH.timer < 0.1) return;
+  TH.timer = 0;
+  const W = THERMAL.w, H = THERMAL.h;
+  let temps;
+  if (TH.src === "demo"){
+    temps = thermalSynth(S.car, S.obstacles, TH.ambient, W, H, TH.rnd);
+  } else {
+    if (!TH.video || TH.video.readyState < 2) return;
+    const g = TH.grab.getContext("2d");
+    g.drawImage(TH.video, 0, 0, W, H);
+    const px = g.getImageData(0, 0, W, H).data;
+    const luma = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) luma[i] = (px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114) | 0;
+    temps = lumaToTemps(luma, TH.ambient, TH.span);
+  }
+  TH.temps = temps;
+  TH.last = thermalAnalyze(temps, W, H, TH.ambient);
+  thDraw();
+}
+function thDraw(){
+  const W = THERMAL.w, H = THERMAL.h, a = TH.last, temps = TH.temps;
+  if (!a || !temps) return;
+  const img = thcx.createImageData(W, H);
+  const lo = TH.ambient - 10, hi = TH.ambient + 35;
+  for (let i = 0; i < W * H; i++){
+    const c = thIron((temps[i] - lo) / (hi - lo));
+    img.data[i*4] = c[0]; img.data[i*4+1] = c[1]; img.data[i*4+2] = c[2]; img.data[i*4+3] = 255;
+  }
+  const tmp = thDraw._c || (thDraw._c = document.createElement("canvas"));
+  tmp.width = W; tmp.height = H; tmp.getContext("2d").putImageData(img, 0, 0);
+  thcx.imageSmoothingEnabled = false;
+  thcx.drawImage(tmp, 0, 0, thcv.width, thcv.height);
+  const sx = thcv.width / W, sy = thcv.height / H;
+  /* 地平線 */
+  thcx.strokeStyle = "rgba(255,255,255,.25)"; thcx.beginPath(); thcx.moveTo(0, H / 2 * sy); thcx.lineTo(thcv.width, H / 2 * sy); thcx.stroke();
+  /* 方位セクタごとの Ξ バーと熱源 */
+  let maxXi = 1e-9;
+  for (const s of a.sectors) maxXi = Math.max(maxXi, s.xi);
+  thcx.font = "10px monospace";
+  for (const s of a.sectors){
+    let c0 = W, c1 = -1;
+    for (let c = 0; c < W; c++) if (angleToRay(thermalColAngle(c, W)) === s.ray){ c0 = Math.min(c0, c); c1 = Math.max(c1, c); }
+    const x0 = c0 * sx, x1 = (c1 + 1) * sx;
+    thcx.fillStyle = "rgba(63,182,196,.75)";
+    thcx.fillRect(x0 + 2, 2, (x1 - x0 - 4) * (s.xi / maxXi), 5);
+    thcx.strokeStyle = "rgba(255,255,255,.18)"; thcx.strokeRect(x0 + .5, .5, x1 - x0 - 1, thcv.height - 1);
+    if (s.type !== "none"){
+      const yb = (thermalDistRow(s.dist, H) + 1) * sy;
+      thcx.strokeStyle = s.type === "car" ? "#ff5a5a" : "#7cf0ff"; thcx.lineWidth = 2;
+      thcx.beginPath(); thcx.moveTo(x0 + 2, yb); thcx.lineTo(x1 - 2, yb); thcx.stroke(); thcx.lineWidth = 1;
+      thcx.fillStyle = "#fff";
+      thcx.fillText((s.type === "car" ? "車" : s.type === "walker" ? "人" : "熱") + " " + s.dist.toFixed(0) + "m " + s.maxT.toFixed(0) + "°", x0 + 3, Math.min(thcv.height - 4, yb + 12));
+    }
+  }
+  document.getElementById("thxi").textContent = a.xi.toFixed(5) + "  (B=" + a.beta.toFixed(4) + ")";
+  document.getElementById("thh").textContent = a.H.toFixed(3) + " bit / M=" + a.M.toFixed(4);
+  document.getElementById("thcaution").textContent = (a.caution * 100).toFixed(0) + "% → 巡航 ×" + (1 - 0.35 * a.caution).toFixed(2);
+  const hot = a.sectors.filter(function(s){ return s.type !== "none"; });
+  document.getElementById("thhot").textContent = hot.length
+    ? hot.map(function(s){ return "レイ" + s.ray + ":" + (s.type === "car" ? "車" : s.type === "walker" ? "人" : "熱源") + " " + s.dist.toFixed(0) + "m"; }).join(" / ")
+    : "なし";
+}
+/* 車の知覚 = レイセンサ + 熱画像の融合 */
+function perceiveRays(){ return fuseRays(senseRays(), TH.last); }
+
+/* ── Cordova (APK) ではカメラの実行時権限を要求 ── */
+function platformCameraPermission(){
+  return new Promise(function(res){
+    const P = window.cordova && window.cordova.plugins && window.cordova.plugins.permissions;
+    if (!P) return res();
+    P.requestPermission(P.CAMERA, function(){ res(); }, function(){ res(); });
+  });
+}
+
+/* ── BLE 温度計 (Environmental Sensing 0x181A / Temperature 0x2A6E, sint16 × 0.01°C) ── */
+function bleEssTemp(dv){ return dv.getInt16(0, true) / 100; }
+async function thConnectBleThermo(){
+  if (!navigator.bluetooth){ sayAl("この環境には Web Bluetooth がありません。外気温は OBD-II (PID 0146) か手入力で設定できます。"); return; }
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [0x181a] }] });
+    const srv = await dev.gatt.connect();
+    const svc = await srv.getPrimaryService(0x181a);
+    const ch = await svc.getCharacteristic(0x2a6e);
+    const onv = function(dv){ thSetAmbient(bleEssTemp(dv), "BLE温度計 " + (dev.name || "")); };
+    onv(await ch.readValue());
+    try { await ch.startNotifications(); ch.addEventListener("characteristicvaluechanged", function(e){ onv(e.target.value); }); } catch (e) {}
+    sayAl("BLE 温度計 " + (dev.name || "") + " に接続。外気温 " + TH.ambient.toFixed(1) + "°C を熱画像の基準にします。");
+  } catch (e) {
+    if (!/cancel/i.test(String(e && e.message))) sayAl("温度計に接続できませんでした: " + (e && e.message ? e.message : e));
+  }
+}
+
+/* =====================================================================
+ * 🤫 サイレントトーク UI — 前面カメラの口元 ROI から口形素を読む
+ * ===================================================================== */
+const ST = { stream: null, video: null, grab: null, on: false, dec: new StDecoder(), gate: {}, timer: 0,
+             v: "C", feat: null, word: "", speedFactor: 1 };
+const stcv = document.getElementById("stcv");
+const stcx = stcv.getContext("2d");
+const ST_ROI = { x: 0.3, y: 0.58, w: 0.4, h: 0.24 };   /* 画面上の口元ガイド枠 (割合) */
+async function stStart(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    sayAl("この環境ではカメラ API が使えません。下の口形パッドでサイレントトークを試せます。"); return;
+  }
+  try {
+    await platformCameraPermission();
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 320, height: 240 }, audio: false });
+    ST.stream = stream;
+    ST.video = document.createElement("video");
+    ST.video.muted = true; ST.video.playsInline = true; ST.video.srcObject = stream;
+    await ST.video.play();
+    ST.grab = document.createElement("canvas"); ST.grab.width = 48; ST.grab.height = 32;
+    ST.on = true; ST.dec.reset();
+    document.getElementById("ststart").style.display = "none";
+    document.getElementById("ststop").style.display = "";
+    sayAl("サイレントトーク開始。口を黄色い枠に合わせ、声を出さずに「はっしん」「ていし」などと口を動かしてください。単語の終わりは口を閉じて一拍。");
+  } catch (e) {
+    sayAl("前面カメラに接続できませんでした: " + (e && e.message ? e.message : e));
+  }
+}
+function stStop(){
+  if (ST.stream) ST.stream.getTracks().forEach(function(t){ t.stop(); });
+  ST.stream = null; ST.video = null; ST.on = false;
+  document.getElementById("ststart").style.display = "";
+  document.getElementById("ststop").style.display = "none";
+  stcx.clearRect(0, 0, stcv.width, stcv.height);
+}
+function stStep(dt){
+  if (!ST.on || !ST.video || ST.video.readyState < 2) return;
+  ST.timer += dt;
+  if (ST.timer < 1 / 15) return;
+  ST.timer = 0;
+  const W = stcv.width, H = stcv.height;
+  stcx.save(); stcx.translate(W, 0); stcx.scale(-1, 1);          /* 鏡像表示 */
+  stcx.drawImage(ST.video, 0, 0, W, H); stcx.restore();
+  const vw = ST.video.videoWidth, vh = ST.video.videoHeight;
+  const g = ST.grab.getContext("2d");
+  /* 鏡像なので ROI の x を反転して元映像から切り出す */
+  g.drawImage(ST.video, (1 - ST_ROI.x - ST_ROI.w) * vw, ST_ROI.y * vh, ST_ROI.w * vw, ST_ROI.h * vh, 0, 0, 48, 32);
+  const px = g.getImageData(0, 0, 48, 32).data;
+  const luma = new Uint8Array(48 * 32);
+  for (let i = 0; i < luma.length; i++) luma[i] = (px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114) | 0;
+  const f = stLipFeatures(luma, 48, 32, 0.55);
+  stFeed(stClassify(f), f);
+  stcx.strokeStyle = "#c8a44a"; stcx.lineWidth = 2;
+  stcx.strokeRect(ST_ROI.x * W, ST_ROI.y * H, ST_ROI.w * W, ST_ROI.h * H); stcx.lineWidth = 1;
+  stcx.fillStyle = "#c8a44a"; stcx.font = "bold 22px sans-serif"; stcx.fillText(ST.v, 8, 26);
+}
+/* 口形素 1 フレームを入力 (カメラ・パッド共通の経路) */
+function stFeed(v, f){
+  ST.v = v; ST.feat = f || null;
+  const tok = ST.dec.push(v);
+  document.getElementById("stv").textContent = v + (v === "C" ? " (休止)" : "");
+  document.getElementById("stfeat").textContent = f ? ("開口 " + f.aperture.toFixed(2) + " / 横幅 " + f.spread.toFixed(2)) : "— (パッド入力)";
+  document.getElementById("stword").textContent = ST.dec.word || "—";
+  if (tok) stHandle(tok);
+}
+function stPadViseme(v){ for (let i = 0; i < ST.dec.stable; i++) stFeed(v, null); }
+function stPadRest(){ for (let i = 0; i < ST.dec.stable + ST.dec.restFrames; i++) stFeed("C", null); }
+function stPadWord(word){ for (const v of word){ stPadViseme(v); } stPadRest(); }
+function stHandle(tok){
+  document.getElementById("stcmd").textContent = tok.word + " → " + (tok.cmd ? ST_LABEL[tok.cmd] + " (" + tok.cmd + ")" : "辞書にない口形");
+  say("you", "🤫 " + tok.word + (tok.cmd ? " (" + ST_LABEL[tok.cmd] + ")" : ""));
+  if (!tok.cmd){ sayAl("口形「" + tok.word + "」は走行辞書にありません。誤認識として無視します。"); return; }
+  const g = stGate(ST.gate, tok.cmd, Date.now());
+  document.getElementById("stpend").textContent = ST.gate.pending ? ST_LABEL[ST.gate.pending.cmd] + " (5秒以内にもう一度)" : "—";
+  if (g.needConfirm){ sayAl("「" + ST_LABEL[tok.cmd] + "」を受け付けました。安全のため、5秒以内にもう一度同じ口形で確定してください。"); return; }
+  if (g.act) stExecute(g.cmd);
+}
+function stExecute(cmd){
+  const btn = document.getElementById("drive");
+  if (cmd === "STOP"){
+    if (S.driving) btn.click(); else sayAl("停止中です。");
+    return;
+  }
+  if (cmd === "START"){
+    if (!S.path.length){ sayAl("目的地がありません。地図をタップするか、「戻る」「左へ」「右へ」で行き先を決めてください。"); return; }
+    if (!S.driving) btn.click();
+    return;
+  }
+  if (cmd === "HOME"){
+    const from = carCell();
+    const p = planRoute(from, [0, 0]);
+    if (!p){ sayAl("出発地への経路が見つかりません。"); return; }
+    S.path = p; S.wp = 0; S.target = [0, 0];
+    sayAl("出発地 (0,0) へ戻る経路を引きました (" + p.length + " 区間)。");
+    if (!S.driving) btn.click();
+    return;
+  }
+  if (cmd === "LEFT" || cmd === "RIGHT"){
+    const hadRoute = S.path.length > 0 && S.wp < S.path.length;
+    let path;
+    if (hadRoute) path = S.path.slice(S.wp);
+    else {
+      /* 目的地なし → 進行方向へ直進する仮経路を作り、その先で曲がる */
+      const c = carCell(); path = [c];
+      const hx = Math.round(Math.cos(S.car.heading)), hy = Math.round(Math.sin(S.car.heading));
+      let x = c[0], y = c[1];
+      while ((hx || hy) && isRoad(x + hx, y + hy)){ x += hx; y += hy; path.push([x, y]); }
+    }
+    const t = turnRoute(path, 0, S.car.heading, cmd);
+    if (!t){ sayAl("この先に" + ST_LABEL[cmd] + "曲がれる道がありません。"); return; }
+    let target = hadRoute ? S.target : null;
+    if (!target){
+      /* 曲がった先をまっすぐ行けるところまでを目的地に */
+      const dx = t.into[0] - t.turnAt[0], dy = t.into[1] - t.turnAt[1];
+      let x = t.into[0], y = t.into[1];
+      while (isRoad(x + dx, y + dy)){ x += dx; y += dy; }
+      target = [x, y];
+    }
+    const idx = path.findIndex(function(p){ return p[0] === t.turnAt[0] && p[1] === t.turnAt[1]; });
+    const tail = planRoute(t.into, target) || [t.into];
+    S.path = path.slice(0, idx + 1).concat(tail); S.wp = 0; S.target = target;
+    sayAl("交差点 (" + t.turnAt[0] + "," + t.turnAt[1] + ") で" + ST_LABEL[cmd] + "曲がる経路に組み替えました。" + (S.driving ? "" : "「発進」でどうぞ。"));
+    return;
+  }
+  if (cmd === "SLOW" || cmd === "FAST"){
+    ST.speedFactor = Math.max(0.4, Math.min(1, ST.speedFactor + (cmd === "SLOW" ? -0.2 : 0.2)));
+    document.getElementById("stspeed").textContent = "×" + ST.speedFactor.toFixed(1);
+    sayAl(cmd === "SLOW" ? "減速します。速度係数 ×" + ST.speedFactor.toFixed(1) + "。" : "加速します (上限は巡航速度)。速度係数 ×" + ST.speedFactor.toFixed(1) + "。");
+    return;
+  }
+  if (cmd === "STATUS"){
+    sayAl(alReply("状態", { x: S.est.x, y: S.est.y, speed: S.car.speed, mode: S.mode, err: S.err }) +
+          (TH.last ? "\n熱画像: Ξ=" + TH.last.xi.toFixed(4) + "、慎重度 " + (TH.last.caution * 100).toFixed(0) + "%。" : ""));
+  }
+}
+function carCell(){ return [Math.max(0, Math.min(GRID_W - 1, Math.floor(S.car.x / CELL))), Math.max(0, Math.min(GRID_H - 1, Math.floor(S.car.y / CELL)))]; }
 
 /* ── 起動 ── */
 queueTiles();

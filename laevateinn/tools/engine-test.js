@@ -12,7 +12,11 @@
  *      ランドマーク補正による吸着
  *   4. 人工衛星モード測位 — 擬似距離の最小二乗トリラテレーション
  *   5. 地図タイル AEAD — 封緘/開封の往復 (CJK 含む) と改ざん拒否
- *   6. アル (意図エンジン) の応答
+ *   6. アル (意図エンジン) の応答 / トランスフォーマー制御ヘッド / 車両運動
+ *   7. ELM327 (OBD-II) — 外気温 PID 0146 (車の温度計) を含む
+ *   8. ガンマ関数・大域的部分積分多様体エントロピー Ξ
+ *   9. 熱画像知覚 (赤外線カメラ × 温度計) と 16 レイ融合
+ *  10. サイレントトーク (口形 → 口形素 → 走行コマンド) と安全ゲート
  */
 "use strict";
 const fs = require("fs");
@@ -157,6 +161,7 @@ const P = G("elmParseLine");
 assert(P("41 0D 3C").type === "speed" && P("41 0D 3C").kmh === 60, "ELM: '41 0D 3C' -> 60 km/h");
 assert(P("410C1AF8").type === "rpm" && P("410C1AF8").rpm === 1726, "ELM: '410C1AF8' -> 1726 rpm");
 assert(P("41 05 5A").type === "coolant" && P("41 05 5A").c === 50, "ELM: '41 05 5A' -> coolant 50°C");
+assert(P("41 46 3A").type === "ambient" && P("41 46 3A").c === 18, "ELM: '41 46 3A' -> ambient air 18°C (PID 0146)");
 assert(P("12.6V").type === "volt" && P("12.6V").v === 12.6, "ELM: 'ATRV' reply '12.6V' -> battery voltage");
 assert(P("NO DATA").type === "nodata" && P("UNABLE TO CONNECT").type === "nodata", "ELM: NO DATA / UNABLE TO CONNECT are flagged");
 assert(P("010D").type === "echo" && P("ATZ").type === "echo", "ELM: command echoes are ignored as echo");
@@ -180,9 +185,12 @@ assert(states.indexOf("ready") >= 0, "ELM session: reports ready after init");
 sess.feed("41 0D 28\r>");                       /* 40 km/h */
 sess.feed("41 0C 0F A0\r>");                    /* 1000 rpm */
 sess.feed("41 05 46\r>");                       /* 30°C */
+sess.feed("41 46 3C\r>");                       /* 外気温 20°C */
 sess.feed("12.4V\r>");
-assert(writes[writes.length - 1] === "010D" && writes.length === 10,
-       "ELM session: poll cycle wraps around (010D 010C 0105 ATRV -> 010D)");
+assert(writes[writes.length - 1] === "010D" && writes.length === 11,
+       "ELM session: poll cycle wraps around (010D 010C 0105 0146 ATRV -> 010D)");
+const amb = telemetry.filter(function(e){ return e.type === "ambient"; });
+assert(amb.length === 1 && amb[0].c === 20, "ELM session: ambient air temperature (PID 0146, the car's thermometer) 20°C delivered");
 const spd = telemetry.filter(function(e){ return e.type === "speed"; });
 const rpm = telemetry.filter(function(e){ return e.type === "rpm"; });
 assert(spd.length === 1 && spd[0].kmh === 40, "ELM session: telemetry speed 40 km/h delivered");
@@ -191,5 +199,95 @@ sess.feed("41 0D");        /* 分割パケット前半 */
 sess.feed(" 50\r>");       /* 後半 — 結合して 80 km/h */
 const spd2 = telemetry.filter(function(e){ return e.type === "speed"; });
 assert(spd2.length === 2 && spd2[1].kmh === 80, "ELM session: split BLE packets are reassembled (80 km/h)");
+
+/* 8. ガンマ関数・大域的部分積分多様体エントロピー Ξ */
+const Gm = G("lvGamma"), Bt = G("lvBeta"), MI = G("manifoldInvariant");
+assert(Math.abs(Gm(5) - 24) < 1e-9 && Math.abs(Gm(0.5) - Math.sqrt(Math.PI)) < 1e-12, "Gamma (Lanczos): Γ(5)=24, Γ(1/2)=√π");
+assert(Math.abs(Gm(0.25) * Gm(0.75) - Math.PI / Math.sin(Math.PI / 4)) < 1e-9, "Gamma reflection formula Γ(x)Γ(1-x)=π/sin(πx)");
+assert(Math.abs(Bt(2, 3) - 1 / 12) < 1e-12, "Beta: B(2,3) = 1/12");
+assert(Math.abs(G("zetaGauge")(2, 3, Math.E) - 1 / 12) < 1e-12, "zeta gauge = B(p,q)/log x");
+assert(Math.abs(G("manifoldElement")(Math.E) - 1 / (Math.E * Math.E)) < 1e-12 && G("manifoldElement")(1) === 1,
+       "manifold element dμ = 1/(x log x)^2 (safe at x<=1)");
+const uni = MI([10, 10, 10, 10]), peak = MI([40, 0, 0, 0]);
+assert(Math.abs(uni.H - 2) < 1e-12 && peak.H === 0, "manifold invariant: Shannon H of a uniform 4-bin measure = 2 bit, a delta = 0");
+assert(Math.abs(uni.xi - G("zetaGauge")(uni.H + 1, uni.M + 1, 41)) < 1e-15 && uni.xi > 0,
+       "manifold invariant: Xi = zeta_gauge(H+1, M+1, N+1)");
+/* Ruby 実装 (bada_ruby Manifold.invariant) と同じ値になること: 分布 [0.5,0.25,0.25], N=4 */
+const rb = MI([2, 1, 1]);
+const expM = 0.5 / Math.pow(2 * Math.log(2), 2) + 0.25 / Math.pow(3 * Math.log(3), 2) + 0.25 / Math.pow(4 * Math.log(4), 2);
+assert(Math.abs(rb.H - 1.5) < 1e-12 && Math.abs(rb.M - expM) < 1e-12, "manifold invariant matches the Ruby definition (H=1.5, M=Σp·dμ(rank+2))");
+
+/* 9. 熱画像知覚 — 赤外線カメラ × 温度計 */
+const TW = 64, TH_ = 48;
+assert(G("angleToRay")(0) === 8 && G("angleToRay")(-0.05) === 7, "thermal: straight ahead maps to the front rays 7/8");
+const d0 = 60, row = G("thermalDistRow")(d0, TH_);
+assert(Math.abs(G("thermalRowDist")(row, TH_) - d0) < 4, "thermal: ground-plane row <-> distance mapping round-trips");
+const quiet = G("thermalAnalyze")(G("thermalSynth")({ x: 0, y: 0, heading: 0 }, [], 20, TW, TH_, G("lvRand")(1)), TW, TH_, 20);
+assert(quiet.sectors.every(function(s){ return s.type === "none"; }), "thermal: an empty (silent) scene has no heat sources");
+const walker = { x: 50, y: 0, type: "walker" };
+const seen = G("thermalAnalyze")(G("thermalSynth")({ x: 0, y: 0, heading: 0 }, [walker], 20, TW, TH_, G("lvRand")(1)), TW, TH_, 20);
+const hit = seen.sectors.filter(function(s){ return s.type !== "none"; });
+assert(hit.length >= 1 && hit.every(function(s){ return s.ray === 7 || s.ray === 8; }), "thermal: a silent pedestrian ahead is detected in the front sector");
+assert(hit[0].type === "walker" && Math.abs(hit[0].dist - 50) < 12, "thermal: classified as walker (~34°C) at ~50 m (" + hit[0].dist.toFixed(0) + " m)");
+const carObs = { x: 0, y: 40, type: "car" };
+const seenCar = G("thermalAnalyze")(G("thermalSynth")({ x: 0, y: 0, heading: Math.PI / 2 }, [carObs], 20, TW, TH_, null), TW, TH_, 20);
+assert(seenCar.sectors.some(function(s){ return s.type === "car"; }), "thermal: a hot engine/exhaust (>45°C) is classified as a car");
+const behind = G("thermalAnalyze")(G("thermalSynth")({ x: 0, y: 0, heading: 0 }, [{ x: -50, y: 0, type: "car" }], 20, TW, TH_, null), TW, TH_, 20);
+assert(behind.sectors.every(function(s){ return s.type === "none"; }), "thermal: objects outside the 90° camera FOV are not seen");
+assert(seen.xi > 0 && seen.H > quiet.H - 1e-9, "thermal: per-scene Xi is computed; a heat source adds entropy to the temperature measure");
+/* 輝度 → 温度 (温度計 = 中央値の基準) */
+const lum = new Uint8Array(100); for (let i = 0; i < 100; i++) lum[i] = i < 90 ? 100 : 100 + 51;
+const tt = G("lumaToTemps")(lum, 18, 50);
+assert(Math.abs(tt[0] - 18) < 1e-6 && Math.abs(tt[99] - 28) < 1e-4, "thermal: white-hot luma is anchored to the thermometer (median = ambient)");
+/* 融合: 熱画像でしか見えない無音の歩行者がトランスフォーマーの制動を起こす */
+const blind = clearRays.map(function(r){ return { dist: r.dist, type: r.type }; });
+const fused = G("fuseRays")(blind, seen);
+assert(fused[hit[0].ray].src === "thermal" && fused[hit[0].ray].type === "walker", "fusion: thermal detection fills the ray the LiDAR missed");
+const cFused = G("alControl")(G("fuseRays")(blind, G("thermalAnalyze")(G("thermalSynth")({ x: 0, y: 0, heading: 0 }, [{ x: 20, y: 0, type: "walker" }], 20, TW, TH_, null), TW, TH_, 20)), 0);
+assert(cFused.throttle < 0, "fusion: a close silent pedestrian seen only by the IR camera makes the transformer brake");
+assert(G("bleEssTemp")(new DataView(new Int16Array([2345]).buffer)) === 23.45, "BLE thermometer: ESS 0x2A6E sint16 x 0.01°C");
+
+/* 10. サイレントトーク — 口形 → 口形素 → 走行コマンド */
+function mouth(ap, sp){
+  const w = 48, h = 32, a = new Uint8Array(w * h).fill(200);
+  const rh = Math.round(ap * h), rw = Math.round(sp * w);
+  const r0 = Math.floor((h - rh) / 2), c0 = Math.floor((w - rw) / 2);
+  for (let r = r0; r < r0 + rh; r++) for (let c = c0; c < c0 + rw; c++) a[r * w + c] = 30;
+  return a;
+}
+const LF = G("stLipFeatures"), CL = G("stClassify");
+assert(CL(LF(mouth(0.6, 0.7), 48, 32)) === "A", "silent talk: tall+wide mouth -> A");
+assert(CL(LF(mouth(0.25, 0.7), 48, 32)) === "I", "silent talk: flat+wide mouth -> I");
+assert(CL(LF(mouth(0.6, 0.3), 48, 32)) === "O", "silent talk: tall+narrow mouth -> O");
+assert(CL(LF(mouth(0.16, 0.3), 48, 32)) === "U", "silent talk: small+narrow mouth -> U");
+assert(CL(LF(mouth(0, 0), 48, 32)) === "C", "silent talk: closed mouth -> C (rest)");
+const Dec = G("StDecoder");
+const dec = new Dec({ stable: 3, restFrames: 4 });
+function frames(v, n){ let out = null; for (let i = 0; i < n; i++){ const t = dec.push(v); if (t) out = t; } return out; }
+frames("C", 5); frames("A", 4); frames("I", 5);
+const tk = frames("C", 8);
+assert(tk && tk.word === "AI" && tk.cmd === "START", "silent talk: A..A I..I + rest decodes to 'AI' = 発進 (START)");
+frames("E", 3); frames("O", 1); frames("E", 2); frames("I", 4);   /* O 1 フレームはノイズとして捨てる */
+const tk2 = frames("C", 8);
+assert(tk2 && tk2.word === "EI" && tk2.cmd === "STOP", "silent talk: a 1-frame glitch is filtered; 'EI' = 停止 (STOP)");
+frames("U", 4); frames("U", 4);
+const tk3 = frames("C", 8);
+assert(tk3 && tk3.word === "U" && tk3.cmd === null, "silent talk: an unknown mouth word maps to no command");
+/* 安全ゲート */
+const gate = {}, SG = G("stGate");
+assert(SG(gate, "STOP", 0).act === true, "gate: STOP executes immediately");
+const g1 = SG(gate, "START", 1000);
+assert(!g1.act && g1.needConfirm, "gate: START needs confirmation");
+assert(SG(gate, "START", 4000).act === true, "gate: START confirmed by a second identical word within 5 s");
+SG(gate, "START", 10000);
+assert(SG(gate, "START", 16000).act === false, "gate: confirmation expires after 5 s");
+SG(gate, "START", 20000);
+assert(SG(gate, "STOP", 21000).act === true && gate.pending === null, "gate: STOP cancels a pending START");
+/* 左右指示 → 経路組み替え */
+const straight = G("planRoute")([0, 3], [11, 3]);
+const tR = G("turnRoute")(straight, 0, 0, "RIGHT");
+assert(tR && tR.into[1] === tR.turnAt[1] + 1 && G("isRoad")(tR.into[0], tR.into[1]), "turn: RIGHT while heading east picks the next road branching south");
+const tL = G("turnRoute")(straight, 0, 0, "LEFT");
+assert(tL && tL.into[1] === tL.turnAt[1] - 1 && G("isRoad")(tL.into[0], tL.into[1]), "turn: LEFT while heading east picks the next road branching north");
 
 console.log("\nALL ENGINE TESTS PASSED");
