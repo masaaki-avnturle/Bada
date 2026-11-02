@@ -17,6 +17,8 @@
  *   8. ガンマ関数・大域的部分積分多様体エントロピー Ξ
  *   9. 熱画像知覚 (赤外線カメラ × 温度計) と 16 レイ融合
  *  10. サイレントトーク (口形 → 口形素 → 走行コマンド) と安全ゲート
+ *  11. 目的地リンク (AEAD 封筒 / 地名・座標の解析 / 改ざん拒否)
+ *  12. 完全自動走行ミッション (受理 → 計画 → 封鎖・再計画 → 到着 → 次へ / 緊急停止)
  */
 "use strict";
 const fs = require("fs");
@@ -289,5 +291,59 @@ const tR = G("turnRoute")(straight, 0, 0, "RIGHT");
 assert(tR && tR.into[1] === tR.turnAt[1] + 1 && G("isRoad")(tR.into[0], tR.into[1]), "turn: RIGHT while heading east picks the next road branching south");
 const tL = G("turnRoute")(straight, 0, 0, "LEFT");
 assert(tL && tL.into[1] === tL.turnAt[1] - 1 && G("isRoad")(tL.into[0], tL.into[1]), "turn: LEFT while heading east picks the next road branching north");
+
+/* 11. 目的地リンク */
+const DP = G("dstParse"), DD = G("dstDecode"), DS = G("dstSeal");
+assert(DP("駅").x === 11 && DP("駅").y === 0 && DP("空港へ").label === "空港", "destination: place names resolve to landmark cells");
+assert(DP("3,6").x === 3 && DP("3,6").y === 6 && DP("DST|11,8|空港|7").seq === 7 && DP("DST|11,8|空港|7").label === "空港", "destination: 'x,y' and DST|x,y|label|seq forms parse");
+assert(DP("CMD|STOP").cmd === "STOP" && DP("cmd|go").cmd === "GO" && DP("???") === null, "destination: commands parse, garbage is null");
+const sealed = DS({ x: 11, y: 8, label: "空港", seq: 3 }, 1234);
+assert(/^LVD1\{/.test(sealed), "destination link: sealed envelope carries the LVD1 magic");
+const okd = DD(sealed);
+assert(okd.ok && okd.msg.signed && okd.msg.x === 11 && okd.msg.y === 8 && okd.msg.seq === 3, "destination link: sealed envelope verifies and decodes (signed)");
+const env2 = JSON.parse(sealed.slice(4)); env2.ct[2] = (env2.ct[2] + 1) % 65536;
+assert(DD("LVD1" + JSON.stringify(env2)).ok === false && DD("LVD1" + JSON.stringify(env2)).why === "tamper", "destination link: a tampered envelope is rejected (AEAD tag mismatch)");
+assert(DD("港").ok && DD("港").msg.signed === false && DD("港").msg.x === 11 && DD("港").msg.y === 6, "destination link: plain text is accepted but marked unsigned");
+assert(DD(DS({ cmd: "STOP" }, 5)).msg.cmd === "STOP", "destination link: sealed CMD|STOP decodes");
+
+/* 12. 完全自動走行ミッション */
+const PRA = G("planRouteAvoid");
+const direct = G("planRoute")([0, 0], [11, 0]);
+assert(direct.length === 12, "A*: top road (0,0)->(11,0) is a straight 12-cell route");
+const detour = PRA([0, 0], [11, 0], { "5,0": true });
+assert(detour && detour.length > 12 && !detour.some(function(p){ return p[0] === 5 && p[1] === 0; }), "A* avoid: a blocked cell forces a detour that never enters it (" + detour.length + " cells)");
+assert(PRA([5, 0], [11, 0], { "5,0": true }) !== null, "A* avoid: the start cell itself is never treated as blocked");
+assert(G("isRoad")(5, 0) === true, "A* avoid: isRoad is restored after planning");
+const M = G("Mission");
+const mi = new M();
+assert(mi.accept({ x: 1, y: 1, label: "x", seq: 1 }, 0).ok === false, "mission: an off-road destination is rejected");
+assert(mi.accept({ x: 11, y: 0, label: "駅", seq: 5, signed: true }, 0).ok && mi.accept({ x: 11, y: 8, label: "空港", seq: 2 }, 0).why === "stale",
+       "mission: destinations queue; an older seq than the last accepted is rejected");
+assert(mi.accept({ x: 11, y: 8, label: "空港", seq: 6 }, 0).pos === 2 && mi.queue.length === 2, "mission: second destination waits in the queue");
+const n1 = mi.next([0, 0], 0);
+assert(n1.ok && mi.state === "DRIVING" && mi.current.label === "駅" && mi.path.length === 12, "mission: next() plans the route to the first destination and starts DRIVING (no button)");
+/* 封鎖 → 再計画: セル (5,0) の手前で 6 秒以上停止 */
+mi.wp = 5;
+let ev = null;
+for (let i = 0; i < 70; i++){ const e = mi.observe(1000 + i * 100, 0.1, 0, 0.9, [4, 0]); if (e) ev = e; }
+assert(ev && ev.type === "replan" && ev.cell[0] === 5 && ev.cell[1] === 0 && mi.path[0][0] === 4 && !mi.path.some(function(p){ return p[0] === 5 && p[1] === 0; }),
+       "mission: stuck >6 s at a blocked cell -> that cell is blocked and the route re-planned around it (" + ev.len + " cells)");
+assert(mi.observe(9000, 0.1, 20, 0, [4, 1]) === null && mi.stuckT === 0, "mission: moving again clears the stuck timer");
+assert(Object.keys(mi.activeBlocked(9000)).length === 1 && Object.keys(mi.activeBlocked(9000 + 60000)).length === 0, "mission: a blocked cell expires after BLOCK_TTL");
+/* 緊急停止と再開 */
+mi.hold(); assert(mi.state === "HOLD", "mission: hold() -> HOLD (emergency stop)");
+mi.resume(); assert(mi.state === "DRIVING", "mission: resume() -> DRIVING again");
+/* 到着 → 次へ */
+const arrived = mi.arrive(50000);
+assert(arrived.label === "駅" && mi.state === "ARRIVED" && mi.done.length === 1 && mi.queue.length === 1, "mission: arrive() records the stop and keeps the queue");
+const n2 = mi.next([11, 0], 50000);
+assert(n2.ok && mi.current.label === "空港" && mi.path[0][0] === 11 && mi.path[0][1] === 0, "mission: after arrival the next queued destination is dispatched automatically");
+mi.arrive(60000);
+assert(mi.state === "IDLE" && mi.done.length === 2, "mission: with an empty queue the vehicle returns to IDLE and waits for Bluetooth");
+const mu = new M(); mu.accept({ x: 7, y: 4, label: "unreach", seq: null }, 0);   /* (7,4) is '.'? no: row4 '#..#..#..#.#' -> x=7 '.' → offroad */
+assert(mu.queue.length === 0, "mission: off-road cells never enter the queue");
+const mb = new M(); mb.accept({ x: 11, y: 0, label: "駅" }, 0); mb.blocked["11,0"] = 1e12;
+const nb = mb.next([0, 0], 0);
+assert(!nb.ok && nb.skipped.length === 1 && mb.state === "IDLE", "mission: an unreachable destination is skipped and reported");
 
 console.log("\nALL ENGINE TESTS PASSED");

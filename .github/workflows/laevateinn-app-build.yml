@@ -50,13 +50,15 @@ jobs:
                                   "function ElmSession", "function alControl",
                                   "function carStep", "function lvGamma",
                                   "function manifoldInvariant", "function thermalAnalyze",
-                                  "function fuseRays", "function StDecoder", "function stGate"]) {
+                                  "function fuseRays", "function StDecoder", "function stGate",
+                                  "function dstSeal", "function dstDecode", "function Mission",
+                                  "function planRouteAvoid"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
           '
           node --check /tmp/lv.js
           echo "Laevateinn self-check OK"
-      - name: Engine tests (A* / transformer / positioning / tiles / Al / ELM327 / Γ-manifold entropy / thermal / silent talk)
+      - name: Engine tests (A* / transformer / positioning / tiles / Al / ELM327 / Γ-manifold entropy / thermal / silent talk / destination link / mission)
         run: |
           set -e
           node laevateinn/tools/engine-test.js
@@ -111,6 +113,10 @@ jobs:
           cordova plugin add cordova-plugin-ble-central@1.7.4
           # v2.0: 赤外線カメラ / サイレントトーク (前面カメラ) の実行時カメラ権限
           cordova plugin add cordova-plugin-android-permissions@1.1.5
+          # v3.0: 目的地リンク — タブレットを BLE ペリフェラルにして目的地を待ち受ける
+          # (プラグインが取得できなくてもビルドは続行: アプリは window.blePeripheral を検出し、
+          #  無ければ BLE セントラル / 送信機モード / デモリンクにフォールバックする)
+          cordova plugin add cordova-plugin-ble-peripheral@1.0.0 || echo "::warning::ble-peripheral plugin unavailable; destination link falls back to central/sender modes"
           cordova build android --verbose
       - name: Collect APK
         run: |

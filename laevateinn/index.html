@@ -18,6 +18,10 @@
   ・v2.0 🌡 熱画像知覚: 赤外線カメラ × 温度計 (OBD-II PID 0146 / BLE) の温度場から
     ガンマ関数の大域的部分積分多様体エントロピー Ξ を方位ごとに求め、16 レイへ融合
     (熱放射は無音の対象も写す)
+  ・v3.0 📍 目的地リンク: 目的地を Bluetooth でタブレットへ (BLE ペリフェラル /
+    NUS リモコン / 送信機モード / デモ)。zone:// 系 AEAD 封筒で検証したものだけ受理
+  ・v3.0 🚗 完全自動走行ミッション: 受理 → A* → 自動発進 → 障害物で減速停止 →
+    塞がれたままなら封鎖して再計画 → 到着 → 次の目的地へ (人手なし)
   ・v2.0 🤫 サイレントトーク操縦: 前面カメラの口形 (無発声) → 口形素 → 走行コマンド
     (安全ゲートつき。操縦そのものは常にトランスフォーマー制御ヘッド)
   依存ゼロ・単一 HTML・オフライン動作 (地図受信・衛星はシミュレーション)。
@@ -48,7 +52,7 @@ input:focus{outline:none;border-color:var(--cyan)}
 #modes{display:flex;border:1px solid var(--edge);border-radius:99px;overflow:hidden}
 #modes button{border:none;border-radius:0;padding:6px 14px;background:none;color:var(--dim)}
 #modes button.on{background:var(--blue);color:#fff}
-#drive{margin-left:auto}
+#drive{margin-left:0}
 .badge{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;border:1px solid var(--edge);color:var(--dim)}
 .badge.ok{color:var(--green);border-color:var(--green)}
 .badge.warn{color:var(--gold);border-color:var(--gold)}
@@ -102,13 +106,14 @@ button.chip{font-size:11.5px;padding:3px 9px;border-radius:99px}
     <button id="mode-web" class="on">🌐 Web地図 (衛星不使用)</button>
     <button id="mode-sat">🛰 人工衛星</button>
   </div>
+  <label class="badge ok" style="margin-left:auto;cursor:pointer"><input type="checkbox" id="autoon" checked style="width:auto;vertical-align:middle"/> 完全自動走行 (目的地が届けば自動発進)</label>
   <button id="drive" class="primary">▶ 自動走行 開始</button>
 </div>
 
 <div id="main">
   <div>
     <div class="card" id="mapwrap">
-      <h2>マップ — クリックで目的地を設定 (A* が経路を計画)</h2>
+      <h2>マップ — 目的地は Bluetooth (下の 📍 目的地リンク) か タップで (A* が経路を計画し自動発進)</h2>
       <canvas id="cv" width="720" height="540"></canvas>
       <div id="maphint">地図タイルは受信・AEAD検証したところから表示されます</div>
     </div>
@@ -143,10 +148,38 @@ button.chip{font-size:11.5px;padding:3px 9px;border-radius:99px}
 
   <div id="alpanel">
     <div class="card">
+      <h2>📍 目的地リンク (Bluetooth) — タブレットへ目的地を送る</h2>
+      <div class="btnrow">
+        <button id="dlperi" class="primary">受信待ち受け (BLE ペリフェラル・APK)</button>
+        <button id="dlcent">BLE リモコンに接続</button>
+        <button id="dldemo">デモリンク</button>
+        <button id="dloff" class="danger" style="display:none">切断</button>
+      </div>
+      <div class="kv"><b>状態</b><span id="dlstate">未接続</span></div>
+      <div class="kv"><b>受信</b><span id="dlrx">0 件</span></div>
+      <div id="alrow" style="margin-top:8px">
+        <input id="dlinput" placeholder="目的地: 駅 / 空港 / 3,6 / DST|11,8|空港 / CMD|STOP"/>
+        <button id="dlsend">送信</button>
+      </div>
+      <div id="dlplaces" class="btnrow" style="margin-top:8px"></div>
+      <p style="font-size:11px;color:var(--dim);margin-top:6px">車載タブレット (APK) は BLE ペリフェラル「Laevateinn」として目的地を待ち受けます。スマホでこのページを開き、同じ入力欄から「送信」すると<b>送信機モード</b>になり、Web Bluetooth で目的地を AEAD 封緘して書き込みます。Nordic UART を話す BLE リモコンからの受信にも対応。「デモリンク」は封緘→受信→検証→自動発進を端末内で通します。</p>
+    </div>
+    <div class="card">
+      <h2>🚗 ミッション (完全自動走行)</h2>
+      <div class="kv"><b>状態</b><span id="mstate">待機 (目的地待ち)</span></div>
+      <div class="kv"><b>現在の目的地</b><span id="mcur">—</span></div>
+      <div class="kv"><b>残り (ETA)</b><span id="meta">—</span></div>
+      <div class="kv"><b>待ち行列</b><span id="mqueue">なし</span></div>
+      <div class="kv"><b>到着済み</b><span id="mdone">—</span></div>
+      <div class="kv"><b>封鎖セル (迂回中)</b><span id="mblock">なし</span></div>
+      <div class="btnrow" style="margin-top:8px"><button id="mclear">待ち行列を空に</button></div>
+      <p style="font-size:11px;color:var(--dim);margin-top:6px">目的地が届くと A* で経路を引いて即発進、障害物は熱画像+レイセンサで検知して減速・停止、6 秒以上塞がれたままならそのセルを封鎖して迂回路を再計画、到着したら 2 秒停車して次の目的地へ。緊急停止はボタン・サイレントトーク「停止」・Bluetooth の CMD|STOP のいずれでも即時です。</p>
+    </div>
+    <div class="card">
       <h2>アル (Al) — レーヴァテインのアシスタントAI</h2>
       <div id="allog"></div>
       <div id="alrow">
-        <input id="alin" placeholder="アルに話す: 状態 / どこ / 地図 / 停止 / 発進 / help (サイレントトークも可)"/>
+        <input id="alin" placeholder="アルに話す: 状態 / 停止 / 発進 / 駅へ / help"/>
         <button id="alsend">送信</button>
       </div>
     </div>
@@ -202,7 +235,7 @@ button.chip{font-size:11.5px;padding:3px 9px;border-radius:99px}
 </div>
 
 <div id="statusbar">
-  <span><b>Laevateinn</b> v2.0</span>
+  <span><b>Laevateinn</b> v3.0</span>
   <span>assistant: <b>アル</b> (BadaGPT系意図エンジン)</span>
   <span id="st-mode">mode: web</span>
   <span id="st-msg"></span>
@@ -761,6 +794,156 @@ function turnRoute(path, wp, heading, dir){
 }
 
 /* =====================================================================
+ * 📍 目的地リンク (Bluetooth) と 完全自動走行ミッション (v3.0)
+ *   タブレット (車載) は目的地を Bluetooth で受け取り、受け取った瞬間に
+ *   経路計画 → 発進 → 走行 → 到着 → 次の目的地 … を人手なしで回す。
+ *   目的地は zone:// 系 AEAD 封筒 (mapSeal と同じ鍵系) で封緘され、
+ *   タグ検証に通ったものだけ受理する (改ざん・混信は拒否)。
+ * ===================================================================== */
+/* ランドマーク交差点 ('L') の地名 — 目的地は地名でも座標でも指定できる */
+const PLACES = [
+  { x: 0, y: 0, name: "自宅" },   { x: 11, y: 0, name: "駅" },
+  { x: 0, y: 3, name: "病院" },   { x: 6, y: 3, name: "市役所" }, { x: 11, y: 3, name: "学校" },
+  { x: 0, y: 6, name: "公園" },   { x: 5, y: 6, name: "郵便局" }, { x: 11, y: 6, name: "港" },
+  { x: 0, y: 8, name: "工場" },   { x: 11, y: 8, name: "空港" }
+];
+function placeFind(name){
+  const n = String(name || "").trim().toLowerCase();
+  for (const p of PLACES) if (p.name === n || p.name.toLowerCase() === n) return p;
+  return null;
+}
+function placeAt(x, y){ for (const p of PLACES) if (p.x === x && p.y === y) return p; return null; }
+
+/* ── 目的地メッセージ ─────────────────────────────────────────────
+ *   平文:  DST|x,y|ラベル|seq      (seq は単調増加、再送・古い指示の拒否用)
+ *          CMD|STOP / CMD|GO / CMD|CLEAR
+ *   封筒:  "LVD1" + JSON {salt, ct, tag}   (mapSeal による AEAD)
+ *   送信機 (スマホ) は dstSeal で封緘し、車載タブレットは dstOpen で検証する。
+ *   未封緘の平文 ("駅" / "3,6" / "DST|...") も受理するが signed=false と記録する。 */
+const DST_KEY = lvHash("laevateinn-destination-link");
+const DST_MAGIC = "LVD1";
+function dstSeal(obj, salt){
+  const plain = obj.cmd ? "CMD|" + obj.cmd
+              : "DST|" + obj.x + "," + obj.y + "|" + (obj.label || "") + "|" + (obj.seq == null ? "" : obj.seq);
+  return DST_MAGIC + JSON.stringify(mapSeal(plain, DST_KEY, salt == null ? (Date.now() % 100000) : salt));
+}
+function dstOpen(text){
+  const t = String(text).trim();
+  if (t.slice(0, 4) !== DST_MAGIC) return { signed: false, plain: t };
+  let env;
+  try { env = JSON.parse(t.slice(4)); } catch (e) { return null; }
+  if (!env || !Array.isArray(env.ct)) return null;
+  const plain = mapOpen(env, DST_KEY);
+  return plain == null ? null : { signed: true, plain: plain };
+}
+/* 平文 → {x,y,label,seq} | {cmd} | null */
+function dstParse(plain){
+  const t = String(plain).trim();
+  if (!t) return null;
+  let m;
+  if ((m = /^CMD\|(STOP|GO|CLEAR)$/i.exec(t))) return { cmd: m[1].toUpperCase() };
+  if ((m = /^DST\|(-?\d+)\s*,\s*(-?\d+)\|([^|]*)\|?(\d*)$/.exec(t)))
+    return { x: +m[1], y: +m[2], label: m[3] || (placeAt(+m[1], +m[2]) || {}).name || (m[1] + "," + m[2]), seq: m[4] === "" ? null : +m[4] };
+  if ((m = /^(-?\d+)\s*[, ]\s*(-?\d+)$/.exec(t)))
+    return { x: +m[1], y: +m[2], label: (placeAt(+m[1], +m[2]) || {}).name || (m[1] + "," + m[2]), seq: null };
+  const p = placeFind(t.replace(/^(へ|まで|に)$/, ""));
+  if (p) return { x: p.x, y: p.y, label: p.name, seq: null };
+  const p2 = placeFind(t.replace(/(へ|まで|に|行って|いって)$/, ""));
+  if (p2) return { x: p2.x, y: p2.y, label: p2.name, seq: null };
+  return null;
+}
+/* 受信テキスト → 検証 → 解析 (1 本にまとめた入口) */
+function dstDecode(text){
+  const o = dstOpen(text);
+  if (!o) return { ok: false, why: "tamper" };
+  const d = dstParse(o.plain);
+  if (!d) return { ok: false, why: "parse", plain: o.plain };
+  d.signed = o.signed;
+  return { ok: true, msg: d };
+}
+
+/* ── A* (封鎖セル対応) — 元の planRoute を包んで blocked を避ける ── */
+function planRouteAvoid(from, to, blocked){
+  if (!blocked) return planRoute(from, to);
+  const keys = Object.keys(blocked).filter(function(k){ return blocked[k]; });
+  if (!keys.length) return planRoute(from, to);
+  if (blocked[to[0] + "," + to[1]]) return null;
+  /* 一時的に道路判定を差し替える */
+  const orig = isRoad;
+  isRoad = function(x, y){ return orig(x, y) && !(blocked[x + "," + y] && !(x === from[0] && y === from[1])); };
+  try { return planRoute(from, to); } finally { isRoad = orig; }
+}
+
+/* ── ミッション制御 (完全自動走行の頭脳) ───────────────────────────
+ *   状態: IDLE → DRIVING → ARRIVED → (次があれば) DRIVING … / HOLD (緊急停止)
+ *   ・accept: 目的地を検証して待ち行列へ (道路外・古い seq は拒否)
+ *   ・next:   先頭を取り出し A* で経路を引き DRIVING へ (届かない目的地は飛ばす)
+ *   ・observe: 停止 × 前方脅威が STUCK_SEC 続けば、次のセルを封鎖して再計画
+ *   ・arrive / hold / resume / clear
+ * ------------------------------------------------------------------ */
+const MISSION = { STUCK_SEC: 6, BLOCK_TTL: 45000 };
+function Mission(){
+  this.queue = []; this.state = "IDLE"; this.current = null;
+  this.path = []; this.wp = 0; this.blocked = {}; this.stuckT = 0; this.seq = -1;
+  this.done = []; this.replans = 0;
+}
+Mission.prototype.accept = function(d, now){
+  if (!d || typeof d.x !== "number" || !isRoad(d.x, d.y)) return { ok: false, why: "offroad" };
+  if (d.seq != null){
+    if (d.seq <= this.seq) return { ok: false, why: "stale" };
+    this.seq = d.seq;
+  }
+  const dest = { x: d.x, y: d.y, label: d.label || (placeAt(d.x, d.y) || {}).name || (d.x + "," + d.y),
+                 signed: !!d.signed, src: d.src || "?", t: now || 0 };
+  this.queue.push(dest);
+  return { ok: true, dest: dest, pos: this.queue.length };
+};
+Mission.prototype.activeBlocked = function(now){
+  const b = {};
+  for (const k in this.blocked) if (this.blocked[k] > now) b[k] = true; else delete this.blocked[k];
+  return b;
+};
+Mission.prototype.next = function(fromCell, now){
+  const skipped = [];
+  while (this.queue.length){
+    const d = this.queue.shift();
+    const p = planRouteAvoid(fromCell, [d.x, d.y], this.activeBlocked(now));
+    if (p){ this.current = d; this.path = p; this.wp = 0; this.state = "DRIVING"; this.stuckT = 0;
+            return { ok: true, dest: d, path: p, skipped: skipped }; }
+    skipped.push(d);
+  }
+  this.current = null; this.path = []; this.wp = 0; this.state = "IDLE";
+  return { ok: false, skipped: skipped };
+};
+Mission.prototype.observe = function(now, dt, speed, frontThreat, carCell){
+  if (this.state !== "DRIVING" || !this.current) return null;
+  if (speed < 1.5 && frontThreat > 0.12) this.stuckT += dt;
+  else if (speed >= 1.5) this.stuckT = 0;                        /* 動けている → リセット */
+  else this.stuckT = Math.max(0, this.stuckT - dt * 0.5);        /* 停止中だが前方は空いた → ゆっくり減衰 */
+  if (this.stuckT < MISSION.STUCK_SEC) return null;
+  this.stuckT = 0;
+  const wp = this.path[Math.min(this.wp, this.path.length - 1)];
+  if (wp[0] === this.current.x && wp[1] === this.current.y) return { type: "wait", cell: wp };   /* 目的地そのものは封鎖しない */
+  this.blocked[wp[0] + "," + wp[1]] = now + MISSION.BLOCK_TTL;
+  const p = planRouteAvoid(carCell, [this.current.x, this.current.y], this.activeBlocked(now));
+  if (p){ this.path = p; this.wp = 0; this.replans++; return { type: "replan", cell: wp, len: p.length }; }
+  return { type: "wait", cell: wp };
+};
+Mission.prototype.arrive = function(now){
+  if (this.current) this.done.push({ dest: this.current, t: now || 0 });
+  this.state = this.queue.length ? "ARRIVED" : "IDLE";
+  const d = this.current; this.current = null; this.path = []; this.wp = 0;
+  return d;
+};
+Mission.prototype.hold = function(){ if (this.state === "DRIVING") this.state = "HOLD"; };
+Mission.prototype.resume = function(){ if (this.state === "HOLD" && this.current) this.state = "DRIVING"; };
+Mission.prototype.clear = function(){ this.queue = []; };
+Mission.prototype.eta = function(cruise){
+  if (this.state !== "DRIVING") return 0;
+  return Math.max(0, this.path.length - this.wp) * CELL / Math.max(1, cruise);
+};
+
+/* =====================================================================
  * ここから UI / シミュレーション (ブラウザのみ)
  * ===================================================================== */
 const S = {
@@ -901,9 +1084,11 @@ function stepDrive(dt){
   if (Math.hypot(tx - S.car.x, ty - S.car.y) < CELL * 0.5){
     S.wp++;
     if (S.wp >= S.path.length){
-      S.driving = false; S.car.speed = 0;
-      sayAl("目的地に到着しました。お疲れさまです。");
-      const b = document.getElementById("drive"); if (b){ b.textContent = "▶ 自動走行 開始"; b.className = "primary"; }
+      S.car.speed = 0; setDriving(false);
+      const d = AUTO.mission.arrive(Date.now()); AUTO.arrivedT = performance.now();
+      S.path = []; S.wp = 0; S.target = null;
+      sayAl("目的地「" + (d ? d.label : "") + "」に到着しました。" + (AUTO.mission.queue.length ? "2 秒停車して次の目的地「" + AUTO.mission.queue[0].label + "」へ向かいます。" : "次の目的地を Bluetooth で送ってください。"));
+      missionUi();
       return;
     }
     wp = S.path[S.wp]; tx = (wp[0] + 0.5) * CELL; ty = (wp[1] + 0.5) * CELL;
@@ -924,6 +1109,16 @@ function stepDrive(dt){
     S.warned = true;
   }
   if (ctrl.throttle > 0.3 && S.warned && ctrl.frontThreat < 0.12){ sayAl("進路クリア。再発進します。"); S.warned = false; }
+  /* 完全自動走行: 塞がれたまま動けなければ次のセルを封鎖して再計画 */
+  AUTO.mission.wp = S.wp;
+  const ob = AUTO.mission.observe(Date.now(), dt, S.car.speed, ctrl.frontThreat, carCell());
+  if (ob && ob.type === "replan"){
+    S.path = AUTO.mission.path; S.wp = 0;
+    sayAl("セル (" + ob.cell[0] + "," + ob.cell[1] + ") が塞がれたままなので封鎖し、別経路 (" + ob.len + " 区間) に再計画しました。");
+    missionUi();
+  } else if (ob && ob.type === "wait"){
+    sayAl("迂回路がありません。前方が空くまで待ちます。");
+  }
   /* トランスフォーマー出力で車体を動かす = 操縦 */
   S.car = carStep(S.car, ctrl, dt);
 }
@@ -958,6 +1153,11 @@ function draw(){
       if (isLandmark(x, y)){ cx.fillStyle = "#c8a44a"; cx.beginPath(); cx.arc((x+.5)*CELL, (y+.5)*CELL, 4, 0, 7); cx.fill(); }
     } else { cx.fillStyle = "#0d1322"; cx.fillRect(x * CELL, y * CELL, CELL, CELL); }
   }
+  /* 封鎖セル (再計画で避けている) と地名 */
+  const blk = AUTO.mission.activeBlocked(Date.now());
+  for (const k in blk){ const q = k.split(","); cx.fillStyle = "rgba(208,90,90,.28)"; cx.fillRect(q[0] * CELL, q[1] * CELL, CELL, CELL); }
+  cx.fillStyle = "#c8a44a"; cx.font = "11px sans-serif";
+  for (const pl of PLACES) if (tileGot(pl.x, pl.y)) cx.fillText(pl.name, pl.x * CELL + 4, pl.y * CELL + 13);
   /* 経路 */
   if (S.path.length){
     cx.strokeStyle = "rgba(63,182,196,.8)"; cx.lineWidth = 3; cx.beginPath();
@@ -1025,7 +1225,8 @@ function loop(ts){
   stepTiles(dt);
   stepDrive(dt);
   stepPos(dt);
-  thStep(dt); stStep(dt);
+  thStep(dt); stStep(dt); autoDispatch();
+  if (S.driving && (loop.n = (loop.n || 0) + 1) % 30 === 0) missionUi();
   if (!S.driving){ const per = alControl(perceiveRays(), 0); S.threat = per.threat; S.focus = per.focus; S.lastAttn = per; }
   obsTimer += dt;
   if (obsTimer > 4 && S.obstacles.length < 6){ obsTimer = 0; spawnObstacle(); }
@@ -1041,18 +1242,16 @@ cv.addEventListener("click", function(ev){
   const x = Math.floor((ev.clientX - r.left) / r.width * GRID_W);
   const y = Math.floor((ev.clientY - r.top) / r.height * GRID_H);
   if (!isRoad(x, y)){ say("al", "そこは道路ではありません。道路上のセルを指定してください。"); return; }
-  const from = [Math.max(0, Math.min(GRID_W - 1, Math.floor(S.car.x / CELL))), Math.max(0, Math.min(GRID_H - 1, Math.floor(S.car.y / CELL)))];
-  const path = planRoute(from, [x, y]);
-  if (!path){ say("al", "経路が見つかりません。"); return; }
-  S.path = path; S.wp = 0; S.target = [x, y];
-  say("al", "目的地 (" + x + "," + y + ") を設定。A* で " + path.length + " 区間の経路を引きました。「▶ 自動走行 開始」でいつでも出られます。");
+  say("you", "🖱 タップ: (" + x + "," + y + ")");
+  autoAddDestination({ x: x, y: y, label: (placeAt(x, y) || {}).name || (x + "," + y), seq: null, signed: false, src: "タップ" });
 });
 document.getElementById("drive").addEventListener("click", function(){
-  if (!S.path.length){ say("al", "先に地図をクリックして目的地を決めてください。"); return; }
-  S.driving = !S.driving;
-  this.textContent = S.driving ? "⏸ 停止" : "▶ 自動走行 開始";
-  this.className = S.driving ? "danger" : "primary";
-  say("al", S.driving ? "自動走行を開始します。周囲は私が見張ります。" : "停止しました。");
+  if (S.driving) autoHold("緊急停止ボタン");
+  else autoResume("ボタン操作");
+});
+document.getElementById("autoon").addEventListener("change", function(){
+  AUTO.on = this.checked; missionUi();
+  sayAl(AUTO.on ? "完全自動走行 ON。目的地が届いたら自動で発進します。" : "自動発進 OFF。目的地は受理しますが、発進はボタン操作で。");
 });
 function setMode(m){
   S.mode = m;
@@ -1076,8 +1275,9 @@ function alSend(){
                              tiles: Object.keys(S.tiles).length });
   setTimeout(function(){
     say("al", reply);
-    if (/停止|止ま|stop/.test(t) && S.driving) document.getElementById("drive").click();
-    if (/発進|進|再開|go|start/.test(t) && !S.driving && S.path.length) document.getElementById("drive").click();
+    if (/停止|止ま|stop/.test(t) && S.driving) autoHold("アルへの指示");
+    else if (/発進|進|再開|go|start/.test(t) && !S.driving) autoResume("アルへの指示");
+    else { const d = dstParse(t.replace(/^(目的地|行き先)[:：]?\s*/, "")); if (d && !d.cmd){ d.src = "アルへの指示"; autoAddDestination(d); } }
     if (/衛星|さてらいと|sat/.test(t) && S.mode !== "sat") setMode("sat");
     if (/ウェブ|web|地上/.test(t) && S.mode !== "web") setMode("web");
   }, 150);
@@ -1366,6 +1566,21 @@ document.getElementById("thoff").addEventListener("click", thStop);
 document.getElementById("thamb").addEventListener("change", function(){ thSetAmbient(parseFloat(this.value), "手動"); });
 document.getElementById("thspan").addEventListener("change", function(){ const v = parseFloat(this.value); if (v > 0) TH.span = v; });
 document.getElementById("ststart").addEventListener("click", stStart);
+document.getElementById("dlperi").addEventListener("click", dlStartPeripheral);
+document.getElementById("dlcent").addEventListener("click", dlConnectCentral);
+document.getElementById("dldemo").addEventListener("click", dlStartDemo);
+document.getElementById("dloff").addEventListener("click", dlStop);
+document.getElementById("dlsend").addEventListener("click", function(){ if (DL.kind === "demo") dlDemoSend(); else dlSend(); });
+document.getElementById("dlinput").addEventListener("keydown", function(e){ if (e.key === "Enter") document.getElementById("dlsend").click(); });
+document.getElementById("mclear").addEventListener("click", function(){ AUTO.mission.clear(); missionUi(); sayAl("待ち行列を空にしました。"); });
+(function(){
+  const box = document.getElementById("dlplaces");
+  PLACES.forEach(function(pl){
+    const b = document.createElement("button"); b.className = "chip"; b.textContent = pl.name;
+    b.addEventListener("click", function(){ document.getElementById("dlinput").value = pl.name; document.getElementById("dlsend").click(); });
+    box.appendChild(b);
+  });
+})();
 document.getElementById("ststop").addEventListener("click", stStop);
 (function(){
   const pad = document.getElementById("stpad");
@@ -1621,23 +1836,21 @@ function stHandle(tok){
   if (g.act) stExecute(g.cmd);
 }
 function stExecute(cmd){
-  const btn = document.getElementById("drive");
   if (cmd === "STOP"){
-    if (S.driving) btn.click(); else sayAl("停止中です。");
+    if (S.driving) autoHold("サイレントトーク「停止」"); else sayAl("停止中です。");
     return;
   }
   if (cmd === "START"){
-    if (!S.path.length){ sayAl("目的地がありません。地図をタップするか、「戻る」「左へ」「右へ」で行き先を決めてください。"); return; }
-    if (!S.driving) btn.click();
+    if (!S.driving && AUTO.mission.state !== "HOLD" && !AUTO.mission.queue.length && S.path.length){
+      /* 左右指示で引いた仮経路を走る */
+      AUTO.mission.current = { x: S.target[0], y: S.target[1], label: S.target.join(","), signed: false, src: "サイレントトーク" };
+      AUTO.mission.path = S.path; AUTO.mission.wp = S.wp; AUTO.mission.state = "DRIVING"; setDriving(true); missionUi(); return;
+    }
+    autoResume("サイレントトーク「発進」");
     return;
   }
   if (cmd === "HOME"){
-    const from = carCell();
-    const p = planRoute(from, [0, 0]);
-    if (!p){ sayAl("出発地への経路が見つかりません。"); return; }
-    S.path = p; S.wp = 0; S.target = [0, 0];
-    sayAl("出発地 (0,0) へ戻る経路を引きました (" + p.length + " 区間)。");
-    if (!S.driving) btn.click();
+    autoAddDestination({ x: 0, y: 0, label: "自宅", seq: null, signed: false, src: "サイレントトーク" });
     return;
   }
   if (cmd === "LEFT" || cmd === "RIGHT"){
@@ -1680,10 +1893,236 @@ function stExecute(cmd){
 }
 function carCell(){ return [Math.max(0, Math.min(GRID_W - 1, Math.floor(S.car.x / CELL))), Math.max(0, Math.min(GRID_H - 1, Math.floor(S.car.y / CELL)))]; }
 
+/* =====================================================================
+ * 📍 目的地リンク (Bluetooth) UI — 3 つの経路 + 送信機モード + デモ
+ *   ① 車載タブレット = BLE ペリフェラル (APK: cordova-plugin-ble-peripheral)
+ *      → スマホが Laevateinn 目的地サービスへ書き込む
+ *   ② 車載タブレット = BLE セントラル (Web Bluetooth / APK ble-central)
+ *      → Nordic UART (NUS) を話すリモコン・スマホアプリから通知で受信
+ *   ③ 送信機モード: この index.html をスマホで開き、Web Bluetooth で
+ *      車載タブレット (①) へ封緘した目的地を書き込む
+ *   ④ デモ: 封緘 → 受信 → 検証 → ミッション投入を端末内で通す
+ * ===================================================================== */
+const LAEV_SVC = "7c3e0001-6c61-6576-6174-65696e6e2d64";
+const LAEV_DST = "7c3e0002-6c61-6576-6174-65696e6e2d64";
+const NUS_SVC = "6e400001-b5a3-f393-e0a9-e50e24dcca9e", NUS_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e", NUS_RX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+const DL = { kind: null, device: null, buf: "", seq: 0, rx: 0, rejected: 0 };
+const AUTO = { on: true, mission: new Mission(), arrivedT: 0 };
+
+function dlUi(state){
+  document.getElementById("dlstate").textContent = state;
+  const on = !!DL.kind;
+  document.getElementById("dlperi").style.display = on ? "none" : "";
+  document.getElementById("dlcent").style.display = on ? "none" : "";
+  document.getElementById("dldemo").style.display = on ? "none" : "";
+  document.getElementById("dloff").style.display = on ? "" : "none";
+}
+/* 受信の入口 (全経路共通): 検証 → 解析 → ミッションへ */
+function dlReceive(text, src){
+  DL.rx++;
+  const r = dstDecode(text);
+  document.getElementById("dlrx").textContent = DL.rx + " 件 (拒否 " + DL.rejected + ")";
+  if (!r.ok){
+    DL.rejected++;
+    document.getElementById("dlrx").textContent = DL.rx + " 件 (拒否 " + DL.rejected + ")";
+    sayAl(r.why === "tamper" ? "Bluetooth で受信した目的地の AEAD タグが一致しません。改ざんか混信のため拒否しました。"
+                             : "受信した「" + (r.plain || text) + "」は目的地として解釈できません (地名・x,y・DST|x,y|名前)。");
+    return false;
+  }
+  const m = r.msg;
+  if (m.cmd){
+    say("you", "📡 " + src + ": " + m.cmd);
+    if (m.cmd === "STOP") autoHold("Bluetooth の停止指示");
+    else if (m.cmd === "GO") autoResume("Bluetooth の再開指示");
+    else if (m.cmd === "CLEAR"){ AUTO.mission.clear(); sayAl("待ち行列を空にしました。"); missionUi(); }
+    return true;
+  }
+  m.src = src;
+  say("you", "📡 " + src + ": " + m.label + " (" + m.x + "," + m.y + ")" + (m.signed ? " 🔏" : " (未封緘)"));
+  return autoAddDestination(m);
+}
+
+/* ── ① ペリフェラル (APK) ── */
+function dlStartPeripheral(){
+  const BP = window.blePeripheral;
+  if (!BP){ sayAl("この環境では BLE ペリフェラル (受信待ち受け) になれません。Android 版 APK で使えます。ブラウザでは「BLE リモコンに接続」か「送信機モード」をどうぞ。"); return; }
+  const name = "Laevateinn";
+  const done = function(){
+    DL.kind = "peripheral"; dlUi("受信待ち受け中 (BLE ペリフェラル “" + name + "”)");
+    sayAl("Bluetooth で目的地の受信を待ち受けています。スマホで Laevateinn を開き「送信機モード」から目的地を送ってください。");
+  };
+  const fail = function(e){ dlUi("未接続"); sayAl("BLE ペリフェラルを開始できませんでした: " + JSON.stringify(e)); };
+  try {
+    BP.setCharacteristicValueChangedListener(function(ev){
+      try {
+        const txt = new TextDecoder().decode(ev.value);
+        dlReceive(txt, "スマホ (BLE)");
+      } catch (e) {}
+    });
+    BP.createService(LAEV_SVC)
+      .then(function(){ return BP.addCharacteristic(LAEV_SVC, LAEV_DST, BP.properties.WRITE | BP.properties.WRITE_NO_RESPONSE, BP.permissions.WRITEABLE); })
+      .then(function(){ return BP.publishService(LAEV_SVC); })
+      .then(function(){ return BP.startAdvertising(LAEV_SVC, name); })
+      .then(done, fail);
+  } catch (e) { fail(String(e)); }
+}
+/* ── ② セントラル (NUS リモコン / 目的地サービスを持つ機器) ── */
+async function dlConnectCentral(){
+  if (window.ble && window.ble.scan) return dlConnectCordova();
+  if (!navigator.bluetooth){ sayAl("この環境には Bluetooth API がありません。Android 版 APK か Chrome 系ブラウザでどうぞ。"); return; }
+  try {
+    dlUi("デバイス選択中…");
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [NUS_SVC] }, { services: [LAEV_SVC] }], optionalServices: [NUS_SVC, LAEV_SVC] });
+    const srv = await dev.gatt.connect();
+    let ch = null;
+    try { ch = await (await srv.getPrimaryService(NUS_SVC)).getCharacteristic(NUS_TX); } catch (e) {}
+    if (!ch) { try { ch = await (await srv.getPrimaryService(LAEV_SVC)).getCharacteristic(LAEV_DST); } catch (e) {} }
+    if (!ch){ dlUi("未接続"); sayAl("このデバイスに NUS / Laevateinn 目的地サービスがありません。"); return; }
+    const dec = new TextDecoder();
+    await ch.startNotifications();
+    ch.addEventListener("characteristicvaluechanged", function(ev){ dlFeed(dec.decode(ev.target.value), dev.name || "BLE"); });
+    dev.addEventListener("gattserverdisconnected", function(){ if (DL.kind === "central") dlStop(); });
+    DL.kind = "central"; DL.device = dev; dlUi("接続中 (" + (dev.name || dev.id) + ")");
+    sayAl("Bluetooth リモコン " + (dev.name || "") + " に接続。目的地の受信を待ちます。");
+  } catch (e) {
+    dlUi("未接続");
+    if (!/cancel/i.test(String(e && e.message))) sayAl("接続できませんでした: " + (e && e.message ? e.message : e));
+  }
+}
+function dlConnectCordova(){
+  dlUi("スキャン中… (5秒)");
+  const found = {};
+  window.ble.scan([NUS_SVC, LAEV_SVC], 5, function(d){ found[d.id] = d; }, function(){});
+  setTimeout(function(){
+    let best = null;
+    for (const id in found){ const d = found[id]; if (!best || (d.rssi || -99) > (best.rssi || -99)) best = d; }
+    if (!best){ dlUi("未接続"); sayAl("目的地を送る BLE 機器が見つかりません。"); return; }
+    window.ble.connect(best.id, function(){
+      const dec = new TextDecoder();
+      const sub = function(svc, chr, next){
+        window.ble.startNotification(best.id, svc, chr, function(data){ dlFeed(dec.decode(data), best.name || "BLE"); }, next);
+      };
+      sub(NUS_SVC, NUS_TX, function(){ sub(LAEV_SVC, LAEV_DST, function(){ dlUi("非対応デバイス"); }); });
+      DL.kind = "central"; DL.device = best.id; dlUi("接続中 (" + (best.name || best.id) + ")");
+      sayAl("Bluetooth リモコン " + (best.name || "") + " に接続。目的地の受信を待ちます。");
+    }, function(){ dlUi("未接続"); if (DL.kind === "central") dlStop(); });
+  }, 5200);
+}
+/* 改行区切りで 1 メッセージ (BLE の分割パケットを再結合) */
+function dlFeed(chunk, src){
+  DL.buf += chunk;
+  let p;
+  while ((p = DL.buf.indexOf("\n")) >= 0){
+    const line = DL.buf.slice(0, p).trim(); DL.buf = DL.buf.slice(p + 1);
+    if (line) dlReceive(line, src);
+  }
+  if (DL.buf.length > 4096) DL.buf = "";
+}
+function dlStop(){
+  try { if (DL.kind === "central" && DL.device && DL.device.gatt) DL.device.gatt.disconnect(); } catch (e) {}
+  try { if (DL.kind === "central" && typeof DL.device === "string" && window.ble) window.ble.disconnect(DL.device, function(){}, function(){}); } catch (e) {}
+  try { if (DL.kind === "peripheral" && window.blePeripheral) window.blePeripheral.stopAdvertising(); } catch (e) {}
+  DL.kind = null; DL.device = null; DL.buf = "";
+  dlUi("未接続");
+}
+/* ── ④ デモ受信: 封緘 → 受信 → 検証 を端末内で通す ── */
+function dlStartDemo(){ DL.kind = "demo"; dlUi("デモリンク (端末内で封緘→受信→検証)"); sayAl("デモリンクを開始。下の入力から目的地を送ると、スマホから Bluetooth で届いたのと同じ経路 (AEAD 封筒の検証) を通ります。"); }
+function dlDemoSend(){
+  const inp = document.getElementById("dlinput");
+  const t = inp.value.trim(); if (!t) return;
+  const d = dstParse(t);
+  if (!d){ sayAl("「" + t + "」は目的地として解釈できません。地名 (駅・空港…) か x,y で。"); return; }
+  const env = d.cmd ? dstSeal({ cmd: d.cmd }) : dstSeal({ x: d.x, y: d.y, label: d.label, seq: ++DL.seq });
+  inp.value = "";
+  dlReceive(env, "デモ送信機");
+}
+/* ── ③ 送信機モード (スマホ側): 車載タブレットのペリフェラルへ書き込む ── */
+async function dlSend(){
+  const inp = document.getElementById("dlinput");
+  const t = inp.value.trim(); if (!t) return;
+  const d = dstParse(t);
+  if (!d){ sayAl("「" + t + "」は目的地として解釈できません。"); return; }
+  if (!navigator.bluetooth){ sayAl("送信機モードには Web Bluetooth (Chrome 系) が必要です。"); return; }
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [LAEV_SVC] }, { namePrefix: "Laevateinn" }], optionalServices: [LAEV_SVC] });
+    const srv = await dev.gatt.connect();
+    const ch = await (await srv.getPrimaryService(LAEV_SVC)).getCharacteristic(LAEV_DST);
+    const env = d.cmd ? dstSeal({ cmd: d.cmd }) : dstSeal({ x: d.x, y: d.y, label: d.label, seq: Date.now() });
+    const bytes = new TextEncoder().encode(env + "\n");
+    for (let i = 0; i < bytes.length; i += 20) await ch.writeValue(bytes.slice(i, i + 20));   /* 20 byte ずつ (BLE MTU 安全値) */
+    sayAl("車載タブレット " + (dev.name || "") + " へ目的地「" + (d.label || d.cmd) + "」を送信しました (AEAD 封緘)。");
+    try { dev.gatt.disconnect(); } catch (e) {}
+  } catch (e) {
+    if (!/cancel/i.test(String(e && e.message))) sayAl("送信できませんでした: " + (e && e.message ? e.message : e));
+  }
+}
+
+/* =====================================================================
+ * 🚗 完全自動走行 — 目的地が入った瞬間に計画・発進し、到着後は次へ
+ * ===================================================================== */
+function autoAddDestination(m){
+  const r = AUTO.mission.accept(m, Date.now());
+  if (!r.ok){
+    sayAl(r.why === "offroad" ? "(" + m.x + "," + m.y + ") は道路ではないので受理できません。" : "古い目的地指示 (seq " + m.seq + ") なので無視しました。");
+    return false;
+  }
+  sayAl("目的地「" + r.dest.label + "」を受理 (" + (r.dest.signed ? "AEAD 検証済み" : "未封緘") + ")。" +
+        (AUTO.on ? (AUTO.mission.state === "DRIVING" || AUTO.mission.state === "HOLD" ? "現在の走行の後に向かいます (待ち行列 " + r.pos + " 番目)。" : "すぐに経路を引いて発進します。")
+                 : "自動発進は OFF なので「▶ 自動走行 開始」でどうぞ。"));
+  missionUi();
+  return true;
+}
+function autoDispatch(){
+  const m = AUTO.mission;
+  if (!AUTO.on || S.driving) return;
+  if (m.state === "ARRIVED" && performance.now() - AUTO.arrivedT < 2000) return;   /* 到着後 2 秒の停車 */
+  if ((m.state === "IDLE" || m.state === "ARRIVED") && m.queue.length){
+    const r = m.next(carCell(), Date.now());
+    if (r.skipped.length) sayAl("到達できない目的地を飛ばしました: " + r.skipped.map(function(d){ return d.label; }).join("、"));
+    if (r.ok){
+      S.path = r.path; S.wp = 0; S.target = [r.dest.x, r.dest.y];
+      setDriving(true);
+      sayAl("「" + r.dest.label + "」へ発進。A* で " + r.path.length + " 区間。周囲は熱画像とレイセンサで見張ります。");
+    }
+    missionUi();
+  }
+}
+function autoHold(reason){
+  AUTO.mission.hold();
+  if (S.driving) setDriving(false);
+  sayAl(reason + "により停止。再開は「▶ 再開」・サイレントトーク「発進」・Bluetooth の GO で。");
+  missionUi();
+}
+function autoResume(reason){
+  const m = AUTO.mission;
+  if (m.state === "HOLD"){ m.resume(); setDriving(true); sayAl(reason + "により再開します。"); }
+  else if (!S.driving && m.queue.length){ autoDispatch(); }
+  else sayAl("再開する走行がありません。目的地を送ってください。");
+  missionUi();
+}
+function setDriving(on){
+  S.driving = !!on;
+  const b = document.getElementById("drive");
+  b.textContent = S.driving ? "⏹ 緊急停止" : (AUTO.mission.state === "HOLD" ? "▶ 再開" : "▶ 自動走行 開始");
+  b.className = S.driving ? "danger" : "primary";
+}
+function missionUi(){
+  const m = AUTO.mission;
+  const st = { IDLE: "待機 (目的地待ち)", DRIVING: "走行中", HOLD: "停止中 (再開待ち)", ARRIVED: "到着・次へ" }[m.state] || m.state;
+  document.getElementById("mstate").textContent = st + (AUTO.on ? "" : " / 自動発進 OFF");
+  document.getElementById("mcur").textContent = m.current ? m.current.label + " (" + m.current.x + "," + m.current.y + ")" + (m.current.signed ? " 🔏" : "") : "—";
+  document.getElementById("meta").textContent = m.state === "DRIVING" ? m.eta(CTRL.cruise * ST.speedFactor).toFixed(0) + " 秒 / " + Math.max(0, m.path.length - m.wp) + " 区間" : "—";
+  document.getElementById("mqueue").textContent = m.queue.length ? m.queue.map(function(d, i){ return (i + 1) + ". " + d.label; }).join("  ") : "なし";
+  document.getElementById("mdone").textContent = m.done.length ? m.done.map(function(d){ return d.dest.label; }).join(" → ") : "—";
+  const bl = Object.keys(m.activeBlocked(Date.now()));
+  document.getElementById("mblock").textContent = (bl.length ? bl.join(" / ") : "なし") + (m.replans ? " (再計画 " + m.replans + " 回)" : "");
+}
+
 /* ── 起動 ── */
 queueTiles();
 drawTilesPanel();
-say("al", "こんにちは、アルです。レーヴァテインの走行はお任せください。\nまず地図タイルをウェブサイトから受信します (衛星不使用のWeb地図モード)。地図の道路をクリックして目的地をどうぞ。");
+say("al", "こんにちは、アルです。レーヴァテインは完全自動走行モードです。\n目的地を Bluetooth (📍 目的地リンク) で送るか地図をタップしてください。届いた瞬間に経路を引いて発進し、到着後は次の目的地へ向かいます。");
+dlUi("未接続"); missionUi();
 requestAnimationFrame(loop);
 </script>
 </body>
