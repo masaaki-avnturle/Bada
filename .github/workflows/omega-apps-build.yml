@@ -45,12 +45,17 @@ jobs:
           path: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
       - name: Attach EXE to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          target_commitish: ${{ github.sha }}
-          files: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
-
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        # action-gh-release は既存 Release の PATCH で 403 になることがある
+        # (apps-v1.6.0 で再現)。gh でアップロードだけ行う (Release が無ければ作る)。
+        run: |
+          set -e
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --notes "Ω apps $TAG" || true
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber bio_medicine/${{ matrix.app }}/electron/dist/*.exe
   linux-app:
     runs-on: ubuntu-latest
     strategy:
@@ -77,14 +82,17 @@ jobs:
             bio_medicine/${{ matrix.app }}/electron/dist/*.deb
       - name: Attach Linux builds to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          target_commitish: ${{ github.sha }}
-          files: |
-            bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
-            bio_medicine/${{ matrix.app }}/electron/dist/*.deb
-
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        # action-gh-release は既存 Release の PATCH で 403 になることがある
+        # (apps-v1.6.0 で再現)。gh でアップロードだけ行う (Release が無ければ作る)。
+        run: |
+          set -e
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --notes "Ω apps $TAG" || true
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage bio_medicine/${{ matrix.app }}/electron/dist/*.deb
   android-apk:
     runs-on: ubuntu-latest
     strategy:
@@ -145,8 +153,14 @@ jobs:
           path: out/*.apk
       - name: Attach APK to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          target_commitish: ${{ github.sha }}
-          files: out/*.apk
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        # action-gh-release は既存 Release の PATCH で 403 になることがある
+        # (apps-v1.6.0 で再現)。gh でアップロードだけ行う (Release が無ければ作る)。
+        run: |
+          set -e
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --notes "Ω apps $TAG" || true
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber out/*.apk
