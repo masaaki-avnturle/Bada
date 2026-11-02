@@ -113,10 +113,11 @@ jobs:
           cordova plugin add cordova-plugin-ble-central@1.7.4
           # v2.0: 赤外線カメラ / サイレントトーク (前面カメラ) の実行時カメラ権限
           cordova plugin add cordova-plugin-android-permissions@1.1.5
-          # v3.0: 目的地リンク — タブレットを BLE ペリフェラルにして目的地を待ち受ける
-          # (プラグインが取得できなくてもビルドは続行: アプリは window.blePeripheral を検出し、
-          #  無ければ BLE セントラル / 送信機モード / デモリンクにフォールバックする)
-          cordova plugin add cordova-plugin-ble-peripheral@1.0.0 || echo "::warning::ble-peripheral plugin unavailable; destination link falls back to central/sender modes"
+          # v3.0: 目的地リンクの「受信待ち受け (BLE ペリフェラル)」は cordova-plugin-ble-peripheral が
+          # 必要だが、同プラグインの BLUETOOTH / BLUETOOTH_ADMIN 権限宣言が ble-central と重複して
+          # AndroidManifest のマージに失敗する (laevateinn-v3.0.0 の初回ビルドで確認)。APK では
+          # 同梱せず、アプリは window.blePeripheral が無いことを検出して BLE セントラル /
+          # 送信機モード / デモリンクへフォールバックする。
           cordova build android --verbose
       - name: Collect APK
         run: |
