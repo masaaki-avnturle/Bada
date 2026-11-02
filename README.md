@@ -164,6 +164,7 @@ Actions の**アーティファクトは最長 90 日で消えます**が、**Gi
 - **1 クリックで全部**: Actions → [**📦 Archive all apps**](.github/workflows/archive-all-apps.yml) → *Run workflow*。`suffix` (例 `v2026.11`) を入れると `laevateinn-v2026.11`, `mimir-v2026.11`, … の 16 本が一斉にビルド・保存されます (空欄なら `archive-YYYYMMDD-<run番号>`)。`apps` で対象を絞れます
 - **1 本だけ**: 各ワークフローの *Run workflow* で `release_tag` (例 `mimir-v1.0.2`) を指定
 - **タグを push** しても同じです (`git tag laevateinn-v3.0.0 && git push origin laevateinn-v3.0.0`)
+- **🗄 Artifact Vault** ([`artifact-vault.yml`](.github/workflows/artifact-vault.yml)): ビルドワークフローが完了するたびに自動で起動し、そのランの**全アーティファクトを `artifacts-run-<run_id>` という Release に転送**します (zip のまま、ビルドしたコミットにタグ)。これで Actions に投稿された成果物は 90 日を過ぎても消えません。*Run workflow* → `backfill=true` で、まだ期限切れになっていない過去のアーティファクトも一括で Release に移せます
 - アーティファクト側の保持期間も上限の 90 日に設定済み。公開後の Release を**変更・削除できなく**したい場合はリポジトリ設定の *Immutable releases* を有効にしてください
 
 保存済み一覧: [Releases](https://github.com/masaaki-avnturle/Bada/releases)

@@ -1,0 +1,129 @@
+name: 🗄 Artifact Vault (Actions のアーティファクトを永久保存)
+
+# Actions のアーティファクトは GitHub の仕様で最長 90 日で消えます。
+# このワークフローは、ビルドワークフローが完了するたびに自動で起動し、
+# そのランの **すべてのアーティファクトを GitHub Release に転送** します
+# (タグ: artifacts-run-<run_id>、ビルドしたコミットに付与)。Release の添付
+# ファイルは期限がないため、Actions に投稿された成果物が二度と消えなくなります。
+#
+#   自動:   下の `workflows:` にあるワークフローが完了 → そのランの成果物を保存
+#   手動:   Run workflow → backfill=true で、まだ期限切れになっていない
+#           過去のアーティファクトを全ランぶん一括で Release に移します。
+#           run_id を指定すると、そのランだけ保存します。
+#
+# 注意: workflow_run トリガーはこのファイルが既定ブランチ (main) にあるときだけ働きます。
+
+on:
+  workflow_run:
+    workflows:
+      - "Laevateinn app build (Android APK + Windows EXE + Ubuntu)"
+      - "Mimir app build (Android APK + Windows EXE + Ubuntu)"
+      - "ClearCast Tokyo app build (Android APK + Windows EXE + Ubuntu)"
+      - "Bada QuantOS app build (Android APK + Windows EXE + Ubuntu)"
+      - "Bada SoundFilm app build (Android APK + Windows EXE + Ubuntu)"
+      - "Bada Asobi app build (Android APK + Windows EXE + Ubuntu)"
+      - "BadaGPT Dojo app build (Android APK + Windows EXE + Ubuntu)"
+      - "Bada VM Pro app build (Android APK + Windows EXE + Ubuntu)"
+      - "Bada VM Pro OS ISO build (bootable Ubuntu-based live/installer)"
+      - "Bada GUI IDE build (Windows EXE + Ubuntu + Android APK + CLI)"
+      - "Bada C++Builder app build (Windows EXE + Ubuntu + Android APK)"
+      - "Ω apps build (APK + Windows EXE + Linux)"
+      - "Build Bada Hologram APK"
+      - "Build Bada XP APK"
+      - "ZoneBrowser app build (Windows EXE + Ubuntu + Android APK)"
+      - "zone:// distribution (downloadable bundle)"
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: '期限切れ前の過去アーティファクトを全部 Release へ移す'
+        type: boolean
+        default: true
+      run_id:
+        description: '特定のランだけ保存する場合の run id (空欄なら上の backfill)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: artifact-vault
+  cancel-in-progress: false
+
+jobs:
+  vault:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move artifacts into permanent Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          TRIG_RUN_ID: ${{ github.event.workflow_run.id }}
+          IN_RUN_ID: ${{ github.event.inputs.run_id }}
+          BACKFILL: ${{ github.event.inputs.backfill }}
+        run: |
+          set -euo pipefail
+          SUMMARY="$GITHUB_STEP_SUMMARY"
+          echo "## 🗄 Artifact Vault" >> "$SUMMARY"
+
+          # ---- 1 ランぶんのアーティファクトを Release に保存する関数 ----
+          vault_run() {
+            local run_id="$1"
+            local info name number sha event branch url conclusion
+            info=$(gh api "repos/$REPO/actions/runs/$run_id" \
+                   --jq '[.name, (.run_number|tostring), .head_sha, .event, (.head_branch // ""), .html_url, (.conclusion // "")] | @tsv')
+            IFS=$'\t' read -r name number sha event branch url conclusion <<< "$info"
+            local tag="artifacts-run-$run_id"
+            # まだ期限切れでないアーティファクトを列挙
+            local list
+            list=$(gh api --paginate "repos/$REPO/actions/runs/$run_id/artifacts" \
+                   --jq '.artifacts[] | select(.expired==false) | [(.id|tostring), .name, (.size_in_bytes|tostring)] | @tsv')
+            if [ -z "$list" ]; then
+              echo "- ⏭ run $run_id ($name #$number): アーティファクトなし/期限切れ" >> "$SUMMARY"; return 0
+            fi
+            if gh release view "$tag" --repo "$REPO" >/dev/null 2>&1; then
+              echo "- ✅ run $run_id ($name #$number): 保存済み (\`$tag\`)" >> "$SUMMARY"; return 0
+            fi
+            local dir="vault/$run_id"; rm -rf "$dir"; mkdir -p "$dir"
+            local total=0 n=0
+            while IFS=$'\t' read -r aid aname asize; do
+              [ -n "$aid" ] || continue
+              local safe; safe=$(echo "$aname" | tr -c 'A-Za-z0-9._-' '_')
+              # GitHub の zip をそのまま保存 (中身は元のアーティファクト)
+              gh api "repos/$REPO/actions/artifacts/$aid/zip" > "$dir/$safe.zip"
+              total=$((total + asize)); n=$((n + 1))
+            done <<< "$list"
+            local notes
+            notes=$(printf '%s\n' \
+              "**$name** run #$number — Actions のアーティファクト ($n 個, $(numfmt --to=iec $total)) を永久保存。" \
+              "" \
+              "- ラン: $url" \
+              "- コミット: \`$sha\` ($event${branch:+, $branch})" \
+              "- 結果: $conclusion" \
+              "" \
+              "各 zip は Actions からダウンロードできたものと同じ形式です (zip を展開すると APK / EXE / AppImage / deb / ISO が出ます)。" \
+              "このリリースは 🗄 Artifact Vault ワークフローが自動作成しました。")
+            gh release create "$tag" --repo "$REPO" --target "$sha" \
+              --title "🗄 $name #$number — artifacts" --notes "$notes" "$dir"/*.zip
+            echo "- 📦 run $run_id ($name #$number): $n 個 ($(numfmt --to=iec $total)) → \`$tag\`" >> "$SUMMARY"
+            rm -rf "$dir"
+          }
+
+          # ---- 対象ランの決定 ----
+          if [ "$EVENT" = "workflow_run" ]; then
+            vault_run "$TRIG_RUN_ID"
+          elif [ -n "$IN_RUN_ID" ]; then
+            vault_run "$IN_RUN_ID"
+          elif [ "$BACKFILL" = "true" ]; then
+            runs=$(gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
+                   --jq '.artifacts[] | select(.expired==false) | .workflow_run.id' | sort -u)
+            cnt=$(echo "$runs" | grep -c . || true)
+            echo "backfill: $cnt runs with live artifacts"
+            echo "期限切れ前のアーティファクトを持つラン: $cnt 件" >> "$SUMMARY"
+            for r in $runs; do vault_run "$r" || echo "- ❌ run $r: failed" >> "$SUMMARY"; done
+          else
+            echo "nothing to do" >> "$SUMMARY"
+          fi
