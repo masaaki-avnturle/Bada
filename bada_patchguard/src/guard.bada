@@ -1,0 +1,602 @@
+# ══════════════════════════════════════════════════════════════════════
+#  guard.bada — Bada Reviser PatchGuard (PHP サイト書き換えの副作用ガード)
+#
+#  書き換えの基 (base) と書き換えた後 (after) をタプルとして台帳に置き、
+#  その差をパッチとして扱う。@reviser で定義した規則 (sink / sanitizer /
+#  invariant) が、パッチの「副作用」— 新しい危険関数・無害化の削除・認可の
+#  削除・他ファイルを壊す署名変更など — を検査し、門 (gate) が
+#  ACCEPT / REVIEW / REJECT を決める。
+#
+#  折り畳み (fold): 複数回の書き換え r1, r2, … を
+#      fold(patches, base, |acc, p| patch_apply(acc, p))
+#  で 1 本の正味パッチ base → final に畳み込み、各段の検査と正味の検査を
+#  両方行う。段ごとには安全でも合成すると危険になる変更 (創発) と、
+#  途中で入って後で消えた変更 (相殺) を区別して報告する。
+#
+#  ネイティブ組込み (JS): php_analyze, diff_lines, patch_apply,
+#  patch_reverse, unified, sha256
+# ══════════════════════════════════════════════════════════════════════
+
+GUARD_VERSION := "1.0.0"
+
+SEV := {none: -1, info: 0, low: 1, medium: 2, high: 3, critical: 4}
+SEV_JA := {info: "情報", low: "低", medium: "中", high: "高", critical: "致命的"}
+SINKS := {}
+SANITIZERS := []
+CHECKS := []
+
+# ─── @reviser: セキュリティ規則の文法を拡張する ─────────────────────────
+#  ここで commit した 3 つの rule は、以降の文で新しい構文として使える:
+#    sink "eval", "code", "critical", "high", "説明"
+#    sanitizer "htmlspecialchars"
+#    invariant "PG01", "見出し", |d| 検査関数
+@reviser PATCHGUARD {
+  rule sink(name, kind, tainted_sev, plain_sev, why) {
+    SINKS[lower(name)] = {name: name, kind: kind, tainted: tainted_sev, plain: plain_sev, why: why}
+    Omega >> ["sink", lower(name), kind, tainted_sev, plain_sev]
+  }
+  rule sanitizer(name) {
+    SANITIZERS <- lower(name)
+    Omega >> ["sanitizer", lower(name)]
+  }
+  rule invariant(id, title, check) {
+    CHECKS <- {id: id, title: title, check: check}
+    Omega >> ["invariant", id, title]
+  }
+}
+
+# ─── 危険な受け口 (sink) ─ 汚染時の重大度 / 非汚染時の重大度 ────────────
+sink "eval", "code", "critical", "high", "文字列を PHP コードとして実行する (任意コード実行)"
+sink "assert", "code", "critical", "low", "PHP 7 未満では文字列をコードとして評価する"
+sink "create_function", "code", "critical", "high", "内部で eval を行う (PHP 8 で削除)"
+sink "call_user_func", "code", "critical", "none", "呼び出す関数名を外部入力が決める"
+sink "call_user_func_array", "code", "critical", "none", "呼び出す関数名を外部入力が決める"
+sink "preg_replace_callback", "code", "high", "none", "コールバックに外部入力が渡る"
+sink "extract", "code", "high", "medium", "外部入力から任意の変数を上書きする"
+sink "parse_str", "code", "high", "none", "第 2 引数なしでは変数を上書きする"
+sink "exec", "cmd", "critical", "high", "OS コマンド実行"
+sink "system", "cmd", "critical", "high", "OS コマンド実行"
+sink "passthru", "cmd", "critical", "high", "OS コマンド実行"
+sink "shell_exec", "cmd", "critical", "high", "OS コマンド実行"
+sink "popen", "cmd", "critical", "high", "OS コマンド実行"
+sink "proc_open", "cmd", "critical", "high", "OS コマンド実行"
+sink "pcntl_exec", "cmd", "critical", "high", "OS コマンド実行"
+sink "mail", "cmd", "high", "none", "第 5 引数経由のコマンド注入・ヘッダ注入"
+sink "`backtick`", "cmd", "critical", "high", "バッククォートは shell_exec と同じ"
+sink "mysqli_query", "sql", "critical", "none", "SQL 文字列に外部入力が混入"
+sink "mysql_query", "sql", "critical", "medium", "削除済み拡張 + SQL 注入"
+sink "pg_query", "sql", "critical", "none", "SQL 文字列に外部入力が混入"
+sink "sqlite_query", "sql", "critical", "none", "SQL 文字列に外部入力が混入"
+sink "->query", "sql", "critical", "none", "PDO/mysqli の query に外部入力が混入"
+sink "->exec", "sql", "critical", "none", "PDO::exec に外部入力が混入"
+sink "->prepare", "sql", "critical", "none", "prepare する SQL 自体に外部入力が混入 (プレースホルダを使っていない)"
+sink "->multi_query", "sql", "critical", "medium", "複文実行"
+sink "printf", "xss", "high", "none", "エスケープなしの出力"
+sink "vprintf", "xss", "high", "none", "エスケープなしの出力"
+sink "unserialize", "deser", "high", "low", "オブジェクト注入 (POP チェーン)"
+sink "include", "file_read", "critical", "none", "動的 include"
+sink "file_get_contents", "file_read", "high", "none", "パス・トラバーサル / SSRF"
+sink "readfile", "file_read", "high", "none", "パス・トラバーサル"
+sink "fopen", "file_read", "high", "none", "パス・トラバーサル"
+sink "file", "file_read", "high", "none", "パス・トラバーサル"
+sink "show_source", "file_read", "high", "medium", "ソースの開示"
+sink "highlight_file", "file_read", "high", "medium", "ソースの開示"
+sink "file_put_contents", "file_write", "high", "low", "任意ファイル書き込み"
+sink "fwrite", "file_write", "medium", "none", "ファイル書き込み"
+sink "unlink", "file_write", "high", "low", "ファイル削除"
+sink "rename", "file_write", "high", "low", "ファイル移動"
+sink "copy", "file_write", "high", "low", "ファイル複製"
+sink "move_uploaded_file", "file_write", "high", "medium", "アップロード保存先の検証"
+sink "mkdir", "file_write", "medium", "none", "ディレクトリ作成"
+sink "rmdir", "file_write", "high", "low", "ディレクトリ削除"
+sink "chmod", "file_write", "high", "medium", "権限変更"
+sink "curl_exec", "net", "high", "low", "外部通信 (SSRF)"
+sink "curl_init", "net", "high", "none", "外部通信先を外部入力が決める (SSRF)"
+sink "fsockopen", "net", "high", "low", "外部通信 (SSRF)"
+sink "stream_socket_client", "net", "high", "low", "外部通信 (SSRF)"
+sink "header", "header", "high", "none", "ヘッダ注入 / オープンリダイレクト"
+sink "setcookie", "cookie", "medium", "none", "Cookie の属性"
+sink "md5", "weak", "low", "low", "弱いハッシュ (パスワード・トークン用途に不適)"
+sink "sha1", "weak", "low", "low", "弱いハッシュ (パスワード・トークン用途に不適)"
+sink "crc32", "weak", "low", "low", "改ざん検知に不適"
+sink "rand", "weak", "low", "low", "予測可能な乱数 (random_int を使う)"
+sink "mt_rand", "weak", "low", "low", "予測可能な乱数 (random_int を使う)"
+sink "uniqid", "weak", "low", "low", "予測可能な ID"
+sink "str_shuffle", "weak", "low", "low", "予測可能な乱数"
+sink "phpinfo", "debug", "high", "high", "環境・設定の全開示"
+sink "var_dump", "debug", "low", "low", "デバッグ出力の残り"
+sink "print_r", "debug", "medium", "low", "デバッグ出力の残り"
+sink "var_export", "debug", "low", "none", "デバッグ出力の残り"
+sink "debug_print_backtrace", "debug", "low", "low", "デバッグ出力の残り"
+sink "error_log", "debug", "low", "none", "ログ注入"
+
+# ─── 無害化 (sanitizer) — 包まれた部分は汚染に数えない ─────────────────
+sanitizer "htmlspecialchars"
+sanitizer "htmlentities"
+sanitizer "strip_tags"
+sanitizer "intval"
+sanitizer "floatval"
+sanitizer "boolval"
+sanitizer "abs"
+sanitizer "count"
+sanitizer "filter_var"
+sanitizer "filter_input"
+sanitizer "escapeshellarg"
+sanitizer "escapeshellcmd"
+sanitizer "mysqli_real_escape_string"
+sanitizer "pg_escape_string"
+sanitizer "pg_escape_literal"
+sanitizer "->quote"
+sanitizer "->real_escape_string"
+sanitizer "json_encode"
+sanitizer "urlencode"
+sanitizer "rawurlencode"
+sanitizer "http_build_query"
+sanitizer "basename"
+sanitizer "preg_quote"
+sanitizer "ctype_digit"
+sanitizer "ctype_alnum"
+sanitizer "is_numeric"
+sanitizer "in_array"
+sanitizer "array_key_exists"
+sanitizer "isset"
+sanitizer "empty"
+sanitizer "hash"
+sanitizer "hash_hmac"
+sanitizer "password_hash"
+sanitizer "password_verify"
+sanitizer "hash_equals"
+sanitizer "esc_html"
+sanitizer "esc_attr"
+sanitizer "esc_url"
+sanitizer "e"
+
+EMPTY := {tokens: 0, calls: [], echoes: [], includes: [], defs: [], auth: [], state: [], syntax: {balanced: true, errors: [], detail: ""}, tainted_vars: []}
+
+# ─── 補助 ─────────────────────────────────────────────────────────────
+# 多重集合の差: after にあって base に無いもの (行番号ではなく内容の鍵で数える)
+fn added_items(base_items, after_items, keyf) {
+  cnt := {}
+  for x in base_items {
+    k := keyf(x)
+    cnt[k] = get(cnt, k, 0) + 1
+  }
+  out := []
+  for x in after_items {
+    k := keyf(x)
+    c := get(cnt, k, 0)
+    if c > 0 { cnt[k] = c - 1 } else { out <- x }
+  }
+  return out
+}
+
+fn removed_items(base_items, after_items, keyf) { return added_items(after_items, base_items, keyf) }
+
+fn finding(sev, line, msg, evidence) { return {sev: sev, line: line, msg: msg, evidence: evidence} }
+
+fn src_note(c) {
+  if len(c.sources) > 0 { return " — 汚染源: " + join(c.sources, ", ") }
+  return ""
+}
+
+fn sink_findings(d, kinds) {
+  out := []
+  for c in added_items(d.base.calls, d.after.calls, |c| c.key) {
+    s := get(SINKS, c.lname, nil)
+    if s != nil and contains(kinds, s.kind) {
+      sev := s.plain
+      if c.tainted { sev = s.tainted }
+      if s.kind == "file_read" and c.lname == "file_get_contents" and c.first != nil and match(c.first, "^(https?|ftp)://") != nil { sev = "low" }
+      if s.kind == "cookie" {
+        if c.tainted { sev = "medium" } elif not contains(lower(c.args), "httponly") and c.argc < 7 { sev = "low" } else { sev = "none" }
+      }
+      if sev != "none" {
+        msg := c.name + "() を追加: " + s.why
+        if c.tainted { msg = msg + " (外部入力が届く)" }
+        out <- finding(sev, c.line, msg, c.name + "(" + c.args + ")" + src_note(c))
+      }
+    }
+  }
+  return out
+}
+
+fn sev_max(fs) {
+  m := "none"
+  for f in fs { if SEV[f.sev] > SEV[m] { m = f.sev } }
+  return m
+}
+
+# ─── 不変量 (invariant): 書き換えが守るべき性質 ───────────────────────
+invariant "PG01", "コード実行関数の追加", |d| sink_findings(d, ["code"])
+invariant "PG02", "OS コマンド実行の追加", |d| sink_findings(d, ["cmd"])
+invariant "PG03", "SQL インジェクション", |d| sink_findings(d, ["sql"])
+
+invariant "PG04", "XSS — エスケープなしの出力", |d| xss_findings(d)
+fn xss_findings(d) {
+  out := sink_findings(d, ["xss"])
+  for e in added_items(d.base.echoes, d.after.echoes, |e| e.key) {
+    if e.tainted { out <- finding("high", e.line, e.kind + " が外部入力をエスケープせずに出力", e.kind + " " + e.expr + src_note(e)) }
+  }
+  return out
+}
+
+invariant "PG05", "動的 include (LFI / RFI)", |d| include_findings(d)
+fn include_findings(d) {
+  out := []
+  for i in added_items(d.base.includes, d.after.includes, |i| i.key) {
+    if i.tainted { out <- finding("critical", i.line, i.kind + " のパスを外部入力が決める (ローカル / リモート・ファイル・インクルード)", i.kind + " " + i.expr + src_note(i)) }
+    elif i.dynamic { out <- finding("medium", i.line, i.kind + " のパスが変数で決まる", i.kind + " " + i.expr) }
+  }
+  return out
+}
+
+invariant "PG06", "安全でないデシリアライズ", |d| sink_findings(d, ["deser"])
+invariant "PG07", "ファイル操作 (トラバーサル / 改ざん)", |d| sink_findings(d, ["file_read", "file_write"])
+invariant "PG08", "外部通信 (SSRF)", |d| sink_findings(d, ["net"])
+
+invariant "PG09", "無害化 (エスケープ・検証) の削除", |d| sanitizer_removed(d)
+fn sanitizer_removed(d) {
+  out := []
+  if d.status != "modified" { return out }
+  isS := |c| contains(SANITIZERS, c.lname)
+  for c in removed_items(filter(d.base.calls, isS), filter(d.after.calls, isS), |c| c.key) {
+    out <- finding("medium", c.line, "書き換えの基にあった無害化 " + c.name + "() が消えました (基の行番号)", c.name + "(" + c.args + ")")
+  }
+  return out
+}
+
+invariant "PG10", "認可・CSRF・セッション検査の削除", |d| auth_removed(d)
+fn auth_removed(d) {
+  out := []
+  if d.status != "modified" { return out }
+  for a in removed_items(d.base.auth, d.after.auth, |a| a.key) {
+    out <- finding("high", a.line, "書き換えの基にあった検査が消えました (基の行番号): 認可・CSRF・セッションを確認してください", a.text)
+  }
+  return out
+}
+
+invariant "PG11", "関数・メソッドの署名変更が他のファイルを壊す", |d| api_findings(d)
+fn callers_of(d, fd) {
+  out := []
+  for pc in d.project.calls {
+    c := pc.call
+    hit := false
+    if fd.cls == nil { hit = c.lname == lower(fd.name) } else { hit = endswith(c.lname, "->" + lower(fd.name)) or endswith(c.lname, "::" + lower(fd.name)) }
+    if hit { out <- pc }
+  }
+  return out
+}
+fn api_findings(d) {
+  out := []
+  if d.status == "added" { return out }
+  for bd in d.base.defs {
+    ad := nil
+    for x in d.after.defs { if x.key == bd.key { ad = x } }
+    if ad == nil {
+      if has(d.project.defs, bd.key) { continue }       # 別ファイルへ移動しただけ
+      cs := callers_of(d, bd)
+      if len(cs) > 0 {
+        out <- finding("critical", bd.line, bd.sig + " が削除されたが、まだ呼ばれています → 致命的エラー (Call to undefined function)", join(map(slice(cs, 0, 6), |pc| pc.path + ":" + str(pc.call.line)), ", "))
+      } else {
+        out <- finding("low", bd.line, bd.sig + " が削除されました (呼び出し元は見つかりません)", bd.sig)
+      }
+      continue
+    }
+    if ad.sig == bd.sig and ad.visibility == bd.visibility { continue }
+    cs := callers_of(d, ad)
+    broken := filter(cs, |pc| pc.call.argc < ad.required and not pc.call.named and not contains(pc.call.args, "..."))
+    if len(broken) > 0 {
+      out <- finding("high", ad.line, "必須引数が " + str(bd.required) + " → " + str(ad.required) + " に増え、呼び出し元が引数不足になります (ArgumentCountError)", bd.sig + "  ⇒  " + ad.sig + "  | 呼び出し元: " + join(map(slice(broken, 0, 6), |pc| pc.path + ":" + str(pc.call.line)), ", "))
+    } elif ad.visibility != bd.visibility and bd.visibility == "public" {
+      ext := filter(cs, |pc| pc.path != d.path)
+      sev := "medium"
+      if len(ext) > 0 { sev = "high" }
+      out <- finding(sev, ad.line, "可視性が " + bd.visibility + " → " + ad.visibility + " に狭まりました", bd.sig + " | 外部からの呼び出し: " + str(len(ext)))
+    } else {
+      bn := map(bd.params, |p| p.name)
+      an := map(ad.params, |p| p.name)
+      sev := "low"
+      if bn != an and any(cs, |pc| pc.call.named) { sev = "medium" }
+      out <- finding(sev, ad.line, "署名が変わりました (呼び出し元 " + str(len(cs)) + " 件は引数の数としては互換)", bd.sig + "  ⇒  " + ad.sig)
+    }
+  }
+  return out
+}
+
+invariant "PG12", "大域状態・設定の変更", |d| state_findings(d)
+fn state_findings(d) {
+  out := []
+  for s in added_items(d.base.state, d.after.state, |s| s.key) {
+    sev := "medium"
+    lt := lower(s.text)
+    if s.kind == "global" { sev = "low" }
+    if contains(lt, "display_errors") and (contains(lt, "1") or contains(lt, "on") or contains(lt, "true")) { sev = "high" }
+    if s.kind == "error_reporting" and contains(lt, "0") and not contains(lt, "e_") { sev = "medium" }
+    if s.kind == "superglobal_write" { sev = "medium" }
+    out <- finding(sev, s.line, "大域状態を変える文が加わりました (他のページにも影響します)", s.text)
+  }
+  return out
+}
+
+invariant "PG13", "ヘッダ注入・Cookie 属性", |d| sink_findings(d, ["header", "cookie"])
+
+invariant "PG14", "構文の破損", |d| syntax_findings(d)
+fn syntax_findings(d) {
+  if d.status == "deleted" { return [] }
+  if not d.after.syntax.balanced and d.base.syntax.balanced {
+    return [finding("critical", 0, "書き換え後のファイルが構文として閉じていません → サイト全体が Parse error になります", d.after.syntax.detail)]
+  }
+  return []
+}
+
+invariant "PG15", "弱い暗号・予測可能な乱数", |d| sink_findings(d, ["weak"])
+
+invariant "PG16", "削除したファイルがまだ include されている", |d| deleted_findings(d)
+fn deleted_findings(d) {
+  out := []
+  if d.status != "deleted" { return out }
+  bn := d.path
+  parts := split(d.path, "/")
+  base_name := parts[len(parts) - 1]
+  for pi in d.project.includes {
+    t := pi.inc.target
+    if t != "" and (endswith(t, "/" + base_name) or t == base_name or endswith(t, bn)) {
+      out <- finding("critical", pi.inc.line, "削除したファイルを " + pi.path + " がまだ読み込みます → Fatal error (failed opening required)", pi.inc.kind + " " + pi.inc.expr)
+    }
+  }
+  return out
+}
+
+invariant "PG17", "デバッグ出力・情報開示の残り", |d| sink_findings(d, ["debug"])
+
+# ─── タプル空間 (append-only) ────────────────────────────────────────
+#  out(t) で追記、rd(pattern) で STAR を任意要素とする照会。書き換え・削除は無い。
+TS := ledger("patchguard")
+BLOBS := {}
+ANALYSIS := {}
+RUN := 0
+
+fn out(t) {
+  TS >> t
+  return t
+}
+fn tmatch(p, t) {
+  if len(p) != len(t) { return false }
+  for x, i in p {
+    if not (x == STAR or x == t[i]) { return false }
+  }
+  return true
+}
+fn rd(p) { return filter(TS.items, |t| tmatch(p, t)) }
+
+fn put_blob(text) {
+  h := sha256(text)
+  if not has(BLOBS, h) {
+    BLOBS[h] = text
+    out(["blob", h, len(text)])
+  }
+  return h
+}
+fn blob(h) { return get(BLOBS, h, nil) }
+
+fn analysis_of(h) {
+  if h == nil { return EMPTY }
+  if not has(ANALYSIS, h) { ANALYSIS[h] = php_analyze(BLOBS[h], SANITIZERS) }
+  return ANALYSIS[h]
+}
+
+fn is_php(p) { return endswith(lower(p), ".php") or endswith(lower(p), ".phtml") or endswith(lower(p), ".inc") }
+
+# 書き換え後の木全体の索引 (他ファイルへの副作用を見るため)
+fn project_index(tree) {
+  defs := {}
+  calls := []
+  incs := []
+  for p in keys(tree) {
+    if is_php(p) {
+      a := analysis_of(tree[p])
+      for df in a.defs { defs[df.key] = p }
+      for c in a.calls { calls <- {path: p, call: c} }
+      for i in a.includes { incs <- {path: p, inc: i} }
+    }
+  }
+  return {defs: defs, calls: calls, includes: incs}
+}
+
+fn union_paths(A, B) { return sort(unique(keys(A) + keys(B))) }
+
+fn fkey(f) { return f.id + "|" + f.path + "|" + f.evidence }
+
+# ─── 遷移 A → B の検査 (1 段、または折り畳んだ正味) ─────────────────
+fn check_transition(A, B, k) {
+  proj := project_index(B)
+  files := []
+  allf := []
+  for p in union_paths(A, B) {
+    ha := get(A, p, nil)
+    hb := get(B, p, nil)
+    if ha == hb { continue }
+    status := "modified"
+    if ha == nil { status = "added" }
+    if hb == nil { status = "deleted" }
+    ta := ""
+    tb := ""
+    if ha != nil { ta = blob(ha) }
+    if hb != nil { tb = blob(hb) }
+    df := diff_lines(ta, tb)
+    out(["patch", RUN, k, p, if_nil(ha, "-"), if_nil(hb, "-"), df.adds, df.dels])
+    fs := []
+    if is_php(p) {
+      d := {path: p, status: status, base: analysis_of(ha), after: analysis_of(hb), project: proj}
+      for ck in CHECKS {
+        for f in ck.check(d) {
+          f.id = ck.id
+          f.title = ck.title
+          f.path = p
+          f.step = k
+          fs <- f
+        }
+      }
+    }
+    fs = sortby(fs, |f| -SEV[f.sev] * 100000 + f.line)
+    files <- {path: p, status: status, sha_a: ha, sha_b: hb, adds: df.adds, dels: df.dels, hunks: df.hunks, a_lines: df.a_lines, b_lines: df.b_lines, findings: fs}
+    allf = allf + fs
+  }
+  return {step: k, files: files, findings: allf}
+}
+
+fn if_nil(v, d) {
+  if v == nil { return d }
+  return v
+}
+
+# 折り畳みの検証: 各段のパッチを基へ順に当てると final に一致するか
+fn verify_fold(base, steps, final) {
+  cur := copy(base)
+  problems := []
+  for st in steps {
+    for f in st.files {
+      t := ""
+      if get(cur, f.path, nil) != nil { t = blob(cur[f.path]) }
+      r := patch_apply(t, f.hunks)
+      if not r.ok { problems <- "段 " + str(st.step) + " " + f.path + ": " + r.error }
+      elif f.status == "deleted" { cur[f.path] = nil }
+      else { cur[f.path] = put_blob(r.text) }
+    }
+  }
+  for p in union_paths(cur, final) {
+    if get(cur, p, nil) != get(final, p, nil) { problems <- p + ": 畳み込んだ結果が最終版と一致しません" }
+  }
+  return {ok: len(problems) == 0, problems: problems}
+}
+
+fn waived(f, waivers) {
+  for w in waivers {
+    if w.id == f.id and (w.path == "*" or w.path == f.path or endswith(f.path, w.path)) {
+      if get(w, "match", "") == "" or contains(f.evidence, w.match) { return w }
+    }
+  }
+  return nil
+}
+
+fn decide(fs) {
+  m := sev_max(fs)
+  if SEV[m] >= SEV.high { return "REJECT" }
+  if SEV[m] >= SEV.medium { return "REVIEW" }
+  return "ACCEPT"
+}
+
+# ─── 入口: revise(base, revisions, waivers) ───────────────────────────
+#  base: {path: 内容}, revisions: [{path: 内容}, ...] (書き換えた後を時系列で)
+fn tree_of(files, k) {
+  t := {}
+  for p in keys(files) {
+    h := put_blob(files[p])
+    t[p] = h
+    out(["file", RUN, k, p, h])
+  }
+  return t
+}
+
+fn revise(base_files, revisions, waivers) {
+  RUN = RUN + 1
+  out(["run", RUN, len(revisions), GUARD_VERSION, len(CHECKS)])
+  trees := [tree_of(base_files, 0)]
+  for r, i in revisions { trees <- tree_of(r, i + 1) }
+  base := trees[0]
+  final := trees[len(trees) - 1]
+
+  steps := []
+  if len(trees) > 2 {
+    for k in range(1, len(trees)) { steps <- check_transition(trees[k - 1], trees[k], k) }
+  }
+  net := check_transition(base, final, 0)
+  fold := {ok: true, problems: []}
+  if len(steps) > 0 { fold = verify_fold(base, steps, final) }
+  if not fold.ok { out(["fold_broken", RUN, len(fold.problems)]) }
+
+  # 折り畳みの効果: 途中で現れて消えた指摘 (相殺) と、合成で初めて現れた指摘 (創発)
+  netkeys := map(net.findings, fkey)
+  stepkeys := []
+  for st in steps { stepkeys = stepkeys + map(st.findings, fkey) }
+  cancelled := []
+  seen := {}
+  for st in steps {
+    for f in st.findings {
+      if not contains(netkeys, fkey(f)) and not has(seen, fkey(f)) { seen[fkey(f)] = true; cancelled <- f }
+    }
+  }
+  emergent := []
+  if len(steps) > 0 { emergent = filter(net.findings, |f| not contains(stepkeys, fkey(f))) }
+
+  # 免除 (waiver) は理由ごと台帳に残す
+  active := []
+  for f in net.findings {
+    w := waived(f, waivers)
+    if w != nil {
+      f.waived = w.reason
+      out(["waiver", RUN, f.id, f.path, w.reason])
+    } else { active <- f }
+  }
+  decision := decide(active)
+  if not fold.ok { decision = "REJECT" }
+
+  # 安全な部分パッチ: 指摘が low 以下のファイルだけ。除外したファイルで定義される
+  # 新しい関数を呼ぶファイルも、部分適用で壊れないよう連鎖的に除外する。
+  held := {}
+  for f in sortby(active, |f| -SEV[f.sev]) {
+    if SEV[f.sev] >= SEV.medium and not has(held, f.path) { held[f.path] = "指摘 " + f.id + " (" + f.sev + ")" }
+  }
+  base_defs := project_index(base).defs
+  changed := true
+  while changed {
+    changed = false
+    newdefs := {}
+    for fl in net.files {
+      if has(held, fl.path) and fl.sha_b != nil {
+        for df in analysis_of(fl.sha_b).defs { newdefs[df.key] = fl.path }
+      }
+    }
+    for fl in net.files {
+      if not has(held, fl.path) and fl.sha_b != nil and is_php(fl.path) {
+        for c in analysis_of(fl.sha_b).calls {
+          if has(newdefs, c.lname) and not has(base_defs, c.lname) and not has(held, fl.path) {
+            held[fl.path] = "依存: " + newdefs[c.lname] + " の " + c.name + "() を使う"
+            changed = true
+          }
+        }
+      }
+    }
+  }
+  for fl in net.files {
+    if has(held, fl.path) { out(["held", RUN, fl.path, held[fl.path]]) } else { out(["revised", RUN, fl.path, if_nil(fl.sha_b, "-")]) }
+  }
+  counts := {}
+  for f in active { counts[f.sev] = get(counts, f.sev, 0) + 1 }
+  out(["verdict", RUN, decision, len(active), len(net.findings) - len(active)])
+  return {
+    run: RUN, decision: decision, version: GUARD_VERSION, net: net, steps: steps, fold: fold,
+    cancelled: cancelled, emergent: emergent, active: active, counts: counts, held: held,
+    tuples: len(TS)
+  }
+}
+
+# ─── パッチの文字列化 (git 互換 unified diff + 基/後の SHA-256) ─────────
+fn file_patch(fl) {
+  return unified(fl.path, {hunks: fl.hunks, a_lines: fl.a_lines, b_lines: fl.b_lines}, {a_sha: fl.sha_a, b_sha: fl.sha_b, a_absent: fl.sha_a == nil, b_absent: fl.sha_b == nil})
+}
+fn patch_text(rep, only_safe) {
+  parts := []
+  for fl in rep.net.files {
+    if not only_safe or not has(rep.held, fl.path) { parts <- file_patch(fl) }
+  }
+  return join(parts, "")
+}
+fn rollback_text(rep) {
+  parts := []
+  for fl in rep.net.files {
+    rv := {path: fl.path, hunks: patch_reverse(fl.hunks), a_lines: fl.b_lines, b_lines: fl.a_lines, sha_a: fl.sha_b, sha_b: fl.sha_a}
+    parts <- unified(fl.path, rv, {a_sha: fl.sha_b, b_sha: fl.sha_a, a_absent: fl.sha_b == nil, b_absent: fl.sha_a == nil})
+  }
+  return join(parts, "")
+}

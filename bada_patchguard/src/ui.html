@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bada PatchGuard</title>
+<style>
+:root{
+  --bg:#f5f6f3; --panel:#ffffff; --ink:#1c1f1d; --muted:#646a66; --line:#d9ddd8; --chip:#e9ece7;
+  --accent:#2f6f5e; --accent-ink:#ffffff; --code:#f0f2ee;
+  --add:#e3f4e6; --add-ink:#1d6b2f; --del:#fbe6e4; --del-ink:#9d2b22;
+  --crit:#a4161a; --high:#d0442c; --med:#b7791f; --low:#2b6cb0; --ok:#2f855a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151816; --panel:#1d211f; --ink:#e7ebe8; --muted:#9aa29d; --line:#323834; --chip:#272c29;
+    --accent:#5fb49a; --accent-ink:#0f1412; --code:#232825;
+    --add:#183524; --add-ink:#8fe0a6; --del:#3d1c1a; --del-ink:#f4a59c;
+    --crit:#ff6b6b; --high:#ff8a65; --med:#f0b45a; --low:#7fb3f0; --ok:#6fd39b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151816; --panel:#1d211f; --ink:#e7ebe8; --muted:#9aa29d; --line:#323834; --chip:#272c29;
+  --accent:#5fb49a; --accent-ink:#0f1412; --code:#232825;
+  --add:#183524; --add-ink:#8fe0a6; --del:#3d1c1a; --del-ink:#f4a59c;
+  --crit:#ff6b6b; --high:#ff8a65; --med:#f0b45a; --low:#7fb3f0; --ok:#6fd39b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14.5px/1.6 -apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+code,pre,.mono{font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:3}
+.logo{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700}
+header h1{font-size:16px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header h1 small{color:var(--muted);font-weight:400;margin-left:6px}
+.icon{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 9px}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+.inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.tree{border:1px dashed var(--line);border-radius:10px;padding:10px;min-height:120px;display:flex;flex-direction:column;gap:8px}
+.tree.drag{border-color:var(--accent);background:var(--chip)}
+.tree h3{margin:0;font-size:14px;display:flex;align-items:center;gap:6px}
+.tree h3 .x{margin-left:auto;border:0;background:none;color:var(--muted)}
+.tree .count{font-size:13px;color:var(--muted)}
+.tree .btns{display:flex;flex-wrap:wrap;gap:6px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 11px;font-size:13.5px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:8px 18px;font-size:14.5px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.files{font-size:12.5px;color:var(--muted);max-height:96px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px;overflow-x:auto}
+.tabs button{border:0;background:none;padding:8px 12px;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.tab{display:none}.tab.on{display:block}
+.verdict{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dec{font-size:22px;font-weight:800;padding:6px 16px;border-radius:10px;color:#fff}
+.dec.ACCEPT{background:var(--ok)}.dec.REVIEW{background:var(--med)}.dec.REJECT{background:var(--crit)}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px}
+.sev{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:0 8px;color:#fff;white-space:nowrap}
+.sev.critical{background:var(--crit)}.sev.high{background:var(--high)}.sev.medium{background:var(--med)}.sev.low{background:var(--low)}.sev.info{background:var(--muted)}
+.fl{border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.fl > summary{list-style:none;padding:9px 12px;cursor:pointer;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--chip)}
+.fl > summary::-webkit-details-marker{display:none}
+.fl > summary .p{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600;word-break:break-all}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--muted)}
+.tag.held{color:var(--med);border-color:var(--med)}.tag.safe{color:var(--ok);border-color:var(--ok)}
+.finds{padding:6px 12px}
+.find{border-left:3px solid var(--line);padding:4px 10px;margin:8px 0}
+.find.critical{border-color:var(--crit)}.find.high{border-color:var(--high)}.find.medium{border-color:var(--med)}.find.low{border-color:var(--low)}
+.find .ev{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:var(--muted);word-break:break-all}
+.find .wv{font-size:12px;border:0;background:none;color:var(--accent);padding:0;margin-left:8px}
+.find.waived{opacity:.55}
+.diff{font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;border-top:1px solid var(--line);overflow:auto}
+.diff table{border-collapse:collapse;width:100%}
+.diff td{padding:0 8px;white-space:pre;vertical-align:top}
+.diff td.n{color:var(--muted);text-align:right;user-select:none;width:1%;border-right:1px solid var(--line)}
+.diff tr.a td.t{background:var(--add);color:var(--add-ink)}
+.diff tr.d td.t{background:var(--del);color:var(--del-ink)}
+.diff tr.h td{background:var(--chip);color:var(--muted)}
+.diff tr.fold td{background:var(--code);color:var(--muted);cursor:pointer;text-align:center;font-family:inherit}
+.diff tr.fold:hover td{color:var(--ink)}
+.diff tr.mark td.t{box-shadow:inset 3px 0 0 var(--high)}
+table.grid{border-collapse:collapse;width:100%;font-size:13px}
+table.grid th,table.grid td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+table.grid td.mono{font-size:12.5px;word-break:break-all}
+textarea.src{width:100%;min-height:420px;border:1px solid var(--line);border-radius:10px;background:var(--code);padding:10px;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;resize:vertical;white-space:pre;outline:0}
+input[type=text],input[type=search]{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);width:min(720px,calc(100vw - 24px));padding:0}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.dlg{padding:16px}
+.dlg textarea{width:100%;min-height:260px;border:1px solid var(--line);border-radius:8px;background:var(--code);padding:8px;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace}
+.dlg input{width:100%}
+.dlg label{display:block;font-weight:600;margin:10px 0 4px;font-size:13px}
+.msg{font-size:13px;color:var(--muted)}
+.err{color:var(--crit)}
+pre.out{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:360px;overflow:auto;font-size:12.5px;white-space:pre}
+.empty{color:var(--muted);text-align:center;padding:30px 0}
+@media (max-width:640px){
+  main{padding:10px}
+  header h1 small{display:none}
+  .dec{font-size:18px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">⊕</div>
+  <h1>Bada PatchGuard <small>— リバイザで PHP の書き換えの副作用を防ぐパッチ・セキュリティ</small></h1>
+  <button class="icon" id="theme" aria-label="テーマ">◐</button>
+</header>
+<main>
+  <section class="card">
+    <h2>1. 書き換えの基と、書き換えた後</h2>
+    <p class="sub">サイトのフォルダ (またはファイル) を入れます。「後」を複数入れると時系列の段として扱い、各段のパッチを 1 本の正味パッチに<b>折り畳んで</b>検査します。ファイルは端末の外に送信しません。</p>
+    <div class="inputs" id="inputs"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="addrev">＋ 段を追加</button>
+      <span class="msg">例:</span>
+      <button class="btn" data-ex="risky">危険な書き換え</button>
+      <button class="btn" data-ex="safe">安全な書き換え</button>
+      <button class="btn" data-ex="fold">2 段の折り畳み</button>
+      <span style="flex:1"></span>
+      <button class="btn primary" id="run">▶ リバイザで検査</button>
+    </div>
+    <div class="msg" id="status" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <div class="tabs" id="tabs">
+      <button data-t="sum" class="on">概要</button>
+      <button data-t="files">ファイルとパッチ</button>
+      <button data-t="tuples">タプル空間</button>
+      <button data-t="rules">規則 (guard.bada)</button>
+      <button data-t="export">書き出し</button>
+    </div>
+    <div class="tab on" id="t-sum"></div>
+    <div class="tab" id="t-files"></div>
+    <div class="tab" id="t-tuples">
+      <div class="row" style="margin-bottom:8px">
+        <input type="search" id="tq" placeholder='照会: ["patch", *, *, "index.php"] / 種類: verdict' style="flex:1;min-width:200px">
+        <span class="msg" id="tcount"></span>
+      </div>
+      <div style="overflow:auto"><table class="grid" id="ttable"></table></div>
+    </div>
+    <div class="tab" id="t-rules">
+      <p class="sub">規則は Bada の <code>@reviser</code> で文法として追加されています (<code>sink</code> / <code>sanitizer</code> / <code>invariant</code>)。ここで編集して「規則を読み込み直す」と、次の検査から有効になります (この端末に保存)。</p>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn" id="reload">規則を読み込み直す</button>
+        <button class="btn" id="resetrules">既定の規則に戻す</button>
+        <span class="msg" id="rulemsg"></span>
+      </div>
+      <textarea class="src" id="rulesrc" spellcheck="false"></textarea>
+    </div>
+    <div class="tab" id="t-export">
+      <p class="sub">パッチは git 互換の unified diff で、各ファイルに書き換えの基と後の SHA-256 を記録しています。CLI の <code>apply</code> はこの SHA-256 が一致しないと 1 ファイルも書き換えません。</p>
+      <div class="row" id="exbtns"></div>
+      <pre class="out" id="expreview"></pre>
+    </div>
+  </section>
+</main>
+
+<dialog id="pastedlg">
+  <form method="dialog" class="dlg">
+    <h3 style="margin:0 0 6px">ファイルを貼り付け</h3>
+    <label for="pastepath">パス (サイト内の相対パス)</label>
+    <input type="text" id="pastepath" placeholder="pages/search.php">
+    <label for="pastetext">内容</label>
+    <textarea id="pastetext" spellcheck="false"></textarea>
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" value="ok">追加</button></div>
+  </form>
+</dialog>
+
+<dialog id="waivedlg">
+  <form method="dialog" class="dlg">
+    <h3 style="margin:0 0 6px">指摘を免除する</h3>
+    <p class="msg" id="waiveinfo"></p>
+    <label for="waivereason">理由 (タプル空間に記録されます)</label>
+    <input type="text" id="waivereason" placeholder="例: 管理画面専用で、別途 IP 制限あり">
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" value="ok">免除して再検査</button></div>
+  </form>
+</dialog>
+
+<script type="application/json" id="examples">/*__EXAMPLES__*/</script>
+<script type="text/bada" id="guard-src">/*__GUARD__*/</script>
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+/*__PHP__*/
+</script>
+<script>
+/*__DIFF__*/
+</script>
+<script>
+/*__CORE__*/
+</script>
+<script>
+/*__APP__*/
+</script>
+</body>
+</html>

@@ -1,0 +1,2724 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bada PatchGuard</title>
+<style>
+:root{
+  --bg:#f5f6f3; --panel:#ffffff; --ink:#1c1f1d; --muted:#646a66; --line:#d9ddd8; --chip:#e9ece7;
+  --accent:#2f6f5e; --accent-ink:#ffffff; --code:#f0f2ee;
+  --add:#e3f4e6; --add-ink:#1d6b2f; --del:#fbe6e4; --del-ink:#9d2b22;
+  --crit:#a4161a; --high:#d0442c; --med:#b7791f; --low:#2b6cb0; --ok:#2f855a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151816; --panel:#1d211f; --ink:#e7ebe8; --muted:#9aa29d; --line:#323834; --chip:#272c29;
+    --accent:#5fb49a; --accent-ink:#0f1412; --code:#232825;
+    --add:#183524; --add-ink:#8fe0a6; --del:#3d1c1a; --del-ink:#f4a59c;
+    --crit:#ff6b6b; --high:#ff8a65; --med:#f0b45a; --low:#7fb3f0; --ok:#6fd39b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151816; --panel:#1d211f; --ink:#e7ebe8; --muted:#9aa29d; --line:#323834; --chip:#272c29;
+  --accent:#5fb49a; --accent-ink:#0f1412; --code:#232825;
+  --add:#183524; --add-ink:#8fe0a6; --del:#3d1c1a; --del-ink:#f4a59c;
+  --crit:#ff6b6b; --high:#ff8a65; --med:#f0b45a; --low:#7fb3f0; --ok:#6fd39b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14.5px/1.6 -apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+code,pre,.mono{font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:3}
+.logo{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700}
+header h1{font-size:16px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header h1 small{color:var(--muted);font-weight:400;margin-left:6px}
+.icon{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 9px}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+.inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.tree{border:1px dashed var(--line);border-radius:10px;padding:10px;min-height:120px;display:flex;flex-direction:column;gap:8px}
+.tree.drag{border-color:var(--accent);background:var(--chip)}
+.tree h3{margin:0;font-size:14px;display:flex;align-items:center;gap:6px}
+.tree h3 .x{margin-left:auto;border:0;background:none;color:var(--muted)}
+.tree .count{font-size:13px;color:var(--muted)}
+.tree .btns{display:flex;flex-wrap:wrap;gap:6px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 11px;font-size:13.5px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:8px 18px;font-size:14.5px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.files{font-size:12.5px;color:var(--muted);max-height:96px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px;overflow-x:auto}
+.tabs button{border:0;background:none;padding:8px 12px;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.tab{display:none}.tab.on{display:block}
+.verdict{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dec{font-size:22px;font-weight:800;padding:6px 16px;border-radius:10px;color:#fff}
+.dec.ACCEPT{background:var(--ok)}.dec.REVIEW{background:var(--med)}.dec.REJECT{background:var(--crit)}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px}
+.sev{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:0 8px;color:#fff;white-space:nowrap}
+.sev.critical{background:var(--crit)}.sev.high{background:var(--high)}.sev.medium{background:var(--med)}.sev.low{background:var(--low)}.sev.info{background:var(--muted)}
+.fl{border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.fl > summary{list-style:none;padding:9px 12px;cursor:pointer;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--chip)}
+.fl > summary::-webkit-details-marker{display:none}
+.fl > summary .p{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600;word-break:break-all}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--muted)}
+.tag.held{color:var(--med);border-color:var(--med)}.tag.safe{color:var(--ok);border-color:var(--ok)}
+.finds{padding:6px 12px}
+.find{border-left:3px solid var(--line);padding:4px 10px;margin:8px 0}
+.find.critical{border-color:var(--crit)}.find.high{border-color:var(--high)}.find.medium{border-color:var(--med)}.find.low{border-color:var(--low)}
+.find .ev{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:var(--muted);word-break:break-all}
+.find .wv{font-size:12px;border:0;background:none;color:var(--accent);padding:0;margin-left:8px}
+.find.waived{opacity:.55}
+.diff{font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;border-top:1px solid var(--line);overflow:auto}
+.diff table{border-collapse:collapse;width:100%}
+.diff td{padding:0 8px;white-space:pre;vertical-align:top}
+.diff td.n{color:var(--muted);text-align:right;user-select:none;width:1%;border-right:1px solid var(--line)}
+.diff tr.a td.t{background:var(--add);color:var(--add-ink)}
+.diff tr.d td.t{background:var(--del);color:var(--del-ink)}
+.diff tr.h td{background:var(--chip);color:var(--muted)}
+.diff tr.fold td{background:var(--code);color:var(--muted);cursor:pointer;text-align:center;font-family:inherit}
+.diff tr.fold:hover td{color:var(--ink)}
+.diff tr.mark td.t{box-shadow:inset 3px 0 0 var(--high)}
+table.grid{border-collapse:collapse;width:100%;font-size:13px}
+table.grid th,table.grid td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+table.grid td.mono{font-size:12.5px;word-break:break-all}
+textarea.src{width:100%;min-height:420px;border:1px solid var(--line);border-radius:10px;background:var(--code);padding:10px;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;resize:vertical;white-space:pre;outline:0}
+input[type=text],input[type=search]{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);width:min(720px,calc(100vw - 24px));padding:0}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.dlg{padding:16px}
+.dlg textarea{width:100%;min-height:260px;border:1px solid var(--line);border-radius:8px;background:var(--code);padding:8px;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace}
+.dlg input{width:100%}
+.dlg label{display:block;font-weight:600;margin:10px 0 4px;font-size:13px}
+.msg{font-size:13px;color:var(--muted)}
+.err{color:var(--crit)}
+pre.out{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:360px;overflow:auto;font-size:12.5px;white-space:pre}
+.empty{color:var(--muted);text-align:center;padding:30px 0}
+@media (max-width:640px){
+  main{padding:10px}
+  header h1 small{display:none}
+  .dec{font-size:18px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">⊕</div>
+  <h1>Bada PatchGuard <small>— リバイザで PHP の書き換えの副作用を防ぐパッチ・セキュリティ</small></h1>
+  <button class="icon" id="theme" aria-label="テーマ">◐</button>
+</header>
+<main>
+  <section class="card">
+    <h2>1. 書き換えの基と、書き換えた後</h2>
+    <p class="sub">サイトのフォルダ (またはファイル) を入れます。「後」を複数入れると時系列の段として扱い、各段のパッチを 1 本の正味パッチに<b>折り畳んで</b>検査します。ファイルは端末の外に送信しません。</p>
+    <div class="inputs" id="inputs"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="addrev">＋ 段を追加</button>
+      <span class="msg">例:</span>
+      <button class="btn" data-ex="risky">危険な書き換え</button>
+      <button class="btn" data-ex="safe">安全な書き換え</button>
+      <button class="btn" data-ex="fold">2 段の折り畳み</button>
+      <span style="flex:1"></span>
+      <button class="btn primary" id="run">▶ リバイザで検査</button>
+    </div>
+    <div class="msg" id="status" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <div class="tabs" id="tabs">
+      <button data-t="sum" class="on">概要</button>
+      <button data-t="files">ファイルとパッチ</button>
+      <button data-t="tuples">タプル空間</button>
+      <button data-t="rules">規則 (guard.bada)</button>
+      <button data-t="export">書き出し</button>
+    </div>
+    <div class="tab on" id="t-sum"></div>
+    <div class="tab" id="t-files"></div>
+    <div class="tab" id="t-tuples">
+      <div class="row" style="margin-bottom:8px">
+        <input type="search" id="tq" placeholder='照会: ["patch", *, *, "index.php"] / 種類: verdict' style="flex:1;min-width:200px">
+        <span class="msg" id="tcount"></span>
+      </div>
+      <div style="overflow:auto"><table class="grid" id="ttable"></table></div>
+    </div>
+    <div class="tab" id="t-rules">
+      <p class="sub">規則は Bada の <code>@reviser</code> で文法として追加されています (<code>sink</code> / <code>sanitizer</code> / <code>invariant</code>)。ここで編集して「規則を読み込み直す」と、次の検査から有効になります (この端末に保存)。</p>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn" id="reload">規則を読み込み直す</button>
+        <button class="btn" id="resetrules">既定の規則に戻す</button>
+        <span class="msg" id="rulemsg"></span>
+      </div>
+      <textarea class="src" id="rulesrc" spellcheck="false"></textarea>
+    </div>
+    <div class="tab" id="t-export">
+      <p class="sub">パッチは git 互換の unified diff で、各ファイルに書き換えの基と後の SHA-256 を記録しています。CLI の <code>apply</code> はこの SHA-256 が一致しないと 1 ファイルも書き換えません。</p>
+      <div class="row" id="exbtns"></div>
+      <pre class="out" id="expreview"></pre>
+    </div>
+  </section>
+</main>
+
+<dialog id="pastedlg">
+  <form method="dialog" class="dlg">
+    <h3 style="margin:0 0 6px">ファイルを貼り付け</h3>
+    <label for="pastepath">パス (サイト内の相対パス)</label>
+    <input type="text" id="pastepath" placeholder="pages/search.php">
+    <label for="pastetext">内容</label>
+    <textarea id="pastetext" spellcheck="false"></textarea>
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" value="ok">追加</button></div>
+  </form>
+</dialog>
+
+<dialog id="waivedlg">
+  <form method="dialog" class="dlg">
+    <h3 style="margin:0 0 6px">指摘を免除する</h3>
+    <p class="msg" id="waiveinfo"></p>
+    <label for="waivereason">理由 (タプル空間に記録されます)</label>
+    <input type="text" id="waivereason" placeholder="例: 管理画面専用で、別途 IP 制限あり">
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" value="ok">免除して再検査</button></div>
+  </form>
+</dialog>
+
+<script type="application/json" id="examples">{"base":{"admin/delete.php":"<?php\nrequire_once __DIR__ . '/../lib/db.php';\nrequire_once __DIR__ . '/../lib/auth.php';\n\nrequire_login();\ncsrf_check($_POST['token'] ?? null);\n\n$id = (int)($_POST['id'] ?? 0);\n$st = db()->prepare('DELETE FROM items WHERE id = ?');\n$st->execute([$id]);\nheader('Location: /admin/');\n","config.php":"<?php\n// サイト設定\ndefine('SITE_NAME', 'Bada Shop');\ndefine('DEBUG', false);\nini_set('display_errors', '0');\nerror_reporting(E_ALL);\n","index.php":"<?php\nrequire_once __DIR__ . '/lib/db.php';\n\n$pages = ['home', 'search', 'profile'];\n$page = $_GET['page'] ?? 'home';\nif (!in_array($page, $pages, true)) {\n    $page = 'home';\n}\n?>\n<!doctype html>\n<title><?= htmlspecialchars(SITE_NAME) ?><\/title>\n<h1><?= htmlspecialchars(SITE_NAME) ?><\/h1>\n<nav><a href=\"?page=search\">検索<\/a> <a href=\"?page=profile&id=1\">プロフィール<\/a><\/nav>\n<?php require __DIR__ . '/pages/' . $page . '.php'; ?>\n","lib/auth.php":"<?php\nfunction require_login(): void\n{\n    session_start();\n    if (empty($_SESSION['uid'])) {\n        header('Location: /login.php');\n        exit;\n    }\n}\n\nfunction csrf_token(): string\n{\n    if (empty($_SESSION['csrf'])) {\n        $_SESSION['csrf'] = bin2hex(random_bytes(32));\n    }\n    return $_SESSION['csrf'];\n}\n\nfunction csrf_check(?string $token): void\n{\n    if (!is_string($token) || !hash_equals($_SESSION['csrf'] ?? '', $token)) {\n        http_response_code(403);\n        exit('invalid token');\n    }\n}\n","lib/db.php":"<?php\nrequire_once __DIR__ . '/../config.php';\n\nfunction db(): PDO\n{\n    static $pdo = null;\n    if ($pdo === null) {\n        $pdo = new PDO('sqlite:' . __DIR__ . '/../data/shop.db');\n        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);\n    }\n    return $pdo;\n}\n\nfunction find_user(PDO $db, int $id)\n{\n    $st = $db->prepare('SELECT id, name FROM users WHERE id = ?');\n    $st->execute([$id]);\n    return $st->fetch(PDO::FETCH_ASSOC);\n}\n\nfunction search_items(PDO $db, string $q): array\n{\n    $st = $db->prepare('SELECT name, price FROM items WHERE name LIKE ?');\n    $st->execute(['%' . $q . '%']);\n    return $st->fetchAll(PDO::FETCH_ASSOC);\n}\n","pages/home.php":"<p>ようこそ。<\/p>\n","pages/profile.php":"<?php\n$user = find_user(db(), (int)($_GET['id'] ?? 0));\nif (!$user) {\n    echo '<p>ユーザーが見つかりません<\/p>';\n    return;\n}\n?>\n<h2><?= htmlspecialchars($user['name']) ?><\/h2>\n","pages/search.php":"<?php\n$q = $_GET['q'] ?? '';\n$rows = search_items(db(), $q);\n?>\n<form><input name=\"page\" type=\"hidden\" value=\"search\"><input name=\"q\" value=\"<?= htmlspecialchars($q, ENT_QUOTES) ?>\"><\/form>\n<p>「<?= htmlspecialchars($q, ENT_QUOTES) ?>」の検索結果 <?= count($rows) ?> 件<\/p>\n<ul>\n<?php foreach ($rows as $r): ?>\n  <li><?= htmlspecialchars($r['name']) ?> — <?= (int)$r['price'] ?> 円<\/li>\n<?php endforeach; ?>\n<\/ul>\n"},"risky":[{"admin/delete.php":"<?php\nrequire_once __DIR__ . '/../lib/db.php';\nrequire_once __DIR__ . '/../lib/auth.php';\n\nrequire_login();\n\n$id = (int)($_POST['id'] ?? 0);\n$st = db()->prepare('DELETE FROM items WHERE id = ?');\n$st->execute([$id]);\nheader('Location: /admin/');\n","config.php":"<?php\n// サイト設定\ndefine('SITE_NAME', 'Bada Shop');\ndefine('DEBUG', false);\nini_set('display_errors', '1');\nerror_reporting(E_ALL);\n","index.php":"<?php\nrequire_once __DIR__ . '/lib/db.php';\n\n// リファクタ: ページ一覧の管理をやめて、ファイル名で直接読む\n$page = $_GET['page'] ?? 'home';\n?>\n<!doctype html>\n<title><?= htmlspecialchars(SITE_NAME) ?><\/title>\n<h1><?= htmlspecialchars(SITE_NAME) ?><\/h1>\n<nav><a href=\"?page=search\">検索<\/a> <a href=\"?page=profile&id=1\">プロフィール<\/a><\/nav>\n<?php include __DIR__ . '/pages/' . $page . '.php'; ?>\n","lib/auth.php":"<?php\nfunction require_login(): void\n{\n    session_start();\n    if (empty($_SESSION['uid'])) {\n        header('Location: /login.php');\n        exit;\n    }\n}\n\nfunction csrf_token(): string\n{\n    if (empty($_SESSION['csrf'])) {\n        $_SESSION['csrf'] = bin2hex(random_bytes(32));\n    }\n    return $_SESSION['csrf'];\n}\n\nfunction csrf_check(?string $token): void\n{\n    if (!is_string($token) || !hash_equals($_SESSION['csrf'] ?? '', $token)) {\n        http_response_code(403);\n        exit('invalid token');\n    }\n}\n","lib/db.php":"<?php\nrequire_once __DIR__ . '/../config.php';\n\nfunction db(): PDO\n{\n    static $pdo = null;\n    if ($pdo === null) {\n        $pdo = new PDO('sqlite:' . __DIR__ . '/../data/shop.db');\n        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);\n    }\n    return $pdo;\n}\n\nfunction find_user(PDO $db, int $id, bool $withOrders)\n{\n    $st = $db->prepare('SELECT id, name FROM users WHERE id = ?' . ($withOrders ? ' /* +orders */' : ''));\n    $st->execute([$id]);\n    return $st->fetch(PDO::FETCH_ASSOC);\n}\n","pages/home.php":"<p>ようこそ。<\/p>\n","pages/profile.php":"<?php\n$user = find_user(db(), (int)($_GET['id'] ?? 0));\nif (!$user) {\n    echo '<p>ユーザーが見つかりません<\/p>';\n    return;\n}\n?>\n<h2><?= htmlspecialchars($user['name']) ?><\/h2>\n","pages/search.php":"<?php\n$q = $_GET['q'] ?? '';\n// 高速化: prepare をやめて直接 query\n$rows = db()->query(\"SELECT name, price FROM items WHERE name LIKE '%$q%'\")->fetchAll();\n?>\n<form><input name=\"page\" type=\"hidden\" value=\"search\"><input name=\"q\" value=\"<?= htmlspecialchars($q, ENT_QUOTES) ?>\"><\/form>\n<p>「<?= $q ?>」の検索結果 <?= count($rows) ?> 件<\/p>\n<ul>\n<?php foreach ($rows as $r): ?>\n  <li><?= htmlspecialchars($r['name']) ?> — <?= (int)$r['price'] ?> 円<\/li>\n<?php endforeach; ?>\n<\/ul>\n","tools/info.php":"<?php\nphpinfo();\n","tools/thumb.php":"<?php\n// サムネイル生成 (急ぎで追加)\n$src = $_GET['src'];\nsystem('convert ' . $src . ' -resize 120x120 /tmp/thumb.png');\n$prefs = unserialize($_COOKIE['prefs'] ?? 'a:0:{}');\nreadfile('/tmp/thumb.png');\n"}],"safe":[{"admin/delete.php":"<?php\nrequire_once __DIR__ . '/../lib/db.php';\nrequire_once __DIR__ . '/../lib/auth.php';\n\nrequire_login();\ncsrf_check($_POST['token'] ?? null);\n\n$id = (int)($_POST['id'] ?? 0);\n$st = db()->prepare('DELETE FROM items WHERE id = ?');\n$st->execute([$id]);\nheader('Location: /admin/');\n","config.php":"<?php\n// サイト設定\ndefine('SITE_NAME', 'Bada Shop');\ndefine('DEBUG', false);\nini_set('display_errors', '0');\nerror_reporting(E_ALL);\n","index.php":"<?php\nrequire_once __DIR__ . '/lib/db.php';\n\n$pages = ['home', 'search', 'profile', 'about'];\n$page = $_GET['page'] ?? 'home';\nif (!in_array($page, $pages, true)) {\n    $page = 'home';\n}\n?>\n<!doctype html>\n<title><?= htmlspecialchars(SITE_NAME) ?><\/title>\n<h1><?= htmlspecialchars(SITE_NAME) ?><\/h1>\n<nav><a href=\"?page=search\">検索<\/a> <a href=\"?page=profile&id=1\">プロフィール<\/a> <a href=\"?page=about\">このサイトについて<\/a><\/nav>\n<?php require __DIR__ . '/pages/' . $page . '.php'; ?>\n","lib/auth.php":"<?php\nfunction require_login(): void\n{\n    session_start();\n    if (empty($_SESSION['uid'])) {\n        header('Location: /login.php');\n        exit;\n    }\n}\n\nfunction csrf_token(): string\n{\n    if (empty($_SESSION['csrf'])) {\n        $_SESSION['csrf'] = bin2hex(random_bytes(32));\n    }\n    return $_SESSION['csrf'];\n}\n\nfunction csrf_check(?string $token): void\n{\n    if (!is_string($token) || !hash_equals($_SESSION['csrf'] ?? '', $token)) {\n        http_response_code(403);\n        exit('invalid token');\n    }\n}\n","lib/db.php":"<?php\nrequire_once __DIR__ . '/../config.php';\n\nfunction db(): PDO\n{\n    static $pdo = null;\n    if ($pdo === null) {\n        $pdo = new PDO('sqlite:' . __DIR__ . '/../data/shop.db');\n        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);\n    }\n    return $pdo;\n}\n\nfunction find_user(PDO $db, int $id)\n{\n    $st = $db->prepare('SELECT id, name FROM users WHERE id = ?');\n    $st->execute([$id]);\n    return $st->fetch(PDO::FETCH_ASSOC);\n}\n\nfunction search_items(PDO $db, string $q, int $limit = 50): array\n{\n    $st = $db->prepare('SELECT name, price FROM items WHERE name LIKE ? LIMIT ' . (int)$limit);\n    $st->execute(['%' . $q . '%']);\n    return $st->fetchAll(PDO::FETCH_ASSOC);\n}\n","pages/about.php":"<?php\n?>\n<h2>このサイトについて<\/h2>\n<p><?= htmlspecialchars(SITE_NAME) ?> は Bada で検査されたパッチだけを公開しています。<\/p>\n","pages/home.php":"<p>ようこそ。<\/p>\n","pages/profile.php":"<?php\n$user = find_user(db(), (int)($_GET['id'] ?? 0));\nif (!$user) {\n    echo '<p>ユーザーが見つかりません<\/p>';\n    return;\n}\n?>\n<h2><?= htmlspecialchars($user['name']) ?><\/h2>\n","pages/search.php":"<?php\n$q = $_GET['q'] ?? '';\n$rows = search_items(db(), $q);\n?>\n<form><input name=\"page\" type=\"hidden\" value=\"search\"><input name=\"q\" value=\"<?= htmlspecialchars($q, ENT_QUOTES) ?>\"><\/form>\n<p>「<?= htmlspecialchars($q, ENT_QUOTES) ?>」の検索結果 <?= count($rows) ?> 件<\/p>\n<ul>\n<?php foreach ($rows as $r): ?>\n  <li><?= htmlspecialchars($r['name']) ?> — <?= number_format((int)$r['price']) ?> 円<\/li>\n<?php endforeach; ?>\n<\/ul>\n"}],"fold":[{"admin/delete.php":"<?php\nrequire_once __DIR__ . '/../lib/db.php';\nrequire_once __DIR__ . '/../lib/auth.php';\n\nrequire_login();\ncsrf_check($_POST['token'] ?? null);\n\n$id = (int)($_POST['id'] ?? 0);\n$st = db()->prepare('DELETE FROM items WHERE id = ?');\n$st->execute([$id]);\nheader('Location: /admin/');\n","config.php":"<?php\n// サイト設定\ndefine('SITE_NAME', 'Bada Shop');\ndefine('DEBUG', false);\nini_set('display_errors', '0');\nerror_reporting(E_ALL);\n","index.php":"<?php\nrequire_once __DIR__ . '/lib/db.php';\n\n$pages = ['home', 'search', 'profile'];\n$page = $_GET['page'] ?? 'home';\nif (!in_array($page, $pages, true)) {\n    $page = 'home';\n}\n?>\n<!doctype html>\n<title><?= htmlspecialchars(SITE_NAME) ?><\/title>\n<h1><?= htmlspecialchars(SITE_NAME) ?><\/h1>\n<nav><a href=\"?page=search\">検索<\/a> <a href=\"?page=profile&id=1\">プロフィール<\/a><\/nav>\n<?php require __DIR__ . '/pages/' . $page . '.php'; ?>\n","lib/auth.php":"<?php\nfunction require_login(): void\n{\n    session_start();\n    if (empty($_SESSION['uid'])) {\n        header('Location: /login.php');\n        exit;\n    }\n}\n\nfunction csrf_token(): string\n{\n    if (empty($_SESSION['csrf'])) {\n        $_SESSION['csrf'] = bin2hex(random_bytes(32));\n    }\n    return $_SESSION['csrf'];\n}\n\nfunction csrf_check(?string $token): void\n{\n    if (!is_string($token) || !hash_equals($_SESSION['csrf'] ?? '', $token)) {\n        http_response_code(403);\n        exit('invalid token');\n    }\n}\n","lib/db.php":"<?php\nrequire_once __DIR__ . '/../config.php';\n\nfunction db(): PDO\n{\n    static $pdo = null;\n    if ($pdo === null) {\n        $pdo = new PDO('sqlite:' . __DIR__ . '/../data/shop.db');\n        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);\n    }\n    return $pdo;\n}\n\nfunction find_user(PDO $db, int $id)\n{\n    $st = $db->prepare('SELECT id, name FROM users WHERE id = ?');\n    $st->execute([$id]);\n    return $st->fetch(PDO::FETCH_ASSOC);\n}\n\nfunction search_items(PDO $db, string $q): array\n{\n    $st = $db->prepare('SELECT name, price FROM items WHERE name LIKE ?');\n    $st->execute(['%' . $q . '%']);\n    return $st->fetchAll(PDO::FETCH_ASSOC);\n}\n","pages/home.php":"<p>ようこそ。<\/p>\n","pages/profile.php":"<?php\n$user = find_user(db(), (int)($_GET['id'] ?? 0));\nif (!$user) {\n    echo '<p>ユーザーが見つかりません<\/p>';\n    return;\n}\n?>\n<h2><?= htmlspecialchars($user['name']) ?><\/h2>\n","pages/search.php":"<?php\n$q = $_GET['q'] ?? '';\n$rows = search_items(db(), $q);\n?>\n<form><input name=\"page\" type=\"hidden\" value=\"search\"><input name=\"q\" value=\"<?= htmlspecialchars($q, ENT_QUOTES) ?>\"><\/form>\n<p>「<?= $q ?>」の検索結果 (一時的にエスケープを外した版) <?= count($rows) ?> 件<\/p>\n<ul>\n<?php foreach ($rows as $r): ?>\n  <li><?= htmlspecialchars($r['name']) ?> — <?= (int)$r['price'] ?> 円<\/li>\n<?php endforeach; ?>\n<\/ul>\n"},{"admin/delete.php":"<?php\nrequire_once __DIR__ . '/../lib/db.php';\nrequire_once __DIR__ . '/../lib/auth.php';\n\nrequire_login();\ncsrf_check($_POST['token'] ?? null);\n\n$id = (int)($_POST['id'] ?? 0);\n$st = db()->prepare('DELETE FROM items WHERE id = ?');\n$st->execute([$id]);\nheader('Location: /admin/');\n","config.php":"<?php\n// サイト設定\ndefine('SITE_NAME', 'Bada Shop');\ndefine('DEBUG', false);\nini_set('display_errors', '0');\nerror_reporting(E_ALL);\n","index.php":"<?php\nrequire_once __DIR__ . '/lib/db.php';\n\n$pages = ['home', 'search', 'profile', 'about'];\n$page = $_GET['page'] ?? 'home';\nif (!in_array($page, $pages, true)) {\n    $page = 'home';\n}\n?>\n<!doctype html>\n<title><?= htmlspecialchars(SITE_NAME) ?><\/title>\n<h1><?= htmlspecialchars(SITE_NAME) ?><\/h1>\n<nav><a href=\"?page=search\">検索<\/a> <a href=\"?page=profile&id=1\">プロフィール<\/a> <a href=\"?page=about\">このサイトについて<\/a><\/nav>\n<?php require __DIR__ . '/pages/' . $page . '.php'; ?>\n","lib/auth.php":"<?php\nfunction require_login(): void\n{\n    session_start();\n    if (empty($_SESSION['uid'])) {\n        header('Location: /login.php');\n        exit;\n    }\n}\n\nfunction csrf_token(): string\n{\n    if (empty($_SESSION['csrf'])) {\n        $_SESSION['csrf'] = bin2hex(random_bytes(32));\n    }\n    return $_SESSION['csrf'];\n}\n\nfunction csrf_check(?string $token): void\n{\n    if (!is_string($token) || !hash_equals($_SESSION['csrf'] ?? '', $token)) {\n        http_response_code(403);\n        exit('invalid token');\n    }\n}\n","lib/db.php":"<?php\nrequire_once __DIR__ . '/../config.php';\n\nfunction db(): PDO\n{\n    static $pdo = null;\n    if ($pdo === null) {\n        $pdo = new PDO('sqlite:' . __DIR__ . '/../data/shop.db');\n        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);\n    }\n    return $pdo;\n}\n\nfunction find_user(PDO $db, int $id)\n{\n    $st = $db->prepare('SELECT id, name FROM users WHERE id = ?');\n    $st->execute([$id]);\n    return $st->fetch(PDO::FETCH_ASSOC);\n}\n\nfunction search_items(PDO $db, string $q, int $limit = 50): array\n{\n    $st = $db->prepare('SELECT name, price FROM items WHERE name LIKE ? LIMIT ' . (int)$limit);\n    $st->execute(['%' . $q . '%']);\n    return $st->fetchAll(PDO::FETCH_ASSOC);\n}\n","pages/about.php":"<?php\n?>\n<h2>このサイトについて<\/h2>\n<p><?= htmlspecialchars(SITE_NAME) ?> は Bada で検査されたパッチだけを公開しています。<\/p>\n","pages/home.php":"<p>ようこそ。<\/p>\n","pages/profile.php":"<?php\n$user = find_user(db(), (int)($_GET['id'] ?? 0));\nif (!$user) {\n    echo '<p>ユーザーが見つかりません<\/p>';\n    return;\n}\n?>\n<h2><?= htmlspecialchars($user['name']) ?><\/h2>\n","pages/search.php":"<?php\n$q = $_GET['q'] ?? '';\n$rows = search_items(db(), $q);\n?>\n<form><input name=\"page\" type=\"hidden\" value=\"search\"><input name=\"q\" value=\"<?= htmlspecialchars($q, ENT_QUOTES) ?>\"><\/form>\n<p>「<?= htmlspecialchars($q, ENT_QUOTES) ?>」の検索結果 <?= count($rows) ?> 件<\/p>\n<ul>\n<?php foreach ($rows as $r): ?>\n  <li><?= htmlspecialchars($r['name']) ?> — <?= number_format((int)$r['price']) ?> 円<\/li>\n<?php endforeach; ?>\n<\/ul>\n"}]}</script>
+<script type="text/bada" id="guard-src"># ══════════════════════════════════════════════════════════════════════
+#  guard.bada — Bada Reviser PatchGuard (PHP サイト書き換えの副作用ガード)
+#
+#  書き換えの基 (base) と書き換えた後 (after) をタプルとして台帳に置き、
+#  その差をパッチとして扱う。@reviser で定義した規則 (sink / sanitizer /
+#  invariant) が、パッチの「副作用」— 新しい危険関数・無害化の削除・認可の
+#  削除・他ファイルを壊す署名変更など — を検査し、門 (gate) が
+#  ACCEPT / REVIEW / REJECT を決める。
+#
+#  折り畳み (fold): 複数回の書き換え r1, r2, … を
+#      fold(patches, base, |acc, p| patch_apply(acc, p))
+#  で 1 本の正味パッチ base → final に畳み込み、各段の検査と正味の検査を
+#  両方行う。段ごとには安全でも合成すると危険になる変更 (創発) と、
+#  途中で入って後で消えた変更 (相殺) を区別して報告する。
+#
+#  ネイティブ組込み (JS): php_analyze, diff_lines, patch_apply,
+#  patch_reverse, unified, sha256
+# ══════════════════════════════════════════════════════════════════════
+
+GUARD_VERSION := "1.0.0"
+
+SEV := {none: -1, info: 0, low: 1, medium: 2, high: 3, critical: 4}
+SEV_JA := {info: "情報", low: "低", medium: "中", high: "高", critical: "致命的"}
+SINKS := {}
+SANITIZERS := []
+CHECKS := []
+
+# ─── @reviser: セキュリティ規則の文法を拡張する ─────────────────────────
+#  ここで commit した 3 つの rule は、以降の文で新しい構文として使える:
+#    sink "eval", "code", "critical", "high", "説明"
+#    sanitizer "htmlspecialchars"
+#    invariant "PG01", "見出し", |d| 検査関数
+@reviser PATCHGUARD {
+  rule sink(name, kind, tainted_sev, plain_sev, why) {
+    SINKS[lower(name)] = {name: name, kind: kind, tainted: tainted_sev, plain: plain_sev, why: why}
+    Omega >> ["sink", lower(name), kind, tainted_sev, plain_sev]
+  }
+  rule sanitizer(name) {
+    SANITIZERS <- lower(name)
+    Omega >> ["sanitizer", lower(name)]
+  }
+  rule invariant(id, title, check) {
+    CHECKS <- {id: id, title: title, check: check}
+    Omega >> ["invariant", id, title]
+  }
+}
+
+# ─── 危険な受け口 (sink) ─ 汚染時の重大度 / 非汚染時の重大度 ────────────
+sink "eval", "code", "critical", "high", "文字列を PHP コードとして実行する (任意コード実行)"
+sink "assert", "code", "critical", "low", "PHP 7 未満では文字列をコードとして評価する"
+sink "create_function", "code", "critical", "high", "内部で eval を行う (PHP 8 で削除)"
+sink "call_user_func", "code", "critical", "none", "呼び出す関数名を外部入力が決める"
+sink "call_user_func_array", "code", "critical", "none", "呼び出す関数名を外部入力が決める"
+sink "preg_replace_callback", "code", "high", "none", "コールバックに外部入力が渡る"
+sink "extract", "code", "high", "medium", "外部入力から任意の変数を上書きする"
+sink "parse_str", "code", "high", "none", "第 2 引数なしでは変数を上書きする"
+sink "exec", "cmd", "critical", "high", "OS コマンド実行"
+sink "system", "cmd", "critical", "high", "OS コマンド実行"
+sink "passthru", "cmd", "critical", "high", "OS コマンド実行"
+sink "shell_exec", "cmd", "critical", "high", "OS コマンド実行"
+sink "popen", "cmd", "critical", "high", "OS コマンド実行"
+sink "proc_open", "cmd", "critical", "high", "OS コマンド実行"
+sink "pcntl_exec", "cmd", "critical", "high", "OS コマンド実行"
+sink "mail", "cmd", "high", "none", "第 5 引数経由のコマンド注入・ヘッダ注入"
+sink "`backtick`", "cmd", "critical", "high", "バッククォートは shell_exec と同じ"
+sink "mysqli_query", "sql", "critical", "none", "SQL 文字列に外部入力が混入"
+sink "mysql_query", "sql", "critical", "medium", "削除済み拡張 + SQL 注入"
+sink "pg_query", "sql", "critical", "none", "SQL 文字列に外部入力が混入"
+sink "sqlite_query", "sql", "critical", "none", "SQL 文字列に外部入力が混入"
+sink "->query", "sql", "critical", "none", "PDO/mysqli の query に外部入力が混入"
+sink "->exec", "sql", "critical", "none", "PDO::exec に外部入力が混入"
+sink "->prepare", "sql", "critical", "none", "prepare する SQL 自体に外部入力が混入 (プレースホルダを使っていない)"
+sink "->multi_query", "sql", "critical", "medium", "複文実行"
+sink "printf", "xss", "high", "none", "エスケープなしの出力"
+sink "vprintf", "xss", "high", "none", "エスケープなしの出力"
+sink "unserialize", "deser", "high", "low", "オブジェクト注入 (POP チェーン)"
+sink "include", "file_read", "critical", "none", "動的 include"
+sink "file_get_contents", "file_read", "high", "none", "パス・トラバーサル / SSRF"
+sink "readfile", "file_read", "high", "none", "パス・トラバーサル"
+sink "fopen", "file_read", "high", "none", "パス・トラバーサル"
+sink "file", "file_read", "high", "none", "パス・トラバーサル"
+sink "show_source", "file_read", "high", "medium", "ソースの開示"
+sink "highlight_file", "file_read", "high", "medium", "ソースの開示"
+sink "file_put_contents", "file_write", "high", "low", "任意ファイル書き込み"
+sink "fwrite", "file_write", "medium", "none", "ファイル書き込み"
+sink "unlink", "file_write", "high", "low", "ファイル削除"
+sink "rename", "file_write", "high", "low", "ファイル移動"
+sink "copy", "file_write", "high", "low", "ファイル複製"
+sink "move_uploaded_file", "file_write", "high", "medium", "アップロード保存先の検証"
+sink "mkdir", "file_write", "medium", "none", "ディレクトリ作成"
+sink "rmdir", "file_write", "high", "low", "ディレクトリ削除"
+sink "chmod", "file_write", "high", "medium", "権限変更"
+sink "curl_exec", "net", "high", "low", "外部通信 (SSRF)"
+sink "curl_init", "net", "high", "none", "外部通信先を外部入力が決める (SSRF)"
+sink "fsockopen", "net", "high", "low", "外部通信 (SSRF)"
+sink "stream_socket_client", "net", "high", "low", "外部通信 (SSRF)"
+sink "header", "header", "high", "none", "ヘッダ注入 / オープンリダイレクト"
+sink "setcookie", "cookie", "medium", "none", "Cookie の属性"
+sink "md5", "weak", "low", "low", "弱いハッシュ (パスワード・トークン用途に不適)"
+sink "sha1", "weak", "low", "low", "弱いハッシュ (パスワード・トークン用途に不適)"
+sink "crc32", "weak", "low", "low", "改ざん検知に不適"
+sink "rand", "weak", "low", "low", "予測可能な乱数 (random_int を使う)"
+sink "mt_rand", "weak", "low", "low", "予測可能な乱数 (random_int を使う)"
+sink "uniqid", "weak", "low", "low", "予測可能な ID"
+sink "str_shuffle", "weak", "low", "low", "予測可能な乱数"
+sink "phpinfo", "debug", "high", "high", "環境・設定の全開示"
+sink "var_dump", "debug", "low", "low", "デバッグ出力の残り"
+sink "print_r", "debug", "medium", "low", "デバッグ出力の残り"
+sink "var_export", "debug", "low", "none", "デバッグ出力の残り"
+sink "debug_print_backtrace", "debug", "low", "low", "デバッグ出力の残り"
+sink "error_log", "debug", "low", "none", "ログ注入"
+
+# ─── 無害化 (sanitizer) — 包まれた部分は汚染に数えない ─────────────────
+sanitizer "htmlspecialchars"
+sanitizer "htmlentities"
+sanitizer "strip_tags"
+sanitizer "intval"
+sanitizer "floatval"
+sanitizer "boolval"
+sanitizer "abs"
+sanitizer "count"
+sanitizer "filter_var"
+sanitizer "filter_input"
+sanitizer "escapeshellarg"
+sanitizer "escapeshellcmd"
+sanitizer "mysqli_real_escape_string"
+sanitizer "pg_escape_string"
+sanitizer "pg_escape_literal"
+sanitizer "->quote"
+sanitizer "->real_escape_string"
+sanitizer "json_encode"
+sanitizer "urlencode"
+sanitizer "rawurlencode"
+sanitizer "http_build_query"
+sanitizer "basename"
+sanitizer "preg_quote"
+sanitizer "ctype_digit"
+sanitizer "ctype_alnum"
+sanitizer "is_numeric"
+sanitizer "in_array"
+sanitizer "array_key_exists"
+sanitizer "isset"
+sanitizer "empty"
+sanitizer "hash"
+sanitizer "hash_hmac"
+sanitizer "password_hash"
+sanitizer "password_verify"
+sanitizer "hash_equals"
+sanitizer "esc_html"
+sanitizer "esc_attr"
+sanitizer "esc_url"
+sanitizer "e"
+
+EMPTY := {tokens: 0, calls: [], echoes: [], includes: [], defs: [], auth: [], state: [], syntax: {balanced: true, errors: [], detail: ""}, tainted_vars: []}
+
+# ─── 補助 ─────────────────────────────────────────────────────────────
+# 多重集合の差: after にあって base に無いもの (行番号ではなく内容の鍵で数える)
+fn added_items(base_items, after_items, keyf) {
+  cnt := {}
+  for x in base_items {
+    k := keyf(x)
+    cnt[k] = get(cnt, k, 0) + 1
+  }
+  out := []
+  for x in after_items {
+    k := keyf(x)
+    c := get(cnt, k, 0)
+    if c > 0 { cnt[k] = c - 1 } else { out <- x }
+  }
+  return out
+}
+
+fn removed_items(base_items, after_items, keyf) { return added_items(after_items, base_items, keyf) }
+
+fn finding(sev, line, msg, evidence) { return {sev: sev, line: line, msg: msg, evidence: evidence} }
+
+fn src_note(c) {
+  if len(c.sources) > 0 { return " — 汚染源: " + join(c.sources, ", ") }
+  return ""
+}
+
+fn sink_findings(d, kinds) {
+  out := []
+  for c in added_items(d.base.calls, d.after.calls, |c| c.key) {
+    s := get(SINKS, c.lname, nil)
+    if s != nil and contains(kinds, s.kind) {
+      sev := s.plain
+      if c.tainted { sev = s.tainted }
+      if s.kind == "file_read" and c.lname == "file_get_contents" and c.first != nil and match(c.first, "^(https?|ftp)://") != nil { sev = "low" }
+      if s.kind == "cookie" {
+        if c.tainted { sev = "medium" } elif not contains(lower(c.args), "httponly") and c.argc < 7 { sev = "low" } else { sev = "none" }
+      }
+      if sev != "none" {
+        msg := c.name + "() を追加: " + s.why
+        if c.tainted { msg = msg + " (外部入力が届く)" }
+        out <- finding(sev, c.line, msg, c.name + "(" + c.args + ")" + src_note(c))
+      }
+    }
+  }
+  return out
+}
+
+fn sev_max(fs) {
+  m := "none"
+  for f in fs { if SEV[f.sev] > SEV[m] { m = f.sev } }
+  return m
+}
+
+# ─── 不変量 (invariant): 書き換えが守るべき性質 ───────────────────────
+invariant "PG01", "コード実行関数の追加", |d| sink_findings(d, ["code"])
+invariant "PG02", "OS コマンド実行の追加", |d| sink_findings(d, ["cmd"])
+invariant "PG03", "SQL インジェクション", |d| sink_findings(d, ["sql"])
+
+invariant "PG04", "XSS — エスケープなしの出力", |d| xss_findings(d)
+fn xss_findings(d) {
+  out := sink_findings(d, ["xss"])
+  for e in added_items(d.base.echoes, d.after.echoes, |e| e.key) {
+    if e.tainted { out <- finding("high", e.line, e.kind + " が外部入力をエスケープせずに出力", e.kind + " " + e.expr + src_note(e)) }
+  }
+  return out
+}
+
+invariant "PG05", "動的 include (LFI / RFI)", |d| include_findings(d)
+fn include_findings(d) {
+  out := []
+  for i in added_items(d.base.includes, d.after.includes, |i| i.key) {
+    if i.tainted { out <- finding("critical", i.line, i.kind + " のパスを外部入力が決める (ローカル / リモート・ファイル・インクルード)", i.kind + " " + i.expr + src_note(i)) }
+    elif i.dynamic { out <- finding("medium", i.line, i.kind + " のパスが変数で決まる", i.kind + " " + i.expr) }
+  }
+  return out
+}
+
+invariant "PG06", "安全でないデシリアライズ", |d| sink_findings(d, ["deser"])
+invariant "PG07", "ファイル操作 (トラバーサル / 改ざん)", |d| sink_findings(d, ["file_read", "file_write"])
+invariant "PG08", "外部通信 (SSRF)", |d| sink_findings(d, ["net"])
+
+invariant "PG09", "無害化 (エスケープ・検証) の削除", |d| sanitizer_removed(d)
+fn sanitizer_removed(d) {
+  out := []
+  if d.status != "modified" { return out }
+  isS := |c| contains(SANITIZERS, c.lname)
+  for c in removed_items(filter(d.base.calls, isS), filter(d.after.calls, isS), |c| c.key) {
+    out <- finding("medium", c.line, "書き換えの基にあった無害化 " + c.name + "() が消えました (基の行番号)", c.name + "(" + c.args + ")")
+  }
+  return out
+}
+
+invariant "PG10", "認可・CSRF・セッション検査の削除", |d| auth_removed(d)
+fn auth_removed(d) {
+  out := []
+  if d.status != "modified" { return out }
+  for a in removed_items(d.base.auth, d.after.auth, |a| a.key) {
+    out <- finding("high", a.line, "書き換えの基にあった検査が消えました (基の行番号): 認可・CSRF・セッションを確認してください", a.text)
+  }
+  return out
+}
+
+invariant "PG11", "関数・メソッドの署名変更が他のファイルを壊す", |d| api_findings(d)
+fn callers_of(d, fd) {
+  out := []
+  for pc in d.project.calls {
+    c := pc.call
+    hit := false
+    if fd.cls == nil { hit = c.lname == lower(fd.name) } else { hit = endswith(c.lname, "->" + lower(fd.name)) or endswith(c.lname, "::" + lower(fd.name)) }
+    if hit { out <- pc }
+  }
+  return out
+}
+fn api_findings(d) {
+  out := []
+  if d.status == "added" { return out }
+  for bd in d.base.defs {
+    ad := nil
+    for x in d.after.defs { if x.key == bd.key { ad = x } }
+    if ad == nil {
+      if has(d.project.defs, bd.key) { continue }       # 別ファイルへ移動しただけ
+      cs := callers_of(d, bd)
+      if len(cs) > 0 {
+        out <- finding("critical", bd.line, bd.sig + " が削除されたが、まだ呼ばれています → 致命的エラー (Call to undefined function)", join(map(slice(cs, 0, 6), |pc| pc.path + ":" + str(pc.call.line)), ", "))
+      } else {
+        out <- finding("low", bd.line, bd.sig + " が削除されました (呼び出し元は見つかりません)", bd.sig)
+      }
+      continue
+    }
+    if ad.sig == bd.sig and ad.visibility == bd.visibility { continue }
+    cs := callers_of(d, ad)
+    broken := filter(cs, |pc| pc.call.argc < ad.required and not pc.call.named and not contains(pc.call.args, "..."))
+    if len(broken) > 0 {
+      out <- finding("high", ad.line, "必須引数が " + str(bd.required) + " → " + str(ad.required) + " に増え、呼び出し元が引数不足になります (ArgumentCountError)", bd.sig + "  ⇒  " + ad.sig + "  | 呼び出し元: " + join(map(slice(broken, 0, 6), |pc| pc.path + ":" + str(pc.call.line)), ", "))
+    } elif ad.visibility != bd.visibility and bd.visibility == "public" {
+      ext := filter(cs, |pc| pc.path != d.path)
+      sev := "medium"
+      if len(ext) > 0 { sev = "high" }
+      out <- finding(sev, ad.line, "可視性が " + bd.visibility + " → " + ad.visibility + " に狭まりました", bd.sig + " | 外部からの呼び出し: " + str(len(ext)))
+    } else {
+      bn := map(bd.params, |p| p.name)
+      an := map(ad.params, |p| p.name)
+      sev := "low"
+      if bn != an and any(cs, |pc| pc.call.named) { sev = "medium" }
+      out <- finding(sev, ad.line, "署名が変わりました (呼び出し元 " + str(len(cs)) + " 件は引数の数としては互換)", bd.sig + "  ⇒  " + ad.sig)
+    }
+  }
+  return out
+}
+
+invariant "PG12", "大域状態・設定の変更", |d| state_findings(d)
+fn state_findings(d) {
+  out := []
+  for s in added_items(d.base.state, d.after.state, |s| s.key) {
+    sev := "medium"
+    lt := lower(s.text)
+    if s.kind == "global" { sev = "low" }
+    if contains(lt, "display_errors") and (contains(lt, "1") or contains(lt, "on") or contains(lt, "true")) { sev = "high" }
+    if s.kind == "error_reporting" and contains(lt, "0") and not contains(lt, "e_") { sev = "medium" }
+    if s.kind == "superglobal_write" { sev = "medium" }
+    out <- finding(sev, s.line, "大域状態を変える文が加わりました (他のページにも影響します)", s.text)
+  }
+  return out
+}
+
+invariant "PG13", "ヘッダ注入・Cookie 属性", |d| sink_findings(d, ["header", "cookie"])
+
+invariant "PG14", "構文の破損", |d| syntax_findings(d)
+fn syntax_findings(d) {
+  if d.status == "deleted" { return [] }
+  if not d.after.syntax.balanced and d.base.syntax.balanced {
+    return [finding("critical", 0, "書き換え後のファイルが構文として閉じていません → サイト全体が Parse error になります", d.after.syntax.detail)]
+  }
+  return []
+}
+
+invariant "PG15", "弱い暗号・予測可能な乱数", |d| sink_findings(d, ["weak"])
+
+invariant "PG16", "削除したファイルがまだ include されている", |d| deleted_findings(d)
+fn deleted_findings(d) {
+  out := []
+  if d.status != "deleted" { return out }
+  bn := d.path
+  parts := split(d.path, "/")
+  base_name := parts[len(parts) - 1]
+  for pi in d.project.includes {
+    t := pi.inc.target
+    if t != "" and (endswith(t, "/" + base_name) or t == base_name or endswith(t, bn)) {
+      out <- finding("critical", pi.inc.line, "削除したファイルを " + pi.path + " がまだ読み込みます → Fatal error (failed opening required)", pi.inc.kind + " " + pi.inc.expr)
+    }
+  }
+  return out
+}
+
+invariant "PG17", "デバッグ出力・情報開示の残り", |d| sink_findings(d, ["debug"])
+
+# ─── タプル空間 (append-only) ────────────────────────────────────────
+#  out(t) で追記、rd(pattern) で STAR を任意要素とする照会。書き換え・削除は無い。
+TS := ledger("patchguard")
+BLOBS := {}
+ANALYSIS := {}
+RUN := 0
+
+fn out(t) {
+  TS >> t
+  return t
+}
+fn tmatch(p, t) {
+  if len(p) != len(t) { return false }
+  for x, i in p {
+    if not (x == STAR or x == t[i]) { return false }
+  }
+  return true
+}
+fn rd(p) { return filter(TS.items, |t| tmatch(p, t)) }
+
+fn put_blob(text) {
+  h := sha256(text)
+  if not has(BLOBS, h) {
+    BLOBS[h] = text
+    out(["blob", h, len(text)])
+  }
+  return h
+}
+fn blob(h) { return get(BLOBS, h, nil) }
+
+fn analysis_of(h) {
+  if h == nil { return EMPTY }
+  if not has(ANALYSIS, h) { ANALYSIS[h] = php_analyze(BLOBS[h], SANITIZERS) }
+  return ANALYSIS[h]
+}
+
+fn is_php(p) { return endswith(lower(p), ".php") or endswith(lower(p), ".phtml") or endswith(lower(p), ".inc") }
+
+# 書き換え後の木全体の索引 (他ファイルへの副作用を見るため)
+fn project_index(tree) {
+  defs := {}
+  calls := []
+  incs := []
+  for p in keys(tree) {
+    if is_php(p) {
+      a := analysis_of(tree[p])
+      for df in a.defs { defs[df.key] = p }
+      for c in a.calls { calls <- {path: p, call: c} }
+      for i in a.includes { incs <- {path: p, inc: i} }
+    }
+  }
+  return {defs: defs, calls: calls, includes: incs}
+}
+
+fn union_paths(A, B) { return sort(unique(keys(A) + keys(B))) }
+
+fn fkey(f) { return f.id + "|" + f.path + "|" + f.evidence }
+
+# ─── 遷移 A → B の検査 (1 段、または折り畳んだ正味) ─────────────────
+fn check_transition(A, B, k) {
+  proj := project_index(B)
+  files := []
+  allf := []
+  for p in union_paths(A, B) {
+    ha := get(A, p, nil)
+    hb := get(B, p, nil)
+    if ha == hb { continue }
+    status := "modified"
+    if ha == nil { status = "added" }
+    if hb == nil { status = "deleted" }
+    ta := ""
+    tb := ""
+    if ha != nil { ta = blob(ha) }
+    if hb != nil { tb = blob(hb) }
+    df := diff_lines(ta, tb)
+    out(["patch", RUN, k, p, if_nil(ha, "-"), if_nil(hb, "-"), df.adds, df.dels])
+    fs := []
+    if is_php(p) {
+      d := {path: p, status: status, base: analysis_of(ha), after: analysis_of(hb), project: proj}
+      for ck in CHECKS {
+        for f in ck.check(d) {
+          f.id = ck.id
+          f.title = ck.title
+          f.path = p
+          f.step = k
+          fs <- f
+        }
+      }
+    }
+    fs = sortby(fs, |f| -SEV[f.sev] * 100000 + f.line)
+    files <- {path: p, status: status, sha_a: ha, sha_b: hb, adds: df.adds, dels: df.dels, hunks: df.hunks, a_lines: df.a_lines, b_lines: df.b_lines, findings: fs}
+    allf = allf + fs
+  }
+  return {step: k, files: files, findings: allf}
+}
+
+fn if_nil(v, d) {
+  if v == nil { return d }
+  return v
+}
+
+# 折り畳みの検証: 各段のパッチを基へ順に当てると final に一致するか
+fn verify_fold(base, steps, final) {
+  cur := copy(base)
+  problems := []
+  for st in steps {
+    for f in st.files {
+      t := ""
+      if get(cur, f.path, nil) != nil { t = blob(cur[f.path]) }
+      r := patch_apply(t, f.hunks)
+      if not r.ok { problems <- "段 " + str(st.step) + " " + f.path + ": " + r.error }
+      elif f.status == "deleted" { cur[f.path] = nil }
+      else { cur[f.path] = put_blob(r.text) }
+    }
+  }
+  for p in union_paths(cur, final) {
+    if get(cur, p, nil) != get(final, p, nil) { problems <- p + ": 畳み込んだ結果が最終版と一致しません" }
+  }
+  return {ok: len(problems) == 0, problems: problems}
+}
+
+fn waived(f, waivers) {
+  for w in waivers {
+    if w.id == f.id and (w.path == "*" or w.path == f.path or endswith(f.path, w.path)) {
+      if get(w, "match", "") == "" or contains(f.evidence, w.match) { return w }
+    }
+  }
+  return nil
+}
+
+fn decide(fs) {
+  m := sev_max(fs)
+  if SEV[m] >= SEV.high { return "REJECT" }
+  if SEV[m] >= SEV.medium { return "REVIEW" }
+  return "ACCEPT"
+}
+
+# ─── 入口: revise(base, revisions, waivers) ───────────────────────────
+#  base: {path: 内容}, revisions: [{path: 内容}, ...] (書き換えた後を時系列で)
+fn tree_of(files, k) {
+  t := {}
+  for p in keys(files) {
+    h := put_blob(files[p])
+    t[p] = h
+    out(["file", RUN, k, p, h])
+  }
+  return t
+}
+
+fn revise(base_files, revisions, waivers) {
+  RUN = RUN + 1
+  out(["run", RUN, len(revisions), GUARD_VERSION, len(CHECKS)])
+  trees := [tree_of(base_files, 0)]
+  for r, i in revisions { trees <- tree_of(r, i + 1) }
+  base := trees[0]
+  final := trees[len(trees) - 1]
+
+  steps := []
+  if len(trees) > 2 {
+    for k in range(1, len(trees)) { steps <- check_transition(trees[k - 1], trees[k], k) }
+  }
+  net := check_transition(base, final, 0)
+  fold := {ok: true, problems: []}
+  if len(steps) > 0 { fold = verify_fold(base, steps, final) }
+  if not fold.ok { out(["fold_broken", RUN, len(fold.problems)]) }
+
+  # 折り畳みの効果: 途中で現れて消えた指摘 (相殺) と、合成で初めて現れた指摘 (創発)
+  netkeys := map(net.findings, fkey)
+  stepkeys := []
+  for st in steps { stepkeys = stepkeys + map(st.findings, fkey) }
+  cancelled := []
+  seen := {}
+  for st in steps {
+    for f in st.findings {
+      if not contains(netkeys, fkey(f)) and not has(seen, fkey(f)) { seen[fkey(f)] = true; cancelled <- f }
+    }
+  }
+  emergent := []
+  if len(steps) > 0 { emergent = filter(net.findings, |f| not contains(stepkeys, fkey(f))) }
+
+  # 免除 (waiver) は理由ごと台帳に残す
+  active := []
+  for f in net.findings {
+    w := waived(f, waivers)
+    if w != nil {
+      f.waived = w.reason
+      out(["waiver", RUN, f.id, f.path, w.reason])
+    } else { active <- f }
+  }
+  decision := decide(active)
+  if not fold.ok { decision = "REJECT" }
+
+  # 安全な部分パッチ: 指摘が low 以下のファイルだけ。除外したファイルで定義される
+  # 新しい関数を呼ぶファイルも、部分適用で壊れないよう連鎖的に除外する。
+  held := {}
+  for f in sortby(active, |f| -SEV[f.sev]) {
+    if SEV[f.sev] >= SEV.medium and not has(held, f.path) { held[f.path] = "指摘 " + f.id + " (" + f.sev + ")" }
+  }
+  base_defs := project_index(base).defs
+  changed := true
+  while changed {
+    changed = false
+    newdefs := {}
+    for fl in net.files {
+      if has(held, fl.path) and fl.sha_b != nil {
+        for df in analysis_of(fl.sha_b).defs { newdefs[df.key] = fl.path }
+      }
+    }
+    for fl in net.files {
+      if not has(held, fl.path) and fl.sha_b != nil and is_php(fl.path) {
+        for c in analysis_of(fl.sha_b).calls {
+          if has(newdefs, c.lname) and not has(base_defs, c.lname) and not has(held, fl.path) {
+            held[fl.path] = "依存: " + newdefs[c.lname] + " の " + c.name + "() を使う"
+            changed = true
+          }
+        }
+      }
+    }
+  }
+  for fl in net.files {
+    if has(held, fl.path) { out(["held", RUN, fl.path, held[fl.path]]) } else { out(["revised", RUN, fl.path, if_nil(fl.sha_b, "-")]) }
+  }
+  counts := {}
+  for f in active { counts[f.sev] = get(counts, f.sev, 0) + 1 }
+  out(["verdict", RUN, decision, len(active), len(net.findings) - len(active)])
+  return {
+    run: RUN, decision: decision, version: GUARD_VERSION, net: net, steps: steps, fold: fold,
+    cancelled: cancelled, emergent: emergent, active: active, counts: counts, held: held,
+    tuples: len(TS)
+  }
+}
+
+# ─── パッチの文字列化 (git 互換 unified diff + 基/後の SHA-256) ─────────
+fn file_patch(fl) {
+  return unified(fl.path, {hunks: fl.hunks, a_lines: fl.a_lines, b_lines: fl.b_lines}, {a_sha: fl.sha_a, b_sha: fl.sha_b, a_absent: fl.sha_a == nil, b_absent: fl.sha_b == nil})
+}
+fn patch_text(rep, only_safe) {
+  parts := []
+  for fl in rep.net.files {
+    if not only_safe or not has(rep.held, fl.path) { parts <- file_patch(fl) }
+  }
+  return join(parts, "")
+}
+fn rollback_text(rep) {
+  parts := []
+  for fl in rep.net.files {
+    rv := {path: fl.path, hunks: patch_reverse(fl.hunks), a_lines: fl.b_lines, b_lines: fl.a_lines, sha_a: fl.sha_b, sha_b: fl.sha_a}
+    parts <- unified(fl.path, rv, {a_sha: fl.sha_b, b_sha: fl.sha_a, a_absent: fl.sha_b == nil, b_absent: fl.sha_a == nil})
+  }
+  return join(parts, "")
+}
+</script>
+<script>
+/*
+ * engine.js — Bada 言語処理系 (字句解析 → 構文解析 → 木構造インタプリタ)
+ *
+ * BadaClaude の頭脳 (brain.bada) はこの処理系の上で動きます。JavaScript が
+ * 担うのは「言語そのもの」と、I/O・数値核などのネイティブ組込みだけです。
+ * 対話パイプライン (意図推定・検索・計算・生成・台帳記録) はすべて Bada で
+ * 書かれています (src/brain.bada)。
+ *
+ * 文法は bada-source-1.pdf (The Unknown-Prior Engine Language) と
+ * bada-quantum-reviser-paper.pdf (Reviser-Extensible Grammars) に従います:
+ *   :=  束縛        >>  台帳への commit (append-only)   <-  配列への追加
+ *   ::  スコープ    ~   漸進型の整合 (STAR ~ x は常に真)  |x| ラムダ
+ *   @reviser { rule 名(引数) { ... } }  — 文法拡張: 規則を台帳に commit し、
+ *        以降の文は「名 引数, 引数」という新しい文として構文解析される
+ *   qubit q[n] / H / CNOT / Measure — Q# 型量子副言語 (位相核の上に実装)
+ */
+"use strict";
+
+/* ───────────────────────── 値 ───────────────────────── */
+class Complex {
+  constructor(re, im) { this.re = re; this.im = im; }
+}
+const C = (re, im) => new Complex(re, im || 0);
+const isC = v => v instanceof Complex;
+const toC = v => isC(v) ? v : C(+v, 0);
+
+class Ledger {
+  constructor(name) { this.name = name; this.items = []; }
+  commit(v) { this.items.push(Object.freeze(v)); return v; }
+}
+
+class QReg {
+  constructor(n) {
+    if (n < 1 || n > 12) throw new BadaError("qubit 数は 1〜12 です");
+    this.n = n; this.N = 1 << n;
+    this.re = new Float64Array(this.N); this.im = new Float64Array(this.N);
+    this.re[0] = 1;
+  }
+}
+
+class Closure {
+  constructor(name, params, body, env, isExpr) {
+    this.name = name; this.params = params; this.body = body; this.env = env; this.isExpr = isExpr;
+  }
+}
+
+class BadaError extends Error {}
+class BreakSig {}
+class ContinueSig {}
+class ReturnSig { constructor(v) { this.v = v; } }
+
+/* ───────────────────────── 字句解析 ───────────────────────── */
+const OPS = [":=>", "**", ":=", "::", ">>", "<-", "->", "=>", "==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=",
+  "+", "-", "*", "/", "%", "^", "<", ">", "=", "(", ")", "[", "]", "{", "}", ",", ".", ":", ";", "|", "~", "@", "!"];
+const KEYWORDS = new Set(["fn", "def", "if", "elif", "else", "while", "for", "in", "return", "break", "continue",
+  "true", "false", "nil", "and", "or", "not", "struct", "rule", "qubit"]);
+const BINOP_END = new Set(["+", "-", "*", "/", "%", "^", "**", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "and", "or",
+  ":=", "=", ">>", "<-", ",", "(", "[", "{", "=>", "->", "::", ".", "~", "+=", "-=", "*=", "/=", "not", "in"]);
+
+function lex(src) {
+  const toks = []; let i = 0, line = 1, depth = 0;
+  const push = (t, v) => toks.push({ t, v, line });
+  const idStart = /[\p{L}_$]/u, idPart = /[\p{L}\p{N}_$']/u;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === "\n") {
+      line++; i++;
+      if (depth === 0 && toks.length && toks[toks.length - 1].t !== "NL") {
+        const last = toks[toks.length - 1];
+        if (!(last.t === "op" && BINOP_END.has(last.v) && last.v !== ")" && last.v !== "]" && last.v !== "}")) push("NL", "\n");
+      }
+      continue;
+    }
+    if (c === " " || c === "\t" || c === "\r") { i++; continue; }
+    if (c === "#" || (c === "/" && src[i + 1] === "/")) { while (i < src.length && src[i] !== "\n") i++; continue; }
+    if (/[0-9]/.test(c) || (c === "." && /[0-9]/.test(src[i + 1] || ""))) {
+      const m = /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/.exec(src.slice(i));
+      push("num", parseFloat(m[0])); i += m[0].length; continue;
+    }
+    if (c === '"' || c === "'" || c === "「") {
+      const close = c === "「" ? "」" : c; let s = ""; i++;
+      while (i < src.length && src[i] !== close) {
+        if (src[i] === "\\" && close !== "」") {
+          const n = src[i + 1]; i += 2;
+          s += n === "n" ? "\n" : n === "t" ? "\t" : n === "u" ? (() => { const h = src.substr(i, 4); i += 4; return String.fromCharCode(parseInt(h, 16)); })() : n;
+          continue;
+        }
+        if (src[i] === "\n") line++;
+        s += src[i++];
+      }
+      if (src[i] !== close) throw new BadaError(`line ${line}: 文字列が閉じていません`);
+      i++; push("str", s); continue;
+    }
+    if (idStart.test(c)) {
+      let j = i + 1; while (j < src.length && idPart.test(src[j])) j++;
+      const w = src.slice(i, j); i = j;
+      push(KEYWORDS.has(w) ? "kw" : "id", w); continue;
+    }
+    const op = OPS.find(o => src.startsWith(o, i));
+    if (!op) throw new BadaError(`line ${line}: 不明な文字 '${c}'`);
+    if (op === "(" || op === "[") depth++;
+    if ((op === ")" || op === "]") && depth > 0) depth--;
+    push("op", op); i += op.length;
+  }
+  push("NL", "\n"); push("EOF", null);
+  return toks;
+}
+
+/* ───────────────────────── 構文解析 ─────────────────────────
+ * 文を 1 つずつ解析・実行できるよう、Parser は rules (文法台帳) を参照する。 */
+class Parser {
+  constructor(toks, rules) { this.toks = toks; this.p = 0; this.rules = rules || new Map(); }
+  peek(o) { return this.toks[this.p + (o || 0)]; }
+  next() { return this.toks[this.p++]; }
+  is(t, v) { const k = this.peek(); return k.t === t && (v === undefined || k.v === v); }
+  isOp(v) { return this.is("op", v); }
+  isKw(v) { return this.is("kw", v); }
+  eat(t, v) {
+    const k = this.next();
+    if (k.t !== t || (v !== undefined && k.v !== v))
+      throw new BadaError(`line ${k.line}: '${v || t}' が必要ですが '${k.v === null ? "EOF" : k.v}' がありました`);
+    return k;
+  }
+  skipNL() { while (this.is("NL") || this.isOp(";")) this.p++; }
+  atEnd() { this.skipNL(); return this.is("EOF"); }
+
+  block() {
+    this.skipNL(); this.eat("op", "{"); const body = [];
+    for (;;) { this.skipNL(); if (this.isOp("}")) break; if (this.is("EOF")) throw new BadaError("'}' がありません"); body.push(this.statement()); }
+    this.eat("op", "}"); return { k: "block", body };
+  }
+  params() {
+    this.eat("op", "("); const ps = [];
+    while (!this.isOp(")")) { ps.push(this.eat("id").v); if (this.isOp(",")) this.next(); }
+    this.eat("op", ")"); return ps;
+  }
+  statement() {
+    this.skipNL(); const t = this.peek(); const line = t.line;
+    const st = this.statementInner(); st.line = st.line || line;
+    const prev = this.toks[this.p - 1];
+    if (!(this.is("NL") || this.isOp(";") || this.isOp("}") || this.is("EOF") || (prev.t === "op" && prev.v === "}" && (st.k === "if" || st.k === "while" || st.k === "for" || st.k === "fndef" || st.k === "annot" || st.k === "rule"))))
+      throw new BadaError(`line ${this.peek().line}: 文の終わりに余分な '${this.peek().v}'`);
+    return st;
+  }
+  statementInner() {
+    const t = this.peek();
+    if (t.t === "kw") {
+      switch (t.v) {
+        case "fn": case "def":
+          if (this.peek(1).t === "id") {
+            this.next(); let name = this.eat("id").v;
+            if (this.isOp(".")) { this.next(); name += "." + this.eat("id").v; }
+            const ps = this.params(); const body = this.block();
+            return { k: "fndef", name, params: ps, body };
+          }
+          break;
+        case "if": {
+          this.next(); const branches = [[this.expr(), this.block()]]; let els = null;
+          for (;;) {
+            const save = this.p; this.skipNL();
+            if (this.isKw("elif")) { this.next(); branches.push([this.expr(), this.block()]); continue; }
+            if (this.isKw("else")) {
+              this.next();
+              if (this.isKw("if")) { els = { k: "block", body: [this.statementInner()] }; }
+              else els = this.block();
+            } else this.p = save;
+            break;
+          }
+          return { k: "if", branches, els };
+        }
+        case "while": { this.next(); const c = this.expr(); return { k: "while", cond: c, body: this.block() }; }
+        case "for": {
+          this.next(); const a = this.eat("id").v; let b = null;
+          if (this.isOp(",")) { this.next(); b = this.eat("id").v; }
+          this.eat("kw", "in"); const it = this.expr();
+          return { k: "for", a, b, it, body: this.block() };
+        }
+        case "return": {
+          this.next();
+          if (this.is("NL") || this.isOp(";") || this.isOp("}") || this.is("EOF")) return { k: "return", e: null };
+          return { k: "return", e: this.expr() };
+        }
+        case "break": this.next(); return { k: "break" };
+        case "continue": this.next(); return { k: "continue" };
+        case "struct": {
+          this.next(); const name = this.eat("id").v; this.eat("op", "{"); const fields = [];
+          for (;;) { this.skipNL(); if (this.isOp("}")) break; fields.push(this.eat("id").v); if (this.isOp(",")) this.next(); }
+          this.eat("op", "}"); return { k: "struct", name, fields };
+        }
+        case "rule": {
+          this.next(); const name = this.eat("id").v; const ps = this.params(); const body = this.block();
+          this.rules.set(name, ps.length);      // 解析時にも文法台帳へ (同じ入力内の後続文から有効)
+          return { k: "rule", name, params: ps, body };
+        }
+        case "qubit": {
+          this.next(); const name = this.eat("id").v; this.eat("op", "["); const n = this.expr(); this.eat("op", "]");
+          return { k: "qubit", name, n };
+        }
+      }
+    }
+    if (t.t === "op" && t.v === "@") {
+      this.next(); const kind = this.eat("id").v; let name = null;
+      if (this.is("id") || this.is("str")) name = this.next().v;
+      // 原稿の見出し (例: @reviser GRAMMAR :=> ) は '{' まで読み飛ばす
+      while (!this.isOp("{") && !this.is("EOF")) this.next();
+      return { k: "annot", kind, name, body: this.block() };
+    }
+    // 文法台帳の規則による文:  bell q  /  prepare q, 3
+    if (t.t === "id" && this.rules.has(t.v)) {
+      const n1 = this.peek(1);
+      const callLike = n1.t === "op" && ["(", "=", ":=", ".", "[", "::", "+=", "-=", "*=", "/=", ">>", "<-"].includes(n1.v);
+      if (!callLike) {
+        this.next(); const args = [];
+        if (!(this.is("NL") || this.isOp(";") || this.isOp("}") || this.is("EOF"))) {
+          args.push(this.expr()); while (this.isOp(",")) { this.next(); args.push(this.expr()); }
+        }
+        return { k: "expr", e: { k: "call", f: { k: "name", name: t.v }, args } };
+      }
+    }
+    const e = this.expr();
+    if (this.isOp(":=")) {
+      if (e.k !== "name") throw new BadaError(`line ${t.line}: ':=' の左辺は名前です`);
+      this.next(); return { k: "bind", name: e.name, e: this.expr() };
+    }
+    if (this.isOp("=") || this.isOp("+=") || this.isOp("-=") || this.isOp("*=") || this.isOp("/=")) {
+      const op = this.next().v;
+      if (!["name", "index", "member"].includes(e.k)) throw new BadaError(`line ${t.line}: 代入できない左辺です`);
+      let rhs = this.expr();
+      if (op !== "=") rhs = { k: "bin", op: op[0], l: e, r: rhs };
+      return { k: "assign", target: e, e: rhs };
+    }
+    return { k: "expr", e };
+  }
+
+  expr() { return this.commit(); }
+  commit() {
+    let l = this.or();
+    while (this.isOp(">>") || this.isOp("<-") || this.isOp("=>") || this.isOp("->")) {
+      const op = this.next().v; const r = this.or();
+      l = { k: op === ">>" ? "commit" : op === "<-" ? "append" : "query", l, r };
+    }
+    return l;
+  }
+  or() { let l = this.and(); while (this.isOp("||") || this.isKw("or")) { this.next(); l = { k: "or", l, r: this.and() }; } return l; }
+  and() { let l = this.not(); while (this.isOp("&&") || this.isKw("and")) { this.next(); l = { k: "and", l, r: this.not() }; } return l; }
+  not() { if (this.isKw("not") || this.isOp("!")) { this.next(); return { k: "not", e: this.not() }; } return this.cmp(); }
+  cmp() {
+    let l = this.add();
+    for (;;) {
+      const k = this.peek();
+      if (k.t === "op" && ["==", "!=", "<", ">", "<=", ">=", "~"].includes(k.v)) { this.next(); l = { k: "bin", op: k.v, l, r: this.add() }; }
+      else if (k.t === "kw" && k.v === "in") { this.next(); l = { k: "bin", op: "in", l, r: this.add() }; }
+      else return l;
+    }
+  }
+  add() { let l = this.mul(); while (this.isOp("+") || this.isOp("-")) { const op = this.next().v; l = { k: "bin", op, l, r: this.mul() }; } return l; }
+  mul() { let l = this.unary(); while (this.isOp("*") || this.isOp("/") || this.isOp("%")) { const op = this.next().v; l = { k: "bin", op, l, r: this.unary() }; } return l; }
+  unary() {
+    if (this.isOp("-")) { this.next(); return { k: "neg", e: this.unary() }; }
+    if (this.isOp("+")) { this.next(); return this.unary(); }
+    return this.pow();
+  }
+  pow() {
+    const b = this.postfix();
+    if (this.isOp("^") || this.isOp("**")) { this.next(); return { k: "bin", op: "^", l: b, r: this.unary() }; }
+    return b;
+  }
+  postfix() {
+    let e = this.primary();
+    for (;;) {
+      if (this.isOp("(")) {
+        this.next(); const args = [];
+        while (!this.isOp(")")) { args.push(this.expr()); if (this.isOp(",")) this.next(); else break; }
+        this.eat("op", ")"); e = { k: "call", f: e, args };
+      } else if (this.isOp("[")) {
+        this.next(); const i = this.expr(); this.eat("op", "]"); e = { k: "index", o: e, i };
+      } else if (this.isOp(".") || this.isOp("::")) {
+        const op = this.next().v; const k = this.next();
+        if (k.t !== "id" && k.t !== "kw") throw new BadaError(`line ${k.line}: '${op}' の後に名前が必要です`);
+        e = { k: "member", o: e, name: k.v, scope: op === "::" };
+      } else return e;
+    }
+  }
+  lambda(params) {
+    if (this.isOp("{")) return { k: "lambda", params, body: this.block() };
+    return { k: "lambda", params, body: this.expr(), isExpr: true };
+  }
+  primary() {
+    const t = this.next();
+    switch (t.t) {
+      case "num": return { k: "lit", v: t.v };
+      case "str": return { k: "lit", v: t.v };
+      case "id": return { k: "name", name: t.v };
+      case "kw":
+        if (t.v === "true") return { k: "lit", v: true };
+        if (t.v === "false") return { k: "lit", v: false };
+        if (t.v === "nil") return { k: "lit", v: null };
+        if (t.v === "fn" || t.v === "def") { const ps = this.params(); return { k: "lambda", params: ps, body: this.block() }; }
+        break;
+      case "op":
+        if (t.v === "(") { const e = this.expr(); this.eat("op", ")"); return e; }
+        if (t.v === "[") {
+          const items = []; this.skipNL();
+          while (!this.isOp("]")) { items.push(this.expr()); this.skipNL(); if (this.isOp(",")) { this.next(); this.skipNL(); } else break; }
+          this.skipNL(); this.eat("op", "]"); return { k: "list", items };
+        }
+        if (t.v === "{") {
+          const pairs = []; this.skipNL();
+          while (!this.isOp("}")) {
+            const kt = this.next(); let key;
+            if (kt.t === "id" || kt.t === "str" || kt.t === "kw") key = { k: "lit", v: String(kt.v) };
+            else if (kt.t === "num") key = { k: "lit", v: String(kt.v) };
+            else if (kt.t === "op" && kt.v === "[") { key = this.expr(); this.eat("op", "]"); }
+            else throw new BadaError(`line ${kt.line}: マップのキーが不正です`);
+            this.eat("op", ":"); this.skipNL(); pairs.push([key, this.expr()]); this.skipNL();
+            if (this.isOp(",")) { this.next(); this.skipNL(); } else break;
+          }
+          this.skipNL(); this.eat("op", "}"); return { k: "map", pairs };
+        }
+        if (t.v === "|") {
+          const ps = [];
+          while (!this.isOp("|")) { ps.push(this.eat("id").v); if (this.isOp(",")) this.next(); }
+          this.eat("op", "|"); return this.lambda(ps);
+        }
+        if (t.v === "||") return this.lambda([]);
+        break;
+    }
+    throw new BadaError(`line ${t.line}: 予期しない '${t.v === null ? "EOF" : t.v}'`);
+  }
+}
+
+/* ───────────────────────── 環境 ───────────────────────── */
+class Env {
+  constructor(parent) { this.vars = new Map(); this.parent = parent || null; }
+  lookup(n) { for (let e = this; e; e = e.parent) if (e.vars.has(n)) return e; return null; }
+  get(n) { const e = this.lookup(n); if (!e) throw new BadaError(`未定義の名前 '${n}'`); return e.vars.get(n); }
+  def(n, v) { this.vars.set(n, v); return v; }
+  set(n, v) { const e = this.lookup(n); (e || this).vars.set(n, v); return v; }
+}
+
+/* ───────────────────────── 表示 ───────────────────────── */
+function fnum(x) {
+  if (!isFinite(x)) return isNaN(x) ? "NaN" : (x > 0 ? "∞" : "-∞");
+  if (Number.isInteger(x) && Math.abs(x) < 1e15) return String(x);
+  const a = Math.abs(x);
+  if (a !== 0 && (a < 1e-4 || a >= 1e10)) return x.toExponential(6).replace(/\.?0+e/, "e");
+  return String(+x.toPrecision(10));
+}
+function show(v, depth) {
+  depth = depth || 0;
+  if (v === null || v === undefined) return "nil";
+  if (typeof v === "number") return fnum(v);
+  if (typeof v === "string") return depth ? JSON.stringify(v) : v;
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (isC(v)) {
+    if (Math.abs(v.im) < 1e-15) return fnum(v.re);
+    return `${fnum(v.re)} ${v.im < 0 ? "-" : "+"} ${fnum(Math.abs(v.im))}i`;
+  }
+  if (Array.isArray(v)) {
+    if (depth > 3) return "[…]";
+    const items = v.slice(0, 40).map(x => show(x, depth + 1));
+    return "[" + items.join(", ") + (v.length > 40 ? `, … (${v.length})` : "") + "]";
+  }
+  if (v instanceof Closure) return `<fn ${v.name || "λ"}(${v.params.join(", ")})>`;
+  if (typeof v === "function") return `<native ${v.bname || "fn"}>`;
+  if (v instanceof Ledger) return `<Ω ${v.name}: ${v.items.length} facts>`;
+  if (v instanceof QReg) return `<qubit[${v.n}] ${qstateString(v)}>`;
+  if (typeof v === "object") {
+    if (depth > 3) return "{…}";
+    const ks = Object.keys(v).filter(k => k !== "__type");
+    const body = ks.slice(0, 30).map(k => `${k}: ${show(v[k], depth + 1)}`).join(", ");
+    return (v.__type ? v.__type + " " : "") + "{" + body + (ks.length > 30 ? ", …" : "") + "}";
+  }
+  return String(v);
+}
+const truthy = v => !(v === null || v === undefined || v === false || v === 0 || v === "");
+
+/* ───────────────────────── 数値核 ───────────────────────── */
+const LG = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+  -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+function gamma(x) {
+  if (x < 0.5) return Math.PI / (Math.sin(Math.PI * x) * gamma(1 - x));
+  x -= 1; let a = LG[0]; const t = x + 7.5;
+  for (let i = 1; i < 9; i++) a += LG[i] / (x + i);
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
+}
+function lgamma(x) {
+  if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - lgamma(1 - x);
+  x -= 1; let a = LG[0]; const t = x + 7.5;
+  for (let i = 1; i < 9; i++) a += LG[i] / (x + i);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+function beta(p, q) {
+  if (p > 0 && q > 0) return Math.exp(lgamma(p) + lgamma(q) - lgamma(p + q));
+  return gamma(p) * gamma(q) / gamma(p + q);
+}
+function digamma(x) {
+  let r = 0; while (x < 6) { r -= 1 / x; x += 1; }
+  const f = 1 / (x * x);
+  return r + Math.log(x) - 0.5 / x - f * (1 / 12 - f * (1 / 120 - f * (1 / 252 - f * (1 / 240 - f / 132))));
+}
+/* 複素演算 */
+const cadd = (a, b) => C(a.re + b.re, a.im + b.im);
+const csub = (a, b) => C(a.re - b.re, a.im - b.im);
+const cmul = (a, b) => C(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re);
+const cdiv = (a, b) => { const d = b.re * b.re + b.im * b.im; return C((a.re * b.re + a.im * b.im) / d, (a.im * b.re - a.re * b.im) / d); };
+const cexp = a => { const m = Math.exp(a.re); return C(m * Math.cos(a.im), m * Math.sin(a.im)); };
+const clog = a => C(Math.log(Math.hypot(a.re, a.im)), Math.atan2(a.im, a.re));
+const cabs = a => Math.hypot(a.re, a.im);
+const cpow = (a, b) => (a.re === 0 && a.im === 0) ? C(0, 0) : cexp(cmul(b, clog(a)));
+const csin = a => C(Math.sin(a.re) * Math.cosh(a.im), Math.cos(a.re) * Math.sinh(a.im));
+const ccos = a => C(Math.cos(a.re) * Math.cosh(a.im), -Math.sin(a.re) * Math.sinh(a.im));
+const csqrt = a => { const r = cabs(a), t = Math.atan2(a.im, a.re) / 2, s = Math.sqrt(r); return C(s * Math.cos(t), s * Math.sin(t)); };
+/* 複素 log Γ: 平行移動 + Stirling 級数 (Re z > 0 で連続な分枝) */
+function clgamma(z) {
+  let shift = C(0, 0);
+  while (z.re < 10) { shift = cadd(shift, clog(z)); z = cadd(z, C(1, 0)); }
+  const zi = cdiv(C(1, 0), z), zi2 = cmul(zi, zi);
+  let s = cadd(csub(cmul(csub(z, C(0.5, 0)), clog(z)), z), C(0.5 * Math.log(2 * Math.PI), 0));
+  const co = [1 / 12, -1 / 360, 1 / 1260, -1 / 1680];
+  let term = zi;
+  for (const c of co) { s = cadd(s, C(term.re * c, term.im * c)); term = cmul(term, zi2); }
+  return csub(s, shift);
+}
+/* ζ(s): Borwein のイータ加速 (Re s > 0) + 関数等式 (Re s ≤ 0) */
+function czeta(s) {
+  s = toC(s);
+  if (Math.abs(s.re - 1) < 1e-12 && Math.abs(s.im) < 1e-12) return C(Infinity, 0);
+  if (s.re < 0.5) {
+    // ζ(s) = 2^s π^(s−1) sin(πs/2) Γ(1−s) ζ(1−s)
+    const one = C(1, 0), oms = csub(one, s);
+    const g = cexp(clgamma(oms));
+    const f = cmul(cmul(cpow(C(2, 0), s), cpow(C(Math.PI, 0), csub(s, one))), csin(C(Math.PI * s.re / 2, Math.PI * s.im / 2)));
+    return cmul(cmul(f, g), czeta(oms));
+  }
+  const n = Math.min(400, 40 + Math.ceil(Math.abs(s.im) * 1.3));
+  const d = new Array(n + 1); let sum = 0;
+  for (let i = 0; i <= n; i++) {
+    // d_i = n Σ_{j=0}^{i} (n+j−1)! 4^j / ((n−j)! (2j)!)  を対数で安定に
+    const lt = Math.log(n) + lgamma(n + i) + i * Math.log(4) - lgamma(n - i + 1) - lgamma(2 * i + 1);
+    sum += Math.exp(lt - (n * Math.log(5.8284271247461903)));
+    d[i] = sum;
+  }
+  let acc = C(0, 0);
+  for (let k = 0; k < n; k++) {
+    const w = (k % 2 ? -1 : 1) * (d[k] - d[n]);
+    const term = cexp(cmul(C(-Math.log(k + 1), 0), s));
+    acc = cadd(acc, C(w * term.re, w * term.im));
+  }
+  const eta = C(-acc.re / d[n], -acc.im / d[n]);
+  const denom = csub(C(1, 0), cpow(C(2, 0), csub(C(1, 0), s)));
+  return cdiv(eta, denom);
+}
+function zeta(s) {
+  if (isC(s)) return czeta(s);
+  if (s === 1) return Infinity;
+  if (s < 0 && Number.isInteger(s) && s % 2 === 0) return 0;
+  return czeta(C(s, 0)).re;
+}
+function rsTheta(t) { return clgamma(C(0.25, t / 2)).im - (t / 2) * Math.log(Math.PI); }
+function rsZ(t) { const th = rsTheta(t); return cmul(C(Math.cos(th), Math.sin(th)), czeta(C(0.5, t))).re; }
+function lambertw(x) {
+  if (x < -1 / Math.E) return NaN;
+  let w;
+  if (x < -0.32) w = -1 + Math.sqrt(2 * (1 + Math.E * x));
+  else if (x < 3) w = Math.log1p(x);
+  else w = Math.log(x) - Math.log(Math.log(x));
+  for (let i = 0; i < 60; i++) {
+    const ew = Math.exp(w), f = w * ew - x, wp1 = w + 1;
+    const dw = f / (ew * wp1 - (w + 2) * f / (2 * wp1));
+    w -= dw; if (Math.abs(dw) < 1e-15 * (1 + Math.abs(w))) break;
+  }
+  return w;
+}
+/* Jones 多項式 (blueprint の表記と同じ向き) */
+const JONES = {
+  "3_1": [[-4, -1], [-3, 1], [-1, 1]],
+  "4_1": [[-2, 1], [-1, -1], [0, 1], [1, -1], [2, 1]],
+  "5_1": [[2, 1], [4, 1], [5, -1], [6, 1], [7, -1]],
+  "unknot": [[0, 1]],
+};
+function jones(knot, t) {
+  const poly = JONES[knot]; if (!poly) throw new BadaError(`未知の結び目 '${knot}' (3_1, 4_1, 5_1, unknot)`);
+  let acc = C(0, 0); const tc = toC(t);
+  for (const [e, c] of poly) { const p = cpow(tc, C(e, 0)); acc = cadd(acc, C(c * p.re, c * p.im)); }
+  return Math.abs(acc.im) < 1e-14 ? acc.re : acc;
+}
+function jonesString(knot) {
+  const poly = JONES[knot]; if (!poly) return "?";
+  return poly.map(([e, c], i) => {
+    const sg = c < 0 ? "-" : (i ? "+" : ""); const mono = e === 0 ? "1" : (e === 1 ? "t" : `t^${e}`);
+    return (i ? " " : "") + sg + (i && sg ? " " : "") + mono;
+  }).join("");
+}
+
+/* ─────────── Unknown-Prior Engine (原稿 S.12〜S.26 / Q.1〜Q.21) ─────────── */
+function softmax(z) {
+  const m = Math.max(...z); const p = z.map(v => (v - m < -30 ? 0 : Math.exp(v - m)));
+  const s = p.reduce((a, b) => a + b, 0); return p.map(v => v / s);
+}
+function entropy(p) { let h = 0; for (const x of p) { const q = Math.max(x, 1e-12); h -= q * Math.log(q); } return h; }
+function normalize(p) { const s = p.reduce((a, b) => a + b, 0); return s > 0 ? p.map(v => v / s) : p.slice(); }
+function update(p, e, lr) {
+  lr = lr === undefined ? 0.5 : lr;
+  return normalize(p.map((v, i) => (1 - lr) * v + lr * (e[i] || 0)));
+}
+function cognitiveSystem(a, modules, betas) {
+  const V = a.length; const theta = new Array(V).fill(0);
+  modules.forEach((m, k) => {
+    const q = m[0], phi = m[1] || []; const b = betas && betas[k] !== undefined ? betas[k] : 1;
+    const H = entropy(q);
+    for (let i = 0; i < V; i++) theta[i] += b * H * (Array.isArray(phi) ? (phi[i] || 0) : phi);
+  });
+  const psi = a.map((ai, i) => C(Math.sqrt(ai) * Math.cos(theta[i]), Math.sqrt(ai) * Math.sin(theta[i])));
+  const mod = psi.map(z => z.re * z.re + z.im * z.im);
+  const q = normalize(mod);
+  let md = 0; for (let i = 0; i < V; i++) md = Math.max(md, Math.abs(q[i] - a[i]));
+  const zeros = []; q.forEach((v, i) => { if (v === 0) zeros.push(i); });
+  return { a, theta, psi, q, maxdiff: md, zeros, entropy: entropy(q) };
+}
+
+/* ─────────── 量子レジスタ (Q# 型副言語の数値核) ─────────── */
+function q1(reg, i, m) {   // m = [[a,b],[c,d]] 複素 2x2
+  const bit = 1 << i;
+  for (let s = 0; s < reg.N; s++) {
+    if (s & bit) continue;
+    const t = s | bit;
+    const ar = reg.re[s], ai = reg.im[s], br = reg.re[t], bi = reg.im[t];
+    const [[a, b], [c, d]] = m;
+    reg.re[s] = a.re * ar - a.im * ai + b.re * br - b.im * bi;
+    reg.im[s] = a.re * ai + a.im * ar + b.re * bi + b.im * br;
+    reg.re[t] = c.re * ar - c.im * ai + d.re * br - d.im * bi;
+    reg.im[t] = c.re * ai + c.im * ar + d.re * bi + d.im * br;
+  }
+  return reg;
+}
+const R2 = Math.SQRT1_2;
+const GATES = {
+  H: [[C(R2), C(R2)], [C(R2), C(-R2)]],
+  X: [[C(0), C(1)], [C(1), C(0)]],
+  Y: [[C(0), C(0, -1)], [C(0, 1), C(0)]],
+  Z: [[C(1), C(0)], [C(0), C(-1)]],
+  S: [[C(1), C(0)], [C(0), C(0, 1)]],
+  T: [[C(1), C(0)], [C(0), C(R2, R2)]],
+};
+function rot(axis, th) {
+  const c = Math.cos(th / 2), s = Math.sin(th / 2);
+  if (axis === "X") return [[C(c), C(0, -s)], [C(0, -s), C(c)]];
+  if (axis === "Y") return [[C(c), C(-s)], [C(s), C(c)]];
+  return [[C(Math.cos(-th / 2), Math.sin(-th / 2)), C(0)], [C(0), C(Math.cos(th / 2), Math.sin(th / 2))]];
+}
+function qcheck(reg, ...idx) {
+  if (!(reg instanceof QReg)) throw new BadaError("量子レジスタが必要です (qubit q[n])");
+  for (const i of idx) if (!(Number.isInteger(i) && i >= 0 && i < reg.n)) throw new BadaError(`qubit 番号 ${i} は範囲外です`);
+}
+function cnot(reg, c, t) {
+  const cb = 1 << c, tb = 1 << t;
+  for (let s = 0; s < reg.N; s++) if ((s & cb) && !(s & tb)) {
+    const u = s | tb; let x = reg.re[s]; reg.re[s] = reg.re[u]; reg.re[u] = x; x = reg.im[s]; reg.im[s] = reg.im[u]; reg.im[u] = x;
+  }
+  return reg;
+}
+function qprobs(reg) { const p = []; for (let s = 0; s < reg.N; s++) p.push(reg.re[s] ** 2 + reg.im[s] ** 2); return p; }
+function bits(s, n) { let b = ""; for (let i = n - 1; i >= 0; i--) b += (s >> i) & 1; return b; }
+function qstateString(reg) {
+  const parts = [];
+  for (let s = 0; s < reg.N; s++) {
+    const re = reg.re[s], im = reg.im[s]; if (re * re + im * im < 1e-12) continue;
+    const amp = Math.abs(im) < 1e-12 ? fnum(+re.toFixed(4)) : `(${fnum(+re.toFixed(4))}${im < 0 ? "-" : "+"}${fnum(+Math.abs(im).toFixed(4))}i)`;
+    parts.push(`${amp}|${bits(s, reg.n)}⟩`);
+  }
+  return parts.join(" + ").replace(/\+ -/g, "- ") || "0";
+}
+
+/* ─────────── 決定論的乱数 (mulberry32) ─────────── */
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+/* ─────────── 日本語混じりテキストの分かち書き (文字種の連なり) ─────────── */
+function tokens(s) {
+  const out = [];
+  const re = /[\p{Script=Han}々〆]+|[\p{Script=Katakana}ー]+|[\p{Script=Hiragana}]+|[A-Za-z][A-Za-z0-9_'.]*[A-Za-z0-9]|[A-Za-z]|\d+(?:\.\d+)?|[α-ωΑ-Ωβζγπψφθλ∫∮∇□⊕⊗ℏ]/gu;
+  let m; const low = String(s).toLowerCase();
+  while ((m = re.exec(low))) {
+    const w = m[0];
+    if (/^[\p{Script=Han}]+$/u.test(w) && w.length > 2) {   // 長い漢字列は 2-gram も索引へ
+      out.push(w); for (let i = 0; i + 2 <= w.length; i++) out.push(w.slice(i, i + 2));
+    } else out.push(w);
+  }
+  return out;
+}
+
+/* ───────────────────────── インタプリタ ───────────────────────── */
+class Interp {
+  constructor(opts) {
+    opts = opts || {};
+    this.out = []; this.steps = 0; this.maxSteps = opts.maxSteps || 2e7;
+    this.rules = new Map();                       // 文法台帳 (解析器が読む)
+    this.Omega = new Ledger("Omega");
+    this.global = new Env(null);
+    this.rng = makeRng(opts.seed || 20260918);
+    this.host = opts.host || {};
+    installNatives(this);
+  }
+  print(s) { this.out.push(s); if (this.host.onPrint) this.host.onPrint(s); }
+  /* 文を 1 つずつ解析・実行する: 前の文で commit された rule が次の文の構文になる */
+  run(src, env) {
+    env = env || this.global;
+    const toks = lex(src); const P = new Parser(toks, this.rules);
+    let last = null;
+    while (!P.atEnd()) { const st = P.statement(); last = this.exec(st, env); }
+    return last;
+  }
+  evalExpr(src, env) {
+    const P = new Parser(lex(src), this.rules); const e = P.expr(); P.skipNL();
+    if (!P.is("EOF")) throw new BadaError(`式の後に余分な '${P.peek().v}'`);
+    return this.eval(e, env || this.global);
+  }
+  tick() { if (++this.steps > this.maxSteps) throw new BadaError("実行ステップ上限に達しました (無限ループ?)"); }
+  execBlock(b, env) { let last = null; for (const s of b.body) last = this.exec(s, env); return last; }
+  exec(s, env) {
+    this.tick();
+    try {
+      return this.execInner(s, env);
+    } catch (e) {
+      if (e instanceof BadaError && !/^line \d+/.test(e.message) && s.line) e.message = `line ${s.line}: ${e.message}`;
+      throw e;
+    }
+  }
+  execInner(s, env) {
+    switch (s.k) {
+      case "expr": return this.eval(s.e, env);
+      case "bind": return env.def(s.name, this.eval(s.e, env));
+      case "assign": return this.assign(s.target, this.eval(s.e, env), env);
+      case "fndef": {
+        if (s.name.includes(".")) {
+          const [tn, mn] = s.name.split("."); const T = env.get(tn);
+          if (!T || !T.__methods) throw new BadaError(`'${tn}' は struct ではありません`);
+          T.__methods[mn] = new Closure(s.name, s.params, s.body, env); return null;
+        }
+        return env.def(s.name, new Closure(s.name, s.params, s.body, env));
+      }
+      case "if": {
+        for (const [c, b] of s.branches) if (truthy(this.eval(c, env))) return this.execBlock(b, new Env(env));
+        return s.els ? this.execBlock(s.els, new Env(env)) : null;
+      }
+      case "while": {
+        while (truthy(this.eval(s.cond, env))) {
+          this.tick();
+          try { this.execBlock(s.body, new Env(env)); }
+          catch (e) { if (e instanceof BreakSig) break; if (e instanceof ContinueSig) continue; throw e; }
+        }
+        return null;
+      }
+      case "for": {
+        const it = this.eval(s.it, env);
+        let seq;
+        if (Array.isArray(it)) seq = it.map((v, i) => [v, i]);
+        else if (typeof it === "string") seq = Array.from(it).map((v, i) => [v, i]);
+        else if (it instanceof Ledger) seq = it.items.map((v, i) => [v, i]);
+        else if (it && typeof it === "object") seq = Object.keys(it).filter(k => k !== "__type").map(k => [k, it[k]]);
+        else throw new BadaError("for の対象は配列・文字列・マップ・台帳です");
+        for (const [v, i] of seq) {
+          this.tick(); const e2 = new Env(env);
+          if (s.b) { e2.def(s.a, v); e2.def(s.b, i); } else e2.def(s.a, v);
+          try { this.execBlock(s.body, e2); }
+          catch (e) { if (e instanceof BreakSig) break; if (e instanceof ContinueSig) continue; throw e; }
+        }
+        return null;
+      }
+      case "return": throw new ReturnSig(s.e ? this.eval(s.e, env) : null);
+      case "break": throw new BreakSig();
+      case "continue": throw new ContinueSig();
+      case "struct": {
+        const fields = s.fields; const methods = {};
+        const ctor = (args) => {
+          const o = { __type: s.name }; fields.forEach((f, i) => { o[f] = args[i] === undefined ? null : args[i]; });
+          Object.defineProperty(o, "__methods", { value: methods, enumerable: false });
+          return o;
+        };
+        ctor.bname = s.name; ctor.__methods = methods;
+        return env.def(s.name, ctor);
+      }
+      case "rule": {
+        const fn = new Closure(s.name, s.params, s.body, env);
+        this.rules.set(s.name, s.params.length);
+        this.Omega.commit(["rule", s.name, "stmt", s.params.slice(), "denotation"]);
+        return env.def(s.name, fn);
+      }
+      case "qubit": {
+        const n = this.eval(s.n, env); const reg = new QReg(n);
+        this.Omega.commit(["qubit", s.name, n]);
+        return env.def(s.name, reg);
+      }
+      case "annot": {
+        this.Omega.commit(["@" + s.kind, s.name || "", "open"]);
+        const r = this.execBlock(s.body, env);           // reviser の規則は囲む環境に定義される
+        this.Omega.commit(["@" + s.kind, s.name || "", "commit"]);
+        return r;
+      }
+    }
+    throw new BadaError("不明な文 " + s.k);
+  }
+  assign(t, v, env) {
+    if (t.k === "name") return env.set(t.name, v);
+    const o = this.eval(t.o, env);
+    if (t.k === "index") {
+      const i = this.eval(t.i, env);
+      if (Array.isArray(o)) { if (typeof i !== "number") throw new BadaError("配列の添字は数です"); o[i < 0 ? o.length + i : i] = v; return v; }
+      if (o && typeof o === "object") { o[String(i)] = v; return v; }
+    }
+    if (t.k === "member" && o && typeof o === "object" && !(o instanceof Ledger)) { o[t.name] = v; return v; }
+    throw new BadaError("代入できない対象です");
+  }
+  call(f, args) {
+    this.tick();
+    if (typeof f === "function") return f(args, this);
+    if (f instanceof Closure) {
+      const env = new Env(f.env);
+      f.params.forEach((p, i) => env.def(p, args[i] === undefined ? null : args[i]));
+      if (f.isExpr) return this.eval(f.body, env);
+      try { return this.execBlock(f.body, env); }
+      catch (e) { if (e instanceof ReturnSig) return e.v; throw e; }
+    }
+    throw new BadaError(`${show(f)} は関数ではありません`);
+  }
+  eval(e, env) {
+    switch (e.k) {
+      case "lit": return e.v;
+      case "name": return env.get(e.name);
+      case "list": return e.items.map(x => this.eval(x, env));
+      case "map": { const o = {}; for (const [k, v] of e.pairs) o[String(this.eval(k, env))] = this.eval(v, env); return o; }
+      case "lambda": return new Closure(null, e.params, e.body, env, e.isExpr);
+      case "neg": { const v = this.eval(e.e, env); return isC(v) ? C(-v.re, -v.im) : -num(v); }
+      case "not": return !truthy(this.eval(e.e, env));
+      case "and": { const l = this.eval(e.l, env); return truthy(l) ? this.eval(e.r, env) : l; }
+      case "or": { const l = this.eval(e.l, env); return truthy(l) ? l : this.eval(e.r, env); }
+      case "bin": return binop(e.op, this.eval(e.l, env), this.eval(e.r, env));
+      case "commit": {
+        const l = this.eval(e.l, env), r = this.eval(e.r, env);
+        if (l instanceof Ledger) return l.commit(r);
+        if (Array.isArray(l)) { l.push(r); return r; }
+        throw new BadaError(">> の左辺は台帳 (Omega / tuplespace) です");
+      }
+      case "append": {
+        const l = this.eval(e.l, env), r = this.eval(e.r, env);
+        if (Array.isArray(l)) { l.push(r); return l; }
+        if (l instanceof Ledger) { l.commit(r); return l; }
+        throw new BadaError("<- の左辺は配列です");
+      }
+      case "query": {   // xs => f  : 写像 / パターン照会
+        const l = this.eval(e.l, env), r = this.eval(e.r, env);
+        const src = l instanceof Ledger ? l.items : l;
+        if (Array.isArray(src) && (r instanceof Closure || typeof r === "function")) return src.map(x => this.call(r, [x]));
+        if (r instanceof Closure || typeof r === "function") return this.call(r, [l]);
+        return r;
+      }
+      case "call": {
+        if (e.f.k === "member" && !e.f.scope) {   // メソッド呼び出し
+          const o = this.eval(e.f.o, env);
+          if (o && typeof o === "object" && o.__methods && o.__methods[e.f.name])
+            return this.call(o.__methods[e.f.name], [o, ...e.args.map(a => this.eval(a, env))]);
+        }
+        const f = this.eval(e.f, env);
+        return this.call(f, e.args.map(a => this.eval(a, env)));
+      }
+      case "index": {
+        const o = this.eval(e.o, env), i = this.eval(e.i, env);
+        if (Array.isArray(o) || typeof o === "string") {
+          const k = i < 0 ? o.length + i : i; const v = o[k];
+          if (Array.isArray(o) && (k < 0 || k >= o.length)) throw new BadaError(`添字 ${i} は範囲外 (長さ ${o.length})`);
+          return v === undefined ? null : v;
+        }
+        if (o instanceof Ledger) return o.items[i] === undefined ? null : o.items[i];
+        if (o && typeof o === "object") { const v = o[String(i)]; return v === undefined ? null : v; }
+        throw new BadaError(`${show(o)} は添字で参照できません`);
+      }
+      case "member": {
+        const o = this.eval(e.o, env);
+        if (o instanceof Ledger) {
+          if (e.name === "DATABASE" || e.name === "items") return o.items;
+          if (e.name === "size" || e.name === "len") return o.items.length;
+          if (e.name === "name") return o.name;
+        }
+        if (o instanceof QReg && e.name === "n") return o.n;
+        if (o && (typeof o === "object" || typeof o === "function")) {
+          const v = o[e.name];
+          if (v !== undefined && !(typeof o === "function" && e.name in Function.prototype)) return v;
+          return null;
+        }
+        if (typeof o === "string" && e.name === "len") return o.length;
+        if (Array.isArray(o) && e.name === "len") return o.length;
+        throw new BadaError(`${show(o)} に '${e.name}' はありません`);
+      }
+    }
+    throw new BadaError("不明な式 " + e.k);
+  }
+}
+function num(v) {
+  if (typeof v === "number") return v;
+  if (typeof v === "boolean") return v ? 1 : 0;
+  throw new BadaError(`数が必要ですが ${show(v, 1)} でした`);
+}
+function eq(a, b) {
+  if (isC(a) || isC(b)) { const x = toC(a), y = toC(b); return x.re === y.re && x.im === y.im; }
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((v, i) => eq(v, b[i]));
+  return a === b;
+}
+function binop(op, a, b) {
+  if (op === "==") return eq(a, b);
+  if (op === "!=") return !eq(a, b);
+  if (op === "~") return a === "STAR" || b === "STAR" || a === null || b === null || typeof a === typeof b;
+  if (op === "in") {
+    if (Array.isArray(b)) return b.some(x => eq(x, a));
+    if (typeof b === "string") return b.includes(String(a));
+    if (b instanceof Ledger) return b.items.some(x => eq(x, a));
+    if (b && typeof b === "object") return Object.prototype.hasOwnProperty.call(b, String(a));
+    return false;
+  }
+  if (op === "+") {
+    if (typeof a === "string" || typeof b === "string") return show(a) + show(b);
+    if (Array.isArray(a) && Array.isArray(b)) return a.concat(b);
+  }
+  if (isC(a) || isC(b)) {
+    const x = toC(a), y = toC(b);
+    switch (op) {
+      case "+": return cadd(x, y); case "-": return csub(x, y); case "*": return cmul(x, y);
+      case "/": return cdiv(x, y); case "^": return cpow(x, y);
+    }
+    throw new BadaError(`複素数に '${op}' は使えません`);
+  }
+  if (op === "*" && typeof a === "string" && typeof b === "number") return a.repeat(Math.max(0, b));
+  const x = num(a), y = num(b);
+  switch (op) {
+    case "+": return x + y; case "-": return x - y; case "*": return x * y;
+    case "/": return y === 0 ? 0 : x / y;              // 原稿 S.25: a/b = 0 if b = 0
+    case "%": return y === 0 ? 0 : x % y;
+    case "^": if (x < 0 && !Number.isInteger(y)) return cpow(C(x, 0), C(y, 0)); return Math.pow(x, y);
+    case "<": return x < y; case ">": return x > y; case "<=": return x <= y; case ">=": return x >= y;
+  }
+  throw new BadaError("不明な演算子 " + op);
+}
+
+/* ───────────────────────── 組込み ───────────────────────── */
+function installNatives(I) {
+  const g = I.global;
+  const def = (name, fn) => { fn.bname = name; g.def(name, fn); };
+  const arr = v => { if (!Array.isArray(v)) throw new BadaError(`配列が必要ですが ${show(v, 1)} でした`); return v; };
+  const fcall = (f, ...a) => I.call(f, a);
+  const cplx = (f, fc) => ([x]) => isC(x) ? fc(x) : f(num(x));
+
+  g.def("Omega", I.Omega); g.def("tuplespace", I.Omega);
+  g.def("pi", Math.PI); g.def("π", Math.PI); g.def("e", Math.E); g.def("I", C(0, 1)); g.def("i_", C(0, 1));
+  g.def("phi", (1 + Math.sqrt(5)) / 2); g.def("euler_gamma", 0.5772156649015329); g.def("STAR", "STAR");
+  g.def("inf", Infinity);
+
+  /* 入出力と基本 */
+  def("print", a => { I.print(a.map(x => show(x)).join(" ")); return null; });
+  def("show", a => show(a[0], 1));
+  def("str", a => show(a[0]));
+  def("num", a => { const v = parseFloat(a[0]); return isNaN(v) ? null : v; });
+  def("int", a => Math.trunc(num(a[0])));
+  def("type", a => { const v = a[0]; return v === null ? "nil" : Array.isArray(v) ? "array" : isC(v) ? "complex" : v instanceof Ledger ? "tuplespace" : v instanceof QReg ? "qubits" : (v instanceof Closure || typeof v === "function") ? "func" : (v && v.__type) ? v.__type : typeof v === "object" ? "map" : typeof v; });
+  def("len", a => { const v = a[0]; if (v instanceof Ledger) return v.items.length; if (Array.isArray(v) || typeof v === "string") return v.length; if (v && typeof v === "object") return Object.keys(v).length; return 0; });
+  def("push", a => { arr(a[0]).push(a[1]); return a[0]; });
+  def("pop", a => { const v = arr(a[0]).pop(); return v === undefined ? null : v; });
+  def("keys", a => Object.keys(a[0] || {}).filter(k => k !== "__type"));
+  def("values", a => Object.keys(a[0] || {}).filter(k => k !== "__type").map(k => a[0][k]));
+  def("has", a => a[0] != null && Object.prototype.hasOwnProperty.call(a[0], String(a[1])));
+  def("get", a => { const o = a[0]; if (o && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, String(a[1]))) return o[String(a[1])]; return a[2] === undefined ? null : a[2]; });
+  def("range", a => { let [s, e, st] = a.length === 1 ? [0, num(a[0]), 1] : [num(a[0]), num(a[1]), a[2] === undefined ? 1 : num(a[2])]; const r = []; if (st === 0) return r; for (let x = s; st > 0 ? x < e : x > e; x += st) { r.push(x); if (r.length > 1e6) break; } return r; });
+  def("map", a => arr(a[0]).map((x, i) => fcall(a[1], x, i)));
+  def("filter", a => arr(a[0]).filter((x, i) => truthy(fcall(a[1], x, i))));
+  def("fold", a => arr(a[0]).reduce((acc, x) => fcall(a[2], acc, x), a[1]));
+  def("each", a => { arr(a[0]).forEach((x, i) => fcall(a[1], x, i)); return null; });
+  def("any", a => arr(a[0]).some(x => truthy(a[1] ? fcall(a[1], x) : x)));
+  def("all", a => arr(a[0]).every(x => truthy(a[1] ? fcall(a[1], x) : x)));
+  def("sum", a => arr(a[0]).reduce((s, x) => (isC(s) || isC(x)) ? cadd(toC(s), toC(x)) : s + num(x), 0));
+  def("sort", a => arr(a[0]).slice().sort((x, y) => (typeof x === "string" ? (x < y ? -1 : x > y ? 1 : 0) : x - y)));
+  def("sortby", a => arr(a[0]).map(x => [num(fcall(a[1], x)), x]).sort((p, q) => p[0] - q[0]).map(p => p[1]));
+  def("reverse", a => typeof a[0] === "string" ? Array.from(a[0]).reverse().join("") : arr(a[0]).slice().reverse());
+  def("slice", a => { const v = a[0]; const s = a[1] === undefined ? 0 : num(a[1]); const e = a[2] === undefined || a[2] === null ? undefined : num(a[2]); return typeof v === "string" ? Array.from(v).slice(s, e).join("") : arr(v).slice(s, e); });
+  def("index_of", a => Array.isArray(a[0]) ? a[0].findIndex(x => eq(x, a[1])) : String(a[0]).indexOf(String(a[1])));
+  def("unique", a => { const seen = new Set(), out = []; for (const x of arr(a[0])) { const k = typeof x + ":" + show(x, 1); if (!seen.has(k)) { seen.add(k); out.push(x); } } return out; });
+  def("zip", a => arr(a[0]).map((x, i) => [x, arr(a[1])[i]]));
+  def("argmax", a => { const v = arr(a[0]); let b = 0; v.forEach((x, i) => { if (num(x) > num(v[b])) b = i; }); return b; });
+  def("argsort_desc", a => arr(a[0]).map((x, i) => [num(x), i]).sort((p, q) => q[0] - p[0]).map(p => p[1]));
+  def("min", a => Math.min(...(a.length === 1 && Array.isArray(a[0]) ? a[0] : a).map(num)));
+  def("max", a => Math.max(...(a.length === 1 && Array.isArray(a[0]) ? a[0] : a).map(num)));
+  def("copy", a => JSON.parse(JSON.stringify(a[0])));
+  def("json", a => JSON.stringify(a[0], (k, v) => isC(v) ? show(v) : v));
+
+  /* 文字列 */
+  def("split", a => String(a[0]).split(a[1] === undefined ? /\s+/ : String(a[1])).filter(x => a[1] !== undefined || x !== ""));
+  def("join", a => arr(a[0]).map(x => show(x)).join(a[1] === undefined ? "" : String(a[1])));
+  def("lower", a => String(a[0]).toLowerCase());
+  def("upper", a => String(a[0]).toUpperCase());
+  def("trim", a => String(a[0]).trim());
+  def("contains", a => Array.isArray(a[0]) ? a[0].some(x => eq(x, a[1])) : String(a[0]).includes(String(a[1])));
+  def("startswith", a => String(a[0]).startsWith(String(a[1])));
+  def("endswith", a => String(a[0]).endsWith(String(a[1])));
+  def("replace", a => String(a[0]).split(String(a[1])).join(String(a[2])));
+  def("chars", a => Array.from(String(a[0])));
+  def("repeat", a => String(a[0]).repeat(Math.max(0, num(a[1]))));
+  def("match", a => { const m = new RegExp(String(a[1]), "u").exec(String(a[0])); return m ? Array.from(m, x => x === undefined ? null : x) : null; });
+  def("match_all", a => Array.from(String(a[0]).matchAll(new RegExp(String(a[1]), "gu")), m => m[0]));
+  def("tokens", a => tokens(a[0]));
+  def("f5", a => num(a[0]).toFixed(5));
+  def("fixed", a => num(a[0]).toFixed(a[1] === undefined ? 4 : num(a[1])));
+  def("sci", a => num(a[0]).toExponential(a[1] === undefined ? 3 : num(a[1])));
+  def("fmt", a => show(a[0]));
+  def("pad", a => String(a[0]).padStart(num(a[1])));
+
+  /* 数学 (実数・複素数) */
+  def("abs", a => isC(a[0]) ? cabs(a[0]) : Math.abs(num(a[0])));
+  def("sqrt", a => isC(a[0]) || num(a[0]) < 0 ? csqrt(toC(a[0])) : Math.sqrt(a[0]));
+  def("exp", cplx(Math.exp, cexp));
+  def("log", a => { const x = a[0]; if (isC(x) || num(x) < 0) return clog(toC(x)); if (a[1] !== undefined) return Math.log(x) / Math.log(num(a[1])); return Math.log(x); });
+  def("sin", cplx(Math.sin, csin)); def("cos", cplx(Math.cos, ccos));
+  def("tan", a => isC(a[0]) ? cdiv(csin(a[0]), ccos(a[0])) : Math.tan(num(a[0])));
+  def("atan", a => Math.atan(num(a[0]))); def("atan2", a => Math.atan2(num(a[0]), num(a[1])));
+  def("asin", a => Math.asin(num(a[0]))); def("acos", a => Math.acos(num(a[0])));
+  def("sinh", a => Math.sinh(num(a[0]))); def("cosh", a => Math.cosh(num(a[0]))); def("tanh", a => Math.tanh(num(a[0])));
+  def("acosh", a => Math.acosh(num(a[0])));
+  def("pow", a => binop("^", a[0], a[1]));
+  def("floor", a => Math.floor(num(a[0]))); def("ceil", a => Math.ceil(num(a[0])));
+  def("round", a => { const d = a[1] === undefined ? 0 : num(a[1]); const m = Math.pow(10, d); return Math.round(num(a[0]) * m) / m; });
+  def("cx", a => C(num(a[0]), a[1] === undefined ? 0 : num(a[1])));
+  def("re", a => toC(a[0]).re); def("im", a => toC(a[0]).im);
+  def("conj", a => { const z = toC(a[0]); return C(z.re, -z.im); });
+  def("arg", a => { const z = toC(a[0]); return Math.atan2(z.im, z.re); });
+  def("gamma", a => isC(a[0]) ? cexp(clgamma(a[0])) : gamma(num(a[0])));
+  def("lgamma", a => isC(a[0]) ? clgamma(a[0]) : lgamma(num(a[0])));
+  def("digamma", a => digamma(num(a[0])));
+  def("beta", a => beta(num(a[0]), num(a[1])));
+  def("zeta", a => zeta(a[0]));
+  def("rs_theta", a => rsTheta(num(a[0])));
+  def("rs_Z", a => rsZ(num(a[0])));
+  def("lambertw", a => lambertw(num(a[0])));
+  def("xlogx_root", () => Math.exp(lambertw(1)));
+  def("jones", a => jones(String(a[0]), a[1]));
+  def("jones_poly", a => jonesString(String(a[0])));
+  def("integrate", a => {   // 合成シンプソン
+    const f = a[0], lo = num(a[1]), hi = num(a[2]); let n = a[3] === undefined ? 2000 : num(a[3]); if (n % 2) n++;
+    const h = (hi - lo) / n; let s = C(0, 0);
+    for (let k = 0; k <= n; k++) {
+      const w = k === 0 || k === n ? 1 : (k % 2 ? 4 : 2); const v = toC(fcall(f, lo + k * h));
+      s = cadd(s, C(w * v.re, w * v.im));
+    }
+    const r = C(s.re * h / 3, s.im * h / 3); return Math.abs(r.im) < 1e-14 ? r.re : r;
+  });
+  def("deriv", a => { const h = a[2] === undefined ? 1e-5 : num(a[2]); const x = num(a[1]); const d = binop("-", fcall(a[0], x + h), fcall(a[0], x - h)); return binop("/", d, 2 * h); });
+  def("solve", a => {   // 二分法 f(x)=0 on [lo,hi]
+    const f = x => num(fcall(a[0], x)); let lo = num(a[1]), hi = num(a[2]); let flo = f(lo);
+    if (flo * f(hi) > 0) return null;
+    for (let k = 0; k < 200; k++) { const m = (lo + hi) / 2, fm = f(m); if (flo * fm <= 0) hi = m; else { lo = m; flo = fm; } }
+    return (lo + hi) / 2;
+  });
+  def("seed", a => { I.rng = makeRng(num(a[0])); return null; });
+  def("rand", () => I.rng());
+
+  /* Unknown-Prior Engine */
+  def("softmax", a => softmax(arr(a[0]).map(num)));
+  def("entropy", a => entropy(arr(a[0]).map(num)));
+  def("unknown_prior", a => { const V = num(a[0]); return new Array(V).fill(1 / V); });
+  def("update", a => update(arr(a[0]).map(num), arr(a[1]).map(num), a[2] === undefined ? undefined : num(a[2])));
+  def("dist", a => normalize(arr(a[0]).map(num)));
+  def("phase", a => arr(a[0]).map(t => C(Math.cos(num(t)), Math.sin(num(t)))));
+  def("zeros_of", a => { const z = []; arr(a[0]).forEach((v, i) => { if (v === 0) z.push(i); }); return z; });
+  def("maxdiff", a => { let m = 0; arr(a[0]).forEach((v, i) => { m = Math.max(m, Math.abs(num(v) - num(arr(a[1])[i]))); }); return m; });
+  def("manifold_embed", a => {
+    const x = arr(a[0]).map(num); let d = x;
+    if (a[1]) d = arr(a[1]).map(row => row.reduce((s, w, j) => s + num(w) * (x[j] || 0), 0));
+    const n = Math.sqrt(d.reduce((s, v) => s + v * v, 0)) + 1e-12; return d.map(v => v / n);
+  });
+  def("cognitive_system", a => cognitiveSystem(arr(a[0]).map(num), arr(a[1]), a[2] ? arr(a[2]).map(num) : []));
+  def("ledger", a => new Ledger(a[0] === undefined ? "tuplespace" : String(a[0])));
+  def("commit", a => { const L = a[0] instanceof Ledger ? a[0] : I.Omega; return L.commit(a[0] instanceof Ledger ? a[1] : a[0]); });
+  def("rules", () => Array.from(I.rules.keys()));
+
+  /* Q# 型量子副言語 */
+  def("Qubits", a => { const r = new QReg(num(a[0])); I.Omega.commit(["qubit", "anon", r.n]); return r; });
+  for (const gname of Object.keys(GATES)) def(gname, a => { qcheck(a[0], a[1]); return q1(a[0], a[1], GATES[gname]); });
+  def("RX", a => { qcheck(a[0], a[1]); return q1(a[0], a[1], rot("X", num(a[2]))); });
+  def("RY", a => { qcheck(a[0], a[1]); return q1(a[0], a[1], rot("Y", num(a[2]))); });
+  def("RZ", a => { qcheck(a[0], a[1]); return q1(a[0], a[1], rot("Z", num(a[2]))); });
+  def("CNOT", a => { qcheck(a[0], a[1], a[2]); if (a[1] === a[2]) throw new BadaError("CNOT の制御と標的が同じです"); return cnot(a[0], a[1], a[2]); });
+  def("CZ", a => { qcheck(a[0], a[1], a[2]); const r = a[0], cb = 1 << a[1], tb = 1 << a[2]; for (let s = 0; s < r.N; s++) if ((s & cb) && (s & tb)) { r.re[s] = -r.re[s]; r.im[s] = -r.im[s]; } return r; });
+  def("SWAP", a => { qcheck(a[0], a[1], a[2]); cnot(a[0], a[1], a[2]); cnot(a[0], a[2], a[1]); return cnot(a[0], a[1], a[2]); });
+  const measure = a => {
+    const r = a[0], i = a[1]; qcheck(r, i); const bit = 1 << i; let p1 = 0;
+    for (let s = 0; s < r.N; s++) if (s & bit) p1 += r.re[s] ** 2 + r.im[s] ** 2;
+    const out = I.rng() < p1 ? 1 : 0; const norm = Math.sqrt(out ? p1 : 1 - p1) || 1;
+    for (let s = 0; s < r.N; s++) {
+      if (((s & bit) ? 1 : 0) !== out) { r.re[s] = 0; r.im[s] = 0; } else { r.re[s] /= norm; r.im[s] /= norm; }
+    }
+    I.Omega.commit(["measure", i, out, +p1.toFixed(12)]);   // 測定は台帳への commit
+    return out;
+  };
+  def("Measure", measure); def("M", measure);
+  def("probs", a => { qcheck(a[0]); return qprobs(a[0]); });
+  def("amps", a => { qcheck(a[0]); const r = a[0], o = []; for (let s = 0; s < r.N; s++) o.push(C(r.re[s], r.im[s])); return o; });
+  def("qstate", a => { qcheck(a[0]); return qstateString(a[0]); });
+  def("basis", a => bits(num(a[0]), num(a[1])));
+  def("reset", a => { qcheck(a[0]); a[0].re.fill(0); a[0].im.fill(0); a[0].re[0] = 1; return a[0]; });
+
+  /* 知識ベースとホスト */
+  const kb = () => (I.host.kb || { equations: [], chunks: [], sources: [], blueprint: "" });
+  def("kb_equations", () => kb().equations);
+  def("kb_chunks", () => kb().chunks);
+  def("kb_sources", () => kb().sources);
+  def("kb_blueprint", () => kb().blueprint);
+  def("host_mode", () => (I.host.mode ? I.host.mode() : "local"));
+  def("now", () => Date.now());
+  def("eval_bada", a => {   // サンドボックスで Bada を実行 (チャットから送られたコード)
+    const sub = new Interp({ host: { kb: I.host.kb }, maxSteps: 3e6, seed: 7 });
+    const src = String(a[0]);
+    try {
+      let v;
+      try { v = sub.evalExpr(src); }
+      catch (e) { if (!(e instanceof BadaError)) throw e; sub.out = []; v = sub.run(src); }
+      return { ok: true, value: v, shown: show(v, 1), out: sub.out.slice(), ledger: sub.Omega.items.length, rules: Array.from(sub.rules.keys()) };
+    } catch (e) {
+      if (e instanceof ReturnSig) return { ok: true, value: e.v, shown: show(e.v, 1), out: sub.out.slice(), ledger: sub.Omega.items.length, rules: [] };
+      return { ok: false, error: e instanceof BadaError ? e.message : String(e && e.message || e), out: sub.out.slice() };
+    }
+  });
+}
+
+const BadaEngine = { lex, Parser, Interp, BadaError, Complex, Ledger, QReg, show, tokens, gamma, lgamma, beta, zeta, czeta, rsZ, rsTheta, lambertw, jones, softmax, entropy, cognitiveSystem };
+if (typeof module !== "undefined" && module.exports) module.exports = BadaEngine;
+
+</script>
+<script>
+/*
+ * php.js — PHP の字句解析と「副作用の事実」の抽出 (Bada へ渡すネイティブ組込み)
+ *
+ * ここでは判定はしません。PHP ソースから、書き換え前後を比べるための事実
+ * (関数呼び出し・出力・include・関数定義・認可チェック・大域状態・構文の均衡)
+ * を集めるだけです。何が危険で、どの変化を副作用とみなすかは guard.bada の
+ * @reviser 規則が決めます。
+ *
+ * 汚染 (taint) の追跡は 1 ファイル内の近似です:
+ *   - $_GET/$_POST/$_REQUEST/$_COOKIE/$_FILES と一部の $_SERVER、php://input が源泉
+ *   - $x = <汚染された式> で $x が汚染され、無害化関数 (guard.bada の sanitizer) や
+ *     (int) などのキャストで包まれた部分は汚染に数えない
+ */
+"use strict";
+
+const PHP_OPS = ["<=>", "===", "!==", "**=", "...", "<<=", ">>=", "??=", "?->", "->", "=>", "::", "==", "!=", "<>", "<=", ">=",
+  "&&", "||", "??", "++", "--", "+=", "-=", "*=", "/=", ".=", "%=", "&=", "|=", "^=", "<<", ">>", "**"];
+const SUPERGLOBALS = new Set(["$_GET", "$_POST", "$_REQUEST", "$_COOKIE", "$_FILES"]);
+const SERVER_TAINTED = /^(HTTP_|REQUEST_URI$|PHP_SELF$|QUERY_STRING$|PATH_INFO$|PATH_TRANSLATED$|ORIG_PATH_INFO$|CONTENT_TYPE$|REMOTE_USER$|AUTH_)/;
+const CASTS = new Set(["int", "integer", "float", "double", "bool", "boolean"]);
+const AUTH_RE = /(auth|login|logged|permission|capab|csrf|xsrf|nonce|verify|is_admin|require_role|has_role|can_|current_user_can|check_|session_start|session_regenerate_id|password_verify|hash_equals)/i;
+
+function phpLex(src) {
+  const toks = []; let i = 0, line = 1, inPhp = false;
+  const n = src.length;
+  const push = (t, v, extra) => { const o = { t, v, line }; if (extra) Object.assign(o, extra); toks.push(o); return o; };
+  const count = s => { for (let k = 0; k < s.length; k++) if (s.charCodeAt(k) === 10) line++; };
+  const interpVars = s => {
+    const vs = []; const re = /\{?\$([A-Za-z_\x80-￿][\w\x80-￿]*)/g; let m;
+    while ((m = re.exec(s))) { if (m.index > 0 && s[m.index - 1] === "\\" && s[m.index] === "$") continue; vs.push("$" + m[1]); }
+    return vs;
+  };
+  while (i < n) {
+    if (!inPhp) {
+      const j = src.indexOf("<?", i);
+      const end = j < 0 ? n : j;
+      if (end > i) { const h = src.slice(i, end); push("html", h); count(h); }
+      if (j < 0) break;
+      if (src.startsWith("<?php", j)) { push("open", "<?php"); i = j + 5; }
+      else if (src.startsWith("<?=", j)) { push("openecho", "<?="); i = j + 3; }
+      else { push("open", "<?"); i = j + 2; }
+      inPhp = true; continue;
+    }
+    const c = src[i];
+    if (c === "\n") { line++; i++; continue; }
+    if (c === " " || c === "\t" || c === "\r") { i++; continue; }
+    if (src.startsWith("?>", i)) { push("close", "?>"); i += 2; if (src[i] === "\n") { line++; i++; } inPhp = false; continue; }
+    if (c === "#" && src[i + 1] === "[") {           // PHP 8 属性 #[...]
+      let d = 0, j = i + 1;
+      for (; j < n; j++) { if (src[j] === "[") d++; else if (src[j] === "]") { d--; if (!d) break; } }
+      const s = src.slice(i, j + 1); push("comment", s); count(s); i = j + 1; continue;
+    }
+    if (c === "#" || (c === "/" && src[i + 1] === "/")) {
+      let j = i; while (j < n && src[j] !== "\n" && !src.startsWith("?>", j)) j++;
+      push("comment", src.slice(i, j)); i = j; continue;
+    }
+    if (c === "/" && src[i + 1] === "*") {
+      let j = src.indexOf("*/", i + 2); const bad = j < 0; if (bad) j = n; else j += 2;
+      const s = src.slice(i, j); push(bad ? "error" : "comment", bad ? "unterminated comment" : s); count(s); i = j; continue;
+    }
+    if (c === "$" && /[A-Za-z_\x80-￿$]/.test(src[i + 1] || "")) {
+      if (src[i + 1] === "$") { push("var", "$$"); i += 1; continue; }
+      let j = i + 1; while (j < n && /[\w\x80-￿]/.test(src[j])) j++;
+      push("var", src.slice(i, j)); i = j; continue;
+    }
+    if (/[A-Za-z_\\\x80-￿]/.test(c)) {
+      let j = i; while (j < n && /[\w\\\x80-￿]/.test(src[j])) j++;
+      push("id", src.slice(i, j)); i = j; continue;
+    }
+    if (/[0-9]/.test(c) || (c === "." && /[0-9]/.test(src[i + 1] || ""))) {
+      const m = /^(0[xX][0-9a-fA-F_]+|0[bB][01_]+|(\d[\d_]*)?\.?\d[\d_]*([eE][+-]?\d+)?)/.exec(src.slice(i, i + 64));
+      push("num", m[0]); i += m[0].length || 1; continue;
+    }
+    if (c === "'" || c === '"' || c === "`") {
+      let j = i + 1;
+      while (j < n && src[j] !== c) { if (src[j] === "\\") j++; j++; }
+      const bad = j >= n; const s = src.slice(i, Math.min(j + 1, n));
+      if (bad) { push("error", "unterminated string"); count(s); i = n; continue; }
+      const body = s.slice(1, -1);
+      const o = push(c === "`" ? "backtick" : "str", body, { q: c, vars: c === "'" ? [] : interpVars(body) });
+      count(s); i = j + 1; void o; continue;
+    }
+    if (src.startsWith("<<<", i)) {
+      const m = /^<<<[ \t]*(['"]?)([A-Za-z_]\w*)\1\r?\n/.exec(src.slice(i, i + 200));
+      if (m) {
+        const id = m[2], nowdoc = m[1] === "'";
+        const start = i + m[0].length;
+        const re = new RegExp("(^|\\n)[ \\t]*" + id + "\\b", "g"); re.lastIndex = start - 1;
+        const mm = re.exec(src);
+        const stop = mm ? mm.index + mm[0].length : n;
+        const body = src.slice(start, mm ? mm.index : n);
+        const startLine = line;
+        count(src.slice(i, stop));
+        toks.push({ t: "str", v: body, line: startLine, q: nowdoc ? "'" : '"', vars: nowdoc ? [] : interpVars(body) });
+        i = stop; continue;
+      }
+    }
+    const op = PHP_OPS.find(o => src.startsWith(o, i));
+    if (op) { push("op", op); i += op.length; continue; }
+    push("op", c); i++;
+  }
+  return toks;
+}
+
+/* 呼び出し・式の範囲を求める補助 */
+function matchClose(T, i) {   // T[i] は '(' か '[' か '{'
+  const open = T[i].v, close = open === "(" ? ")" : open === "[" ? "]" : "}";
+  let d = 0;
+  for (let k = i; k < T.length; k++) {
+    if (T[k].t !== "op") continue;
+    if (T[k].v === open) d++;
+    else if (T[k].v === close) { d--; if (d === 0) return k; }
+  }
+  return T.length - 1;
+}
+function stmtEnd(T, i) {   // ';' / '?>' (深さ 0) まで
+  let d = 0;
+  for (let k = i; k < T.length; k++) {
+    const t = T[k];
+    if (t.t === "close") return k;
+    if (t.t !== "op") continue;
+    if (t.v === "(" || t.v === "[" || t.v === "{") d++;
+    else if (t.v === ")" || t.v === "]" || t.v === "}") { if (d === 0) return k; d--; }
+    else if (t.v === ";" && d === 0) return k;
+  }
+  return T.length;
+}
+/* トークン列を読みやすい 1 行に (比較の鍵にも使うので空白の規則は決定的) */
+function norm(toks) {
+  let out = "", prev = null;
+  for (const t of toks) {
+    const v = t.t === "str" ? t.q + t.v + t.q : t.t === "backtick" ? "`" + t.v + "`" : t.v;
+    const tight = prev && (["(", "[", "->", "?->", "::", "!", "$$", "&", "@"].includes(prev.v) && prev.t === "op" ||
+      (t.t === "op" && ["(", ")", "[", "]", ",", ";", "->", "?->", "::", "++", "--"].includes(t.v) && !(t.v === "(" && prev.t === "op" && !["(", ")", "]"].includes(prev.v))));
+    out += (out && !tight ? " " : "") + v;
+    prev = t;
+  }
+  return out.replace(/\s+/g, " ").trim();
+}
+const lc = s => String(s).toLowerCase().replace(/^\\/, "");
+
+function analyzePhp(src, sanitizerList) {
+  const all = phpLex(String(src));
+  const errors = all.filter(t => t.t === "error").map(t => ({ line: t.line, msg: t.v }));
+  const T = all.filter(t => t.t !== "comment" && t.t !== "html");
+  const sanit = new Set((sanitizerList || []).map(lc));
+  const tainted = new Set();
+
+  function isSuper(k) {
+    const t = T[k];
+    if (t.t !== "var") return false;
+    if (SUPERGLOBALS.has(t.v)) return true;
+    if (t.v === "$_SERVER" && T[k + 1] && T[k + 1].v === "[" && T[k + 2] && T[k + 2].t === "str") return SERVER_TAINTED.test(T[k + 2].v);
+    return false;
+  }
+  /* 範囲 [a, b) の汚染: raw = 無害化を無視、eff = 無害化された部分を除く */
+  function taint(a, b, skipSanitized) {
+    const src = [];
+    for (let k = a; k < b; k++) {
+      const t = T[k];
+      if (skipSanitized) {
+        const meth = T[k - 1] && (T[k - 1].v === "->" || T[k - 1].v === "?->");
+        if (t.t === "id" && (meth ? sanit.has("->" + lc(t.v)) : sanit.has(lc(t.v))) && T[k + 1] && T[k + 1].v === "(") { k = matchClose(T, k + 1); continue; }
+        if (t.v === "(" && T[k + 1] && T[k + 1].t === "id" && CASTS.has(lc(T[k + 1].v)) && T[k + 2] && T[k + 2].v === ")") {
+          k += 3; while (k + 1 < b && T[k + 1].v === "[") k = matchClose(T, k + 1); continue;
+        }
+      }
+      if (isSuper(k)) src.push(t.v);
+      else if (t.t === "var" && tainted.has(t.v)) src.push(t.v);
+      else if (t.t === "str" && t.vars) { for (const v of t.vars) if (tainted.has(v) || SUPERGLOBALS.has(v)) src.push(v); }
+      else if (t.t === "backtick" && t.vars) { for (const v of t.vars) if (tainted.has(v) || SUPERGLOBALS.has(v)) src.push(v); }
+      else if (t.t === "str" && /^php:\/\/input$/i.test(t.v)) src.push("php://input");
+    }
+    return Array.from(new Set(src));
+  }
+
+  /* ── 汚染の伝播 (代入・foreach) を 2 周 ── */
+  for (let pass = 0; pass < 2; pass++) {
+    for (let k = 0; k < T.length; k++) {
+      const t = T[k];
+      if (t.t === "var" && T[k + 1] && T[k + 1].t === "op" && ["=", ".=", "??="].includes(T[k + 1].v)
+          && !(T[k - 1] && (T[k - 1].v === "->" || T[k - 1].v === "::"))) {
+        const e = stmtEnd(T, k + 2);
+        const eff = taint(k + 2, e, true);
+        if (eff.length) tainted.add(t.v);
+        else if (T[k + 1].v === "=" && pass === 0) tainted.delete(t.v);
+      }
+      if (t.t === "id" && lc(t.v) === "foreach" && T[k + 1] && T[k + 1].v === "(") {
+        const c = matchClose(T, k + 1); let asI = -1;
+        for (let q = k + 2; q < c; q++) if (T[q].t === "id" && lc(T[q].v) === "as") { asI = q; break; }
+        if (asI > 0 && taint(k + 2, asI, true).length) for (let q = asI + 1; q < c; q++) if (T[q].t === "var") tainted.add(T[q].v);
+      }
+    }
+  }
+
+  const calls = [], echoes = [], includes = [], defs = [], auth = [], state = [];
+  const classStack = []; let depth = 0, pendingClass = null;
+  const KEYWORDS = new Set(["if", "elseif", "while", "for", "foreach", "switch", "match", "return", "array", "list", "isset", "empty", "unset", "function", "fn", "new", "catch", "declare", "use", "exit", "die", "echo", "print", "include", "include_once", "require", "require_once", "and", "or", "xor", "instanceof", "clone", "yield", "static", "self", "parent"]);
+
+  for (let k = 0; k < T.length; k++) {
+    const t = T[k], prev = T[k - 1], next = T[k + 1];
+    if (t.t === "op" && t.v === "{") { depth++; if (pendingClass) { classStack.push({ name: pendingClass, depth }); pendingClass = null; } continue; }
+    if (t.t === "op" && t.v === "}") { if (classStack.length && classStack[classStack.length - 1].depth === depth) classStack.pop(); depth--; continue; }
+    const cls = classStack.length ? classStack[classStack.length - 1].name : null;
+
+    if (t.t === "id") {
+      const lv = lc(t.v);
+      if ((lv === "class" || lv === "interface" || lv === "trait" || lv === "enum") && next && next.t === "id" && !(prev && prev.v === "::")) { pendingClass = next.v; continue; }
+      if (lv === "function" && next) {
+        let q = k + 1; if (T[q] && T[q].v === "&") q++;
+        if (T[q] && T[q].t === "id" && T[q + 1] && T[q + 1].v === "(") {
+          const c = matchClose(T, q + 1);
+          const params = []; let cur = [];
+          const flush = () => {
+            if (!cur.length) return;
+            const vi = cur.findIndex(x => x.t === "var");
+            if (vi >= 0) {
+              const eq = cur.findIndex(x => x.v === "=");
+              params.push({
+                name: cur[vi].v, type: norm(cur.slice(0, vi).filter(x => !["&", "..."].includes(x.v) && !/^(public|private|protected|readonly)$/i.test(x.v))),
+                def: eq >= 0 ? norm(cur.slice(eq + 1)) : null, ref: cur.some(x => x.v === "&"), variadic: cur.some(x => x.v === "...")
+              });
+            }
+            cur = [];
+          };
+          let d = 0;
+          for (let p = q + 2; p < c; p++) {
+            const x = T[p];
+            if (x.v === "(" || x.v === "[") d++; else if (x.v === ")" || x.v === "]") d--;
+            if (x.v === "," && d === 0) flush(); else cur.push(x);
+          }
+          flush();
+          let vis = "public", stat = false;
+          for (let b = k - 1; b >= Math.max(0, k - 4); b--) {
+            const w = lc(T[b].v);
+            if (w === "private" || w === "protected" || w === "public") vis = w;
+            else if (w === "static") stat = true;
+            else if (w !== "final" && w !== "abstract") break;
+          }
+          const name = T[q].v;
+          defs.push({
+            key: cls ? lc(cls) + "::" + lc(name) : lc(name), name, cls, line: t.line, visibility: cls ? vis : "public", static: stat,
+            params, required: params.filter(p => p.def === null && !p.variadic).length,
+            sig: name + "(" + params.map(p => (p.type ? p.type + " " : "") + (p.ref ? "&" : "") + (p.variadic ? "..." : "") + p.name + (p.def !== null ? " = " + p.def : "")).join(", ") + ")"
+          });
+          continue;
+        }
+      }
+      if (lv === "echo" || lv === "print") {
+        const e = stmtEnd(T, k + 1);
+        const eff = taint(k + 1, e, true), raw = taint(k + 1, e, false);
+        echoes.push({ line: t.line, kind: lv, expr: norm(T.slice(k + 1, e)).slice(0, 160), key: lv + " " + norm(T.slice(k + 1, e)) + (eff.length ? " ⟨tainted⟩" : ""), tainted: eff.length > 0, sources: eff, sanitized: raw.length > 0 && eff.length === 0 });
+        continue;
+      }
+      if (/^(include|require)(_once)?$/.test(lv)) {
+        const e = stmtEnd(T, k + 1); const seg = T.slice(k + 1, e);
+        const eff = taint(k + 1, e, true);
+        const lit = seg.filter(x => x.t === "str").map(x => x.v).join("");
+        includes.push({ line: t.line, kind: lv, expr: norm(seg).slice(0, 160), key: lv + " " + norm(seg) + (eff.length ? " ⟨tainted⟩" : ""), dynamic: seg.some(x => x.t === "var") || seg.some(x => x.t === "str" && x.vars && x.vars.length), tainted: eff.length > 0, sources: eff, target: lit });
+        continue;
+      }
+      if (lv === "global") {
+        const e = stmtEnd(T, k + 1);
+        for (let q = k + 1; q < e; q++) if (T[q].t === "var") state.push({ kind: "global", key: "global " + T[q].v, line: t.line, text: "global " + T[q].v });
+        continue;
+      }
+      if (lv === "if" && next && next.v === "(") {
+        const c = matchClose(T, k + 1);
+        const seg = T.slice(k + 2, c);
+        if (seg.some(x => x.v === "$_SESSION")) auth.push({ name: "if($_SESSION)", key: "if " + norm(seg), line: t.line, text: "if (" + norm(seg).slice(0, 120) + ")" });
+      }
+      /* 関数・メソッド呼び出し */
+      if (next && next.v === "(" && !KEYWORDS.has(lv)) {
+        if (prev && (lc(prev.v) === "function" || lc(prev.v) === "new" || prev.v === "fn")) continue;
+        let name = t.v, lname = lv;
+        if (prev && (prev.v === "->" || prev.v === "?->")) { name = "->" + t.v; lname = "->" + lv; }
+        else if (prev && prev.v === "::" && T[k - 2]) { name = T[k - 2].v + "::" + t.v; lname = lc(T[k - 2].v) + "::" + lv; }
+        const c = matchClose(T, k + 1);
+        const argT = T.slice(k + 2, c);
+        let argc = argT.length ? 1 : 0, d = 0;
+        for (const x of argT) { if (x.v === "(" || x.v === "[" || x.v === "{") d++; else if (x.v === ")" || x.v === "]" || x.v === "}") d--; else if (x.v === "," && d === 0) argc++; }
+        const named = argT.some((x, q) => x.t === "id" && argT[q + 1] && argT[q + 1].v === ":" && (q === 0 || argT[q - 1].v === ","));
+        const eff = taint(k + 2, c, true), raw = taint(k + 2, c, false);
+        const args = norm(argT);
+        const call = { name, lname, line: t.line, argc, named, args: args.slice(0, 200), key: lname + "(" + args + ")" + (eff.length ? " ⟨tainted⟩" : ""), tainted: eff.length > 0, sources: eff, sanitized: raw.length > 0 && eff.length === 0, first: argT[0] ? (argT[0].t === "str" ? argT[0].v : null) : null };
+        calls.push(call);
+        if (AUTH_RE.test(lname.replace(/^->/, ""))) auth.push({ name, key: call.key, line: t.line, text: name + "(" + call.args.slice(0, 80) + ")" });
+        if (["ini_set", "error_reporting", "set_error_handler", "set_exception_handler", "define", "putenv", "date_default_timezone_set", "setlocale", "ini_restore", "set_include_path"].includes(lv))
+          state.push({ kind: lv, key: call.key, line: t.line, text: name + "(" + call.args.slice(0, 100) + ")", name: lv === "define" ? (argT[0] && argT[0].t === "str" ? argT[0].v : args) : null });
+        continue;
+      }
+    }
+    if (t.t === "openecho") {
+      const e = stmtEnd(T, k + 1);
+      const eff = taint(k + 1, e, true), raw = taint(k + 1, e, false);
+      echoes.push({ line: t.line, kind: "<?=", expr: norm(T.slice(k + 1, e)).slice(0, 160), key: "<?= " + norm(T.slice(k + 1, e)) + (eff.length ? " ⟨tainted⟩" : ""), tainted: eff.length > 0, sources: eff, sanitized: raw.length > 0 && eff.length === 0 });
+      continue;
+    }
+    if (t.t === "backtick") {
+      const eff = taint(k, k + 1, true);
+      calls.push({ name: "`backtick`", lname: "`backtick`", line: t.line, argc: 1, named: false, args: t.v.slice(0, 200), key: "`" + t.v + "`" + (eff.length ? " ⟨tainted⟩" : ""), tainted: eff.length > 0, sources: eff, sanitized: false, first: null });
+      continue;
+    }
+    if (t.t === "var" && (t.v === "$GLOBALS" || (SUPERGLOBALS.has(t.v) || t.v === "$_SESSION" || t.v === "$_SERVER" || t.v === "$_ENV")) && next && next.v === "[") {
+      const c = matchClose(T, k + 1);
+      if (T[c + 1] && T[c + 1].t === "op" && ["=", ".=", "+=", "-=", "??="].includes(T[c + 1].v) && !["$_SESSION"].includes(t.v))
+        state.push({ kind: "superglobal_write", key: "write " + t.v + norm(T.slice(k + 1, c + 1)), line: t.line, text: t.v + norm(T.slice(k + 1, c + 1)) + " " + T[c + 1].v + " …" });
+    }
+  }
+
+  /* 構文の均衡 (php -l の代わりの最低限の検査) */
+  const bal = { "(": 0, "[": 0, "{": 0 }; const pair = { ")": "(", "]": "[", "}": "{" };
+  let firstBad = null;
+  for (const t of T) {
+    if (t.t !== "op") continue;
+    if (t.v in bal) bal[t.v]++;
+    else if (t.v in pair) { bal[pair[t.v]]--; if (bal[pair[t.v]] < 0 && !firstBad) firstBad = t.line; }
+  }
+  const balanced = !firstBad && bal["("] === 0 && bal["["] === 0 && bal["{"] === 0 && errors.length === 0;
+  return {
+    tokens: T.length, calls, echoes, includes, defs, auth, state,
+    syntax: { balanced, errors, detail: balanced ? "" : (errors.length ? errors.map(e => `line ${e.line}: ${e.msg}`).join("; ") : `括弧の対応: () ${bal["("]}, [] ${bal["["]}, {} ${bal["{"]}` + (firstBad ? ` (line ${firstBad} で閉じ過ぎ)` : "")) },
+    tainted_vars: Array.from(tainted)
+  };
+}
+
+const PHPAnalyzer = { phpLex, analyzePhp };
+if (typeof module !== "undefined" && module.exports) module.exports = PHPAnalyzer;
+
+</script>
+<script>
+/*
+ * diff.js — 行単位の差分・パッチ適用・逆パッチ・SHA-256 (Bada へ渡すネイティブ組込み)
+ *
+ *   diffLines(a, b)          Myers の O(ND) 差分 → ハンク (文脈 3 行)
+ *   applyHunks(text, hunks)  文脈を厳密に照合して適用 (ずれた土台には当てない)
+ *   reverseHunks(hunks)      逆パッチ (ロールバック)
+ *   unified(path, a, b, hs)  git 互換の unified diff 文字列
+ *   parseUnified(text)       unified diff をファイル毎のハンクへ
+ *   sha256(text)             UTF-8 の SHA-256 (16 進)
+ */
+"use strict";
+
+/* 末尾に改行の無い最終行には NOEOL 印を付けて比較する
+   (改行の有無の変化も「最終行の変更」として差分・照合の対象になる) */
+const NOEOL = "\u0000";
+function splitLines(s) {
+  s = String(s);
+  if (s === "") return { lines: [], eofNL: true };
+  const eofNL = s.endsWith("\n");
+  const lines = (eofNL ? s.slice(0, -1) : s).split("\n");
+  if (!eofNL) lines[lines.length - 1] += NOEOL;
+  return { lines, eofNL };
+}
+function joinLines(lines) {
+  if (!lines.length) return "";
+  const last = lines[lines.length - 1];
+  if (last.endsWith(NOEOL)) return lines.slice(0, -1).concat([last.slice(0, -1)]).join("\n");
+  return lines.join("\n") + "\n";
+}
+
+/* Myers の差分: 編集列 [[op, text], ...] (op: " " 共通, "-" 削除, "+" 追加) */
+function myers(A, B) {
+  const N = A.length, M = B.length, MAX = N + M;
+  const V = new Int32Array(2 * MAX + 2); const trace = [];
+  const off = MAX;
+  outer:
+  for (let D = 0; D <= MAX; D++) {
+    trace.push(V.slice());
+    for (let k = -D; k <= D; k += 2) {
+      let x;
+      if (k === -D || (k !== D && V[off + k - 1] < V[off + k + 1])) x = V[off + k + 1];
+      else x = V[off + k - 1] + 1;
+      let y = x - k;
+      while (x < N && y < M && A[x] === B[y]) { x++; y++; }
+      V[off + k] = x;
+      if (x >= N && y >= M) { trace.push(V.slice()); break outer; }
+    }
+  }
+  const ops = []; let x = N, y = M;
+  for (let D = trace.length - 2; D >= 0 && (x > 0 || y > 0); D--) {
+    const Vd = trace[D]; const k = x - y;
+    let pk;
+    if (k === -D || (k !== D && Vd[off + k - 1] < Vd[off + k + 1])) pk = k + 1; else pk = k - 1;
+    const px = Vd[off + pk], py = px - pk;
+    while (x > px && y > py) { ops.push([" ", A[x - 1]]); x--; y--; }
+    if (D > 0) { if (x === px) ops.push(["+", B[y - 1]]); else ops.push(["-", A[x - 1]]); }
+    x = px; y = py;
+  }
+  while (x > 0 && y > 0) { ops.push([" ", A[x - 1]]); x--; y--; }
+  return ops.reverse();
+}
+
+function diffLines(a, b, ctx) {
+  ctx = ctx === undefined ? 3 : ctx;
+  const sa = splitLines(a), sb = splitLines(b);
+  const A = sa.lines, B = sb.lines;
+  // 共通の先頭・末尾を先に剥がして高速化
+  let pre = 0; while (pre < A.length && pre < B.length && A[pre] === B[pre]) pre++;
+  let suf = 0; while (suf < A.length - pre && suf < B.length - pre && A[A.length - 1 - suf] === B[B.length - 1 - suf]) suf++;
+  const mid = myers(A.slice(pre, A.length - suf), B.slice(pre, B.length - suf));
+  const ops = A.slice(0, pre).map(l => [" ", l]).concat(mid, A.slice(A.length - suf).map(l => [" ", l]));
+  const hunks = []; let ai = 0, bi = 0, cur = null, lastChange = -1;
+  ops.forEach((op, idx) => {
+    const changed = op[0] !== " ";
+    if (changed) {
+      if (!cur || idx - lastChange > 2 * ctx) {
+        if (cur) closeH(cur);
+        const back = Math.min(ctx, countBack(ops, idx));
+        cur = { a_start: ai - back + 1, b_start: bi - back + 1, lines: ops.slice(idx - back, idx).map(o => [" ", o[1]]) };
+      } else {
+        for (let q = lastChange + 1; q < idx; q++) cur.lines.push([" ", ops[q][1]]);
+      }
+      cur.lines.push(op); lastChange = idx;
+    }
+    if (op[0] !== "+") ai++;
+    if (op[0] !== "-") bi++;
+  });
+  if (cur) closeH(cur);
+  function countBack(o, idx) { let n = 0; for (let q = idx - 1; q >= 0 && o[q][0] === " "; q--) n++; return n; }
+  function closeH(h) {
+    let after = 0, q = lastChange + 1;
+    while (after < ctx && q < ops.length && ops[q][0] === " ") { h.lines.push([" ", ops[q][1]]); after++; q++; }
+    h.a_len = h.lines.filter(l => l[0] !== "+").length;
+    h.b_len = h.lines.filter(l => l[0] !== "-").length;
+    if (h.a_len === 0) h.a_start -= 1;
+    if (h.b_len === 0) h.b_start -= 1;
+    hunks.push(h);
+  }
+  const adds = ops.filter(o => o[0] === "+").length, dels = ops.filter(o => o[0] === "-").length;
+  return { hunks, adds, dels, a_lines: A.length, b_lines: B.length };
+}
+
+/* 厳密適用: ハンクの文脈と削除行が土台と一字一句一致しなければ失敗 */
+function applyHunks(text, hunks) {
+  const s = splitLines(text); const A = s.lines; const out = []; let ai = 0;
+  for (const h of hunks) {
+    const start = h.a_len === 0 ? h.a_start : h.a_start - 1;
+    if (start < ai || start > A.length) return { ok: false, error: `ハンク @@ -${h.a_start} の位置が不正です` };
+    while (ai < start) out.push(A[ai++]);
+    for (const [op, line] of h.lines) {
+      if (op === "+") { out.push(line); continue; }
+      if (A[ai] !== line) return { ok: false, error: `line ${ai + 1}: 土台が記録と一致しません (期待 ${JSON.stringify(line.replace(NOEOL, "")).slice(0, 80)}, 実際 ${JSON.stringify(A[ai] === undefined ? "(EOF)" : A[ai].replace(NOEOL, "")).slice(0, 80)})` };
+      if (op === " ") out.push(line);
+      ai++;
+    }
+  }
+  while (ai < A.length) out.push(A[ai++]);
+  return { ok: true, text: joinLines(out) };
+}
+
+function reverseHunks(hunks) {
+  return hunks.map(h => ({
+    a_start: h.b_start, a_len: h.b_len, b_start: h.a_start, b_len: h.a_len,
+    lines: h.lines.map(([op, l]) => [op === "+" ? "-" : op === "-" ? "+" : " ", l])
+  }));
+}
+
+function hunkHeader(h) {
+  const r = (s, n) => (n === 1 ? `${s}` : `${s},${n}`);
+  return `@@ -${r(h.a_start, h.a_len)} +${r(h.b_start, h.b_len)} @@`;
+}
+function unified(path, d, meta) {
+  meta = meta || {};
+  const aName = meta.a_absent ? "/dev/null" : "a/" + path, bName = meta.b_absent ? "/dev/null" : "b/" + path;
+  const head = [`diff --git a/${path} b/${path}`];
+  if (meta.a_sha || meta.b_sha) head.push(`PatchGuard-Base-SHA256: ${meta.a_sha || "-"}`, `PatchGuard-After-SHA256: ${meta.b_sha || "-"}`);
+  head.push(`--- ${aName}`, `+++ ${bName}`);
+  const body = [];
+  d.hunks.forEach(h => {
+    body.push(hunkHeader(h));
+    for (const [op, l] of h.lines) {
+      if (l.endsWith(NOEOL)) { body.push(op + l.slice(0, -1)); body.push("\\ No newline at end of file"); }
+      else body.push(op + l);
+    }
+  });
+  return head.concat(body).join("\n") + "\n";
+}
+
+/* unified diff (この形式と git diff) をファイル毎に読み戻す */
+function parseUnified(text) {
+  const files = []; let f = null, h = null;
+  const lines = String(text).replace(/\r\n/g, "\n").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.startsWith("diff --git ")) { f = { path: null, a_sha: null, b_sha: null, hunks: [], a_absent: false, b_absent: false }; files.push(f); h = null; continue; }
+    if (l.startsWith("PatchGuard-Base-SHA256: ") && f) { const v = l.slice(24).trim(); f.a_sha = v === "-" ? null : v; continue; }
+    if (l.startsWith("PatchGuard-After-SHA256: ") && f) { const v = l.slice(25).trim(); f.b_sha = v === "-" ? null : v; continue; }
+    if (l.startsWith("--- ") && (!h || lines[i + 1] && lines[i + 1].startsWith("+++ "))) {
+      if (!f || f.hunks.length) { f = { path: null, a_sha: null, b_sha: null, hunks: [], a_absent: false, b_absent: false }; files.push(f); }
+      const a = l.slice(4).trim(); f.a_absent = a === "/dev/null"; if (!f.a_absent) f.path = a.replace(/^a\//, "");
+      h = null; continue;
+    }
+    if (l.startsWith("+++ ") && f && !h) { const b = l.slice(4).trim(); f.b_absent = b === "/dev/null"; if (!f.b_absent) f.path = b.replace(/^b\//, ""); continue; }
+    const m = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(l);
+    if (m && f) { h = { a_start: +m[1], a_len: m[2] === undefined ? 1 : +m[2], b_start: +m[3], b_len: m[4] === undefined ? 1 : +m[4], lines: [] }; f.hunks.push(h); continue; }
+    if (h && l.startsWith("\\")) { const last = h.lines[h.lines.length - 1]; if (last) last[1] += NOEOL; continue; }
+    if (h && (l[0] === " " || l[0] === "+" || l[0] === "-")) { h.lines.push([l[0], l.slice(1)]); continue; }
+    if (h && l === "" && i < lines.length - 1) { h.lines.push([" ", ""]); continue; }
+  }
+  return files.filter(x => x.path);
+}
+
+/* SHA-256 (純 JS / 同期) */
+const K256 = new Uint32Array([0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]);
+function utf8(s) {
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(s);
+  return Uint8Array.from(Buffer.from(s, "utf8"));
+}
+function sha256(str) {
+  const msg = utf8(String(str)); const l = msg.length;
+  const nb = ((l + 9 + 63) >> 6) << 6; const buf = new Uint8Array(nb); buf.set(msg); buf[l] = 0x80;
+  const bits = l * 8; const dv = new DataView(buf.buffer);
+  dv.setUint32(nb - 4, bits >>> 0); dv.setUint32(nb - 8, Math.floor(bits / 4294967296));
+  const H = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+  const W = new Uint32Array(64);
+  for (let o = 0; o < nb; o += 64) {
+    for (let t = 0; t < 16; t++) W[t] = dv.getUint32(o + t * 4);
+    for (let t = 16; t < 64; t++) {
+      const x = W[t - 15], y = W[t - 2];
+      const s0 = (x >>> 7 | x << 25) ^ (x >>> 18 | x << 14) ^ (x >>> 3);
+      const s1 = (y >>> 17 | y << 15) ^ (y >>> 19 | y << 13) ^ (y >>> 10);
+      W[t] = (W[t - 16] + s0 + W[t - 7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let t = 0; t < 64; t++) {
+      const S1 = (e >>> 6 | e << 26) ^ (e >>> 11 | e << 21) ^ (e >>> 25 | e << 7);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K256[t] + W[t]) >>> 0;
+      const S0 = (a >>> 2 | a << 30) ^ (a >>> 13 | a << 19) ^ (a >>> 22 | a << 10);
+      const mj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + mj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H[0] += a; H[1] += b; H[2] += c; H[3] += d; H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+  }
+  return Array.from(H, x => (x >>> 0).toString(16).padStart(8, "0")).join("");
+}
+
+const PatchDiff = { NOEOL, splitLines, joinLines, diffLines, applyHunks, reverseHunks, unified, parseUnified, sha256, hunkHeader };
+if (typeof module !== "undefined" && module.exports) module.exports = PatchDiff;
+
+</script>
+<script>
+/*
+ * core.js — PatchGuard の中核: Bada 処理系の上で guard.bada を動かす
+ *
+ * ブラウザ (index.html) と Node (cli.js) の両方で使います。
+ *   const pg = PatchGuardCore.create({ Engine, PHP, Diff, guardSrc });
+ *   const rep = pg.revise({ "index.php": "<?php ..." }, [{ "index.php": "<?php ..." }], waivers);
+ *   pg.patchText(rep, false)   // 正味パッチ (base → final)
+ *   pg.patchText(rep, true)    // 安全な部分パッチ (保留したファイルを除く)
+ *   pg.rollbackText(rep)       // ロールバック用の逆パッチ
+ * 判定・タプル・折り畳みはすべて guard.bada (Bada) が行い、ここは
+ * ネイティブ組込み (PHP 解析・差分・SHA-256) を渡すだけです。
+ */
+"use strict";
+(function (root) {
+  function create(opts) {
+    const { Engine, PHP, Diff, guardSrc } = opts;
+    const I = new Engine.Interp({ maxSteps: 4e9, seed: 1 });
+    const def = (name, fn) => { fn.bname = name; I.global.def(name, fn); };
+    def("php_analyze", a => PHP.analyzePhp(String(a[0]), a[1] || []));
+    def("diff_lines", a => Diff.diffLines(String(a[0]), String(a[1])));
+    def("patch_apply", a => Diff.applyHunks(String(a[0]), a[1]));
+    def("patch_reverse", a => Diff.reverseHunks(a[0]));
+    def("unified", a => Diff.unified(String(a[0]), a[1], a[2] || {}));
+    def("sha256", a => Diff.sha256(String(a[0])));
+    I.run(guardSrc);
+    const fn = name => I.global.get(name);
+    const call = (name, args) => { I.steps = 0; return I.call(fn(name), args); };
+    return {
+      interp: I,
+      version: fn("GUARD_VERSION"),
+      revise(base, revisions, waivers) { return call("revise", [base, revisions, waivers || []]); },
+      patchText(rep, onlySafe) { return call("patch_text", [rep, !!onlySafe]); },
+      rollbackText(rep) { return call("rollback_text", [rep]); },
+      tuples() { return fn("TS").items; },
+      blob(h) { return call("blob", [h]); },
+      rules() {
+        return {
+          sinks: fn("SINKS"), sanitizers: fn("SANITIZERS"),
+          checks: fn("CHECKS").map(c => ({ id: c.id, title: c.title })), grammar: Array.from(I.rules.keys())
+        };
+      },
+      sevRank: s => ({ none: -1, info: 0, low: 1, medium: 2, high: 3, critical: 4 })[s]
+    };
+  }
+  const api = { create };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.PatchGuardCore = api;
+})(this);
+
+</script>
+<script>
+/*
+ * app.js — Bada PatchGuard の画面 (入力・表示・書き出しだけ)
+ * 判定はすべて guard.bada (Bada) が core.js 経由で行います。
+ */
+"use strict";
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("badapatchguard:" + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("badapatchguard:" + k, JSON.stringify(v)); } catch (e) { /* 保存できない環境でも動く */ } },
+    del(k) { try { localStorage.removeItem("badapatchguard:" + k); } catch (e) { } }
+  };
+  const theme = store.get("theme", "");
+  if (theme) document.documentElement.dataset.theme = theme;
+  $("theme").onclick = () => {
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+    const nx = cur === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = nx; store.set("theme", nx);
+  };
+
+  const DEFAULT_GUARD = $("guard-src").textContent;
+  const EXAMPLES = JSON.parse($("examples").textContent);
+  let guardSrc = store.get("guard", DEFAULT_GUARD);
+  let pg = null;
+  function loadCore(src) {
+    pg = PatchGuardCore.create({ Engine: BadaEngine, PHP: PHPAnalyzer, Diff: PatchDiff, guardSrc: src });
+    return pg;
+  }
+  try { loadCore(guardSrc); } catch (e) { guardSrc = DEFAULT_GUARD; store.del("guard"); loadCore(guardSrc); }
+
+  /* ── 入力 (基 + 段) ── */
+  const trees = [{ name: "書き換えの基", files: {} }, { name: "書き換えた後 (段 1)", files: {} }];
+  let waivers = [];
+  const TEXT_EXT = /\.(php|phtml|inc|html?|js|css|json|txt|md|xml|svg|ini|htaccess|tpl|twig|yml|yaml|sql|csv)$|(^|\/)\.htaccess$/i;
+  function renderInputs() {
+    const box = $("inputs"); box.innerHTML = "";
+    trees.forEach((t, i) => {
+      const d = document.createElement("div"); d.className = "tree";
+      const n = Object.keys(t.files).length;
+      d.innerHTML = `<h3>${i === 0 ? "🗂" : "✎"} ${esc(t.name)}${i >= 2 ? '<button class="x" title="この段を削除">×</button>' : ""}</h3>
+        <div class="count">${n ? n + " ファイル" : "未選択 — ここへドラッグ＆ドロップもできます"}</div>
+        <div class="btns">
+          <label class="btn">フォルダ<input type="file" webkitdirectory multiple hidden></label>
+          <label class="btn">ファイル<input type="file" multiple hidden></label>
+          <button class="btn paste">貼り付け</button>
+          ${n ? '<button class="btn clear">クリア</button>' : ""}
+        </div>
+        <div class="files">${Object.keys(t.files).sort().slice(0, 200).map(esc).join("<br>")}</div>`;
+      const [dirIn, fileIn] = d.querySelectorAll("input[type=file]");
+      dirIn.onchange = () => readFiles(dirIn.files, t, true);
+      fileIn.onchange = () => readFiles(fileIn.files, t, false);
+      d.querySelector(".paste").onclick = () => pasteInto(t);
+      const cl = d.querySelector(".clear"); if (cl) cl.onclick = () => { t.files = {}; renderInputs(); };
+      const x = d.querySelector(".x"); if (x) x.onclick = () => { trees.splice(i, 1); relabel(); renderInputs(); };
+      d.addEventListener("dragover", e => { e.preventDefault(); d.classList.add("drag"); });
+      d.addEventListener("dragleave", () => d.classList.remove("drag"));
+      d.addEventListener("drop", e => { e.preventDefault(); d.classList.remove("drag"); dropInto(e.dataTransfer, t); });
+      box.appendChild(d);
+    });
+  }
+  function relabel() { trees.forEach((t, i) => { if (i) t.name = `書き換えた後 (段 ${i})`; }); }
+  async function readFiles(list, t, isDir) {
+    const arr = Array.from(list); let skipped = 0;
+    // フォルダ選択では先頭のフォルダ名を取り除き、サイト内の相対パスにする
+    for (const f of arr) {
+      let p = (f.webkitRelativePath || f.name).replace(/\\/g, "/");
+      if (isDir && p.includes("/")) p = p.slice(p.indexOf("/") + 1);
+      if (/(^|\/)(\.git|node_modules|\.patchguard)\//.test(p) || !TEXT_EXT.test(p) || f.size > 4 * 1024 * 1024) { skipped++; continue; }
+      t.files[p] = await f.text();
+    }
+    status(`${Object.keys(t.files).length} ファイルを読み込みました` + (skipped ? ` (対象外 ${skipped} 件をスキップ)` : ""));
+    renderInputs();
+  }
+  async function dropInto(dt, t) {
+    const items = Array.from(dt.items || []).map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    if (!items.length) return readFiles(dt.files, t, false);
+    const files = [];
+    const walk = (entry, pre) => new Promise(res => {
+      if (entry.isFile) entry.file(f => { files.push([pre + f.name, f]); res(); }, () => res());
+      else if (entry.isDirectory) {
+        const r = entry.createReader(); const all = [];
+        const more = () => r.readEntries(async es => { if (!es.length) { for (const e of all) await walk(e, pre + entry.name + "/"); res(); } else { all.push(...es); more(); } }, () => res());
+        more();
+      } else res();
+    });
+    for (const it of items) await walk(it, "");
+    const strip = items.length === 1 && items[0].isDirectory;
+    for (const [p0, f] of files) {
+      const p = strip ? p0.slice(p0.indexOf("/") + 1) : p0;
+      if (TEXT_EXT.test(p) && !/(^|\/)(\.git|node_modules|\.patchguard)\//.test(p)) t.files[p] = await f.text();
+    }
+    renderInputs();
+  }
+  function pasteInto(t) {
+    $("pastepath").value = ""; $("pastetext").value = "";
+    const dlg = $("pastedlg"); dlg.showModal();
+    dlg.onclose = () => {
+      if (dlg.returnValue !== "ok") return;
+      const p = $("pastepath").value.trim().replace(/^\/+/, "");
+      if (!p) return;
+      t.files[p] = $("pastetext").value; renderInputs();
+    };
+  }
+  $("addrev").onclick = () => { trees.push({ name: "", files: {} }); relabel(); renderInputs(); };
+  document.querySelectorAll("[data-ex]").forEach(b => b.onclick = () => {
+    const ex = EXAMPLES[b.dataset.ex];
+    trees.length = 0;
+    trees.push({ name: "書き換えの基", files: Object.assign({}, EXAMPLES.base) });
+    ex.forEach(r => trees.push({ name: "", files: Object.assign({}, r) }));
+    relabel(); renderInputs(); waivers = []; run();
+  });
+  const status = (s, err) => { $("status").innerHTML = err ? `<span class="err">${esc(s)}</span>` : esc(s); };
+
+  /* ── 検査 ── */
+  let rep = null;
+  function run() {
+    if (!Object.keys(trees[0].files).length && trees.slice(1).every(t => !Object.keys(t.files).length)) { status("基と後のファイルを入れてください", true); return; }
+    const t0 = performance.now();
+    try {
+      rep = pg.revise(trees[0].files, trees.slice(1).map(t => t.files), waivers);
+    } catch (e) { status("検査に失敗しました: " + (e && e.message || e), true); return; }
+    status(`検査 ${(performance.now() - t0).toFixed(0)} ms — 変更 ${rep.net.files.length} ファイル、タプル ${rep.tuples} 件`);
+    $("result").hidden = false;
+    renderSummary(); renderFiles(); renderTuples(); renderExport();
+  }
+  $("run").onclick = () => { waivers = []; run(); };
+
+  /* ── 概要 ── */
+  const SEVJ = { critical: "致命的", high: "高", medium: "中", low: "低", info: "情報" };
+  const DECJ = { ACCEPT: "ACCEPT — 受理", REVIEW: "REVIEW — 要確認", REJECT: "REJECT — 拒否" };
+  const sevTag = s => `<span class="sev ${s}">${SEVJ[s] || s}</span>`;
+  function renderSummary() {
+    const n = rep.net, adds = n.files.reduce((s, f) => s + f.adds, 0), dels = n.files.reduce((s, f) => s + f.dels, 0);
+    const cnt = ["critical", "high", "medium", "low", "info"].filter(k => rep.counts[k]).map(k => `<span class="stat">${sevTag(k)} ${rep.counts[k]}</span>`).join("");
+    const heldN = Object.keys(rep.held).length;
+    let h = `<div class="verdict"><span class="dec ${rep.decision}">${DECJ[rep.decision]}</span>
+      <div class="stats"><span class="stat">変更 ${n.files.length} ファイル (+${adds} / −${dels})</span>${cnt || '<span class="stat">指摘なし</span>'}
+      <span class="stat">安全パッチ ${n.files.length - heldN} / 保留 ${heldN}</span><span class="stat">タプル ${rep.tuples}</span></div></div>`;
+    h += `<p class="sub" style="margin-top:12px">判定は折り畳んだ正味の変更 (書き換えの基 → 最終版) に対して行います。高以上が 1 つでもあれば REJECT、中があれば REVIEW です。免除した指摘は数えません。</p>`;
+    if (rep.steps.length) {
+      h += `<h2>折り畳み</h2><p>${rep.steps.length} 段のパッチ → 正味 1 本。 ${rep.fold.ok ? '<b style="color:var(--ok)">✓ 各段のパッチを基へ順に当てると最終版と一致</b>' : '<b class="err">✗ ' + esc(rep.fold.problems.join("; ")) + "</b>"}</p>
+        <table class="grid"><tr><th>段</th><th>変更ファイル</th><th>指摘</th></tr>` +
+        rep.steps.map(s => `<tr><td>${s.step}</td><td class="mono">${s.files.map(f => esc(f.path)).join(", ")}</td><td>${s.findings.length ? s.findings.map(f => sevTag(f.sev) + " " + esc(f.id)).join(" ") : "—"}</td></tr>`).join("") + "</table>";
+      if (rep.cancelled.length) h += `<h3 style="font-size:14px">相殺された指摘 (途中の段にだけ現れ、最終版では消えた)</h3>` + rep.cancelled.map(f => `<div class="find ${f.sev}">${sevTag(f.sev)} 段 ${f.step} · ${esc(f.id)} ${esc(f.path)}:${f.line} — ${esc(f.msg)}</div>`).join("");
+      if (rep.emergent.length) h += `<h3 style="font-size:14px">合成で初めて現れた指摘 (どの段単独でも出ない)</h3>` + rep.emergent.map(f => `<div class="find ${f.sev}">${sevTag(f.sev)} ${esc(f.id)} ${esc(f.path)}:${f.line} — ${esc(f.msg)}</div>`).join("");
+    }
+    if (heldN) h += `<h2 style="margin-top:14px">保留したファイル</h2><table class="grid">` + Object.keys(rep.held).map(p => `<tr><td class="mono">${esc(p)}</td><td>${esc(rep.held[p])}</td></tr>`).join("") + "</table>";
+    if (waivers.length) h += `<h2 style="margin-top:14px">免除</h2><table class="grid">` + waivers.map(w => `<tr><td>${esc(w.id)}</td><td class="mono">${esc(w.path)}</td><td>${esc(w.reason)}</td></tr>`).join("") + "</table>";
+    $("t-sum").innerHTML = h;
+  }
+
+  /* ── ファイルとパッチ (折り畳み表示) ── */
+  function textOf(sha) { return sha ? (pg.blob(sha) || "") : ""; }
+  function diffHtml(fl) {
+    const base = textOf(fl.sha_a).split("\n"); const marks = new Set(fl.findings.map(f => f.line));
+    let rows = "", aPos = 1;
+    const foldRow = (from, to) => {
+      const n = to - from + 1; if (n <= 0) return "";
+      return `<tr class="fold" data-a="${from}" data-b="${to}"><td class="n"></td><td class="n"></td><td class="t">⋯ 変更のない ${n} 行を折り畳み中 (クリックで展開)</td></tr>`;
+    };
+    fl.hunks.forEach(h => {
+      const hs = h.a_len === 0 ? h.a_start + 1 : h.a_start;
+      rows += foldRow(aPos, hs - 1);
+      rows += `<tr class="h"><td class="n"></td><td class="n"></td><td class="t">${esc(PatchDiff.hunkHeader(h))}</td></tr>`;
+      let a = h.a_len === 0 ? h.a_start + 1 : h.a_start, b = h.b_len === 0 ? h.b_start + 1 : h.b_start;
+      for (const [op, line0] of h.lines) {
+        const line = line0.replace(PatchDiff.NOEOL, "");
+        if (op === " ") { rows += `<tr><td class="n">${a}</td><td class="n">${b}</td><td class="t"> ${esc(line)}</td></tr>`; a++; b++; }
+        else if (op === "-") { rows += `<tr class="d"><td class="n">${a}</td><td class="n"></td><td class="t">-${esc(line)}</td></tr>`; a++; }
+        else { rows += `<tr class="a${marks.has(b) ? " mark" : ""}"><td class="n"></td><td class="n">${b}</td><td class="t">+${esc(line)}</td></tr>`; b++; }
+      }
+      aPos = a;
+    });
+    if (fl.sha_a) rows += foldRow(aPos, fl.a_lines);
+    return { html: `<div class="diff"><table>${rows}</table></div>`, base };
+  }
+  function renderFiles() {
+    const box = $("t-files"); box.innerHTML = "";
+    if (!rep.net.files.length) { box.innerHTML = '<div class="empty">基と後に違いはありません</div>'; return; }
+    for (const fl of rep.net.files) {
+      const det = document.createElement("details"); det.className = "fl";
+      const worst = fl.findings.filter(f => !f.waived).reduce((m, f) => pg.sevRank(f.sev) > pg.sevRank(m) ? f.sev : m, "none");
+      det.open = worst !== "none" && pg.sevRank(worst) >= 2;
+      const held = rep.held[fl.path];
+      det.innerHTML = `<summary><span class="p">${esc(fl.path)}</span><span class="tag">${{ modified: "変更", added: "新規", deleted: "削除" }[fl.status]}</span>
+        <span class="tag">+${fl.adds} −${fl.dels}</span>${worst !== "none" ? sevTag(worst) : ""}
+        <span class="tag ${held ? "held" : "safe"}">${held ? "⏸ 保留: " + esc(held) : "✓ 安全パッチに含める"}</span></summary>`;
+      if (fl.findings.length) {
+        const fd = document.createElement("div"); fd.className = "finds";
+        fl.findings.forEach(f => {
+          const d = document.createElement("div"); d.className = `find ${f.sev}${f.waived ? " waived" : ""}`;
+          d.innerHTML = `${sevTag(f.sev)} <b>${esc(f.id)}</b> ${esc(f.title)}${f.line ? ` <span class="msg">line ${f.line}</span>` : ""}
+            ${f.waived ? `<span class="msg"> — 免除: ${esc(f.waived)}</span>` : '<button class="wv">免除…</button>'}
+            <div>${esc(f.msg)}</div><div class="ev">${esc(f.evidence)}</div>`;
+          const wb = d.querySelector(".wv"); if (wb) wb.onclick = () => askWaive(f);
+          fd.appendChild(d);
+        });
+        det.appendChild(fd);
+      }
+      const { html, base } = diffHtml(fl);
+      const wrap = document.createElement("div"); wrap.innerHTML = html; det.appendChild(wrap);
+      wrap.addEventListener("click", e => {
+        const tr = e.target.closest("tr.fold"); if (!tr) return;
+        const from = +tr.dataset.a, to = +tr.dataset.b; let out = "";
+        // 変更のない行は基と後で同じ。後の行番号は直前の行から数える
+        const prev = tr.previousElementSibling; let bno = prev ? parseInt(prev.children[1].textContent, 10) || null : null;
+        if (bno === null) bno = from; else bno++;
+        for (let k = from; k <= to; k++) out += `<tr><td class="n">${k}</td><td class="n">${bno++}</td><td class="t"> ${esc(base[k - 1] || "")}</td></tr>`;
+        tr.insertAdjacentHTML("afterend", out); tr.remove();
+      });
+      box.appendChild(det);
+    }
+  }
+  function askWaive(f) {
+    $("waiveinfo").textContent = `${f.id} ${f.path}:${f.line} — ${f.msg}`;
+    $("waivereason").value = "";
+    const dlg = $("waivedlg"); dlg.showModal();
+    dlg.onclose = () => {
+      if (dlg.returnValue !== "ok") return;
+      const reason = $("waivereason").value.trim();
+      if (!reason) { status("免除には理由が必要です", true); return; }
+      waivers.push({ id: f.id, path: f.path, match: f.evidence, reason });
+      run();
+    };
+  }
+
+  /* ── タプル空間 ── */
+  function renderTuples() {
+    const q = $("tq").value.trim(); let pat = null, kind = null;
+    if (q.startsWith("[")) {
+      try { pat = JSON.parse(q.replace(/(^|[\[,]\s*)\*(?=\s*[,\]])/g, '$1"__STAR__"')); } catch (e) { $("tcount").textContent = "照会の形式: [\"patch\", *, *, \"index.php\"]"; return; }
+    } else if (q) kind = q;
+    const all = pg.tuples();
+    const hit = all.filter(t => {
+      if (kind) return String(t[0]).includes(kind);
+      if (!pat) return true;
+      return pat.length === t.length && pat.every((x, i) => x === "__STAR__" || x === t[i] || String(x) === String(t[i]));
+    });
+    $("tcount").textContent = `${hit.length} / ${all.length} 件 (追記のみ・凍結)`;
+    $("ttable").innerHTML = "<tr><th>#</th><th>タプル</th></tr>" + hit.slice(-500).map(t => `<tr><td>${all.indexOf(t)}</td><td class="mono">${esc(JSON.stringify(t))}</td></tr>`).join("");
+  }
+  $("tq").addEventListener("input", renderTuples);
+
+  /* ── 規則 ── */
+  $("rulesrc").value = guardSrc;
+  $("reload").onclick = () => {
+    const src = $("rulesrc").value;
+    try { loadCore(src); guardSrc = src; store.set("guard", src); $("rulemsg").textContent = `読み込みました: invariant ${pg.rules().checks.length} 件、sink ${Object.keys(pg.rules().sinks).length} 件`; if (rep) run(); }
+    catch (e) { $("rulemsg").innerHTML = `<span class="err">${esc(e && e.message || e)}</span>`; loadCore(guardSrc); }
+  };
+  $("resetrules").onclick = () => { $("rulesrc").value = DEFAULT_GUARD; store.del("guard"); guardSrc = DEFAULT_GUARD; loadCore(guardSrc); $("rulemsg").textContent = "既定の規則に戻しました"; if (rep) run(); };
+
+  /* ── 書き出し ── */
+  function renderExport() {
+    const outs = [
+      ["net.patch", "正味パッチ (基 → 最終版)", () => pg.patchText(rep, false), "text/x-diff"],
+      ["safe.patch", "安全な部分パッチ (保留を除く)", () => pg.patchText(rep, true), "text/x-diff"],
+      ["rollback.patch", "ロールバック (最終版 → 基)", () => pg.rollbackText(rep), "text/x-diff"],
+      ["report.json", "検査結果 (JSON)", () => JSON.stringify(slim(rep), null, 2), "application/json"],
+      ["tuples.jsonl", "タプル空間 (JSON Lines)", () => pg.tuples().map(t => JSON.stringify(t)).join("\n") + "\n", "application/x-ndjson"]
+    ];
+    const box = $("exbtns"); box.innerHTML = "";
+    outs.forEach(([name, label, make, type]) => {
+      const b = document.createElement("button"); b.className = "btn"; b.textContent = "⬇ " + label;
+      b.onclick = () => { const s = make(); $("expreview").textContent = s.slice(0, 20000) || "(空 — 該当するファイルがありません)"; download(name, s, type); };
+      const cp = document.createElement("button"); cp.className = "btn"; cp.textContent = "⧉"; cp.title = name + " をコピー";
+      cp.onclick = () => { const s = make(); $("expreview").textContent = s.slice(0, 20000); try { navigator.clipboard.writeText(s); status(name + " をコピーしました"); } catch (e) { status("コピーできませんでした", true); } };
+      box.append(b, cp);
+    });
+    $("expreview").textContent = pg.patchText(rep, false).slice(0, 20000) || "(変更なし)";
+  }
+  function download(name, text, type) {
+    try {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      status(name + " を保存しました (保存できない端末では ⧉ でコピーしてください)");
+    } catch (e) { status("保存できませんでした。⧉ でコピーしてください", true); }
+  }
+  function slim(r) {
+    return {
+      run: r.run, version: r.version, decision: r.decision, counts: r.counts, held: r.held, fold: r.fold, waivers,
+      files: r.net.files.map(f => ({ path: f.path, status: f.status, sha_base: f.sha_a, sha_after: f.sha_b, adds: f.adds, dels: f.dels, findings: f.findings })),
+      steps: r.steps.map(s => ({ step: s.step, files: s.files.map(f => f.path), findings: s.findings })), cancelled: r.cancelled, emergent: r.emergent
+    };
+  }
+
+  /* ── タブ ── */
+  $("tabs").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.id === "t-" + b.dataset.t));
+  };
+
+  renderInputs();
+  status(`規則: invariant ${pg.rules().checks.length} 件 / sink ${Object.keys(pg.rules().sinks).length} 件 / sanitizer ${pg.rules().sanitizers.length} 件 — @reviser 文法: ${pg.rules().grammar.join(", ")}`);
+})();
+
+</script>
+</body>
+</html>

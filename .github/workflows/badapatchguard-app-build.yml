@@ -1,0 +1,225 @@
+name: Bada PatchGuard app build (Android APK + Windows 10/11 EXE + Linux + CLI)
+
+# bada_patchguard/ の「Bada Reviser PatchGuard」— PHP サイトの書き換えの副作用を防ぐ
+# パッチ・セキュリティ。書き換えの基と後をタプル空間 (append-only) に置き、差をパッチ
+# として扱い、複数回の書き換えを 1 本の正味パッチに折り畳み、Bada の @reviser で
+# 定義した規則 (sink / sanitizer / invariant) が ACCEPT / REVIEW / REJECT を決める。
+# これを
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Linux 向け AppImage / deb
+#   - サーバー / CI 向けの CLI (node 単一ファイル、依存なし)
+# としてビルドします。
+#
+# ダウンロード: リポジトリの Actions タブ → このワークフローの実行 → 「Artifacts」
+#   badapatchguard-android / badapatchguard-windows / badapatchguard-linux / badapatchguard-cli
+# (badapatchguard-v* タグ / release_tag 指定時は GitHub Release にも添付)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: badapatchguard-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'badapatchguard-v*'
+    branches:
+      - '**'
+    paths:
+      - 'bada_patchguard/**'
+      - 'bada_claude/src/engine.js'
+      - '.github/workflows/badapatchguard-app-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build (index.html must match src/, plus the single-file CLI)
+        run: |
+          node bada_patchguard/tools/build.js --check
+          node bada_patchguard/tools/build.js
+      - name: Self-check app HTML (inline JS syntax)
+        run: |
+          set -e
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("bada_patchguard/index.html", "utf8");
+            const scripts = [...src.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+            if (scripts.length !== 5) { console.error("expected 5 inline scripts, got " + scripts.length); process.exit(1); }
+            scripts.forEach((s, i) => fs.writeFileSync("/tmp/pg-" + i + ".js", s));
+            JSON.parse(src.match(/<script type="application\/json" id="examples">([\s\S]*?)<\/script>/)[1]);
+          '
+          for i in 0 1 2 3 4; do node --check /tmp/pg-$i.js; done
+          node --check bada_patchguard/dist/badapatchguard.js
+          echo "PatchGuard self-check OK"
+      - name: Tests (diff/patch, PHP analysis, @reviser rules, gate, fold, tuple space, CLI apply/rollback)
+        run: node bada_patchguard/tools/test.js
+      - name: Example run (risky rewrite must be rejected, safe rewrite accepted)
+        run: |
+          set +e
+          node bada_patchguard/dist/badapatchguard.js check bada_patchguard/examples/base bada_patchguard/examples/after_risky; test $? -eq 2 || exit 1
+          node bada_patchguard/dist/badapatchguard.js check bada_patchguard/examples/base bada_patchguard/examples/after_safe; test $? -eq 0 || exit 1
+          node bada_patchguard/dist/badapatchguard.js check bada_patchguard/examples/base bada_patchguard/examples/fold_step1 bada_patchguard/examples/fold_step2; test $? -eq 0 || exit 1
+
+  cli:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Package the single-file CLI
+        run: |
+          node bada_patchguard/tools/build.js
+          mkdir -p out/badapatchguard-cli
+          cp bada_patchguard/dist/badapatchguard.js out/badapatchguard-cli/
+          cp bada_patchguard/README.md out/badapatchguard-cli/
+          cp -r bada_patchguard/examples out/badapatchguard-cli/examples
+          cd out && zip -qr badapatchguard-cli.zip badapatchguard-cli
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badapatchguard-cli
+          path: out/badapatchguard-cli/
+      - name: Attach CLI to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/badapatchguard-cli.zip
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は SDK リポジトリから
+      # 廃止済みのため、packages を空にして必要な物を次のステップで入れる。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_patchguard/app/www
+          cp bada_patchguard/index.html bada_patchguard/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="bada_patchguard/app"
+          cordova create cordova-build io.github.masaaki_avnturle.badapatchguard BadaPatchGuard
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-patchguard-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badapatchguard-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p bada_patchguard/app/www
+          cp bada_patchguard/index.html bada_patchguard/app/www/index.html
+      - name: Build Windows 10/11 EXE (Electron, NSIS installer + portable)
+        working-directory: bada_patchguard/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badapatchguard-windows
+          path: bada_patchguard/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: bada_patchguard/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_patchguard/app/www
+          cp bada_patchguard/index.html bada_patchguard/app/www/index.html
+      - name: Build Linux AppImage + deb (Electron)
+        working-directory: bada_patchguard/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: badapatchguard-linux
+          path: |
+            bada_patchguard/app/electron/dist/*.AppImage
+            bada_patchguard/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_patchguard/app/electron/dist/*.AppImage
+            bada_patchguard/app/electron/dist/*.deb

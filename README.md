@@ -29,6 +29,25 @@
 
 ---
 
+## ⊕ ダウンロード — Bada PatchGuard(リバイザで PHP サイトの書き換えの副作用を防ぐパッチ・セキュリティ)
+
+**PHP サイトの「書き換えの基」と「書き換えた後」をタプル空間 (追記のみ) に置き、その差をパッチとして扱います。** 複数回の書き換えは 1 本の正味パッチに**折り畳み**、量子プログラミング言語 Bada の `@reviser` で定義したセキュリティ規則 (`sink` / `sanitizer` / `invariant` の 17 不変量) で検査します。検査対象は SQL インジェクション・XSS・LFI・コマンド注入・CSRF 検査の削除・他のファイルを壊す署名変更・構文の破損などで、結果を ACCEPT / REVIEW / REJECT で返します。合格したファイルだけの部分パッチ、ロールバック用の逆パッチ、SHA-256 で照合して全ファイルを当てるか 1 つも当てないかの `apply` も備えます。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Linux / CLI) — Actions からダウンロード
+
+[Actions → Bada PatchGuard app build](https://github.com/masaaki-avnturle/Bada/actions/workflows/badapatchguard-app-build.yml) の最新の成功した実行を開き、**Artifacts** から:
+
+| プラットフォーム | アーティファクト | ファイル |
+|:---|:---|:---|
+| **Android** (APK) | `badapatchguard-android` | `bada-patchguard-debug.apk` |
+| **Windows 10 / 11** | `badapatchguard-windows` | `BadaPatchGuard-*-x64.exe` / `BadaPatchGuard-*-portable.exe` |
+| **Linux** | `badapatchguard-linux` | `BadaPatchGuard-*-x86_64.AppImage` / `BadaPatchGuard-*-amd64.deb` |
+| **サーバー / CI** | `badapatchguard-cli` | `badapatchguard.js` (Node 単一ファイル) |
+
+ブラウザ版は [**bada_patchguard/index.html**](bada_patchguard/index.html)。詳細は [`bada_patchguard/`](bada_patchguard/) を参照。
+
+---
+
 ## ⟨ψ⟩ ダウンロード — BadaClaude(Claude / ChatGPT の対話パイプラインを量子 Bada で作り換えた対話エンジン)
 
 **Claude や ChatGPT が質問に答えるまでの仕組み — 字句化 → 意図推定 (Unknown-Prior Engine) → 検索 (論文 10 本 + 方程式レジストリ 2111 本) → 道具 (ζ・Γ・β・Riemann–Siegel Z・Jones の数値計算 / Q# 型量子回路 / Bada 実行) → 生成 → 台帳記録 — を、すべて量子プログラミング言語 Bada で書き直した対話アプリ。** 頭脳のソース [`brain.bada`](bada_claude/src/brain.bada) はアプリ内でも読めます。学習済みの Claude / ChatGPT の重みは含まないため、汎用の会話が必要なときは設定で Claude API キーを入れると、Bada が組み立てた文脈を Claude (claude-opus-5-5) に渡して回答します。
