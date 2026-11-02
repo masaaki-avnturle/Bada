@@ -157,6 +157,19 @@
 
 ---
 
+## 📦 全アプリの永久保存 (Actions → タグ付き Release)
+
+Actions の**アーティファクトは最長 90 日で消えます**が、**GitHub Release の添付ファイルは消えません**。このリポジトリでは全ビルドワークフローが `release_tag` を受け取り、指定したタグの Release にビルド成果物 (APK / EXE / AppImage / deb / ISO) を添付し、**タグはビルドしたコミットに付きます**。
+
+- **1 クリックで全部**: Actions → [**📦 Archive all apps**](.github/workflows/archive-all-apps.yml) → *Run workflow*。`suffix` (例 `v2026.11`) を入れると `laevateinn-v2026.11`, `mimir-v2026.11`, … の 16 本が一斉にビルド・保存されます (空欄なら `archive-YYYYMMDD-<run番号>`)。`apps` で対象を絞れます
+- **1 本だけ**: 各ワークフローの *Run workflow* で `release_tag` (例 `mimir-v1.0.2`) を指定
+- **タグを push** しても同じです (`git tag laevateinn-v3.0.0 && git push origin laevateinn-v3.0.0`)
+- アーティファクト側の保持期間も上限の 90 日に設定済み。公開後の Release を**変更・削除できなく**したい場合はリポジトリ設定の *Immutable releases* を有効にしてください
+
+保存済み一覧: [Releases](https://github.com/masaaki-avnturle/Bada/releases)
+
+---
+
 ## ⚔ ダウンロード — Laevateinn(自動走行アシスタントAI「アル」)
 
 自動走行の自動車**レーヴァテイン**とアシスタントAI**アル**。**アルのトランスフォーマーが車両を操縦**します — 知覚 attention を操舵角と加減速の2値に写す制御ヘッドが、その2値だけで車体(自転車近似モデル)を動かし、周囲(16レイセンサへの attention)を検知して自動で回避・減速・停止・再発進。測位は 2 モード — **🌐 Web地図モード**は衛星を使わず、ウェブサイトから受信する地図タイル(AEAD 検証つき)+推測航法+ランドマーク補正で走り、**🛰 人工衛星モード**は 4 機の擬似距離から最小二乗で測位します。A* 経路計画・依存ゼロ・単一 HTML。

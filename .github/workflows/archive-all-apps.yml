@@ -1,0 +1,77 @@
+name: 📦 Archive all apps (permanent tagged Releases)
+
+# 全アプリのビルドを 1 クリックで「永久保存」するワークフロー。
+#   Actions のアーティファクトは最長 90 日で消えますが、GitHub Release の
+#   添付ファイルは消えません。このワークフローは各アプリのビルドワークフローを
+#   release_tag 付きで一斉に起動し、それぞれを <prefix>-<suffix> というタグの
+#   Release として保存します (タグはビルドしたコミットに付きます)。
+#
+# 使い方: Actions → 「📦 Archive all apps」 → Run workflow
+#   suffix : タグの末尾 (空欄なら archive-YYYYMMDD-<run番号>)。例: v2026.11
+#   apps   : 対象アプリ (空欄 = 全部。カンマ区切りで絞り込み可。例: laevateinn,mimir)
+#
+# 注意: 同じタグが既にある場合、その Release に添付ファイルが追加/上書きされます。
+#       完全に不変にしたい場合はリポジトリ設定の「Immutable releases」を有効にしてください。
+
+on:
+  workflow_dispatch:
+    inputs:
+      suffix:
+        description: 'タグの末尾 (空欄なら archive-YYYYMMDD-<run番号>)'
+        required: false
+        default: ''
+      apps:
+        description: '対象アプリ (空欄 = 全部。例: laevateinn,mimir,quantos)'
+        required: false
+        default: ''
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch every app build with a permanent release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUFFIX: ${{ github.event.inputs.suffix }}
+          ONLY: ${{ github.event.inputs.apps }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -e
+          [ -n "$SUFFIX" ] || SUFFIX="archive-$(date -u +%Y%m%d)-${{ github.run_number }}"
+          # prefix=workflow file
+          APPS="
+          laevateinn=laevateinn-app-build.yml
+          mimir=mimir-app-build.yml
+          clearcast=clearcast-app-build.yml
+          quantos=quantos-app-build.yml
+          soundfilm=soundfilm-app-build.yml
+          asobi=asobi-app-build.yml
+          badagptdojo=badagptdojo-app-build.yml
+          badavmpro=badavmpro-app-build.yml
+          badaos=badaos-iso-build.yml
+          bada-ide=bada-ide-build.yml
+          cppbuilder=cppbuilder-app-build.yml
+          zone=zone-dist.yml
+          zonebrowser=zonebrowser-app-build.yml
+          apps=omega-apps-build.yml
+          hologram=android-apk.yml
+          badaxp=build-apk.yml
+          "
+          echo "## 📦 Archive: tag suffix \`$SUFFIX\` (ref \`$REF\`)" >> "$GITHUB_STEP_SUMMARY"
+          for line in $APPS; do
+            prefix="${line%%=*}"; wf="${line##*=}"
+            if [ -n "$ONLY" ] && ! echo ",$ONLY," | tr -d ' ' | grep -q ",$prefix,"; then continue; fi
+            tag="$prefix-$SUFFIX"
+            if gh workflow run "$wf" --ref "$REF" -f "release_tag=$tag"; then
+              echo "- ✅ $prefix → \`$tag\` ($wf)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- ❌ $prefix: dispatch failed ($wf)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            sleep 2
+          done
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "各ビルドが終わると https://github.com/${{ github.repository }}/releases に \`<app>-$SUFFIX\` の Release が並びます。" >> "$GITHUB_STEP_SUMMARY"
