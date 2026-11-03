@@ -1,0 +1,56 @@
+name: Archive Actions Artifacts to Release
+on:
+  push:
+    branches: [archive-artifacts]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: archive-artifacts
+  cancel-in-progress: false
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      GH_TOKEN: ${{ github.token }}
+      R: ${{ github.repository }}
+      TAG: artifacts-archive
+    steps:
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true; df -h .
+      - name: Ensure release
+        run: |
+          gh release view "$TAG" -R "$R" >/dev/null 2>&1 || \
+          gh release create "$TAG" -R "$R" --target main --latest=false \
+            --title "Actions Artifacts Archive" \
+            --notes "GitHub Actions artifacts の永久保存。アーティファクト名ごとに最新ビルドの zip をそのまま保存。2GB超は .partNN に分割（\`cat name.zip.part* > name.zip\` で復元）。一覧は MANIFEST.tsv。"
+      - name: Archive
+        run: |
+          set -u
+          gh api --paginate "repos/$R/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired==false) | [.id,.name,.created_at,.size_in_bytes,(.workflow_run.head_sha // "")] | @tsv' \
+            | sort -t$'\t' -k2,2 -k3,3r | awk -F'\t' '!s[$2]++' > MANIFEST.tsv
+          echo "targets: $(wc -l < MANIFEST.tsv)"
+          gh release view "$TAG" -R "$R" --json assets -q '.assets[].name' > have.txt || true
+          up() { for i in 1 2 3 4 5; do gh release upload "$TAG" "$@" -R "$R" --clobber && return 0; sleep $((i*20)); done; return 1; }
+          fail=0
+          while IFS=$'\t' read -r id name created size sha; do
+            n="${name}.zip"
+            if grep -qx -e "$n" -e "$n.part00" have.txt; then echo "skip $n"; continue; fi
+            echo "::group::$n ($size bytes)"
+            ok=0
+            for i in 1 2 3; do gh api "repos/$R/actions/artifacts/$id/zip" > "$n" && ok=1 && break; sleep 15; done
+            if [ $ok = 0 ]; then echo "::error::download failed $n"; fail=1; rm -f "$n"; echo "::endgroup::"; continue; fi
+            if [ "$(stat -c%s "$n")" -gt 2000000000 ]; then
+              split -b 1900M -d -a 2 "$n" "$n.part"; rm -f "$n"
+              for p in "$n".part*; do up "$p" || { echo "::error::upload failed $p"; fail=1; }; rm -f "$p"; done
+            else
+              up "$n" || { echo "::error::upload failed $n"; fail=1; }; rm -f "$n"
+            fi
+            echo "::endgroup::"
+          done < MANIFEST.tsv
+          printf 'id\tname\tcreated_at\tsize_bytes\thead_sha\n' | cat - MANIFEST.tsv > M && mv M MANIFEST.tsv
+          up MANIFEST.tsv
+          exit $fail
