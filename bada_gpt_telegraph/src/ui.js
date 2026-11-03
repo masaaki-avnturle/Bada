@@ -286,6 +286,7 @@
         state[cmd] = "done"; renderSteps(state);
       }
       renderCode();
+      renderBuildCard();
       blog("✓ 錬成完了: " + cur.spec.title);
       var hist = LS.get("history", []);
       hist.unshift({ t: Date.now(), title: cur.spec.title, input: text, coverage: cur.spec.coverage });
@@ -356,6 +357,72 @@
     if (!cur || !cur.spec) return;
     report(saveBytes(cur.gen.file + "-source.zip", zipBuild(sourceProject(cur.spec)), "application/zip"));
   };
+
+  /* ═══ ⑦ 自動コンパイル (GitHub へプッシュ → Actions がビルド → 進行を見守る) ═══ */
+  window.BGT_POLL_MS = window.BGT_POLL_MS || 15000;
+  $("ghToken").value = LS.get("ghToken", ""); $("ghRepo").value = LS.get("ghRepo", ""); $("ghRemember").checked = !!LS.get("ghToken", "");
+  function buildLog(m) { var el = $("buildLog"); el.textContent += (el.textContent === "待機中…" ? "" : "\n") + m; if (el.textContent.indexOf("待機中…") === 0) el.textContent = m; el.scrollTop = el.scrollHeight; }
+  function renderBuildCard() {
+    if (!cur || !cur.spec) return;
+    $("buildCard").classList.remove("hidden");
+    var srcs = CODE_LANGS.map(function (l) { return generateSource(cur.spec, l.id); });
+    $("buildPre").innerHTML = precompileChecks(cur.spec, cur.gen.html, srcs).map(function (c) {
+      return '<li class="' + (c.ok ? "ok" : "ng") + '">' + escHtml(c.name) + (c.note ? ' <span class="muted">— ' + escHtml(c.note) + "</span>" : "") + "</li>";
+    }).join("");
+  }
+  function jobsHtml(jobs) {
+    return jobs.map(function (j) { var cls = j.status !== "completed" ? "run" : j.conclusion === "success" ? "done" : "fail"; return '<span class="' + cls + '">' + escHtml(j.name) + "</span>"; }).join("");
+  }
+  var buildPolling = null;
+  $("buildBtn").onclick = async function () {
+    if (!cur || !cur.gen) return;
+    var token = $("ghToken").value.trim(), repo = $("ghRepo").value.trim();
+    LS.set("ghRepo", repo); LS.set("ghToken", $("ghRemember").checked ? token : "");
+    if (!token || !/^[\w.-]+\/[\w.-]+$/.test(repo)) { $("buildOut").innerHTML = '<span class="err">GitHub トークンと owner/name 形式のリポジトリを入れてください。</span>'; return; }
+    $("buildBtn").disabled = true; $("buildLog").textContent = "待機中…"; $("buildJobs").innerHTML = ""; $("buildOut").textContent = "";
+    clearInterval(buildPolling);
+    try {
+      var kit = buildKit(cur.spec, cur.gen.html, cur.paper || "");
+      buildLog("一式を組み立て: " + kit.files.length + " ファイル (apps/" + kit.slug + "/ + " + kit.workflowPath + ")");
+      var pushed = await githubPush({ fetch: fetch.bind(window), token: token, repo: repo, branch: "main", files: kit.files, createIfMissing: $("ghCreate").checked, private: $("ghPrivate").checked,
+        message: "BadaGPT電信: " + cur.spec.title + " を生成 (思考入力 → 文章 → ソースコード → 自動コンパイル)", log: buildLog });
+      buildLog("✓ プッシュしました: " + pushed.sha.slice(0, 7));
+      $("buildOut").innerHTML = '<a href="' + pushed.commitUrl + '" target="_blank" rel="noopener">コミット</a> ・ <a href="' + pushed.actionsUrl + '" target="_blank" rel="noopener">Actions で進行を見る</a>';
+      var started = Date.now(), run = null;
+      buildLog("Actions の起動を待っています…");
+      buildPolling = setInterval(async function () {
+        try {
+          if (!run || run.status !== "completed") run = await findRun({ fetch: fetch.bind(window), token: token, repo: repo, sha: pushed.sha, workflowPath: kit.workflowPath });
+          if (!run) { if (Date.now() - started > 3 * 60000) { clearInterval(buildPolling); buildLog("! ワークフローが起動しませんでした。リポジトリの Actions が有効か、トークンに Workflows 権限があるか確認してください。"); $("buildBtn").disabled = false; } return; }
+          var jobs = await runJobs({ fetch: fetch.bind(window), token: token, repo: repo, runId: run.id });
+          $("buildJobs").innerHTML = jobsHtml(jobs);
+          if (run.status !== "completed") { buildLog("ビルド中… (" + jobs.filter(function (j) { return j.status === "completed"; }).length + "/" + jobs.length + " ジョブ完了) " + Math.round((Date.now() - started) / 1000) + " 秒"); if (Date.now() - started > 25 * 60000) { clearInterval(buildPolling); buildLog("! 25 分を超えました。Actions のページで続きを確認してください。"); $("buildBtn").disabled = false; } return; }
+          clearInterval(buildPolling);
+          var arts = await runArtifacts({ fetch: fetch.bind(window), token: token, repo: repo, runId: run.id });
+          var rel = await releaseAssets({ fetch: fetch.bind(window), token: token, repo: repo, tag: kit.releaseTag });
+          if (run.conclusion === "success") {
+            buildLog("✓ コンパイル完了 (" + Math.round((Date.now() - started) / 1000) + " 秒)。アーティファクト " + arts.length + " 件・Release 資産 " + rel.length + " 件");
+            $("buildOut").innerHTML = "<b>完成しました。</b><br>" +
+              (rel.length ? "📦 <b>直リンク (ログイン不要・Release " + escHtml(kit.releaseTag) + ")</b>: " + rel.map(function (a) { return '<a href="' + a.url + '" target="_blank" rel="noopener">' + escHtml(a.name) + "</a> (" + Math.round(a.size / 1e6) + " MB)"; }).join(" ・ ") + "<br>" : "") +
+              '⚙️ <a href="' + run.url + '" target="_blank" rel="noopener">Actions の実行ページ</a> の Artifacts: ' + arts.map(function (a) { return escHtml(a.name) + " (" + Math.round(a.size / 1e6) + " MB)"; }).join(" ・ ");
+          } else {
+            buildLog("✗ ビルドが失敗しました (" + run.conclusion + ")。");
+            $("buildOut").innerHTML = '<span class="err">失敗したジョブ: ' + escHtml(jobs.filter(function (j) { return j.conclusion && j.conclusion !== "success"; }).map(function (j) { return j.name; }).join(", ") || "不明") + '</span> ・ <a href="' + run.url + '" target="_blank" rel="noopener">ログを見る</a>';
+          }
+          $("buildBtn").disabled = false;
+        } catch (e) { clearInterval(buildPolling); buildLog("! " + (e.message || e)); $("buildBtn").disabled = false; }
+      }, window.BGT_POLL_MS);
+    } catch (e) {
+      buildLog("! " + (e.message || e));
+      $("buildOut").innerHTML = '<span class="err">' + escHtml(e.message || String(e)) + "</span>" + (/(401|403|404)/.test(e.message || "") ? "<br>トークンの権限 (Contents / Workflows の書き込み、Actions の読み取り) と対象リポジトリを確認してください。" : "");
+      $("buildBtn").disabled = false;
+    }
+  };
+  /* Cordova: 外部リンクは端末のブラウザで開く */
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a[target=_blank]");
+    if (a && isCordova && window.cordova.InAppBrowser) { e.preventDefault(); window.cordova.InAppBrowser.open(a.href, "_system"); }
+  });
 
   /* 論文を A4 画像ページに描く (日本語は端末のフォントで描画) */
   function renderPages(md) {

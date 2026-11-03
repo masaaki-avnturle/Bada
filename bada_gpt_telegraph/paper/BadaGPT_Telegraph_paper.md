@@ -97,9 +97,10 @@ GPT::paper                   # 論文
 | `src/generate.js` | 779 | 14 種の実行時部品、HTML 組み立て、検証 |
 | `src/bio.js` | 124 | 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ) |
 | `src/codegen.js` | 281 | ソースコード化 (仕様 → Python / Node / Bada の動くソース) |
+| `src/autobuild.js` | 254 | 自動コンパイル (一式を GitHub へ 1 コミット → Actions が exe/apk をビルド → 監視) |
 | `src/paper.js` | 435 | 論文の自動執筆、ビルド一式、Claude (任意) |
-| `src/ui.js` | 640 | 画面 |
-| `tools/engine-test.js` | 352 | 単体テスト 156 件 |
+| `src/ui.js` | 707 | 画面 |
+| `tools/engine-test.js` | 414 | 単体テスト 169 件 |
 | `tools/evaluate.js` | 114 | 第 7 章の評価の再現 |
 
 `tools/build.js` がこれらを 1 枚の `index.html` に埋め込み、同じファイルを Cordova (Android) と Electron (Windows / Linux) に同梱する。
@@ -212,11 +213,19 @@ latent からは四つを決定的に復号する: (a) **本と同じ分量ま�
 
 ---
 
+## 6.8 拡張：自動コンパイル (思考入力から exe / apk まで)
+
+思考入力 → 文章 → 仕様 → ソースコード まで来た成果物を、exe / apk に**自動でコンパイル**する段を加えた。WebView や Electron の中では Gradle や electron-builder を実行できないため、実際に成立する仕組みとして次を採った: (1) 生成した一式 (アプリ本体・Electron / Cordova 設定・3 言語のソースコード・論文・ビルド用 GitHub Actions ワークフロー) を、利用者自身のトークンで利用者の GitHub リポジトリへ **Git Data API による 1 コミット** (blobs → tree → commit → ref) でプッシュする (リポジトリが無ければ作成)。(2) プッシュが `apps/<slug>/**` を監視するワークフローを起動し、Android APK・Windows EXE・Linux AppImage/deb をビルドして、Actions アーティファクト (個別 + 一式) と Release `<slug>-latest` (ログイン不要の直リンク) に置く。(3) BadaGPT は同じ commit の実行を探してポーリングし、ジョブの進行・成否・アーティファクト・Release 資産を表示する。
+
+この層は fetch と sleep を注入できる純関数群として書き、偽の GitHub API に対する呼び出し順序 (リポジトリ作成 → ブランチ → blobs × ファイル数 → tree → commit → ref 更新)、ペイロード (base_tree・parents)、トークンがログや URL に出ないこと、同一 commit の他ワークフローを除外して自分の実行を選ぶことを単体テストで検証した。生成するワークフローは YAML として解析し、3 つのビルドジョブと publish、push (paths) と手動起動を持つことを確かめた。実ブラウザでは API をモックして、錬成 → プッシュ → 起動待ち → ビルド中 → 完了 (Release 直リンク 2 件・アーティファクト 2 件) までの画面遷移を通した。端末内で行うのは HTML 検証・Bada 実行・Node 構文の事前チェックまでであり、本当のコンパイルは利用者のリポジトリの Actions 上で利用者の権限で行われる。
+
+---
+
 ## 7. 評価
 
 ### 7.1 単体テスト
 
-`tools/engine-test.js` の 156 件 (体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
+`tools/engine-test.js` の 169 件 (自動コンパイルの偽 GitHub API 検証、体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
 
 ### 7.2 開発用の依頼集合 (24 件)
 
@@ -307,7 +316,7 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 156 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 169 件
 node bada_gpt_telegraph/tools/evaluate.js           # 7.2 開発用の依頼集合
 node bada_gpt_telegraph/tools/evaluate.js --heldout # 7.3 未見の依頼集合
 ```

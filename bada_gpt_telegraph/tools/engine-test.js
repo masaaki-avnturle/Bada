@@ -21,7 +21,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const ctx = { console, TextEncoder, TextDecoder, atob, btoa, Uint8Array, Float32Array, Map };
 vm.createContext(ctx);
-for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/bio.js", "src/generate.js", "src/codegen.js", "src/paper.js"]) {
+for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/bio.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), ctx, { filename: f });
 }
 const E = (expr) => vm.runInContext(expr, ctx);
@@ -274,6 +274,63 @@ section("ソースコード化 (思い → ソースコード)");
   try { fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(rdir, { recursive: true, force: true }); fs.rmSync(ndir, { recursive: true, force: true }); } catch (e) { /* 後始末 */ }
 }
 
+/* 3.7 自動コンパイル (一式の組み立て・GitHub へ 1 コミット・Actions の監視) */
+section("自動コンパイル (プッシュ → Actions → exe / apk)");
+{
+  const cp = require("child_process"); const os = require("os");
+  const spec = call("comprehend", "本を管理したい。タイトル、著者、評価。並べ替えと検索。");
+  const g = call("generateApp", spec), kit = call("buildKit", spec, g.html, "# paper");
+  const paths = kit.files.map((f) => f.path);
+  ok(paths.includes("apps/" + kit.slug + "/www/index.html") && paths.includes("apps/" + kit.slug + "/electron/package.json") && paths.includes("apps/" + kit.slug + "/cordova/config.xml"), "一式: アプリ本体・Electron・Cordova が apps/<slug>/ 配下");
+  ok(paths.includes("apps/" + kit.slug + "/source/python/app.py") && paths.includes("apps/" + kit.slug + "/source/node/app.js") && paths.includes("apps/" + kit.slug + "/source/bada/app.bada"), "一式: ソースコード 3 言語");
+  ok(paths.includes(kit.workflowPath) && kit.workflowPath === ".github/workflows/" + kit.slug + "-build.yml" && !paths.some((p) => p.startsWith("apps/") && p.includes(".github/")), "一式: ワークフローはリポジトリ直下に 1 つ");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bgt-wf-")), wfp = path.join(tmp, "wf.yml");
+  fs.writeFileSync(wfp, kit.files.find((f) => f.path === kit.workflowPath).data);
+  let wfOk = true, wfInfo = "";
+  try { wfInfo = cp.execFileSync("python3", ["-c", "import yaml,sys,json;w=yaml.safe_load(open(sys.argv[1]));on=w.get('on',w.get(True));print(json.dumps({'jobs':list(w['jobs']),'on':list(on),'paths':on['push']['paths'],'needs':w['jobs']['publish']['needs']}))", wfp], { stdio: "pipe" }).toString(); } catch (e) { wfOk = false; wfInfo = String(e.stderr || e); }
+  ok(wfOk, "生成ワークフローが YAML として正しい " + (wfOk ? "" : wfInfo.slice(0, 120)));
+  if (wfOk) { const w = JSON.parse(wfInfo); ok(w.jobs.join() === "android-apk,windows-exe,linux-app,publish" && w.on.includes("push") && w.on.includes("workflow_dispatch") && w.paths.includes("apps/" + kit.slug + "/**") && w.needs.length === 3, "ワークフロー: 3 ビルド + publish、push(paths) と手動起動"); }
+  const wfText = kit.files.find((f) => f.path === kit.workflowPath).data;
+  ok(/-all-platforms/.test(wfText) && /softprops\/action-gh-release/.test(wfText) && new RegExp(kit.releaseTag).test(wfText), "ワークフロー: 一式アーティファクトと Release 直リンク");
+  /* 偽の GitHub API で 1 コミット・プッシュの手順を検証 */
+  const calls = [], logs = []; let repoSeen = 0;
+  const ok200 = (j) => ({ ok: true, status: 200, json: async () => j }), nf = () => ({ ok: false, status: 404, statusText: "Not Found", json: async () => ({ message: "Not Found" }) });
+  const fakeFetch = async (url, opt) => {
+    const p = url.replace("https://api.github.com", ""), m = opt.method; calls.push(m + " " + p);
+    if (opt.headers.Authorization !== "Bearer TOK") throw new Error("auth header missing");
+    if (m === "GET" && p === "/repos/me/app") return repoSeen++ === 0 ? nf() : ok200({ default_branch: "main" });
+    if (m === "POST" && p === "/user/repos") return ok200({ default_branch: "main" });
+    if (m === "GET" && p === "/repos/me/app/git/ref/heads/main") return ok200({ object: { sha: "base1" } });
+    if (m === "GET" && p === "/repos/me/app/git/commits/base1") return ok200({ sha: "base1", tree: { sha: "t0" } });
+    if (m === "POST" && p === "/repos/me/app/git/blobs") return ok200({ sha: "b" + calls.length });
+    if (m === "POST" && p === "/repos/me/app/git/trees") { const b = JSON.parse(opt.body); if (b.base_tree !== "t0" || b.tree.length !== kit.files.length) throw new Error("bad tree"); return ok200({ sha: "t1" }); }
+    if (m === "POST" && p === "/repos/me/app/git/commits") { const b = JSON.parse(opt.body); if (b.tree !== "t1" || b.parents[0] !== "base1") throw new Error("bad commit"); return ok200({ sha: "c1" }); }
+    if (m === "PATCH" && p === "/repos/me/app/git/refs/heads/main") return ok200({});
+    if (m === "GET" && p.startsWith("/repos/me/app/actions/runs?head_sha=c1")) return ok200({ workflow_runs: [{ id: 9, status: "completed", conclusion: "success", html_url: "https://x/run/9", run_number: 1, path: kit.workflowPath }, { id: 8, status: "completed", conclusion: "failure", html_url: "u8", run_number: 0, path: "other.yml" }] });
+    if (m === "GET" && p === "/repos/me/app/actions/runs/9/jobs?per_page=20") return ok200({ jobs: [{ name: "android-apk", status: "completed", conclusion: "success", html_url: "j" }] });
+    if (m === "GET" && p === "/repos/me/app/actions/runs/9/artifacts") return ok200({ artifacts: [{ id: 1, name: kit.slug + "-all-platforms", size_in_bytes: 5, expired: false }] });
+    if (m === "GET" && p === "/repos/me/app/releases/tags/" + kit.releaseTag) return ok200({ assets: [{ name: "a.apk", size: 3, browser_download_url: "https://dl/a.apk" }] });
+    throw new Error("unexpected " + m + " " + p);
+  };
+  (async () => {
+    const r = await call("githubPush", { fetch: fakeFetch, sleep: async () => {}, token: "TOK", repo: "me/app", branch: "main", files: kit.files, createIfMissing: true, log: (x) => logs.push(x) });
+    ok(r.sha === "c1" && r.commitUrl === "https://github.com/me/app/commit/c1", "githubPush: 1 コミットで完了し URL を返す");
+    ok(calls[0] === "GET /repos/me/app" && calls[1] === "POST /user/repos" && calls.filter((c) => c === "POST /repos/me/app/git/blobs").length === kit.files.length && calls[calls.length - 1] === "PATCH /repos/me/app/git/refs/heads/main", "githubPush: 無いリポジトリを作成 → blobs → tree → commit → ref の順");
+    ok(!logs.some((l) => l.includes("TOK")) && !calls.some((c) => c.includes("TOK")), "トークンはログや URL に出ない");
+    const run = await call("findRun", { fetch: fakeFetch, token: "TOK", repo: "me/app", sha: "c1", workflowPath: kit.workflowPath });
+    ok(run && run.id === 9 && run.conclusion === "success", "findRun: 同じ commit の他ワークフローを除いて自分の実行を選ぶ");
+    const jobs = await call("runJobs", { fetch: fakeFetch, token: "TOK", repo: "me/app", runId: 9 }), arts = await call("runArtifacts", { fetch: fakeFetch, token: "TOK", repo: "me/app", runId: 9 }), rel = await call("releaseAssets", { fetch: fakeFetch, token: "TOK", repo: "me/app", tag: kit.releaseTag });
+    ok(jobs.length === 1 && arts[0].name === kit.slug + "-all-platforms" && rel[0].url === "https://dl/a.apk", "runJobs / runArtifacts / releaseAssets の整形");
+    let threw = false; try { await call("githubPush", { fetch: fakeFetch, sleep: async () => {}, token: "TOK", repo: "bad repo name", files: [] }); } catch (e) { threw = /owner\/name/.test(e.message); }
+    ok(threw, "不正なリポジトリ名を拒否");
+    const srcs = ["python", "node", "bada"].map((l) => call("generateSource", spec, l));
+    const pre = call("precompileChecks", spec, g.html, srcs);
+    ok(pre.length === 4 && pre.every((c) => c.ok), "端末内の事前チェック (HTML 検証・Bada 実行・Node 構文)");
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* 後始末 */ }
+    finishAsync();
+  })().catch((e) => { fail++; console.log("  ✗ 自動コンパイルの非同期テストで例外: " + e.message); finishAsync(); });
+}
+
 /* 4. 論文 */
 section("論文");
 {
@@ -348,5 +405,10 @@ section("Claude (任意)");
   ok(st2.stop === "refusal" && st2.stopDetails.category === "cyber", "SSE: refusal と stop_details");
 }
 
-console.log("\n" + pass + " passed, " + fail + " failed");
-process.exit(fail ? 1 : 0);
+let asyncPending = 1;
+function finishAsync() {
+  if (--asyncPending > 0) return;
+  console.log("\n" + pass + " passed, " + fail + " failed");
+  process.exit(fail ? 1 : 0);
+}
+setTimeout(function () { if (asyncPending > 0) { fail++; console.log("  ✗ 非同期テストが終わりません"); asyncPending = 0; finishAsync(); } }, 20000);

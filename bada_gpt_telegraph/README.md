@@ -114,6 +114,22 @@ latent に添えられ、**アプリの中身 (モジュール・対象・項目
 **全言語まとめて ZIP** で保存できます。生成される Python / Node は構文検査と実行 (追加→一覧→CSV)
 まで単体テストで確かめています。
 
+## 🏗 自動コンパイル (⑦) — 思考入力から exe / apk まで自動で
+
+錬成とソースコード化のあと、生成した一式 (アプリ本体・Electron / Cordova 設定・ソースコード 3 言語・論文・
+ビルド用ワークフロー) を **あなたの GitHub リポジトリへ 1 コミットでプッシュ**します (無ければ作成)。
+プッシュが GitHub Actions を起動し、**Android APK / Windows EXE / Linux AppImage・deb** を自動でビルドします。
+BadaGPT は進行をポーリングして表示し、完成したら **Release の直リンク** (ログイン不要) と **Actions のアーティファクト**を示します。
+
+| 入力 | 内容 |
+|:--|:--|
+| GitHub トークン | Contents・Workflows の書き込み、Actions の読み取り。この端末にだけ保存され、GitHub API 以外へは送られません |
+| リポジトリ | `owner/name`。無ければ `auto_init` で作成 (非公開も可)。複数のアプリは `apps/<slug>/` に並びます |
+
+端末の中では Gradle や electron-builder を動かせないため、**本当のコンパイルはあなたのリポジトリの Actions 上で、あなたの権限で**行われます (通常 3〜6 分)。
+端末内では HTML 検証・Bada 実行・Node 構文の事前チェックだけを行います。プッシュの手順 (リポジトリ作成 → blobs → tree → commit → ref) と
+Actions の監視は、偽の GitHub API を注入した単体テストと、API をモックした実ブラウザ試験で検証しています。
+
 ## 📄 論文
 
 [`paper/BadaGPT_Telegraph_paper.pdf`](paper/BadaGPT_Telegraph_paper.pdf) ([Markdown](paper/BadaGPT_Telegraph_paper.md)) —
@@ -124,7 +140,7 @@ latent に添えられ、**アプリの中身 (モジュール・対象・項目
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html (CI は --check で一致を検査)
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 104 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 169 件
 node bada_gpt_telegraph/tools/evaluate.js           # 論文 7.2 の評価 (--heldout で 7.3)
 cd bada_gpt_telegraph/app/electron && npm install && npm start   # デスクトップ版 (要 ../www/index.html)
 ```
@@ -138,6 +154,7 @@ bada_gpt_telegraph/
 │   ├── silent.js           ← サイレント・トーク (非言語 → トランスフォーマー → latent → 文章・画像・Bada)
 │   ├── bio.js              ← 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ)
 │   ├── codegen.js          ← ソースコード化 (仕様 → Python / Node / Bada の動くソース)
+│   ├── autobuild.js        ← 自動コンパイル (一式を GitHub へ 1 コミット → Actions が exe/apk をビルド → 監視)
 │   ├── generate.js         ← 14 部品・HTML 組み立て・検証
 │   ├── paper.js            ← 論文・ビルド一式・Claude (任意)
 │   ├── ui.js / shell.html  ← 画面
