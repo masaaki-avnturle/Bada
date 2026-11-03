@@ -50,6 +50,29 @@ Artifacts のダウンロードには GitHub へのログインが必要です (
 3. ④ でアプリをプレビュー・操作し、**⬇ アプリ (HTML)**・**📦 ビルド一式 (ZIP)**・**📄 論文 PDF**・**📝 論文 Markdown** を保存。
 4. ZIP を GitHub リポジトリに置いて Actions を実行すると、**生成したアプリそのもの**の APK / EXE / AppImage・deb ができます。
 
+## ⓪-α 思考だけで — 脳波 (BCI) で選ぶ: 声も、絵も、文字もなしに
+
+声を出さず、絵も描かず、文字も打たずに入力する、**ブレイン・コンピュータ・インタフェース (BCI)** です。
+**自分の頭に付けた脳波計**が読む信号だけで、BadaGPT が順に示す選択肢 (何のアプリ / 何を扱う / 機能 / 調子 / 分量 / 環境) を
+**注意を向けるだけで選びます**。選んだものがサイレント・トークの非言語列になり、文章 → アプリ → ソースコード → 自動コンパイルへ流れます。
+
+| 方式 | 仕組み |
+|:--|:--|
+| **集中で選ぶ (dwell)** | β 帯 / (α + θ) のバンドパワー比 = 集中度。選択肢が 3 秒ごとに移る間、集中度がしきい値を超えて 1.2 秒続いた選択肢を選ぶ |
+| **点滅を見て選ぶ (SSVEP)** | 選択肢を別々の周波数 (6 / 7.5 / 8.57 / 12 / 15 Hz = 60 Hz 描画の約数) で点滅させ、見つめている選択肢の周波数が脳波 (視覚誘発電位) に現れるのを Goertzel + スペクトル中央値の雑音床で検出。BCI スペラーで確立された方式 |
+
+| 機器 | 接続 |
+|:--|:--|
+| **Muse** (2 / S) | Web Bluetooth。EEG 通知 (12 bit × 12 サンプル, 256 Hz) を復号 |
+| **OpenBCI Cyton** | Web Serial (115200 bps)。33 バイト枠 (24 bit 2 の補数) を復号 |
+| デモ | 合成信号の**シミュレーション** (本人の脳波ではないと明示) |
+
+Bluetooth / Serial は Windows・Linux 版 (Electron) と Chrome で使えます。Android は Chrome ブラウザで web 版 HTML を開いてください (Cordova の WebView は Web Bluetooth 非対応)。
+
+> ※ 脳波計が読むのは「集中している / どの点滅を見ているか」という**脳の状態**で、**思考の内容や言語は読み取れません**。
+> 利用者は提示された選択肢から注意を向けて選びます。他人の脳波を読むものではなく、本人が自分の頭に付けた機器で同意の上で使います。
+> 合成信号では、5 周波数 × 20 乱数系列 × 安静/集中の 200 件で誤検出 0・見逃し 0、刺激なし 40 件で誤検出 0 を確認しています (実機の脳波は個人差が大きく、しきい値の調整が必要です)。
+
 ## ⓪ サイレント・トーク — イメージした思いを、言葉を介さず動きで入力 (大拡張)
 
 文字や絵文字を選ぶのではなく、頭に**思い描いたもの**を、言葉を介さずに**連続した動き**で
@@ -140,7 +163,7 @@ Actions の監視は、偽の GitHub API を注入した単体テストと、API
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html (CI は --check で一致を検査)
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 169 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 184 件
 node bada_gpt_telegraph/tools/evaluate.js           # 論文 7.2 の評価 (--heldout で 7.3)
 cd bada_gpt_telegraph/app/electron && npm install && npm start   # デスクトップ版 (要 ../www/index.html)
 ```
@@ -153,6 +176,7 @@ bada_gpt_telegraph/
 │   ├── comprehend.js       ← 全体把握
 │   ├── silent.js           ← サイレント・トーク (非言語 → トランスフォーマー → latent → 文章・画像・Bada)
 │   ├── bio.js              ← 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ)
+│   ├── bci.js              ← 思考だけで (脳波 BCI: 集中度 / SSVEP・Muse / OpenBCI 復号・スキャン選択)
 │   ├── codegen.js          ← ソースコード化 (仕様 → Python / Node / Bada の動くソース)
 │   ├── autobuild.js        ← 自動コンパイル (一式を GitHub へ 1 コミット → Actions が exe/apk をビルド → 監視)
 │   ├── generate.js         ← 14 部品・HTML 組み立て・検証

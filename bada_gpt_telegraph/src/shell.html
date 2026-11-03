@@ -88,6 +88,11 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
 .sreadout .rrow{display:grid;grid-template-columns:140px 70px 1fr;gap:8px;align-items:baseline}
 .sreadout .rrow i{font-style:normal;color:var(--txt2)}.sreadout .rrow b{font-variant-numeric:tabular-nums;color:var(--acc);font-weight:500}
 .simgs{display:flex;gap:8px;flex-wrap:wrap}.simgs svg{border-radius:8px;border:1px solid rgba(150,190,255,.18)}
+.bciopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.bciopt{padding:14px 10px;border-radius:12px;border:1px solid rgba(150,190,255,.2);background:rgba(30,42,70,.6);text-align:center;font-size:14px;transition:background .1s}
+.bciopt.cur{border-color:var(--acc);background:rgba(143,208,255,.22);box-shadow:0 0 18px rgba(143,208,255,.35)}
+.bciopt.flash{background:#fff;color:#000}
+.bciopt .hz{display:block;font-size:9px;color:var(--txt2)}
 </style>
 </head>
 <body>
@@ -97,6 +102,39 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
  <div class="sub">BadaGPT TELEGRAPH · 思考入力 → 電信 → 全体把握 → 設計 → 生成 → 検証 → 論文<br>
  依頼の全体を捉えてアプリケーションを錬成し、Android (APK) / Windows 10・11 / Linux へ · Bada 言語駆動</div>
 </header>
+
+<div class="card">
+ <h2>⓪-α 思考だけで — 脳波 (BCI) で選ぶ: 声も、絵も、文字もなしに</h2>
+ <div class="muted" style="margin-bottom:8px">声を出さず、絵も描かず、文字も打たずに入力します。<b>自分の頭に付けた脳波計</b> (Muse / OpenBCI) が読む<b>集中度</b> (β/(α+θ)) か、見つめている選択肢の<b>点滅周波数</b> (SSVEP) で、BadaGPT が順に示す選択肢を<b>注意を向けるだけで選びます</b>。選んだものがサイレント・トークの非言語列になり、文章 → アプリ → ソースコード → 自動コンパイルへ流れます。</div>
+ <div class="row">
+  <button class="btn" id="bci-muse">🧠 Muse を接続 (Bluetooth)</button>
+  <button class="btn" id="bci-obci">🔌 OpenBCI Cyton を接続 (Serial)</button>
+  <button class="btn" id="bci-demo">🎛 デモ (合成信号・シミュレーション)</button>
+  <button class="btn hidden" id="bci-stop">⏹ 切断</button>
+  <span class="muted" id="bci-stat">未接続</span>
+ </div>
+ <div class="row">
+  <span class="chip on" id="bci-mode-att">集中で選ぶ (dwell)</span><span class="chip" id="bci-mode-ssvep">点滅を見て選ぶ (SSVEP)</span>
+  <label class="inl" style="margin:0;font-size:11px;color:var(--txt2)">しきい値 <input id="bci-thr" type="range" min="0.4" max="0.9" step="0.05" value="0.6" style="width:90px;padding:0"> <span id="bci-thr-v">0.60</span></label>
+ </div>
+ <canvas id="bci-wave" style="width:100%;height:70px;border-radius:10px;background:#06090f;border:1px solid rgba(130,170,240,.14);margin-top:6px"></canvas>
+ <div class="grid" style="margin-top:8px">
+  <div class="tile"><div class="k">θ 4–7 Hz</div><div class="v" id="bci-th">—</div></div>
+  <div class="tile"><div class="k">α 8–12 Hz</div><div class="v" id="bci-al">—</div></div>
+  <div class="tile"><div class="k">β 13–30 Hz</div><div class="v" id="bci-be">—</div></div>
+  <div class="tile acc"><div class="k">集中度 / SSVEP</div><div class="v" id="bci-att">—</div></div>
+ </div>
+ <label style="margin-top:10px" id="bci-stage">段階: —</label>
+ <div id="bci-options" class="bciopts"></div>
+ <div class="cov" style="margin-top:6px"><div id="bci-prog" style="width:0%"></div></div>
+ <label>選んだもの</label>
+ <div id="bci-picked" class="sstrip"><span class="muted">まだ何も選ばれていません。</span></div>
+ <div class="row">
+  <button class="main" id="bci-send" disabled style="margin-top:4px">⚡ この選択を思いにして錬成する</button>
+  <button class="btn" id="bci-reset">最初から</button>
+ </div>
+ <div class="note" style="text-align:left;margin-top:8px">※ 脳波計が読むのは「集中している / どの点滅を見ているか」という<b>脳の状態</b>で、<b>思考の内容や言語は読み取れません</b>。利用者は提示された選択肢から注意を向けて選びます。他人の脳波を読むものではなく、本人が自分の頭に付けた機器で同意の上で使います。<b>デモは合成信号のシミュレーション</b>で、本人の脳波ではありません。Bluetooth / Serial は Windows・Linux 版と Chrome で使えます (Android は Chrome ブラウザで web 版を開いてください)。</div>
+</div>
 
 <div class="card">
  <h2>⓪ サイレント・トーク — イメージした思いを、言葉を介さず動きで入力する</h2>

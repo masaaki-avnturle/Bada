@@ -508,6 +508,140 @@
   $("clearKey").onclick = function () { LS.set("apiKey", ""); keyState(); };
   keyState();
 
+  /* ═════════════ ⓪-α 思考だけで (脳波 BCI) ═════════════ */
+  var bci = { src: null, fs: 256, buf: [], mode: "att", stageIdx: 0, sel: {}, scanner: null, timer: null, flickerRaf: null, flickerOn: false, att: NaN, ssvep: NaN, device: null, demoT: 0, demoPlan: null };
+  function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  var bcv = $("bci-wave"), bcx = bcv.getContext("2d");
+  function bciStat(m) { $("bci-stat").textContent = m; }
+  function bciPush(samples) { for (var i = 0; i < samples.length; i++) bci.buf.push(samples[i]); if (bci.buf.length > bci.fs * 4) bci.buf.splice(0, bci.buf.length - bci.fs * 4); }
+  function bciDrawWave() {
+    var dpr = window.devicePixelRatio || 1, W = bcv.clientWidth, H = 70;
+    if (bcv.width !== W * dpr) { bcv.width = W * dpr; bcv.height = H * dpr; bcx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    bcx.clearRect(0, 0, W, H); var tail = bci.buf.slice(-Math.min(bci.buf.length, bci.fs)); if (tail.length < 2) return;
+    var mx = 1; tail.forEach(function (v) { mx = Math.max(mx, Math.abs(v)); });
+    bcx.strokeStyle = "rgba(185,140,255,.9)"; bcx.lineWidth = 1.2; bcx.beginPath();
+    tail.forEach(function (v, i) { var x = i / (tail.length - 1) * W, y = H / 2 - v / mx * (H / 2 - 4); if (i) bcx.lineTo(x, y); else bcx.moveTo(x, y); });
+    bcx.stroke();
+  }
+  function bciStage() { return BCI_STAGES[bci.stageIdx]; }
+  function bciRenderOptions() {
+    var st = bciStage(); if (!st) { $("bci-stage").textContent = "段階: 完了 — 「錬成」を押すか、脳波で「錬成」が自動で始まります"; $("bci-options").innerHTML = ""; return; }
+    $("bci-stage").textContent = "段階 " + (bci.stageIdx + 1) + " / " + BCI_STAGES.length + ": " + st.label;
+    $("bci-options").innerHTML = st.options.map(function (id, i) { return '<div class="bciopt" data-id="' + id + '">' + escHtml(bciOptionLabel(id)) + (bci.mode === "ssvep" ? '<span class="hz">' + SSVEP_FREQS[i % SSVEP_FREQS.length] + " Hz</span>" : "") + "</div>"; }).join("");
+    bci.scanner = new Scanner(st.options, { stepMs: 3000, thr: +$("bci-thr").value, dwellMs: 1200 });
+  }
+  function bciRenderPicked() {
+    var atoms = bciSelectionsToAtoms(bci.sel);
+    $("bci-picked").innerHTML = Object.keys(bci.sel).length ? BCI_STAGES.filter(function (st) { return bci.sel[st.key]; }).map(function (st) { return '<span class="schip">' + escHtml(bciOptionLabel(bci.sel[st.key])) + "</span>"; }).join("") : '<span class="muted">まだ何も選ばれていません。</span>';
+    $("bci-send").disabled = !atoms.length;
+  }
+  function bciSelect(id) {
+    var st = bciStage(); if (!st) return;
+    bci.sel[st.key] = id; bci.stageIdx++; bciRenderPicked(); bciRenderOptions();
+    if (!bciStage()) { bciStat("すべて選びました。錬成します…"); setTimeout(function () { $("bci-send").click(); }, 800); }
+  }
+  function bciAnalyze(now) {
+    var winA = bci.buf.slice(-Math.round(bci.fs * 1.25)), win = bci.buf.slice(-bci.fs * 3);
+    var bp = bandPowers(winA, bci.fs); bci.att = attentionIndex(bp);
+    $("bci-th").textContent = isFinite(bp.theta) ? bp.theta.toFixed(0) : "—"; $("bci-al").textContent = isFinite(bp.alpha) ? bp.alpha.toFixed(0) : "—"; $("bci-be").textContent = isFinite(bp.beta) ? bp.beta.toFixed(0) : "—";
+    var drive = bci.att, st = bciStage();
+    if (bci.mode === "ssvep" && st) {
+      var d = ssvepDetect(win, bci.fs, SSVEP_FREQS.slice(0, Math.min(st.options.length, SSVEP_FREQS.length))); bci.ssvep = d.freq;
+      $("bci-att").textContent = isFinite(d.freq) ? d.freq + " Hz (SNR " + d.snr.toFixed(1) + ")" : "— (SNR " + d.snr.toFixed(1) + ")";
+      if (isFinite(d.freq) && bci.scanner) { var idx = SSVEP_FREQS.indexOf(d.freq); if (idx >= 0 && idx < st.options.length) { bci.scanner.i = idx; drive = 1; } else drive = 0; } else drive = 0;
+    } else $("bci-att").textContent = isFinite(bci.att) ? (bci.att * 100).toFixed(0) + " / 100" : "—";
+    if (!bci.scanner || !st) return;
+    var r = bci.scanner.tick(now, drive);
+    qsa(".bciopt", $("bci-options")).forEach(function (el) { el.classList.toggle("cur", el.getAttribute("data-id") === r.current); });
+    $("bci-prog").style.width = Math.round(r.progress * 100) + "%";
+    if (r.selected) bciSelect(r.selected);
+  }
+  function bciFlicker(ts) {
+    if (!bci.flickerOn) return;
+    var els = qsa(".bciopt", $("bci-options"));
+    els.forEach(function (el, i) { var f = SSVEP_FREQS[i % SSVEP_FREQS.length]; el.classList.toggle("flash", Math.floor(ts * f / 1000 * 2) % 2 === 0); });
+    bci.flickerRaf = requestAnimationFrame(bciFlicker);
+  }
+  function bciStart(label) {
+    bci.buf = []; bci.stageIdx = 0; bci.sel = {}; bciRenderPicked(); bciRenderOptions();
+    $("bci-stop").classList.remove("hidden"); bciStat(label + " — 選択肢が 3 秒ごとに移ります。選びたいものの間に集中してください (" + (bci.mode === "ssvep" ? "点滅を見つめる" : "集中度がしきい値を超えて 1.2 秒") + ")。");
+    clearInterval(bci.timer); bci.timer = setInterval(function () { bciDrawWave(); bciAnalyze(performance.now()); }, 100);
+    if (bci.mode === "ssvep") { bci.flickerOn = true; bci.flickerRaf = requestAnimationFrame(bciFlicker); }
+  }
+  function bciStopAll() {
+    clearInterval(bci.timer); bci.timer = null; bci.flickerOn = false; if (bci.flickerRaf) cancelAnimationFrame(bci.flickerRaf);
+    try { if (bci.device && bci.device.gatt) bci.device.gatt.disconnect(); } catch (e) { /* 既に切断 */ }
+    try { if (bci.reader) { bci.reader.cancel(); } if (bci.port) { bci.port.close(); } } catch (e) { /* 既に閉じた */ }
+    bci.device = null; bci.reader = null; bci.port = null; bci.src = null;
+    $("bci-stop").classList.add("hidden"); bciStat("切断しました");
+  }
+  /* デモ: 合成脳波。各段で 2 番目の選択肢の時間に集中が上がる計画 (シミュレーションであることを明示) */
+  $("bci-demo").onclick = function () {
+    bciStopAll(); bci.src = "demo"; bci.fs = 256; bci.demoT = 0;
+    var plan = { domain: "records", object: "book", action: "sort", tone: "cool", scale: "medium", platform: "_all" };
+    bci.demoPlan = plan; bciStart("デモ (合成信号)");
+    var gen = setInterval(function () {
+      if (bci.src !== "demo") { clearInterval(gen); return; }
+      var st = bciStage(); var wantIdx = st ? st.options.indexOf(plan[st.key]) : -1;
+      var focus = st && bci.scanner && bci.scanner.i === wantIdx && !(performance.now() < bci.scanner.cooldownUntil);
+      var tStart = bci.demoT * 0.1; /* 位相をつないで連続した脳波にする (チャンク境界の人工成分を避ける) */
+      var chunk = syntheticEEG(bci.fs, 0.1, { t0: tStart, attention: focus ? [[tStart, tStart + 1]] : [], seed: (bci.demoT * 7919) | 0, ssvepHz: (bci.mode === "ssvep" && focus) ? SSVEP_FREQS[wantIdx % SSVEP_FREQS.length] : 0 });
+      bci.demoT++; bciPush(chunk);
+    }, 100);
+  };
+  /* Muse (Web Bluetooth) */
+  $("bci-muse").onclick = async function () {
+    if (!navigator.bluetooth) { bciStat("この環境は Web Bluetooth に対応していません (Windows/Linux 版か Chrome で)"); return; }
+    try {
+      bciStopAll(); bci.fs = MUSE.FS;
+      var dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "Muse" }], optionalServices: [MUSE.SERVICE] });
+      bci.device = dev; var server = await dev.gatt.connect(); var svc = await server.getPrimaryService(MUSE.SERVICE);
+      var ctrl = await svc.getCharacteristic(MUSE.CONTROL);
+      var eeg = await svc.getCharacteristic(MUSE.EEG[0]); /* TP9: 後頭に近く SSVEP が出やすい */
+      await eeg.startNotifications();
+      eeg.addEventListener("characteristicvaluechanged", function (e) { var d = museDecodeEEG(new Uint8Array(e.target.value.buffer)); bciPush(d.samples); });
+      await ctrl.writeValue(museCommand("h")); await ctrl.writeValue(museCommand("p21")); await ctrl.writeValue(museCommand("s")); await ctrl.writeValue(museCommand("d"));
+      bci.src = "muse"; bciStart("Muse 接続 (" + dev.name + ")");
+    } catch (e) { bciStat("Muse に接続できません: " + (e.message || e)); }
+  };
+  /* OpenBCI Cyton (Web Serial) */
+  $("bci-obci").onclick = async function () {
+    if (!navigator.serial) { bciStat("この環境は Web Serial に対応していません (Windows/Linux 版か Chrome で)"); return; }
+    try {
+      bciStopAll(); bci.fs = OPENBCI.FS;
+      var port = await navigator.serial.requestPort(); await port.open({ baudRate: 115200 }); bci.port = port;
+      var w = port.writable.getWriter(); await w.write(new Uint8Array([0x62])); w.releaseLock(); /* 'b' = ストリーム開始 */
+      bci.src = "openbci"; bciStart("OpenBCI Cyton 接続");
+      var reader = port.readable.getReader(); bci.reader = reader; var carry = new Uint8Array(0);
+      (async function pump() {
+        for (;;) {
+          var r = await reader.read(); if (r.done) break;
+          var merged = new Uint8Array(carry.length + r.value.length); merged.set(carry); merged.set(r.value, carry.length);
+          var frames = openbciDecode(merged); bciPush(frames.map(function (f) { return f.channels[0]; }));
+          var used = frames.length * 33; carry = merged.slice(Math.max(0, merged.length - (merged.length - used) % 33 - 33));
+        }
+      })().catch(function (e) { bciStat("Serial 読み取りが止まりました: " + (e.message || e)); });
+    } catch (e) { bciStat("OpenBCI に接続できません: " + (e.message || e)); }
+  };
+  $("bci-stop").onclick = bciStopAll;
+  $("bci-mode-att").onclick = function () { bci.mode = "att"; this.classList.add("on"); $("bci-mode-ssvep").classList.remove("on"); bci.flickerOn = false; bciRenderOptions(); };
+  $("bci-mode-ssvep").onclick = function () { bci.mode = "ssvep"; this.classList.add("on"); $("bci-mode-att").classList.remove("on"); bciRenderOptions(); if (bci.timer) { bci.flickerOn = true; bci.flickerRaf = requestAnimationFrame(bciFlicker); } };
+  $("bci-thr").oninput = function () { $("bci-thr-v").textContent = (+this.value).toFixed(2); if (bci.scanner) bci.scanner.thr = +this.value; };
+  $("bci-reset").onclick = function () { bci.stageIdx = 0; bci.sel = {}; bciRenderPicked(); bciRenderOptions(); };
+  $("bci-send").onclick = function () {
+    var atoms = bciSelectionsToAtoms(bci.sel); if (!atoms.length) return;
+    bciStopAll();
+    silentSeq = atoms.slice(); saveSeq(); renderStrip();
+    var proc = silentProcess(atoms, volOpt());
+    lastSilent = { seq: proc.seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags, readout: [{ label: "入力", value: "脳波 (BCI)", meant: "声・絵・文字なしに、注意を向けて選んだ " + atoms.length + " 個の選択" }], features: null };
+    $("silent-out").classList.remove("hidden"); renderReadout(lastSilent.readout);
+    $("silent-req").textContent = proc.request; $("silent-doc").innerHTML = mdToHtml(proc.document.markdown); $("silent-bada").textContent = proc.bada; $("silent-imgs").innerHTML = proc.imagery.join("");
+    $("silent-doc-sum").textContent = "📖 思いを展開した文章 (" + proc.document.chars.toLocaleString("ja-JP") + " 字)";
+    $("thought").value = proc.request; LS.set("draft", proc.request);
+    go();
+  };
+  bciRenderOptions(); bciRenderPicked();
+
   /* ═════════════ ⓪ サイレント・トーク (非言語思考入力) ═════════════ */
   var lastSilent = null;
   var CAT_LABEL = { tone: "感情・質感", domain: "領域", object: "対象", action: "動作", scale: "分量", platform: "環境" };

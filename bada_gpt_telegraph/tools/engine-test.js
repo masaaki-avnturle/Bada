@@ -21,7 +21,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const ctx = { console, TextEncoder, TextDecoder, atob, btoa, Uint8Array, Float32Array, Map };
 vm.createContext(ctx);
-for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/bio.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
+for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), ctx, { filename: f });
 }
 const E = (expr) => vm.runInContext(expr, ctx);
@@ -115,6 +115,46 @@ section("体のサイン (本人の心拍・呼吸 → 気分のヒント)");
   const r0 = call("silentToRequest", base, call("silentEncode", base)), r1 = call("silentToRequest", withBio, call("silentEncode", withBio));
   ok(JSON.stringify(call("silentEncode", base).pooled) !== JSON.stringify(call("silentEncode", withBio).pooled), "気分アトムは latent に効く");
   ok(r0.tags.mods.join() === r1.tags.mods.join() && r0.tags.entity === r1.tags.entity, "気分アトムは依頼文のモジュール・対象を変えない");
+}
+
+/* 0.6 思考だけで (脳波 BCI): DSP・機器パケット・スキャン選択 */
+section("思考だけで (脳波 BCI → 注意で選ぶ)");
+{
+  const fsHz = 256;
+  const relaxed = call("syntheticEEG", fsHz, 2, {}), focused = call("syntheticEEG", fsHz, 2, { attention: [[0, 2]] });
+  const aR = call("attentionIndex", call("bandPowers", relaxed, fsHz)), aF = call("attentionIndex", call("bandPowers", focused, fsHz));
+  ok(aF > 0.6 && aR < 0.4, "集中度: 集中 (β↑α↓) と安静を分離 " + aR.toFixed(2) + " / " + aF.toFixed(2));
+  ok(isNaN(call("attentionIndex", call("bandPowers", [1, 2, 3], fsHz))), "短すぎる窓は NaN");
+  let ssvepOk = true;
+  for (const f of E("SSVEP_FREQS")) { const d = call("ssvepDetect", call("syntheticEEG", fsHz, 3, { ssvepHz: f }), fsHz, E("SSVEP_FREQS")); if (d.freq !== f) ssvepOk = false; }
+  ok(ssvepOk, "SSVEP: 5 つの点滅周波数をそれぞれ正しく検出");
+  ok(isNaN(call("ssvepDetect", call("syntheticEEG", fsHz, 3, {}), fsHz, E("SSVEP_FREQS")).freq), "SSVEP: 成分が無ければ検出しない");
+  /* Muse 20 バイト通知の復号 (既知の生値を詰めて往復) */
+  const musePack = (idx, raws) => { const b = new Uint8Array(20); b[0] = idx >> 8; b[1] = idx & 255; let bit = 16; for (const r of raws) { const bi = bit >> 3; if (bit % 8 === 0) { b[bi] |= r >> 4; b[bi + 1] |= (r & 15) << 4; } else { b[bi] |= (r >> 8) & 15; b[bi + 1] = r & 255; } bit += 12; } return b; };
+  const dec = call("museDecodeEEG", musePack(1234, [0x800, 0x801, 0x7FF, 0x000, 0xFFF, 0x900, 0x700, 0x800, 0x811, 0x7EF, 0x801, 0x7FF]));
+  ok(dec.index === 1234 && dec.samples.length === 12 && Math.abs(dec.samples[0]) < 1e-9 && Math.abs(dec.samples[1] - 0.48828125) < 1e-9 && Math.abs(dec.samples[3] + 1000) < 1, "Muse: 12 ビット × 12 サンプルを µV に復号");
+  ok(call("museDecodeEEG", new Uint8Array(5)).samples.length === 0, "Muse: 短いパケットは空");
+  const cmd = call("museCommand", "p21"); ok(cmd[0] === 4 && String.fromCharCode(cmd[1], cmd[2], cmd[3]) === "p21" && cmd[4] === 10, "Muse: 制御コマンドの枠 (長さ + 文字 + 改行)");
+  /* OpenBCI Cyton 33 バイト枠 (ゴミの後に 2 枠) */
+  const obci = (n, vals) => { const b = new Uint8Array(33); b[0] = 0xA0; b[1] = n; for (let c = 0; c < 8; c++) { let v = vals[c] | 0; if (v < 0) v += 0x1000000; b[2 + c * 3] = (v >> 16) & 255; b[3 + c * 3] = (v >> 8) & 255; b[4 + c * 3] = v & 255; } b[32] = 0xC0; return b; };
+  const stream = new Uint8Array(2 + 66); stream.set([0x11, 0x22]); stream.set(obci(7, [1, -1, 8388607, -8388608, 0, 0, 0, 0]), 2); stream.set(obci(8, [0, 0, 0, 0, 0, 0, 0, 0]), 35);
+  const fr = call("openbciDecode", stream), sc = E("OPENBCI").SCALE_UV;
+  ok(fr.length === 2 && fr[0].sample === 7 && fr[1].sample === 8 && Math.abs(fr[0].channels[0] - sc) < 1e-9 && Math.abs(fr[0].channels[1] + sc) < 1e-9 && fr[0].channels[2] > 0 && fr[0].channels[3] < 0, "OpenBCI: 24 ビット 2 の補数を µV に復号し、ゴミを読み飛ばす");
+  /* スキャン選択: 2 番目の選択肢の間に集中 → それが選ばれる */
+  const S = new (E("Scanner"))(["a", "b", "c"], { stepMs: 3000, thr: 0.6, dwellMs: 1200 });
+  let picked = null; for (let t = 0; t <= 9000 && !picked; t += 100) { const r = S.tick(t, (t >= 3300 && t < 4700) ? 0.9 : 0.1); if (r.selected) picked = { t, v: r.selected }; }
+  ok(picked && picked.v === "b" && picked.t >= 4400 && picked.t <= 4600, "スキャン: 集中が 1.2 秒続いた選択肢を選ぶ (" + JSON.stringify(picked) + ")");
+  const S2 = new (E("Scanner"))(["a", "b"], { stepMs: 3000, thr: 0.6, dwellMs: 1200 });
+  let none = true; for (let t = 0; t <= 9000; t += 100) { if (S2.tick(t, 0.9 * ((t / 100) % 2)).selected) none = false; } /* 断続的な集中では選ばない */
+  ok(none, "スキャン: 途切れる集中では選ばない");
+  ok(isNaN(NaN) && !new (E("Scanner"))(["a"], {}).tick(0, NaN).selected, "スキャン: 集中度 NaN でも落ちない");
+  /* 段階 → アトム → 依頼文 */
+  const atoms = call("bciSelectionsToAtoms", { domain: "records", object: "book", action: "sort", tone: "_skip", scale: "medium", platform: "_all" });
+  ok(atoms.join() === "records,book,sort,medium,android,windows,linux", "段階の選択 → 非言語アトム列 (_skip は無視・_all は 3 環境)");
+  const req = call("silentToRequest", atoms, call("silentEncode", atoms)).text;
+  ok(/本/.test(req) && /並べ替え/.test(req) && /スマホとWindowsとLinux/.test(req), "脳波で選んだ列が依頼文になる");
+  ok(E("BCI_STAGES").every((st) => st.options.every((o) => o === "_skip" || o === "_all" || E("ATOM_BY_ID")[o])), "段階の選択肢はすべて実在するアトム");
+  ok(/本/.test(call("bciOptionLabel", "book")) && /次へ/.test(call("bciOptionLabel", "_skip")), "選択肢の表示名");
 }
 
 /* 1. 電信エンジン */

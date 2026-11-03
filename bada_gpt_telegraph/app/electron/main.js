@@ -40,6 +40,14 @@ function createWindow() {
     if (!url.startsWith("file://")) e.preventDefault();
   });
 
+  /* 「思考だけで (BCI)」: Web Bluetooth の機器選択は Muse を自動で選び、Web Serial は許可する */
+  win.webContents.on("select-bluetooth-device", (event, devices, callback) => {
+    event.preventDefault();
+    const muse = devices.find((d) => /muse/i.test(d.deviceName || ""));
+    if (muse) callback(muse.deviceId); else if (devices.length) callback(devices[0].deviceId);
+  });
+  session.defaultSession.setDevicePermissionHandler((details) => details.deviceType === "serial" || details.deviceType === "bluetooth");
+
   win.loadFile(indexPath());
 }
 

@@ -88,6 +88,11 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
 .sreadout .rrow{display:grid;grid-template-columns:140px 70px 1fr;gap:8px;align-items:baseline}
 .sreadout .rrow i{font-style:normal;color:var(--txt2)}.sreadout .rrow b{font-variant-numeric:tabular-nums;color:var(--acc);font-weight:500}
 .simgs{display:flex;gap:8px;flex-wrap:wrap}.simgs svg{border-radius:8px;border:1px solid rgba(150,190,255,.18)}
+.bciopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.bciopt{padding:14px 10px;border-radius:12px;border:1px solid rgba(150,190,255,.2);background:rgba(30,42,70,.6);text-align:center;font-size:14px;transition:background .1s}
+.bciopt.cur{border-color:var(--acc);background:rgba(143,208,255,.22);box-shadow:0 0 18px rgba(143,208,255,.35)}
+.bciopt.flash{background:#fff;color:#000}
+.bciopt .hz{display:block;font-size:9px;color:var(--txt2)}
 </style>
 </head>
 <body>
@@ -97,6 +102,39 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
  <div class="sub">BadaGPT TELEGRAPH · 思考入力 → 電信 → 全体把握 → 設計 → 生成 → 検証 → 論文<br>
  依頼の全体を捉えてアプリケーションを錬成し、Android (APK) / Windows 10・11 / Linux へ · Bada 言語駆動</div>
 </header>
+
+<div class="card">
+ <h2>⓪-α 思考だけで — 脳波 (BCI) で選ぶ: 声も、絵も、文字もなしに</h2>
+ <div class="muted" style="margin-bottom:8px">声を出さず、絵も描かず、文字も打たずに入力します。<b>自分の頭に付けた脳波計</b> (Muse / OpenBCI) が読む<b>集中度</b> (β/(α+θ)) か、見つめている選択肢の<b>点滅周波数</b> (SSVEP) で、BadaGPT が順に示す選択肢を<b>注意を向けるだけで選びます</b>。選んだものがサイレント・トークの非言語列になり、文章 → アプリ → ソースコード → 自動コンパイルへ流れます。</div>
+ <div class="row">
+  <button class="btn" id="bci-muse">🧠 Muse を接続 (Bluetooth)</button>
+  <button class="btn" id="bci-obci">🔌 OpenBCI Cyton を接続 (Serial)</button>
+  <button class="btn" id="bci-demo">🎛 デモ (合成信号・シミュレーション)</button>
+  <button class="btn hidden" id="bci-stop">⏹ 切断</button>
+  <span class="muted" id="bci-stat">未接続</span>
+ </div>
+ <div class="row">
+  <span class="chip on" id="bci-mode-att">集中で選ぶ (dwell)</span><span class="chip" id="bci-mode-ssvep">点滅を見て選ぶ (SSVEP)</span>
+  <label class="inl" style="margin:0;font-size:11px;color:var(--txt2)">しきい値 <input id="bci-thr" type="range" min="0.4" max="0.9" step="0.05" value="0.6" style="width:90px;padding:0"> <span id="bci-thr-v">0.60</span></label>
+ </div>
+ <canvas id="bci-wave" style="width:100%;height:70px;border-radius:10px;background:#06090f;border:1px solid rgba(130,170,240,.14);margin-top:6px"></canvas>
+ <div class="grid" style="margin-top:8px">
+  <div class="tile"><div class="k">θ 4–7 Hz</div><div class="v" id="bci-th">—</div></div>
+  <div class="tile"><div class="k">α 8–12 Hz</div><div class="v" id="bci-al">—</div></div>
+  <div class="tile"><div class="k">β 13–30 Hz</div><div class="v" id="bci-be">—</div></div>
+  <div class="tile acc"><div class="k">集中度 / SSVEP</div><div class="v" id="bci-att">—</div></div>
+ </div>
+ <label style="margin-top:10px" id="bci-stage">段階: —</label>
+ <div id="bci-options" class="bciopts"></div>
+ <div class="cov" style="margin-top:6px"><div id="bci-prog" style="width:0%"></div></div>
+ <label>選んだもの</label>
+ <div id="bci-picked" class="sstrip"><span class="muted">まだ何も選ばれていません。</span></div>
+ <div class="row">
+  <button class="main" id="bci-send" disabled style="margin-top:4px">⚡ この選択を思いにして錬成する</button>
+  <button class="btn" id="bci-reset">最初から</button>
+ </div>
+ <div class="note" style="text-align:left;margin-top:8px">※ 脳波計が読むのは「集中している / どの点滅を見ているか」という<b>脳の状態</b>で、<b>思考の内容や言語は読み取れません</b>。利用者は提示された選択肢から注意を向けて選びます。他人の脳波を読むものではなく、本人が自分の頭に付けた機器で同意の上で使います。<b>デモは合成信号のシミュレーション</b>で、本人の脳波ではありません。Bluetooth / Serial は Windows・Linux 版と Chrome で使えます (Android は Chrome ブラウザで web 版を開いてください)。</div>
+</div>
 
 <div class="card">
  <h2>⓪ サイレント・トーク — イメージした思いを、言葉を介さず動きで入力する</h2>
@@ -1657,6 +1695,220 @@ function bioToAtoms(bio) {
   else atoms.push("joy");
   readout.push({ label: "添える気分", value: atoms.join(","), meant: "調子のヒントとしてだけ latent に加えます (アプリの中身は決めません)" });
   return { atoms: atoms, readout: readout, calm: calm };
+}
+
+/*
+ * bci.js — BadaGPT電信「思考だけで (脳波 BCI)」
+ *
+ * 声を出さず、絵も描かず、文字も打たずに、**自分の頭に付けた脳波計 (EEG)** の
+ * 信号だけで BadaGPT に選択を伝える、ブレイン・コンピュータ・インタフェース (BCI)。
+ *
+ *   - 集中度 (attention): β 帯 (13–30 Hz) / (α 8–12 Hz + θ 4–7 Hz) のバンドパワー比。
+ *     選択肢を順に提示 (スキャン) し、ある選択肢の間に集中度がしきい値を超えて
+ *     一定時間続いたら、それを選ぶ (dwell 選択)。
+ *   - SSVEP: 画面の選択肢を異なる周波数 (60 Hz の約数: 7.5 / 8.57 / 10 / 12 / 15 Hz)
+ *     で点滅させ、見つめている選択肢の周波数が脳波に現れる (視覚誘発電位) ことを
+ *     Goertzel で検出する。BCI スペラーで確立された方式。
+ *   - 機器: Muse (Web Bluetooth)・OpenBCI Cyton (Web Serial) のパケットを復号する。
+ *     機器が無いときは「デモ (合成信号)」で仕組みを動かす (明示的にシミュレーション)。
+ *
+ * 正直な範囲 (重要):
+ *   - 脳波計が読むのは「集中している / リラックスしている / どの点滅を見ているか」
+ *     という **脳の状態** であり、思考の内容や言語は読み取れない。利用者は提示された
+ *     選択肢から **注意を向けることで選ぶ**。これが「思考だけで入力する」の、現在の
+ *     技術で正直に成立する形である。
+ *   - 他人の脳波を読むものではなく、利用者本人が自分の頭に付けた機器で、同意の上で使う。
+ *   - デモはシミュレーションであり、本人の脳波ではない。
+ */
+"use strict";
+
+/* ───────────── DSP ───────────── */
+
+/* 周波数 f のパワー (Goertzel)。samples は µV の配列。 */
+function goertzelPower(samples, fs, f) {
+  var n = samples.length, w = 2 * Math.PI * f / fs, c = 2 * Math.cos(w), s1 = 0, s2 = 0;
+  for (var i = 0; i < n; i++) { var s0 = samples[i] + c * s1 - s2; s2 = s1; s1 = s0; }
+  return (s1 * s1 + s2 * s2 - c * s1 * s2) / (n * n);
+}
+
+function demean(samples) {
+  var m = 0; for (var i = 0; i < samples.length; i++) m += samples[i]; m /= (samples.length || 1);
+  var out = new Array(samples.length); for (var j = 0; j < samples.length; j++) out[j] = samples[j] - m;
+  return out;
+}
+
+/* θ / α / β のバンドパワー (1 Hz 刻みの Goertzel の和)。1 秒以上の窓が必要。 */
+function bandPowers(samples, fs) {
+  if (!samples || samples.length < fs) return { theta: NaN, alpha: NaN, beta: NaN };
+  var x = demean(samples);
+  function band(lo, hi) { var p = 0; for (var f = lo; f <= hi; f++) p += goertzelPower(x, fs, f); return p; }
+  return { theta: band(4, 7), alpha: band(8, 12), beta: band(13, 30) };
+}
+
+/* 集中度 0..1: β / (α + θ) を 0..1 に圧縮 (比 1 で 0.5) */
+function attentionIndex(bp) {
+  if (!isFinite(bp.beta) || !isFinite(bp.alpha) || !isFinite(bp.theta)) return NaN;
+  var r = bp.beta / (bp.alpha + bp.theta + 1e-12);
+  return r / (1 + r);
+}
+
+/* SSVEP: 候補周波数のうち、基本波のパワーがスペクトル全体 (5–30 Hz) の中央値
+ * (雑音床) に比べて最も高いものを返す。中央値は α のピーク 1 本に引きずられない。
+ * 第 2 高調波は候補どうしで重なる (6→12, 7.5→15) ため使わない。{ freq, snr, scores } */
+function ssvepDetect(samples, fs, freqs) {
+  if (!samples || samples.length < fs * 2) return { freq: NaN, snr: 0, scores: [] };
+  var x = demean(samples), floorPows = [];
+  for (var f0 = 5; f0 <= 30; f0 += 0.25) {
+    var near = freqs.some(function (f) { return Math.abs(f0 - f) < 0.6; });
+    if (!near) floorPows.push(goertzelPower(x, fs, f0));
+  }
+  floorPows.sort(function (a, b) { return a - b; });
+  var noise = floorPows.length ? floorPows[floorPows.length >> 1] : 1e-12;
+  var scores = freqs.map(function (f) { return { freq: f, snr: goertzelPower(x, fs, f) / (noise + 1e-12) }; });
+  var best = scores.reduce(function (a, b) { return b.snr > a.snr ? b : a; }, { freq: NaN, snr: 0 });
+  var second = scores.filter(function (sc) { return sc.freq !== best.freq; }).reduce(function (a, b) { return b.snr > a.snr ? b : a; }, { snr: 0 });
+  /* 雑音床の 12 倍以上 (背景の漏れは最大 10 倍程度、本物の誘発電位は 100 倍以上)、
+   * かつ次点の 2 倍以上ではっきり勝っているときだけ採用 */
+  var okHit = best.snr >= 12 && best.snr >= 2 * second.snr;
+  return { freq: okHit ? best.freq : NaN, snr: best.snr, scores: scores };
+}
+
+/* 60 Hz 描画で正確に出せる点滅周波数 (60/n)。α 帯 (8–12 Hz) の 10 Hz は背景律動と
+ * 混同するため外し、β 帯の 20 Hz も集中時の β と混同するため外す。
+ * 段階ごとの選択肢は最大 5 個 (それぞれ別の周波数)。 */
+var SSVEP_FREQS = [6, 7.5, 8.57, 12, 15];
+
+/* ───────────── 機器のパケット復号 ───────────── */
+
+/* Muse (2 / S): EEG 特性 (273e0003〜0006) の 20 バイト通知。
+ * [0..1] パケット番号 (BE)、[2..19] 12 ビット × 12 サンプル。0x800 を中心に 0.48828125 µV/bit。 */
+var MUSE = {
+  SERVICE: "0000fe8d-0000-1000-8000-00805f9b34fb",
+  CONTROL: "273e0001-4c4d-454d-96be-f03bac821358",
+  EEG: ["273e0003-4c4d-454d-96be-f03bac821358", "273e0004-4c4d-454d-96be-f03bac821358", "273e0005-4c4d-454d-96be-f03bac821358", "273e0006-4c4d-454d-96be-f03bac821358"],
+  CHANNELS: ["TP9", "AF7", "AF8", "TP10"],
+  FS: 256
+};
+function museDecodeEEG(bytes) {
+  if (!bytes || bytes.length < 20) return { index: -1, samples: [] };
+  var index = (bytes[0] << 8) | bytes[1], out = [];
+  for (var i = 0; i < 12; i++) {
+    var bit = 16 + i * 12, byteI = bit >> 3, raw;
+    if (bit % 8 === 0) raw = (bytes[byteI] << 4) | (bytes[byteI + 1] >> 4);
+    else raw = ((bytes[byteI] & 0x0F) << 8) | bytes[byteI + 1];
+    out.push((raw - 0x800) * 0.48828125);
+  }
+  return { index: index, samples: out };
+}
+/* Muse へ送る制御コマンド (長さ + ASCII + '\n') */
+function museCommand(str) {
+  var s = str + "\n", out = new Uint8Array(s.length + 1); out[0] = s.length;
+  for (var i = 0; i < s.length; i++) out[i + 1] = s.charCodeAt(i);
+  return out;
+}
+
+/* OpenBCI Cyton: 33 バイト。0xA0, サンプル番号, 8ch × 24bit (2 の補数, BE), 6 バイト補助, 0xC0..0xCF。
+ * 1 LSB = 4.5 V / ゲイン 24 / (2^23 - 1) → µV */
+var OPENBCI = { FS: 250, SCALE_UV: 4.5 / 24 / (Math.pow(2, 23) - 1) * 1e6 };
+function openbciDecode(bytes) {
+  var out = [], i = 0;
+  while (i + 33 <= bytes.length) {
+    if (bytes[i] !== 0xA0 || (bytes[i + 32] & 0xF0) !== 0xC0) { i++; continue; }
+    var ch = [];
+    for (var c = 0; c < 8; c++) {
+      var o = i + 2 + c * 3, v = (bytes[o] << 16) | (bytes[o + 1] << 8) | bytes[o + 2];
+      if (v & 0x800000) v -= 0x1000000;
+      ch.push(v * OPENBCI.SCALE_UV);
+    }
+    out.push({ sample: bytes[i + 1], channels: ch });
+    i += 33;
+  }
+  return out;
+}
+
+/* ───────────── 合成信号 (デモ・テスト用) ───────────── */
+
+/* fs Hz・seconds 秒。実際の脳波に近づけて、α は 9.6–10.4 Hz に広がり、β は 14–26 Hz の
+ * 広帯域、θ は 5–6.5 Hz。attention 区間では β を強め α を弱める。ssvepHz を与えると
+ * その周波数の成分 (視覚誘発電位) を乗せる。 */
+function syntheticEEG(fs, seconds, opts) {
+  opts = opts || {};
+  var n = Math.round(fs * seconds), out = new Array(n), rng = mulberry32(opts.seed || 7);
+  var att = opts.attention || [], t0 = opts.t0 || 0; /* t0: 連続生成のための開始時刻 (位相をつなぐ) */
+  var alphaF = [9.6, 10, 10.4], betaF = [14, 17, 20, 23, 26], thetaF = [5, 6.5];
+  for (var i = 0; i < n; i++) {
+    var t = t0 + i / fs, focus = att.some(function (r) { return t >= r[0] && t < r[1]; }), v = 0, k;
+    for (k = 0; k < alphaF.length; k++) v += (focus ? 2.5 : 8) * Math.sin(2 * Math.PI * alphaF[k] * t + k);
+    for (k = 0; k < betaF.length; k++) v += (focus ? 6 : 1.5) * Math.sin(2 * Math.PI * betaF[k] * t + k * 1.7);
+    for (k = 0; k < thetaF.length; k++) v += 3 * Math.sin(2 * Math.PI * thetaF[k] * t + k * 2.1);
+    v += (rng() - 0.5) * 6;
+    if (opts.ssvepHz) v += 9 * Math.sin(2 * Math.PI * opts.ssvepHz * t);
+    out[i] = v;
+  }
+  return out;
+}
+
+/* ───────────── スキャン選択 (状態機械) ───────────── */
+
+/* 選択肢を順に提示し、集中度が thr 以上で dwellMs 続いたら現在の選択肢を選ぶ。
+ * SSVEP モードでは、検出された周波数の選択肢を selectMs 続いたら選ぶ。 */
+function Scanner(options, cfg) {
+  cfg = cfg || {};
+  this.options = options.slice(); this.i = 0;
+  this.stepMs = cfg.stepMs || 3000; this.thr = cfg.thr != null ? cfg.thr : 0.6; this.dwellMs = cfg.dwellMs || 1200;
+  this.lastStep = null; this.focusSince = null; this.selected = null; this.cooldownUntil = 0;
+}
+Scanner.prototype.current = function () { return this.options[this.i]; };
+/* now: ms, attention: 0..1 (NaN 可) → { current, selected (このティックで確定した選択肢 or null), progress 0..1 } */
+Scanner.prototype.tick = function (now, attention) {
+  if (this.lastStep == null) this.lastStep = now;
+  var selected = null;
+  if (now < this.cooldownUntil) { attention = 0; }
+  if (isFinite(attention) && attention >= this.thr) {
+    if (this.focusSince == null) this.focusSince = now;
+    if (now - this.focusSince >= this.dwellMs) {
+      selected = this.current(); this.selected = selected; this.focusSince = null;
+      this.cooldownUntil = now + this.stepMs; this.lastStep = now;
+      this.i = (this.i + 1) % this.options.length;
+      return { current: this.current(), selected: selected, progress: 0 };
+    }
+  } else this.focusSince = null;
+  if (now - this.lastStep >= this.stepMs) { this.lastStep = now; this.i = (this.i + 1) % this.options.length; this.focusSince = null; }
+  var progress = this.focusSince == null ? 0 : Math.min(1, (now - this.focusSince) / this.dwellMs);
+  return { current: this.current(), selected: selected, progress: progress };
+};
+
+/* ───────────── BadaGPT の選択肢 (段階ごとに非言語アトムを選ぶ) ─────────────
+ * 各段で 1 つ選ぶと次の段へ。「次へ」で選ばずに進める。最後の「完了」で言葉にする。 */
+var BCI_STAGES = [
+  { key: "domain", label: "何のアプリ？", options: ["records", "task", "note", "money", "time"] },
+  { key: "object", label: "何を扱う？ (任意)", options: ["book", "person", "habit", "random", "_skip"] },
+  { key: "action", label: "どんな機能？ (任意)", options: ["find", "sort", "graph", "export", "_skip"] },
+  { key: "tone", label: "どんな調子・色？ (任意)", options: ["calm", "urgent", "cool", "warm", "_skip"] },
+  { key: "scale", label: "文章の分量", options: ["small", "medium", "large", "book_vol"] },
+  { key: "platform", label: "どこで使う？", options: ["android", "windows", "linux", "_all"] }
+];
+var BCI_LABEL = { _skip: "次へ (選ばない)", _all: "すべて" };
+function bciOptionLabel(id) {
+  if (BCI_LABEL[id]) return BCI_LABEL[id];
+  var a = ATOM_BY_ID[id]; if (!a) return id;
+  var m = a.tags.mod, name = m ? (MOD_PHRASE[m] || m).replace(/^を/, "") : "";
+  if (a.tags.entity) name = a.tags.entity;
+  if (a.tags.feat) name = { search: "検索", sort: "並べ替え", chart: "グラフ", export: "CSV 書き出し", print: "印刷" }[a.tags.feat] || a.tags.feat;
+  if (a.cat === "tone") name = { calm: "静か", joy: "軽やか", urgent: "勢い", cool: "暗い青", warm: "明るい橙", vivid: "紫" }[id] || id;
+  if (a.cat === "scale") name = { small: "素描", medium: "短編", large: "中編", book_vol: "本一冊" }[id];
+  if (a.cat === "platform") name = { android: "スマホ", windows: "Windows", linux: "Linux" }[id];
+  return a.g + " " + name;
+}
+/* 段ごとの選択 → 非言語アトム列 */
+function bciSelectionsToAtoms(sel) {
+  var atoms = [];
+  BCI_STAGES.forEach(function (st) {
+    var v = sel[st.key]; if (!v || v === "_skip") return;
+    if (v === "_all") { atoms.push("android", "windows", "linux"); return; }
+    atoms.push(v);
+  });
+  return atoms;
 }
 
 /*
@@ -3923,6 +4175,140 @@ function precompileChecks(spec, html, sources) {
   $("saveKey").onclick = function () { LS.set("apiKey", $("apiKey").value.trim()); LS.set("model", $("model").value); $("apiKey").value = ""; keyState(); };
   $("clearKey").onclick = function () { LS.set("apiKey", ""); keyState(); };
   keyState();
+
+  /* ═════════════ ⓪-α 思考だけで (脳波 BCI) ═════════════ */
+  var bci = { src: null, fs: 256, buf: [], mode: "att", stageIdx: 0, sel: {}, scanner: null, timer: null, flickerRaf: null, flickerOn: false, att: NaN, ssvep: NaN, device: null, demoT: 0, demoPlan: null };
+  function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  var bcv = $("bci-wave"), bcx = bcv.getContext("2d");
+  function bciStat(m) { $("bci-stat").textContent = m; }
+  function bciPush(samples) { for (var i = 0; i < samples.length; i++) bci.buf.push(samples[i]); if (bci.buf.length > bci.fs * 4) bci.buf.splice(0, bci.buf.length - bci.fs * 4); }
+  function bciDrawWave() {
+    var dpr = window.devicePixelRatio || 1, W = bcv.clientWidth, H = 70;
+    if (bcv.width !== W * dpr) { bcv.width = W * dpr; bcv.height = H * dpr; bcx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    bcx.clearRect(0, 0, W, H); var tail = bci.buf.slice(-Math.min(bci.buf.length, bci.fs)); if (tail.length < 2) return;
+    var mx = 1; tail.forEach(function (v) { mx = Math.max(mx, Math.abs(v)); });
+    bcx.strokeStyle = "rgba(185,140,255,.9)"; bcx.lineWidth = 1.2; bcx.beginPath();
+    tail.forEach(function (v, i) { var x = i / (tail.length - 1) * W, y = H / 2 - v / mx * (H / 2 - 4); if (i) bcx.lineTo(x, y); else bcx.moveTo(x, y); });
+    bcx.stroke();
+  }
+  function bciStage() { return BCI_STAGES[bci.stageIdx]; }
+  function bciRenderOptions() {
+    var st = bciStage(); if (!st) { $("bci-stage").textContent = "段階: 完了 — 「錬成」を押すか、脳波で「錬成」が自動で始まります"; $("bci-options").innerHTML = ""; return; }
+    $("bci-stage").textContent = "段階 " + (bci.stageIdx + 1) + " / " + BCI_STAGES.length + ": " + st.label;
+    $("bci-options").innerHTML = st.options.map(function (id, i) { return '<div class="bciopt" data-id="' + id + '">' + escHtml(bciOptionLabel(id)) + (bci.mode === "ssvep" ? '<span class="hz">' + SSVEP_FREQS[i % SSVEP_FREQS.length] + " Hz</span>" : "") + "</div>"; }).join("");
+    bci.scanner = new Scanner(st.options, { stepMs: 3000, thr: +$("bci-thr").value, dwellMs: 1200 });
+  }
+  function bciRenderPicked() {
+    var atoms = bciSelectionsToAtoms(bci.sel);
+    $("bci-picked").innerHTML = Object.keys(bci.sel).length ? BCI_STAGES.filter(function (st) { return bci.sel[st.key]; }).map(function (st) { return '<span class="schip">' + escHtml(bciOptionLabel(bci.sel[st.key])) + "</span>"; }).join("") : '<span class="muted">まだ何も選ばれていません。</span>';
+    $("bci-send").disabled = !atoms.length;
+  }
+  function bciSelect(id) {
+    var st = bciStage(); if (!st) return;
+    bci.sel[st.key] = id; bci.stageIdx++; bciRenderPicked(); bciRenderOptions();
+    if (!bciStage()) { bciStat("すべて選びました。錬成します…"); setTimeout(function () { $("bci-send").click(); }, 800); }
+  }
+  function bciAnalyze(now) {
+    var winA = bci.buf.slice(-Math.round(bci.fs * 1.25)), win = bci.buf.slice(-bci.fs * 3);
+    var bp = bandPowers(winA, bci.fs); bci.att = attentionIndex(bp);
+    $("bci-th").textContent = isFinite(bp.theta) ? bp.theta.toFixed(0) : "—"; $("bci-al").textContent = isFinite(bp.alpha) ? bp.alpha.toFixed(0) : "—"; $("bci-be").textContent = isFinite(bp.beta) ? bp.beta.toFixed(0) : "—";
+    var drive = bci.att, st = bciStage();
+    if (bci.mode === "ssvep" && st) {
+      var d = ssvepDetect(win, bci.fs, SSVEP_FREQS.slice(0, Math.min(st.options.length, SSVEP_FREQS.length))); bci.ssvep = d.freq;
+      $("bci-att").textContent = isFinite(d.freq) ? d.freq + " Hz (SNR " + d.snr.toFixed(1) + ")" : "— (SNR " + d.snr.toFixed(1) + ")";
+      if (isFinite(d.freq) && bci.scanner) { var idx = SSVEP_FREQS.indexOf(d.freq); if (idx >= 0 && idx < st.options.length) { bci.scanner.i = idx; drive = 1; } else drive = 0; } else drive = 0;
+    } else $("bci-att").textContent = isFinite(bci.att) ? (bci.att * 100).toFixed(0) + " / 100" : "—";
+    if (!bci.scanner || !st) return;
+    var r = bci.scanner.tick(now, drive);
+    qsa(".bciopt", $("bci-options")).forEach(function (el) { el.classList.toggle("cur", el.getAttribute("data-id") === r.current); });
+    $("bci-prog").style.width = Math.round(r.progress * 100) + "%";
+    if (r.selected) bciSelect(r.selected);
+  }
+  function bciFlicker(ts) {
+    if (!bci.flickerOn) return;
+    var els = qsa(".bciopt", $("bci-options"));
+    els.forEach(function (el, i) { var f = SSVEP_FREQS[i % SSVEP_FREQS.length]; el.classList.toggle("flash", Math.floor(ts * f / 1000 * 2) % 2 === 0); });
+    bci.flickerRaf = requestAnimationFrame(bciFlicker);
+  }
+  function bciStart(label) {
+    bci.buf = []; bci.stageIdx = 0; bci.sel = {}; bciRenderPicked(); bciRenderOptions();
+    $("bci-stop").classList.remove("hidden"); bciStat(label + " — 選択肢が 3 秒ごとに移ります。選びたいものの間に集中してください (" + (bci.mode === "ssvep" ? "点滅を見つめる" : "集中度がしきい値を超えて 1.2 秒") + ")。");
+    clearInterval(bci.timer); bci.timer = setInterval(function () { bciDrawWave(); bciAnalyze(performance.now()); }, 100);
+    if (bci.mode === "ssvep") { bci.flickerOn = true; bci.flickerRaf = requestAnimationFrame(bciFlicker); }
+  }
+  function bciStopAll() {
+    clearInterval(bci.timer); bci.timer = null; bci.flickerOn = false; if (bci.flickerRaf) cancelAnimationFrame(bci.flickerRaf);
+    try { if (bci.device && bci.device.gatt) bci.device.gatt.disconnect(); } catch (e) { /* 既に切断 */ }
+    try { if (bci.reader) { bci.reader.cancel(); } if (bci.port) { bci.port.close(); } } catch (e) { /* 既に閉じた */ }
+    bci.device = null; bci.reader = null; bci.port = null; bci.src = null;
+    $("bci-stop").classList.add("hidden"); bciStat("切断しました");
+  }
+  /* デモ: 合成脳波。各段で 2 番目の選択肢の時間に集中が上がる計画 (シミュレーションであることを明示) */
+  $("bci-demo").onclick = function () {
+    bciStopAll(); bci.src = "demo"; bci.fs = 256; bci.demoT = 0;
+    var plan = { domain: "records", object: "book", action: "sort", tone: "cool", scale: "medium", platform: "_all" };
+    bci.demoPlan = plan; bciStart("デモ (合成信号)");
+    var gen = setInterval(function () {
+      if (bci.src !== "demo") { clearInterval(gen); return; }
+      var st = bciStage(); var wantIdx = st ? st.options.indexOf(plan[st.key]) : -1;
+      var focus = st && bci.scanner && bci.scanner.i === wantIdx && !(performance.now() < bci.scanner.cooldownUntil);
+      var tStart = bci.demoT * 0.1; /* 位相をつないで連続した脳波にする (チャンク境界の人工成分を避ける) */
+      var chunk = syntheticEEG(bci.fs, 0.1, { t0: tStart, attention: focus ? [[tStart, tStart + 1]] : [], seed: (bci.demoT * 7919) | 0, ssvepHz: (bci.mode === "ssvep" && focus) ? SSVEP_FREQS[wantIdx % SSVEP_FREQS.length] : 0 });
+      bci.demoT++; bciPush(chunk);
+    }, 100);
+  };
+  /* Muse (Web Bluetooth) */
+  $("bci-muse").onclick = async function () {
+    if (!navigator.bluetooth) { bciStat("この環境は Web Bluetooth に対応していません (Windows/Linux 版か Chrome で)"); return; }
+    try {
+      bciStopAll(); bci.fs = MUSE.FS;
+      var dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "Muse" }], optionalServices: [MUSE.SERVICE] });
+      bci.device = dev; var server = await dev.gatt.connect(); var svc = await server.getPrimaryService(MUSE.SERVICE);
+      var ctrl = await svc.getCharacteristic(MUSE.CONTROL);
+      var eeg = await svc.getCharacteristic(MUSE.EEG[0]); /* TP9: 後頭に近く SSVEP が出やすい */
+      await eeg.startNotifications();
+      eeg.addEventListener("characteristicvaluechanged", function (e) { var d = museDecodeEEG(new Uint8Array(e.target.value.buffer)); bciPush(d.samples); });
+      await ctrl.writeValue(museCommand("h")); await ctrl.writeValue(museCommand("p21")); await ctrl.writeValue(museCommand("s")); await ctrl.writeValue(museCommand("d"));
+      bci.src = "muse"; bciStart("Muse 接続 (" + dev.name + ")");
+    } catch (e) { bciStat("Muse に接続できません: " + (e.message || e)); }
+  };
+  /* OpenBCI Cyton (Web Serial) */
+  $("bci-obci").onclick = async function () {
+    if (!navigator.serial) { bciStat("この環境は Web Serial に対応していません (Windows/Linux 版か Chrome で)"); return; }
+    try {
+      bciStopAll(); bci.fs = OPENBCI.FS;
+      var port = await navigator.serial.requestPort(); await port.open({ baudRate: 115200 }); bci.port = port;
+      var w = port.writable.getWriter(); await w.write(new Uint8Array([0x62])); w.releaseLock(); /* 'b' = ストリーム開始 */
+      bci.src = "openbci"; bciStart("OpenBCI Cyton 接続");
+      var reader = port.readable.getReader(); bci.reader = reader; var carry = new Uint8Array(0);
+      (async function pump() {
+        for (;;) {
+          var r = await reader.read(); if (r.done) break;
+          var merged = new Uint8Array(carry.length + r.value.length); merged.set(carry); merged.set(r.value, carry.length);
+          var frames = openbciDecode(merged); bciPush(frames.map(function (f) { return f.channels[0]; }));
+          var used = frames.length * 33; carry = merged.slice(Math.max(0, merged.length - (merged.length - used) % 33 - 33));
+        }
+      })().catch(function (e) { bciStat("Serial 読み取りが止まりました: " + (e.message || e)); });
+    } catch (e) { bciStat("OpenBCI に接続できません: " + (e.message || e)); }
+  };
+  $("bci-stop").onclick = bciStopAll;
+  $("bci-mode-att").onclick = function () { bci.mode = "att"; this.classList.add("on"); $("bci-mode-ssvep").classList.remove("on"); bci.flickerOn = false; bciRenderOptions(); };
+  $("bci-mode-ssvep").onclick = function () { bci.mode = "ssvep"; this.classList.add("on"); $("bci-mode-att").classList.remove("on"); bciRenderOptions(); if (bci.timer) { bci.flickerOn = true; bci.flickerRaf = requestAnimationFrame(bciFlicker); } };
+  $("bci-thr").oninput = function () { $("bci-thr-v").textContent = (+this.value).toFixed(2); if (bci.scanner) bci.scanner.thr = +this.value; };
+  $("bci-reset").onclick = function () { bci.stageIdx = 0; bci.sel = {}; bciRenderPicked(); bciRenderOptions(); };
+  $("bci-send").onclick = function () {
+    var atoms = bciSelectionsToAtoms(bci.sel); if (!atoms.length) return;
+    bciStopAll();
+    silentSeq = atoms.slice(); saveSeq(); renderStrip();
+    var proc = silentProcess(atoms, volOpt());
+    lastSilent = { seq: proc.seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags, readout: [{ label: "入力", value: "脳波 (BCI)", meant: "声・絵・文字なしに、注意を向けて選んだ " + atoms.length + " 個の選択" }], features: null };
+    $("silent-out").classList.remove("hidden"); renderReadout(lastSilent.readout);
+    $("silent-req").textContent = proc.request; $("silent-doc").innerHTML = mdToHtml(proc.document.markdown); $("silent-bada").textContent = proc.bada; $("silent-imgs").innerHTML = proc.imagery.join("");
+    $("silent-doc-sum").textContent = "📖 思いを展開した文章 (" + proc.document.chars.toLocaleString("ja-JP") + " 字)";
+    $("thought").value = proc.request; LS.set("draft", proc.request);
+    go();
+  };
+  bciRenderOptions(); bciRenderPicked();
 
   /* ═════════════ ⓪ サイレント・トーク (非言語思考入力) ═════════════ */
   var lastSilent = null;
