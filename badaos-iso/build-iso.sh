@@ -205,15 +205,16 @@ EOF
 # ---- Rufus「ISO イメージモード」(FAT32 USB にファイルコピー) 用の UEFI ローダ ----
 #   grub-mkrescue の UEFI ローダは ISO の UUID で自分を探すため、ファイルを
 #   コピーした USB では見つからないことがある。ISO の中に普通のファイルとして
-#   \EFI\BOOT\BOOTX64.EFI を置き、/casper/vmlinuz があるボリュームを探して
+#   \efi\boot\bootx64.efi を置き (grub-mkrescue の同じパスのローダを上書き。FAT32 で大文字小文字違いの
+#   2 つが衝突しないよう同じパスにする)、/casper/vmlinuz があるボリュームを探して
 #   /boot/grub/grub.cfg を読むようにする (ISO9660 / FAT32 / exFAT / NTFS どれでも可)。
-mkdir -p "$IMAGE/EFI/BOOT"
+mkdir -p "$IMAGE/efi/boot"
 cat > "$WORK/efi-early.cfg" <<'EOF'
 search --no-floppy --set=root --file /casper/vmlinuz
 set prefix=($root)/boot/grub
 configfile ($root)/boot/grub/grub.cfg
 EOF
-grub-mkimage -O x86_64-efi -o "$IMAGE/EFI/BOOT/BOOTX64.EFI" -p /boot/grub -c "$WORK/efi-early.cfg" \
+grub-mkimage -O x86_64-efi -o "$IMAGE/efi/boot/bootx64.efi" -p /boot/grub -c "$WORK/efi-early.cfg" \
   part_gpt part_msdos fat exfat ntfs iso9660 search search_fs_file normal configfile \
   linux echo test ls all_video efi_gop efi_uga gfxterm font gzio
 # grub.cfg の insmod 用に UEFI モジュールもツリーに置く (grub-mkrescue も入れるが念のため)

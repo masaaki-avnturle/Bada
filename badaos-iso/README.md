@@ -74,7 +74,7 @@ Windows の**すぐ下**に **Bada VM Pro 専用ブートローダの FAT パー
 
 1. [Rufus](https://rufus.ie/) を起動し、USB メモリ(8GB 以上)を挿す
 2. **「選択」**で `BadaVMPro-OS-1.2.0-amd64.iso` を指定
-3. パーティション構成は **MBR**(BIOS/UEFI 両対応)または GPT(UEFI)。**書き込みモードは「ISO イメージモード」(推奨)** で OK。texlive-full 入りでもシステムを 4GB 未満の squashfs 3 つ(`filesystem.squashfs` / `filesystem-tex.squashfs` / `filesystem-fonts.squashfs`)に分けているので FAT32 の USB にそのまま入ります。UEFI 用に `\EFI\BOOT\BOOTX64.EFI` も ISO 内に置いてあります(DD モードでも可)
+3. パーティション構成は **MBR**(BIOS/UEFI 両対応)または GPT(UEFI)。**書き込みモードは「ISO イメージモード」(推奨)** で OK。texlive-full 入りでもシステムを 4GB 未満の squashfs 3 つ(`filesystem.squashfs` / `filesystem-tex.squashfs` / `filesystem-fonts.squashfs`)に分けているので FAT32 の USB にそのまま入ります。UEFI 用ローダ `\efi\boot\bootx64.efi` は USB 上のファイルで起動ディスクを探すので、コピーした USB からも起動します(DD モードでも可)
 4. **「スタート」** →(確認が出たら)そのまま書き込み
 5. 対象 PC を USB から起動(BIOS/UEFI のブートメニューで USB を選択)
 
