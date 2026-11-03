@@ -51,7 +51,11 @@ jobs:
 
       - name: Free up disk space
         run: |
-          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet /opt/hostedtoolcache/CodeQL || true
+          # texlive-full 入りの chroot (~15GB) + squashfs + ISO を作るので大きく空ける
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet /opt/hostedtoolcache \
+                      /usr/local/share/boost /usr/share/swift /usr/local/.ghcup /usr/lib/jvm \
+                      /usr/local/share/powershell /usr/local/share/chromium /opt/microsoft /opt/google || true
+          sudo docker image prune -a -f >/dev/null 2>&1 || true
           df -h
 
       - name: Compute version + apt base URL

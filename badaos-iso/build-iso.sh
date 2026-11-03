@@ -139,8 +139,9 @@ ls -lh "$IMAGE/casper/vmlinuz" "$IMAGE/casper/initrd"
 # filesystem.squashfs
 #   /boot は「除外しない」。除外するとインストール後のシステムにカーネルが
 #   入らず、実ディスクへ入れても起動できなくなるため。
+#   texlive-full を含むため xz + 1MiB ブロックで強めに圧縮する
 mksquashfs "$CHROOT" "$IMAGE/casper/filesystem.squashfs" \
-  -noappend -no-progress -wildcards \
+  -noappend -no-progress -wildcards -comp xz -b 1M \
   -e "boot/grub" "proc/*" "sys/*" "run/*" "tmp/*"
 printf "%s" "$(du -sx --block-size=1 "$CHROOT" | cut -f1)" > "$IMAGE/casper/filesystem.size"
 echo "Bada VM Pro OS ${VERSION}" > "$IMAGE/casper/filesystem.manifest"
@@ -187,7 +188,8 @@ cp /usr/share/grub/unicode.pf2 "$IMAGE/boot/grub/fonts/unicode.pf2"
 #         すべて面倒みる。Rufus / dd でそのまま USB に書ける ----------------
 grub-mkrescue -o "$OUT/$ISO_NAME" "$IMAGE" \
   --product-name "Bada VM Pro OS" --product-version "$VERSION" \
-  -- -volid "BADAVMPRO_OS"
+  -- -volid "BADAVMPRO_OS" -iso-level 3
+# -iso-level 3: filesystem.squashfs が 4GiB を超えても ISO に格納できる (multi-extent)
 
 test -s "$OUT/$ISO_NAME" || { echo "FATAL: ISO 生成に失敗"; exit 1; }
 echo "== built: $OUT/$ISO_NAME =="

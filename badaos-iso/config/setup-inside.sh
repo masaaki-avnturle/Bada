@@ -100,6 +100,18 @@ apt_try openssh-server xinetd screen \
 apt_try falkon evince mpv ristretto mousepad pcmanfm lxtask \
   software-properties-common apt-transport-https gnupg
 
+# ---- TeX: texlive-full (日本語 platex/uplatex/lualatex-ja 含む全パッケージ) ----
+#   PDF マニュアル (texlive-doc, 約 2GB) だけは ISO を軽くするため展開しない。
+#   必要なら /etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc を消して
+#   `sudo apt install --reinstall $(dpkg -l 'texlive-*-doc' | awk '/^ii/{print $2}')`。
+cat > /etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc <<'EOF'
+path-exclude=/usr/share/doc/texlive-doc/*
+EOF
+# 要求機能なので失敗したらビルドを止める (|| true を付けない)
+apt-get install -y --no-install-recommends texlive-full
+# エディタ連携: Emacs の AUCTeX と mozc (Emacs 内の日本語入力)、vim-latexsuite
+apt_try auctex emacs-mozc vim-latexsuite
+
 # 独自 /etc/calamares 設定を使用 (build-iso.sh が config/calamares を配置済み)
 # ブラウザは同梱しない: Bada アプリは Electron 版 (.deb) を優先起動するため不要。
 # Ubuntu 向けアプリは NAT/DHCP + apt でそのまま追加できる (sudo apt install ...)。
@@ -407,6 +419,21 @@ if [ -n "$APT_BASE_URL" ]; then
   sed "s#@APT_BASE_URL@#${APT_BASE_URL}#g" /tmp/bada.list.tmpl > /etc/apt/sources.list.d/bada.list
   echo "registered bada apt repo: $APT_BASE_URL (fetched at first boot, not now)"
 fi
+
+# ---- 要求パッケージの最終確認 (1 つでも欠けたらビルド失敗) ----
+REQUIRED="openssh-server xinetd network-manager iptables dnsmasq-base apt
+  fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
+  screen mlterm xterm w9wm lightdm xserver-xorg
+  vim vim-gtk3 emacs neovim texlive-full texlive-lang-japanese
+  falkon evince mpv pcmanfm mousepad"
+MISSING=""
+for p in $REQUIRED; do dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"; done
+if [ -n "$MISSING" ]; then echo "FATAL: 必須パッケージが入っていません:$MISSING"; exit 1; fi
+echo "required packages OK"
+for c in sshd xinetd screen mlterm vim gvim emacs nvim platex uplatex lualatex pdflatex; do
+  command -v "$c" >/dev/null 2>&1 || { echo "FATAL: コマンド $c がありません"; exit 1; }
+done
+echo "required commands OK"
 
 # initramfs を更新 (casper を取り込む)
 update-initramfs -u || true

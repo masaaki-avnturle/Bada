@@ -13,6 +13,8 @@
 - **ssh**: `openssh-server` を有効化。ホスト鍵は ISO に焼き込まず、**初回起動時にその PC 固有の鍵を生成**(ライブ環境では先に `passwd` でパスワードを設定)
 - **xinetd**: 有効化済み。サンプルサービス `/etc/xinetd.d/bada-info`(TCP 7777, 既定は無効)
 - **apt**: 起動時に `badaos-apt-check` が Bada の apt リポジトリの到達確認(未公開なら自動で無効化しエラーを出さない)→ `apt update`。`sudo apt install <pkg>` / `badaos-apps`(GUI)でアプリを追加
+- **TeX**: **texlive-full**(日本語 platex / uplatex / lualatex-ja 含む全パッケージ。PDF マニュアル texlive-doc のみ容量のため未展開 → `/etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc` を消して再インストールで追加可)
+- **エディタ**: **vim** / **gvim** / **emacs**(AUCTeX・emacs-mozc 付き)/ neovim / vim-latexsuite
 - **端末/アプリ**: **mlterm**(日本語 UTF-8)・**screen**(UTF-8 設定済み)・xterm、ブラウザ **Falkon**、PDF **Evince**、動画 **mpv**、画像 Ristretto/GPicView、ファイル PCManFM、エディタ Mousepad/vim/emacs/neovim、電卓、アーカイバ、タスクマネージャ、ネットワーク設定 (nm-applet / nm-connection-editor)
 - **あなたのリポジトリの apt リポジトリ**: `deb [trusted=yes] <release>/ ./` を登録済み。`apt install` で Bada アプリを取得
 - **起動方式**: GRUB (grub-mkrescue) による BIOS + UEFI ハイブリッド ISO。`search` でカーネルのある ISO を確実に検出 → **Rufus でそのまま USB に書ける**
@@ -72,7 +74,7 @@ Windows の**すぐ下**に **Bada VM Pro 専用ブートローダの FAT パー
 
 1. [Rufus](https://rufus.ie/) を起動し、USB メモリ(8GB 以上)を挿す
 2. **「選択」**で `BadaVMPro-OS-1.2.0-amd64.iso` を指定
-3. パーティション構成は **MBR**(BIOS/UEFI 両対応)または GPT(UEFI)。**書き込みモードは「ISO イメージモード」**
+3. パーティション構成は **MBR**(BIOS/UEFI 両対応)。**書き込みモードは「DD イメージモード」**(texlive-full 入りで ISO 内のファイルが 4GB を超えることがあり、ISO イメージモード = FAT32 コピーでは失敗するため)
 4. **「スタート」** →(確認が出たら)そのまま書き込み
 5. 対象 PC を USB から起動(BIOS/UEFI のブートメニューで USB を選択)
 
@@ -109,7 +111,7 @@ sudo apt install laevateinn bada-vm-pro   # ← あなたのリポジトリの a
 ---
 
 ⚠️ 注記
-- ISO ビルドは実際の Ubuntu パッケージを取得して行う**本物のディストロビルド**です(サイズ 1〜2GB 程度)。
+- ISO ビルドは実際の Ubuntu パッケージを取得して行う**本物のディストロビルド**です(texlive-full 込みで 3〜5GB 程度。Rufus では「DD イメージモード」で書き込んでください)。
 - `w9wm` は最小構成のためデスクトップ環境(パネル等)はありません。`xterm` からアプリを起動できます。
 - Laevateinn の実車 BLE 接続は読取専用・操縦対象はシミュレーション車両のまま(以前の設計を踏襲)。
 - ライブ環境の既定ユーザーは `bada`(sudo 可)。インストール時に任意のユーザーを作成できます。
