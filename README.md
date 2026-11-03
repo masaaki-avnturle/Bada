@@ -286,6 +286,18 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 - ★ **Bada 言語で機能拡張** — 内蔵 Bada インタープリタ (`:=` / `def f |a,b|` / `if` / `while` / `for in` / `print` / **`>> tuplespace`** 設計台帳) + CAD API (`part` `move` `rot` `scale` `paint` `assign` `vehicle` `spec_report` …)。`macro("名前","関数")` で自作 Bada 関数をツールバーのボタンとして登録(localStorage 永続化)。サンプル 5 本同梱
 - **CAD 基本機能** — 8 プリミティブ(ウェッジ/カプセル追加)、GPU ピッキング選択、ドラッグ移動、Undo/Redo、JSON 保存/読込、OBJ+MTL 書き出し、PNG、自動保存
 
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型アプリも [Releases](https://github.com/masaaki-avnturle/Bada/releases) からダウンロードできます:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `yappacad-debug.apk` |
+| **Windows 10 / 11** | `YappaCAD-*-x64.exe` (NSIS インストーラ) / `YappaCAD-*-portable.exe` (ポータブル) |
+| **Ubuntu** | `YappaCAD-*-x86_64.AppImage` / `YappaCAD-*-amd64.deb` |
+
+ビルドは [`yappacad-app-build.yml`](.github/workflows/yappacad-app-build.yml) が実行します(`yappacad-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`yappa_cad/README.md`](yappa_cad/README.md) を参照。
+
 詳細は [`yappa_cad/README.md`](yappa_cad/README.md) を参照。
 
 ---
