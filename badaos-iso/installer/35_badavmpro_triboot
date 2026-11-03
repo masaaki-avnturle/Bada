@@ -1,0 +1,53 @@
+#!/bin/sh
+# /etc/grub.d/35_badavmpro_triboot — Bada VM Pro の起動メニューに
+#   「Windows」「Linux」をチェーンロード項目として追加する (update-grub 時に実行)。
+#   Windows Boot Manager と、ESP 上の他の Linux の EFI ローダ (\EFI\ubuntu など)
+#   を探して並べる。os-prober の検出結果と重複しても害はない。
+set -e
+ESP=/boot/efi
+[ -d /sys/firmware/efi ] || [ -d "$ESP/EFI" ] || exit 0
+ESP_UUID="$(findmnt -n -o UUID "$ESP" 2>/dev/null || true)"
+search_esp(){
+  if [ -n "$ESP_UUID" ]; then echo "    search --no-floppy --fs-uuid --set=root $ESP_UUID"
+  else echo "    search --no-floppy --file --set=root $1"; fi
+}
+
+if [ -f "$ESP/EFI/Microsoft/Boot/bootmgfw.efi" ]; then
+  echo "Found Windows Boot Manager on $ESP" >&2
+  cat <<GRUB
+menuentry "Windows (Windows Boot Manager)" --class windows --class os {
+    insmod part_gpt
+    insmod fat
+    insmod chain
+$(search_esp /EFI/Microsoft/Boot/bootmgfw.efi)
+    chainloader /EFI/Microsoft/Boot/bootmgfw.efi
+}
+GRUB
+fi
+
+# ESP 上の他の OS (Linux) の EFI ローダ。BadaVMPro 自身・Microsoft・BOOT は除外
+for d in "$ESP"/EFI/*/; do
+  id="$(basename "$d")"
+  case "$id" in BadaVMPro|Microsoft|BOOT|Boot|boot) continue ;; esac
+  for f in shimx64.efi grubx64.efi systemd-bootx64.efi; do
+    if [ -f "$d$f" ]; then
+      echo "Found $id EFI loader: /EFI/$id/$f" >&2
+      cat <<GRUB
+menuentry "Linux ($id)" --class gnu-linux --class os {
+    insmod part_gpt
+    insmod fat
+    insmod chain
+$(search_esp "/EFI/$id/$f")
+    chainloader /EFI/$id/$f
+}
+GRUB
+      break
+    fi
+  done
+done
+
+cat <<'GRUB'
+menuentry "UEFI ファームウェア設定" --class settings {
+    fwsetup
+}
+GRUB

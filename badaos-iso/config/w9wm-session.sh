@@ -22,6 +22,7 @@ HINT='echo; echo "=== Bada VM Pro OS ライブ環境 (日本語) ==="; \
 echo "実ディスクへインストール (Calamares/日本語): install-badaos"; \
 echo "パーティションマネージャ (GParted):          badaos-partition"; \
 echo "かんたんインストール (ウィザード):           install-badaos-simple"; \
+echo "トリプルブート (Win|BadaVMPro|Linux):         install-badaos-triboot"; \
 echo "Ubuntu アプリを簡単導入 (GUI):               badaos-apps"; \
 echo "エディタ:                                    vim / gvim / emacs / neovim"; \
 echo "日本語入力の設定 (fcitx):                    fcitx-configtool"; \
@@ -33,6 +34,11 @@ if command -v mlterm >/dev/null 2>&1; then
 else
   (xterm -fa "Noto Sans Mono CJK JP" -fs 12 -geometry 104x30+20+20 \
      -T "Bada VM Pro OS — terminal" -e sh -c "$HINT" &) 2>/dev/null || true
+fi
+
+# GRUB で「トリプルブート導入」を選んだ時はウィザードを自動起動
+if grep -qw "badaos.triboot=1" /proc/cmdline 2>/dev/null; then
+  (sleep 3; /usr/local/bin/install-badaos-triboot) &
 fi
 
 # Bada VM Pro を自動起動 (電子アプリがあればそれ、無ければブラウザで単一HTML)

@@ -96,6 +96,12 @@ install -Dm755 "$HERE/config/badaos-apps.sh"           "$CHROOT/usr/local/bin/ba
 # 自作 GUI インストーラ (zenity ウィザード + 実インストール本体, Calamares 代替)
 install -Dm755 "$HERE/installer/badaos-installer.sh"    "$CHROOT/usr/local/bin/badaos-installer"
 install -Dm755 "$HERE/installer/badaos-install-core.sh" "$CHROOT/usr/local/lib/badaos/badaos-install-core.sh"
+# トリプルブート (Windows / BadaVMPro / Linux): 間にパーティション + Windows の ESP にブートローダ
+install -Dm755 "$HERE/config/install-badaos-triboot.sh"          "$CHROOT/usr/local/bin/install-badaos-triboot"
+install -Dm755 "$HERE/installer/badaos-triboot-installer.sh"     "$CHROOT/usr/local/bin/badaos-triboot-installer"
+install -Dm755 "$HERE/installer/badaos-triboot-core.sh"          "$CHROOT/usr/local/lib/badaos/badaos-triboot-core.sh"
+install -Dm755 "$HERE/installer/35_badavmpro_triboot"            "$CHROOT/usr/local/lib/badaos/35_badavmpro_triboot"
+install -Dm644 "$HERE/installer/add-badavmpro-bootentry.bat"     "$CHROOT/usr/local/lib/badaos/add-badavmpro-bootentry.bat"
 # Calamares の日本語インストール設定
 mkdir -p "$CHROOT/etc/calamares"
 cp -r "$HERE/config/calamares/." "$CHROOT/etc/calamares/"
@@ -153,6 +159,10 @@ set timeout=15
 search --no-floppy --set=root --file /casper/vmlinuz
 menuentry "Bada VM Pro OS ${VERSION} (ライブ / インストール)" {
     linux /casper/vmlinuz $CMDLINE
+    initrd /casper/initrd
+}
+menuentry "Bada VM Pro OS ${VERSION} (トリプルブート導入: Windows | BadaVMPro | Linux)" {
+    linux /casper/vmlinuz $CMDLINE badaos.triboot=1
     initrd /casper/initrd
 }
 menuentry "Bada VM Pro OS ${VERSION} (セーフグラフィック)" {

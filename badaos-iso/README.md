@@ -13,26 +13,60 @@
 - **あなたのリポジトリの apt リポジトリ**: `deb [trusted=yes] <release>/ ./` を登録済み。`apt install` で Bada アプリを取得
 - **起動方式**: GRUB (grub-mkrescue) による BIOS + UEFI ハイブリッド ISO。`search` でカーネルのある ISO を確実に検出 → **Rufus でそのまま USB に書ける**
 
+## 🪟🜁🐧 トリプルブート: Windows | Bada VM Pro | Linux
+
+Windows と Linux が入っている PC で、**その「間」に Bada VM Pro 用のパーティション**を作り、
+**Windows の起動パーティション (EFI System Partition) に Bada VM Pro のブートローダ**を作ります。
+
+```
+┌─────┬──────────────┬─────────────────┬──────────────┐
+│ ESP │ Windows (C:) │ ★ BadaVMPro ★   │ Linux (ext4) │   ← 既存の Windows / Linux は消さない
+│FAT32│    NTFS      │  ext4 (新規作成) │   そのまま   │
+└──┬──┴──────────────┴─────────────────┴──────────────┘
+   └─ \EFI\BadaVMPro\grubx64.efi (+ Secure Boot 用 shimx64.efi) を追加
+      → UEFI 起動メニュー「Bada VM Pro」→ GRUB で Bada VM Pro / Windows / Linux を選択
+```
+
+使い方:
+
+1. Windows で **高速スタートアップを無効化**、BitLocker を一時停止、データをバックアップ
+2. ISO から起動し、GRUB で **「トリプルブート導入: Windows | BadaVMPro | Linux」** を選ぶ
+   (またはデスクトップの「トリプルブート導入」/ 端末で `install-badaos-triboot`)
+3. ディスクとサイズ (GiB, 空欄 = 間の空き全部) を選ぶ → **計画 (予定のレイアウト) を確認** → 実行
+4. 間に空きが無い場合は、ウィザードが **Windows (NTFS) の末尾を縮小** して空きを作るか尋ねます
+   (Windows → Linux の順に並んでいる時。逆順なら GParted = `badaos-partition` で空けてください)
+
+仕組み (`installer/badaos-triboot-core.sh`):
+
+- `sfdisk -J` / `blkid` で ESP・Windows(最大の NTFS)・Linux(ext4/btrfs/xfs)を検出し、Windows と Linux の**間の未割り当て領域**を 1MiB 境界で計算
+- `sgdisk` で GPT 名 `BadaVMPro` / ラベル `BADAVMPRO` の ext4 を作成 → ライブの squashfs を展開
+- Windows の ESP を `/boot/efi` にマウント (作業前に `/var/backups/esp-before-badavmpro.tar` へ退避)
+- `grub-install --bootloader-id=BadaVMPro` で `\EFI\BadaVMPro\` を作成。**`\EFI\Microsoft\` と `\EFI\BOOT\BOOTX64.EFI` は上書きしない**
+- `efibootmgr` で UEFI 起動エントリ **「Bada VM Pro」** を登録 (起動順の先頭)
+- `/etc/grub.d/35_badavmpro_triboot` + os-prober が GRUB メニューに **Windows Boot Manager / Linux / UEFI 設定** を追加
+- Windows 側から登録したい場合は ESP の `\EFI\BadaVMPro\add-badavmpro-bootentry.bat` を管理者で実行 (`bcdedit`)
+- 変更前の確認だけ: `sudo TARGET_DISK=/dev/nvme0n1 PLAN_ONLY=1 /usr/local/lib/badaos/badaos-triboot-core.sh`
+
 ## ⬇️ ダウンロード
 
 [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `badaos-v*` から:
 
 | ファイル | 内容 |
 |:---|:---|
-| `BadaVMPro-OS-1.0.5-amd64.iso` | 起動可能 ISO 本体 |
-| `BadaVMPro-OS-1.0.5-amd64.iso.sha256` | 検証用チェックサム |
+| `BadaVMPro-OS-1.1.0-amd64.iso` | 起動可能 ISO 本体 |
+| `BadaVMPro-OS-1.1.0-amd64.iso.sha256` | 検証用チェックサム |
 | `Packages` / `Packages.gz` / `Release` | apt リポジトリ索引(flat) |
 | `*.deb` | apt で配布される Bada アプリ |
 
 ## 🔥 Rufus で USB ブートを作る手順(Windows)
 
 1. [Rufus](https://rufus.ie/) を起動し、USB メモリ(8GB 以上)を挿す
-2. **「選択」**で `BadaVMPro-OS-1.0.5-amd64.iso` を指定
+2. **「選択」**で `BadaVMPro-OS-1.1.0-amd64.iso` を指定
 3. パーティション構成は **MBR**(BIOS/UEFI 両対応)または GPT(UEFI)。**書き込みモードは「ISO イメージモード」**
 4. **「スタート」** →(確認が出たら)そのまま書き込み
 5. 対象 PC を USB から起動(BIOS/UEFI のブートメニューで USB を選択)
 
-> macOS / Linux では `sudo dd if=BadaVMPro-OS-1.0.5-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync` でも可(ISO は isohybrid)。
+> macOS / Linux では `sudo dd if=BadaVMPro-OS-1.1.0-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync` でも可(ISO は isohybrid)。
 
 ## 🖥 起動後
 

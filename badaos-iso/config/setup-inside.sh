@@ -89,6 +89,8 @@ apt_try qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-contro
   parted gdisk dosfstools e2fsprogs util-linux zenity \
   squashfs-tools rsync \
   grub-common grub2-common grub-pc-bin grub-efi-amd64-bin os-prober
+# トリプルブート用: NTFS 検出/縮小、UEFI 起動メニュー登録、Secure Boot 用署名済み GRUB
+apt_try ntfs-3g efibootmgr fdisk shim-signed grub-efi-amd64-signed python3-minimal
 
 # 独自 /etc/calamares 設定を使用 (build-iso.sh が config/calamares を配置済み)
 # ブラウザは同梱しない: Bada アプリは Electron 版 (.deb) を優先起動するため不要。
@@ -198,6 +200,16 @@ Comment=使いたいハードディスクを初期化・パーティション作
 Exec=/usr/local/bin/badaos-partition
 Terminal=false
 Icon=gparted
+Categories=System;
+EOF
+cat > /etc/skel/Desktop/install-badaos-triboot.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=トリプルブート導入 (Windows | Bada VM Pro | Linux)
+Comment=Windows と Linux の間に BadaVMPro パーティションを作り、Windows の起動パーティションにブートローダを作成
+Exec=/usr/local/bin/install-badaos-triboot
+Terminal=false
+Icon=drive-harddisk
 Categories=System;
 EOF
 cat > /etc/skel/Desktop/install-badaos-simple.desktop <<EOF
