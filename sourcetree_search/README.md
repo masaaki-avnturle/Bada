@@ -89,9 +89,17 @@ TypeScript/Python/Ruby/Java/Go/Rust/PHP/C#/Swift/Kotlin/Shell/SQL/HTML/CSS/Bada/
 ## PDF 検索について
 
 PDF は内蔵パーサーが FlateDecode / 無圧縮のコンテンツ ストリームを伸長し、
-`Tj` / `TJ` / 16 進文字列 (UTF-16BE 対応) のテキスト オペレータから本文を抽出します。
-外部ライブラリ・ネットワーク不要。画像だけのスキャン PDF や CID フォント埋め込みの
-一部 PDF はテキストを取れないことがあります (その場合は検索対象から自動で外れます)。
+`Tj` / `TJ` / 16 進文字列のテキスト オペレータから本文を抽出します。
+外部ライブラリ・ネットワーク不要。
+
+**日本語の文字化け対策**: 日本語 PDF が使う CID フォント (Identity-H) では、
+文字列の 2 バイトは Unicode ではなくグリフ ID のため、そのまま文字コード化すると
+文字化けします。本パーサーは PDF 内の **`/ToUnicode` CMap** (`beginbfchar` /
+`beginbfrange`) を解析して **CID → Unicode に変換**するため、日本語も正しく
+索引・検索できます (Node=EXE / ブラウザ=APK 共通のロジック)。ブラウザ側 (APK) は
+`DecompressionStream` で伸長し、`/Length` または末尾 EOL の調整で厳格な展開にも対応します。
+画像だけのスキャン PDF や `/ToUnicode` を持たない一部 PDF はテキストを取れないことが
+あります (その場合は検索対象から自動で外れます)。
 
 ## テスト
 

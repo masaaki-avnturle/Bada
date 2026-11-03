@@ -55,6 +55,44 @@ fs.writeFileSync(path.join(tmp, "doc", "paper.pdf"), makePdf("Hello Quantum Kauf
 const pdfText = core.extractPdfText(fs.readFileSync(path.join(tmp, "doc", "paper.pdf")));
 ok(pdfText.includes("Hello Quantum Kauffman"), "extractPdfText decodes FlateDecode Tj text");
 
+/* ── 日本語 CID フォント (Identity-H) + ToUnicode CMap の文字化け修正 ──
+ * 本文は 2 バイトのグリフ ID <0001><0002>、ToUnicode が 0001->量 / 0002->子。
+ * 修正前はコードをそのまま文字コード化して化けるが、CMap 経由で「量子」に戻る。 */
+function flate(str){ return zlib.deflateSync(Buffer.from(str, "latin1")); }
+function stream(objno, dictExtra, bodyBuf){
+  const head = objno + " 0 obj\n<< /Length " + bodyBuf.length + " /Filter /FlateDecode" + (dictExtra || "") + " >>\nstream\n";
+  return Buffer.concat([Buffer.from(head, "latin1"), bodyBuf, Buffer.from("\nendstream\nendobj\n", "latin1")]);
+}
+function makeCidPdf(){
+  const content = flate("BT /F1 12 Tf 72 700 Td <00010002> Tj ET");
+  const cmap = flate([
+    "/CIDInit /ProcSet findresource begin 12 dict begin begincmap",
+    "1 begincodespacerange <0000> <ffff> endcodespacerange",
+    "2 beginbfchar <0001> <91cf> <0002> <5b50> endbfchar",
+    "endcmap CMapName currentdict /CMap defineresource pop end end"
+  ].join("\n"));
+  const parts = [Buffer.from("%PDF-1.5\n", "latin1")];
+  parts.push(Buffer.from("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n", "latin1"));
+  parts.push(Buffer.from("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n", "latin1"));
+  parts.push(Buffer.from("3 0 obj\n<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n", "latin1"));
+  parts.push(stream(4, "", content));
+  parts.push(Buffer.from("5 0 obj\n<< /Type /Font /Subtype /Type0 /ToUnicode 6 0 R >>\nendobj\n", "latin1"));
+  parts.push(stream(6, "", cmap));
+  parts.push(Buffer.from("trailer\n<< /Root 1 0 R >>\n%%EOF\n", "latin1"));
+  return Buffer.concat(parts);
+}
+const cidPdf = makeCidPdf();   /* バッファのまま抽出を検証 (索引ツリーには入れない) */
+const cidText = core.extractPdfText(cidPdf);
+ok(cidText.includes("量子"), "CID/ToUnicode PDF decodes to 「量子」 (文字化けしない) — got: " + JSON.stringify(cidText.trim()).slice(0, 40));
+ok(!/\u0001|\u0002/.test(cidText), "raw glyph codes are not left in the text (no mojibake bytes)");
+
+/* parseToUnicodeCMap / decodeTextOps の単体 */
+const cm = core.parseToUnicodeCMap("1 begincodespacerange <0000> <ffff> endcodespacerange\n2 beginbfchar <0001> <91cf> <0002> <5b50> endbfchar", { map:{}, width:0 });
+ok(cm.width === 2 && cm.map[1] === "量" && cm.map[2] === "子", "parseToUnicodeCMap maps codes to Unicode (width 2)");
+ok(core.decodeTextOps("BT <00010002> Tj ET", cm) === "量子", "decodeTextOps applies the CMap to a hex string");
+const cmr = core.parseToUnicodeCMap("1 begincodespacerange <0000> <ffff> endcodespacerange\n1 beginbfrange <0010> <0012> <0041> endbfrange", { map:{}, width:0 });
+ok(cmr.map[0x10] === "A" && cmr.map[0x11] === "B" && cmr.map[0x12] === "C", "parseToUnicodeCMap handles bfrange base form (0010..0012 -> A B C)");
+
 /* ── インデックス ── */
 const idx = core.buildIndex(tmp);
 ok(idx.files.length === 5, "index holds 5 files (4 source + 1 PDF), binaries and .git excluded — got " + idx.files.length);

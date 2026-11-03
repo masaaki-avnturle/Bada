@@ -33,10 +33,13 @@
     return s;
   }
 
-  /* ブラウザでの PDF テキスト抽出 (searchcore の extractTextOps 相当を再利用) */
+  /* ブラウザでの PDF テキスト抽出。
+     stream を DecompressionStream で展開し、searchcore (UMD) の
+     parseToUnicodeCMap / decodeTextOps を再利用して ToUnicode で正しく
+     Unicode 化する (日本語 CID フォントの文字化けを防止)。 */
   async function extractPdfTextBrowser(bytes) {
     if (!HAS_INFLATE) return "";
-    var raw = latin1(bytes), texts = [], idx = 0;
+    var raw = latin1(bytes), streams = [], idx = 0;
     while (true) {
       var s = raw.indexOf("stream", idx); if (s < 0) break;
       var e = raw.indexOf("endstream", s); if (e < 0) break;
@@ -45,60 +48,41 @@
       if (raw[start] === "\n") start++;
       var dictStart = raw.lastIndexOf("<<", s);
       var dict = dictStart >= 0 ? raw.slice(dictStart, s) : "";
-      var body = bytes.subarray(start, e);
       var content = null;
       if (/\/FlateDecode/.test(dict)) {
-        try { content = latin1(await inflate(body, false)); }
-        catch (e1) { try { content = latin1(await inflate(body, true)); } catch (e2) { content = null; } }
+        /* DecompressionStream は厳格で末尾の余分なバイト (endstream 前の EOL) で
+           失敗するため、inline /Length があれば正確に切り出し、無ければ末尾を
+           1〜2 バイト削って再試行する。 */
+        var ends = [];
+        var lenM = /\/Length\s+(\d+)(?!\s+\d+\s+R)/.exec(dict);
+        if (lenM) { var n = parseInt(lenM[1], 10); if (n > 0 && start + n <= e) ends.push(start + n); }
+        ends.push(e, e - 1, e - 2);
+        for (var ei = 0; ei < ends.length && content === null; ei++) {
+          var be = ends[ei]; if (be <= start) continue;
+          var body = bytes.subarray(start, be);
+          try { content = latin1(await inflate(body, false)); }
+          catch (e1) { try { content = latin1(await inflate(body, true)); } catch (e2) { content = null; } }
+        }
       } else if (!/\/Filter/.test(dict)) {
-        content = latin1(body);
+        content = latin1(bytes.subarray(start, e));
       }
-      if (content && content.length > 4 * 1024 * 1024) content = content.slice(0, 4 * 1024 * 1024);
-      if (content && /\b(Tj|TJ|BT)\b/.test(content)) {
-        var t = extractTextOps(content);
-        if (t.trim()) texts.push(t);
-      }
+      if (content) { if (content.length > 4 * 1024 * 1024) content = content.slice(0, 4 * 1024 * 1024); streams.push(content); }
       idx = e + 9;
     }
+    /* パス 1: ToUnicode CMap を集約 */
+    var cmap = { map: {}, width: 0 };
+    for (var i = 0; i < streams.length; i++) if (/beginbf(char|range)/.test(streams[i])) Core.parseToUnicodeCMap(streams[i], cmap);
+    if (!cmap.width) cmap.width = 2;
+    var hasMap = Object.keys(cmap.map).length > 0;
+    /* パス 2: テキストを抽出 (必要なら ToUnicode 変換) */
+    var texts = [];
+    for (var j = 0; j < streams.length; j++) {
+      if (/\b(Tj|TJ|BT)\b/.test(streams[j])) {
+        var t = Core.decodeTextOps(streams[j], hasMap ? cmap : null);
+        if (t.trim()) texts.push(t);
+      }
+    }
     return texts.join("\n");
-  }
-  /* searchcore と同一の抽出ロジック (ブラウザ移植版) */
-  function extractTextOps(content) {
-    var parts = [];
-    var re = /\(((?:\\.|[^\\()])*)\)\s*(Tj|')|\[((?:\\.|[^\]\\])*)\]\s*TJ|<([0-9a-fA-F\s]+)>\s*Tj/g;
-    var m;
-    while ((m = re.exec(content))) {
-      if (m[1] !== undefined) parts.push(unescapePdf(m[1]));
-      else if (m[3] !== undefined) {
-        var inner = m[3], re2 = /\(((?:\\.|[^\\()])*)\)|<([0-9a-fA-F\s]+)>/g, mm;
-        while ((mm = re2.exec(inner))) {
-          if (mm[1] !== undefined) parts.push(unescapePdf(mm[1]));
-          else parts.push(hexToText(mm[2]));
-        }
-      } else if (m[4] !== undefined) parts.push(hexToText(m[4]));
-    }
-    return parts.join(" ");
-  }
-  function unescapePdf(s) {
-    var out = "", i = 0;
-    while (i < s.length) {
-      var ch = s[i];
-      if (ch !== "\\") { out += ch; i++; continue; }
-      var n = s[i + 1];
-      if (n === "n") out += "\n"; else if (n === "r") out += "\r"; else if (n === "t") out += "\t";
-      else if (n === "b" || n === "f") out += ""; else if (n === "(" || n === ")" || n === "\\") out += n;
-      else if (/[0-7]/.test(n || "")) { var oct = s.substr(i + 1, 3).match(/^[0-7]{1,3}/)[0]; out += String.fromCharCode(parseInt(oct, 8) & 0xff); i += oct.length - 1; }
-      i += 2;
-    }
-    return out;
-  }
-  function hexToText(hex) {
-    var clean = hex.replace(/[^0-9a-fA-F]/g, ""), bytes = [];
-    for (var i = 0; i + 1 < clean.length; i += 2) bytes.push(parseInt(clean.substr(i, 2), 16));
-    if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
-      var s = ""; for (var j = 2; j + 1 < bytes.length; j += 2) s += String.fromCharCode((bytes[j] << 8) | bytes[j + 1]); return s;
-    }
-    return bytes.map(function (b) { return String.fromCharCode(b); }).join("");
   }
 
   async function buildIndexFromFiles(fileList, onProgress) {

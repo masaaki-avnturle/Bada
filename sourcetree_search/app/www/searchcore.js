@@ -82,38 +82,102 @@ function pdfHexToText(hex){
   }
   return bytes.map(function(b){ return String.fromCharCode(b); }).join("");
 }
-function extractTextOps(content){
-  /* content stream 内の (…)Tj / (…)' / [ … ]TJ / <hex>Tj を拾う。
-     各選択肢は重複のない線形パターン (バックトラッキング爆発防止)。 */
-  const parts = [];
-  const re = /\(((?:\\.|[^\\()])*)\)\s*(Tj|')|\[((?:\\.|[^\]\\])*)\]\s*TJ|<([0-9a-fA-F\s]+)>\s*Tj/g;
-  let m;
-  while ((m = re.exec(content))){
-    if (m[1] !== undefined) parts.push(pdfLiteralUnescape(m[1]));
-    else if (m[3] !== undefined){
-      const inner = m[3];
-      const re2 = /\(((?:\\.|[^\\()])*)\)|<([0-9a-fA-F\s]+)>/g;
-      let mm;
-      while ((mm = re2.exec(inner))){
-        if (mm[1] !== undefined) parts.push(pdfLiteralUnescape(mm[1]));
-        else parts.push(pdfHexToText(mm[2]));
+
+/* ── /ToUnicode CMap の解析 (CID/コード → Unicode) ──
+ * 日本語など CID フォント (Identity-H) では文字列の 2 バイトはグリフ ID で、
+ * ToUnicode CMap を使って Unicode に変換しないと文字化けする。
+ * cmap = { map: {codeInt: "unicode文字列"}, width: バイト幅 } を蓄積する。 */
+function hexToUtf16BE(hex){
+  const clean = hex.replace(/[^0-9a-fA-F]/g, "");
+  if (clean.length === 2) return String.fromCharCode(parseInt(clean, 16));
+  let s = "";
+  for (let i = 0; i + 4 <= clean.length; i += 4) s += String.fromCharCode(parseInt(clean.substr(i, 4), 16));
+  if (clean.length % 4 === 2) s += String.fromCharCode(parseInt(clean.substr(clean.length - 2, 2), 16));
+  return s;
+}
+function parseToUnicodeCMap(text, acc){
+  acc = acc || { map: {}, width: 0 };
+  const cs = /begincodespacerange([\s\S]*?)endcodespacerange/.exec(text);
+  if (cs){
+    const w1 = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/.exec(cs[1]);
+    if (w1){ const w = Math.round(w1[1].length / 2); if (w > acc.width) acc.width = w; }
+  }
+  let b, reC = /beginbfchar([\s\S]*?)endbfchar/g;
+  while ((b = reC.exec(text))){
+    let e, reE = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g;
+    while ((e = reE.exec(b[1]))) acc.map[parseInt(e[1], 16)] = hexToUtf16BE(e[2]);
+  }
+  let r, reR = /beginbfrange([\s\S]*?)endbfrange/g;
+  while ((r = reR.exec(text))){
+    const body = r[1];
+    /* 配列形式: <lo> <hi> [ <d0> <d1> ... ] */
+    let a, reArr = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*\[([\s\S]*?)\]/g;
+    while ((a = reArr.exec(body))){
+      const lo = parseInt(a[1], 16);
+      const items = a[3].match(/<([0-9a-fA-F]+)>/g) || [];
+      for (let i = 0; i < items.length; i++) acc.map[lo + i] = hexToUtf16BE(items[i].replace(/[<>]/g, ""));
+    }
+    /* 基底形式: <lo> <hi> <dstBase> (範囲内で末尾コードユニットを加算) */
+    let c2, reBase = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g;
+    while ((c2 = reBase.exec(body))){
+      const lo = parseInt(c2[1], 16), hi = parseInt(c2[2], 16), dstHex = c2[3];
+      const units = [];
+      for (let k = 0; k + 4 <= dstHex.length; k += 4) units.push(parseInt(dstHex.substr(k, 4), 16));
+      if (!units.length && dstHex.length === 2) units.push(parseInt(dstHex, 16));
+      for (let code = lo, n = 0; code <= hi && n < 65536; code++, n++){
+        let s = "";
+        for (let u = 0; u < units.length; u++) s += String.fromCharCode((units[u] + (u === units.length - 1 ? n : 0)) & 0xffff);
+        acc.map[code] = s;
       }
     }
-    else if (m[4] !== undefined) parts.push(pdfHexToText(m[4]));
   }
-  /* BT…ET ブロック間・TJ 間は空白で継ぐ */
+  return acc;
+}
+function rawToBytes(str){ const b = []; for (let i = 0; i < str.length; i++) b.push(str.charCodeAt(i) & 0xff); return b; }
+function mapByCmap(rawByteStr, cmap){
+  if (!cmap || !cmap.width || cmap.width < 2) return null;
+  const bytes = rawToBytes(rawByteStr), w = cmap.width;
+  let out = "", any = false;
+  for (let i = 0; i + w <= bytes.length; i += w){
+    let code = 0; for (let k = 0; k < w; k++) code = code * 256 + bytes[i + k];
+    const u = cmap.map[code];
+    if (u != null){ out += u; any = true; }
+  }
+  return any ? out : null;
+}
+/* content stream から (…)Tj / (…)' / [ … ]TJ / <hex>Tj を取り出してテキスト化。
+   cmap があれば ToUnicode で変換 (日本語の文字化けを防止)、無ければ従来処理。 */
+function decodeTextOps(content, cmap){
+  const parts = [];
+  function lit(s){ const raw = pdfLiteralUnescape(s); const d = mapByCmap(raw, cmap); return d != null ? d : raw; }
+  function hx(h){
+    const clean = h.replace(/[^0-9a-fA-F]/g, "");
+    let raw = ""; for (let i = 0; i + 1 < clean.length; i += 2) raw += String.fromCharCode(parseInt(clean.substr(i, 2), 16));
+    const d = mapByCmap(raw, cmap); return d != null ? d : pdfHexToText(h);
+  }
+  let m, re = /\(((?:\\.|[^\\()])*)\)\s*(Tj|')|\[((?:\\.|[^\]\\])*)\]\s*TJ|<([0-9a-fA-F\s]+)>\s*Tj/g;
+  while ((m = re.exec(content))){
+    if (m[1] !== undefined) parts.push(lit(m[1]));
+    else if (m[3] !== undefined){
+      let mm, re2 = /\(((?:\\.|[^\\()])*)\)|<([0-9a-fA-F\s]+)>/g;
+      while ((mm = re2.exec(m[3]))){ if (mm[1] !== undefined) parts.push(lit(mm[1])); else parts.push(hx(mm[2])); }
+    }
+    else if (m[4] !== undefined) parts.push(hx(m[4]));
+  }
   return parts.join(" ");
 }
+/* 後方互換: cmap なしの素の抽出 */
+function extractTextOps(content){ return decodeTextOps(content, null); }
+
 function extractPdfText(buf){
-  const texts = [];
   const raw = buf.toString("latin1");
+  const streams = [];
   let idx = 0;
   while (true){
     const s = raw.indexOf("stream", idx);
     if (s < 0) break;
     const e = raw.indexOf("endstream", s);
     if (e < 0) break;
-    /* stream キーワード直後の EOL をスキップ */
     let start = s + 6;
     if (raw[start] === "\r") start++;
     if (raw[start] === "\n") start++;
@@ -123,18 +187,25 @@ function extractPdfText(buf){
     let content = null;
     if (/\/FlateDecode/.test(dict)){
       try { content = zlib.inflateSync(body).toString("latin1"); }
-      catch (err){
-        try { content = zlib.inflateRawSync(body).toString("latin1"); } catch (e2) { content = null; }
-      }
+      catch (err){ try { content = zlib.inflateRawSync(body).toString("latin1"); } catch (e2) { content = null; } }
     } else if (!/\/Filter/.test(dict)){
       content = body.toString("latin1");
     }
-    if (content && content.length > 4 * 1024 * 1024) content = content.slice(0, 4 * 1024 * 1024);
-    if (content && /\b(Tj|TJ|BT)\b/.test(content)){
-      const t = extractTextOps(content);
+    if (content){ if (content.length > 4 * 1024 * 1024) content = content.slice(0, 4 * 1024 * 1024); streams.push(content); }
+    idx = e + 9;
+  }
+  /* パス 1: すべての ToUnicode CMap を集約 */
+  const cmap = { map: {}, width: 0 };
+  for (let i = 0; i < streams.length; i++) if (/beginbf(char|range)/.test(streams[i])) parseToUnicodeCMap(streams[i], cmap);
+  if (!cmap.width) cmap.width = 2;
+  const hasMap = Object.keys(cmap.map).length > 0;
+  /* パス 2: テキスト stream を (必要なら ToUnicode で) 抽出 */
+  const texts = [];
+  for (let j = 0; j < streams.length; j++){
+    if (/\b(Tj|TJ|BT)\b/.test(streams[j])){
+      const t = decodeTextOps(streams[j], hasMap ? cmap : null);
       if (t.trim()) texts.push(t);
     }
-    idx = e + 9;
   }
   return texts.join("\n");
 }
@@ -317,7 +388,9 @@ var API = {
   search: search,
   tokenizeLine: tokenizeLine,
   buildVocab: buildVocab,
-  complete: complete
+  complete: complete,
+  parseToUnicodeCMap: parseToUnicodeCMap,
+  decodeTextOps: decodeTextOps
 };
 if (isNode) module.exports = API;
 if (typeof global !== "undefined") global.BadaSearchCore = API;
