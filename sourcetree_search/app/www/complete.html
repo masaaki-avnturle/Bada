@@ -98,6 +98,7 @@ mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-
 <div id="status"></div>
 
 <script src="demo-data.js"></script>
+<script src="cinevim.js"></script>
 <script>
 (function(){
   "use strict";
@@ -198,6 +199,7 @@ mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-
         '<span class="rel">'+esc(h.rel)+'</span>'+
         '<span class="lang">'+esc(h.lang)+'</span>'+
         '<span class="cnt">'+h.count+' 件</span>'+
+        '<button data-cine="'+encodeURIComponent(h.path||h.rel)+'" data-line="'+((h.matches[0]&&h.matches[0].line)||1)+'">🎬 CineVim</button>'+
         '<button data-open="'+encodeURIComponent(h.path||h.rel)+'">開く</button>'+
         '</div>'+
         h.matches.slice(0,10).map(function(m){
@@ -209,6 +211,23 @@ mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-
     $("results").innerHTML = out;
     Array.prototype.forEach.call($("results").querySelectorAll("button[data-open]"), function(b){
       b.onclick = function(e){ e.stopPropagation(); if (api) api.openFile(decodeURIComponent(b.getAttribute("data-open"))); };
+    });
+    Array.prototype.forEach.call($("results").querySelectorAll("button[data-cine]"), function(b){
+      b.onclick = function(e){ e.stopPropagation();
+        openCine(decodeURIComponent(b.getAttribute("data-cine")), parseInt(b.getAttribute("data-line"),10)||1); };
+    });
+  }
+
+  /* ── BadaCineVim: 付属のシネマ風 Vim ビューア/エディタでファイルを開く ── */
+  function openCine(p, line){
+    if (!bridge || !window.BadaCineVim){ setStatus("CineVim を読み込めません"); return; }
+    Promise.resolve(bridge.fileText(p)).then(function(res){
+      if (!res || res.error){ setStatus("⚠ "+esc((res&&res.error)||"ファイルを開けません")); return; }
+      window.BadaCineVim.open({
+        name: res.name, lines: res.lines, lang: res.lang, readonly: res.readonly,
+        gotoLine: line, search: lastQ,
+        onSave: function(text){ return Promise.resolve(bridge.saveFile(p, text)); }
+      });
     });
   }
 
@@ -290,7 +309,13 @@ mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-
         hits.sort(function(a,b){return b.count-a.count;});
         var total=hits.reduce(function(s,h){return s+h.count;},0);
         return Promise.resolve({ query:q, hits:hits, total:total, files:hits.length });
-      }
+      },
+      fileText: function(p){
+        var d = data.docs.filter(function(x){ return x.rel===p || x.path===p; })[0];
+        if(!d) return Promise.resolve({ error:"not found" });
+        return Promise.resolve({ name:d.rel, lines:d.lines.slice(), lang:d.lang, readonly:d.lang==="PDF" });
+      },
+      saveFile: function(){ return Promise.resolve({ ok:true }); }   /* デモは保存しない */
     };
     function copy(e){ return { t:e.t, count:e.count, files:e.files }; }
   }

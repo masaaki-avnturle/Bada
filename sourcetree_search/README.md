@@ -23,6 +23,22 @@ TypeScript/Python/Ruby/Java/Go/Rust/PHP/C#/Swift/Kotlin/Shell/SQL/HTML/CSS/Bada/
 > 画面右上の「**詳細ビュー →**」で、従来のフィルタ付き一覧ビュー(下記)にいつでも切り替えられます
 > (詳細ビュー側の「🏥 単語補完 大画面 →」で戻れます)。
 
+## 🎬 付属エディタ BadaCineVim (シネマ風 Vim ビューア/エディタ)
+
+検索結果の各ファイルの **🎬 CineVim** ボタンから、そのファイルを **Vim スタイルの
+モーダル・エディタ**で開けます(黒い大画面に合うシネマ風オーバーレイ・依存ゼロの純 JS)。
+検索語の **該当行へ自動ジャンプ**し、一致箇所をハイライトします。
+
+- **NORMAL**: `h j k l` 移動 / `0 $ ^` 行頭末 / `w b` 単語 / `gg G` 先頭末 /
+  `x` 1字削除 / `dd` 行削除 / `Ctrl-d` `Ctrl-u` 半画面 / `n` `N` 検索送り
+- **INSERT**: `i a A I o O` で挿入開始、`Enter` 改行、`Backspace`、`Esc` で NORMAL へ
+- **COMMAND**: `/語` 検索、`:w` 保存、`:q` 閉じる、`:wq` 保存して閉じる、`:<行番号>` 移動
+- 論文(PDF 由来テキスト)は **読み取り専用 `[RO]`** で開き、編集・保存はしません。
+  ソースコードは `:w` でその場に保存できます(Electron 版)。
+
+> 由来: リポジトリの mini-Vim 実装 (`neovim/omega-vim.c`) の操作系を、Web/Electron の
+> Bada Search に合わせて純 JS で作り直した付属エディタです。
+
 ## ⬇️ ダウンロード (Windows 10 / 11)
 
 [Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
@@ -73,5 +89,13 @@ node sourcetree_search/tools/test-search.js
 FlateDecode PDF の生成→抽出、言語判定、AND / 正規表現 / 大文字小文字 / 言語・パス
 フィルタ、日本語検索、バイナリと `.git` の除外、さらに**単語補完エンジン**
 (語彙構築 / 前方一致・部分一致補完 / 和文補完 / 補完語での全文検索)など 25 項目以上を
-検証します(CI の `test-core` ジョブでも実行)。黒い大画面 UI は Playwright/Chromium の
-スモークテストで、ポップアップ出現→候補選択→結果表示まで確認済みです。
+検証します。
+
+```
+node sourcetree_search/tools/test-cinevim.js
+```
+
+BadaCineVim エンジン(Vim モーション / 挿入・削除 / 検索 / ex コマンド / 読み取り専用)
+35 項目を検証します。いずれも CI の `test-core` ジョブで実行。黒い大画面 UI と
+CineVim オーバーレイは Playwright/Chromium のスモークテストで、ポップアップ出現→
+候補選択→結果表示、および CineVim の起動→移動→挿入→保存→クローズまで確認済みです。

@@ -93,6 +93,7 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
 </div>
 <div id="status"></div>
 
+<script src="cinevim.js"></script>
 <script>
 (function(){
   "use strict";
@@ -170,6 +171,7 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
         '<span class="rel">' + escHtml(h.rel) + '</span>' +
         '<span class="lang">' + escHtml(h.lang) + '</span>' +
         '<span class="cnt">' + h.count + ' 件</span>' +
+        '<button data-cine="' + encodeURIComponent(h.path) + '" data-line="' + ((h.matches[0]&&h.matches[0].line)||1) + '">🎬 CineVim</button>' +
         '<button data-open="' + encodeURIComponent(h.path) + '">開く</button>' +
         '<button data-reveal="' + encodeURIComponent(h.path) + '">📁</button>' +
         "</div><div class=\"lines\">" +
@@ -186,6 +188,23 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
     });
     $("results").querySelectorAll("button[data-reveal]").forEach(function(b){
       b.onclick = function(e){ e.stopPropagation(); api.revealFile(decodeURIComponent(b.getAttribute("data-reveal"))); };
+    });
+    $("results").querySelectorAll("button[data-cine]").forEach(function(b){
+      b.onclick = function(e){ e.stopPropagation();
+        openCine(decodeURIComponent(b.getAttribute("data-cine")), parseInt(b.getAttribute("data-line"),10)||1, $("q").value); };
+    });
+  }
+
+  /* BadaCineVim: 付属のシネマ風 Vim ビューア/エディタでファイルを開く */
+  function openCine(p, line, q){
+    if (!api || !window.BadaCineVim) return;
+    Promise.resolve(api.fileText(p)).then(function(res){
+      if (!res || res.error){ setStatus("⚠ " + escHtml((res&&res.error)||"ファイルを開けません")); return; }
+      window.BadaCineVim.open({
+        name: res.name, lines: res.lines, lang: res.lang, readonly: res.readonly,
+        gotoLine: line, search: q,
+        onSave: function(text){ return Promise.resolve(api.saveFile(p, text)); }
+      });
     });
   }
 

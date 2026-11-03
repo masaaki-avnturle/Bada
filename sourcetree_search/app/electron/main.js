@@ -78,6 +78,22 @@ ipcMain.handle("search", function(ev, query, opts){
   try { return core.search(index, query, opts || {}); }
   catch (e){ return { error: e.message }; }
 });
+ipcMain.handle("file-text", function(ev, p){
+  /* まず索引済みの本文 (PDF 抽出テキスト含む) を使い、無ければディスクから読む */
+  if (index){
+    var f = index.files.find(function(x){ return x.path === p; });
+    if (f) return { name: f.rel, lines: f.lines, lang: f.lang, readonly: f.lang === "PDF" };
+  }
+  try {
+    var buf = fs.readFileSync(p);
+    if (buf.includes(0)) return { error: "バイナリファイルは開けません" };
+    return { name: path.basename(p), lines: buf.toString("utf8").split(/\r?\n/), lang: core.langOf(p) || "Text", readonly: false };
+  } catch (e){ return { error: e.message }; }
+});
+ipcMain.handle("save-file", function(ev, p, text){
+  try { fs.writeFileSync(p, text, "utf8"); return { ok: true }; }
+  catch (e){ return { error: e.message }; }
+});
 ipcMain.handle("open-file", function(ev, p){ return shell.openPath(p); });
 ipcMain.handle("reveal-file", function(ev, p){ shell.showItemInFolder(p); return true; });
 ipcMain.handle("startup-repo", function(){ return argvRepo(); });

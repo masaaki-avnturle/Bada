@@ -221,6 +221,8 @@ Git GUI **SourceTree** のカスタム操作 (`$REPO`) に登録して付属ア�
 
 **🏥 単語補完 大画面モード**(既定画面・広島大学医学部附属病院の薬剤検索風): 黒い大画面の端末で、検索ボックスに数文字打つと、論文(PDF)とソースコードから抽出した単語の**補完候補がポップアップメニューで出現**します(前方一致優先 → 部分一致、頻度順、和文対応)。`↑`/`↓` で選び `Enter` で確定すると、その語で全文を横断検索。「詳細ビュー」でフィルタ付き一覧へ切替可。
 
+**🎬 付属エディタ BadaCineVim**: 検索結果の各ファイルの「🎬 CineVim」ボタンで、そのファイルを **Vim スタイルのシネマ風モーダル・エディタ**で開き、該当行へ自動ジャンプ。`h j k l`/`w b`/`gg G`/`x dd`/`i a o`/`/`検索/`:w`保存/`:q`閉じる に対応(論文 PDF は読み取り専用)。リポジトリの mini-Vim (`neovim/omega-vim.c`) を Web/Electron 用に純 JS で作り直した付属物です。
+
 | プラットフォーム | 入手 |
 |:---|:---|
 | **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaSearch-Setup-*-x64.exe` (インストーラ) / `BadaSearch-Portable-*-x64.exe` (インストール不要) |

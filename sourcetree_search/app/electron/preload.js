@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld("badaSearch", {
   buildVocab:  function(){ return ipcRenderer.invoke("build-vocab"); },
   complete:    function(prefix, opts){ return ipcRenderer.invoke("complete", prefix, opts); },
   search:      function(q, opts){ return ipcRenderer.invoke("search", q, opts); },
+  fileText:    function(p){ return ipcRenderer.invoke("file-text", p); },
+  saveFile:    function(p, text){ return ipcRenderer.invoke("save-file", p, text); },
   openFile:    function(p){ return ipcRenderer.invoke("open-file", p); },
   revealFile:  function(p){ return ipcRenderer.invoke("reveal-file", p); },
   startupRepo: function(){ return ipcRenderer.invoke("startup-repo"); },
