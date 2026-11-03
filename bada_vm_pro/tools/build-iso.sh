@@ -51,9 +51,17 @@ MSG
 
 mkdir -p "$ROOT/dist"
 
-# grub-mkrescue: BIOS(i386-pc) レガシー ブータブル ISO。
-# --modules で chainloader/part/fs を core に埋め込み、メニューが確実に動くように。
-grub-mkrescue \
+# grub-mkrescue: BIOS(i386-pc) レガシー専用 ブータブル ISO。
+# -d /usr/lib/grub/i386-pc で i386-pc のみを強制 (x86_64-efi を作らせない。
+#  これをしないと、ランナーに grub-efi があると EFI 側で biosdisk 等の
+#  BIOS 専用モジュールを探して失敗する)。
+GRUB_PC_DIR=""
+for d in /usr/lib/grub/i386-pc /usr/lib/grub2/i386-pc /usr/share/grub/i386-pc; do
+  [ -d "$d" ] && { GRUB_PC_DIR="$d"; break; }
+done
+[ -n "$GRUB_PC_DIR" ] || { echo "ERROR: grub i386-pc モジュールが見つかりません (apt install grub-pc-bin)"; exit 1; }
+
+grub-mkrescue -d "$GRUB_PC_DIR" \
   --modules="biosdisk part_msdos part_gpt fat ntfs ntldr chain configfile normal echo ls search search_label test all_video gfxterm" \
   -o "$OUT" "$STAGE" \
   -- -volid BADAVMPRO_LIVE
