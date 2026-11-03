@@ -206,7 +206,7 @@ cat > /etc/skel/Desktop/install-badaos-triboot.desktop <<EOF
 [Desktop Entry]
 Type=Application
 Name=トリプルブート導入 (Windows | Bada VM Pro | Linux)
-Comment=Windows と Linux の間に BadaVMPro パーティションを作り、Windows の起動パーティションにブートローダを作成
+Comment=Windows と Linux の間に Bada VM Pro 専用ブート FAT と OS パーティションを作成 (UEFI / Legacy)
 Exec=/usr/local/bin/install-badaos-triboot
 Terminal=false
 Icon=drive-harddisk

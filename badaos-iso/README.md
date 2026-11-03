@@ -13,39 +13,45 @@
 - **あなたのリポジトリの apt リポジトリ**: `deb [trusted=yes] <release>/ ./` を登録済み。`apt install` で Bada アプリを取得
 - **起動方式**: GRUB (grub-mkrescue) による BIOS + UEFI ハイブリッド ISO。`search` でカーネルのある ISO を確実に検出 → **Rufus でそのまま USB に書ける**
 
-## 🪟🜁🐧 トリプルブート: Windows | Bada VM Pro | Linux
+## 🪟🜁🐧 トリプルブート: Windows | Bada VM Pro | Linux (UEFI / Legacy 両対応)
 
-Windows と Linux が入っている PC で、**その「間」に Bada VM Pro 用のパーティション**を作り、
-**Windows の起動パーティション (EFI System Partition) に Bada VM Pro のブートローダ**を作ります。
+Windows と後ろの Linux が入っている PC で、その**真ん中**に Bada VM Pro を入れます。
+Windows の**すぐ下**に **Bada VM Pro 専用ブートローダの FAT パーティション**を作り、
+その下の空き領域に **Bada VM Pro OS** をインストールします。**Windows の起動パーティションは触りません。**
 
 ```
-┌─────┬──────────────┬─────────────────┬──────────────┐
-│ ESP │ Windows (C:) │ ★ BadaVMPro ★   │ Linux (ext4) │   ← 既存の Windows / Linux は消さない
-│FAT32│    NTFS      │  ext4 (新規作成) │   そのまま   │
-└──┬──┴──────────────┴─────────────────┴──────────────┘
-   └─ \EFI\BadaVMPro\grubx64.efi (+ Secure Boot 用 shimx64.efi) を追加
-      → UEFI 起動メニュー「Bada VM Pro」→ GRUB で Bada VM Pro / Windows / Linux を選択
+┌───────┬──────────────┬──────────────────┬───────────────────┬──────────────┐
+│ (ESP) │ Windows (C:) │ ★ BADAVMBOOT ★   │ ★ BADAVMPRO ★     │ Linux (ext4) │
+│ 変更  │    NTFS      │ FAT32 512MiB     │ ext4 = Bada VM    │  既存のまま  │
+│ しない│              │ 専用ブートローダ │ Pro OS 本体       │              │
+└───────┴──────────────┴──────────────────┴───────────────────┴──────────────┘
+                         ├ EFI/BadaVMPro/   (UEFI: shimx64.efi + grubx64.efi)
+                         ├ EFI/BOOT/BOOTX64.EFI (このFAT専用のフォールバック)
+                         └ grub/            (GRUB モジュール + grub.cfg, Legacy/UEFI 共通)
 ```
+
+| 起動方式 | Bada VM Pro のブートローダ |
+|:---|:---|
+| **UEFI** (GPT) | 専用 FAT の `\EFI\BadaVMPro\` を UEFI 起動メニュー **「Bada VM Pro」** に登録 (起動順の先頭)。Windows の ESP・`\EFI\Microsoft\` は無変更 |
+| **Legacy BIOS** (MBR) | GRUB の起動コードをディスク先頭に、モジュールと `grub.cfg` は専用 FAT の `/grub` に。基本区画が足りない (System Reserved + C: + Linux) 場合は**拡張区画 + 論理区画**で作成。元の MBR は `grub/mbr-before-badavmpro.bin` に退避 |
+| **Legacy BIOS** (GPT) | 上と同じ + GRUB 埋め込み用の 1MiB BIOS 起動区画を専用 FAT の前に作成 |
+
+どちらの方式でも GRUB メニューで **Bada VM Pro / Windows / Linux** を選べます。
+(Windows は UEFI なら `bootmgfw.efi`、Legacy なら `bootmgr` を起動時に探して起動。後ろの Linux は os-prober が検出)
+
+**ISO は BIOS(El Torito) + UEFI のハイブリッド**なので、Legacy の PC でも UEFI の PC でも USB/DVD から起動してインストールできます。
 
 使い方:
 
 1. Windows で **高速スタートアップを無効化**、BitLocker を一時停止、データをバックアップ
-2. ISO から起動し、GRUB で **「トリプルブート導入: Windows | BadaVMPro | Linux」** を選ぶ
+2. ISO から (Legacy でも UEFI でも) 起動し、GRUB で **「トリプルブート導入: Windows | BadaVMPro | Linux」** を選ぶ
    (またはデスクトップの「トリプルブート導入」/ 端末で `install-badaos-triboot`)
-3. ディスクとサイズ (GiB, 空欄 = 間の空き全部) を選ぶ → **計画 (予定のレイアウト) を確認** → 実行
+3. ディスクとサイズ (GiB, 空欄 = 間の空き全部) を選ぶ → **予定のレイアウトを確認** → 実行
 4. 間に空きが無い場合は、ウィザードが **Windows (NTFS) の末尾を縮小** して空きを作るか尋ねます
-   (Windows → Linux の順に並んでいる時。逆順なら GParted = `badaos-partition` で空けてください)
 
-仕組み (`installer/badaos-triboot-core.sh`):
-
-- `sfdisk -J` / `blkid` で ESP・Windows(最大の NTFS)・Linux(ext4/btrfs/xfs)を検出し、Windows と Linux の**間の未割り当て領域**を 1MiB 境界で計算
-- `sgdisk` で GPT 名 `BadaVMPro` / ラベル `BADAVMPRO` の ext4 を作成 → ライブの squashfs を展開
-- Windows の ESP を `/boot/efi` にマウント (作業前に `/var/backups/esp-before-badavmpro.tar` へ退避)
-- `grub-install --bootloader-id=BadaVMPro` で `\EFI\BadaVMPro\` を作成。**`\EFI\Microsoft\` と `\EFI\BOOT\BOOTX64.EFI` は上書きしない**
-- `efibootmgr` で UEFI 起動エントリ **「Bada VM Pro」** を登録 (起動順の先頭)
-- `/etc/grub.d/35_badavmpro_triboot` + os-prober が GRUB メニューに **Windows Boot Manager / Linux / UEFI 設定** を追加
-- Windows 側から登録したい場合は ESP の `\EFI\BadaVMPro\add-badavmpro-bootentry.bat` を管理者で実行 (`bcdedit`)
-- 変更前の確認だけ: `sudo TARGET_DISK=/dev/nvme0n1 PLAN_ONLY=1 /usr/local/lib/badaos/badaos-triboot-core.sh`
+確認だけ (ディスクは変更しない):
+`sudo TARGET_DISK=/dev/sda PLAN_ONLY=1 /usr/local/lib/badaos/badaos-triboot-core.sh`
+(`BOOT_MODE=bios` / `uefi` で起動方式を指定可)
 
 ## ⬇️ ダウンロード
 

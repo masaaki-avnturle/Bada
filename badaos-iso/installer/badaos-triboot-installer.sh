@@ -12,7 +12,7 @@ command -v zenity >/dev/null 2>&1 || { xmessage -center "zenity が見つかり�
 Z(){ zenity --window-icon=info "$@"; }
 
 Z --info --width=600 --title="$TITLE" --ok-label="次へ" \
-  --text="<span size='xx-large' foreground='#c8a44a'><b>Bada VM Pro トリプルブート</b></span>\n\n<tt>[ESP][ Windows ][ ★BadaVMPro★ ][ Linux ]</tt>\n\n• Windows と Linux の<b>間</b>に BadaVMPro パーティションを作ります\n• Windows の起動パーティション (ESP) に <b>\\\\EFI\\\\BadaVMPro\\\\</b> ブートローダを作り、\n  起動メニューで <b>Bada VM Pro / Windows / Linux</b> を選べるようにします\n• 既存の Windows / Linux は消しません\n\n⚠ 事前に Windows の<b>高速スタートアップを無効</b>にし、BitLocker を一時停止し、\n  大切なデータはバックアップしてください。" || exit 0
+  --text="<span size='xx-large' foreground='#c8a44a'><b>Bada VM Pro トリプルブート</b></span>\n\n<tt>[ Windows ][ ★BADAVMBOOT (FAT)★ ][ ★BADAVMPRO (OS)★ ][ Linux ]</tt>\n\n• Windows の<b>下</b>に Bada VM Pro <b>専用ブートローダの FAT パーティション</b>を作り、\n  その下の空き領域に <b>Bada VM Pro OS</b> をインストールします (Linux との間)\n• Windows の起動パーティションは変更しません\n• <b>UEFI / Legacy BIOS</b> どちらでも、起動メニューで <b>Bada VM Pro / Windows / Linux</b> を選べます\n• 既存の Windows / Linux は消しません\n\n⚠ 事前に Windows の<b>高速スタートアップを無効</b>にし、BitLocker を一時停止し、\n  大切なデータはバックアップしてください。" || exit 0
 
 declare -a ROWS=()
 while read -r name size model; do
@@ -25,7 +25,7 @@ DISK="$(Z --list --radiolist --title="$TITLE — ディスク" --width=600 --hei
 [ -n "$DISK" ] || exit 1
 
 SIZE="$(Z --entry --title="$TITLE — サイズ" --width=520 \
-  --text="BadaVMPro パーティションの大きさ (GiB)。空欄 = Windows と Linux の間の空きを全部使う:" \
+  --text="Bada VM Pro に使う大きさ (GiB, ブート FAT 512MiB 込み)。空欄 = Windows と Linux の間の空きを全部使う:" \
   --entry-text="")" || exit 0
 SIZE="${SIZE//[^0-9]/}"; SIZE="${SIZE:-0}"
 

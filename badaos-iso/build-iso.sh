@@ -102,12 +102,11 @@ install -Dm755 "$HERE/config/badaos-apps.sh"           "$CHROOT/usr/local/bin/ba
 # 自作 GUI インストーラ (zenity ウィザード + 実インストール本体, Calamares 代替)
 install -Dm755 "$HERE/installer/badaos-installer.sh"    "$CHROOT/usr/local/bin/badaos-installer"
 install -Dm755 "$HERE/installer/badaos-install-core.sh" "$CHROOT/usr/local/lib/badaos/badaos-install-core.sh"
-# トリプルブート (Windows / BadaVMPro / Linux): 間にパーティション + Windows の ESP にブートローダ
+# トリプルブート: Windows の下に Bada VM Pro 専用ブート FAT + OS 区画 (UEFI / Legacy)
 install -Dm755 "$HERE/config/install-badaos-triboot.sh"          "$CHROOT/usr/local/bin/install-badaos-triboot"
 install -Dm755 "$HERE/installer/badaos-triboot-installer.sh"     "$CHROOT/usr/local/bin/badaos-triboot-installer"
 install -Dm755 "$HERE/installer/badaos-triboot-core.sh"          "$CHROOT/usr/local/lib/badaos/badaos-triboot-core.sh"
 install -Dm755 "$HERE/installer/35_badavmpro_triboot"            "$CHROOT/usr/local/lib/badaos/35_badavmpro_triboot"
-install -Dm644 "$HERE/installer/add-badavmpro-bootentry.bat"     "$CHROOT/usr/local/lib/badaos/add-badavmpro-bootentry.bat"
 # Calamares の日本語インストール設定
 mkdir -p "$CHROOT/etc/calamares"
 cp -r "$HERE/config/calamares/." "$CHROOT/etc/calamares/"
@@ -153,8 +152,11 @@ echo "Bada VM Pro OS ${VERSION} - Release amd64" > "$IMAGE/.disk/info"
 # ---- 5. GRUB 設定 (BIOS+UEFI 共通)。search で ISO を必ず見つける ----------
 CMDLINE="boot=casper username=bada hostname=badaos quiet splash ---"
 cat > "$IMAGE/boot/grub/grub.cfg" <<EOF
-if loadfont /boot/grub/fonts/unicode.pf2 ; then set gfxmode=auto; insmod gfxterm; terminal_output gfxterm; fi
+# 日本語メニューを Legacy BIOS / UEFI どちらでも表示するため、ビデオ → フォント → gfxterm の順に
 insmod all_video
+insmod gfxterm
+insmod font
+if loadfont /boot/grub/fonts/unicode.pf2 ; then set gfxmode=auto; terminal_output gfxterm; fi
 insmod part_gpt
 insmod part_msdos
 insmod iso9660
@@ -176,6 +178,10 @@ menuentry "Bada VM Pro OS ${VERSION} (セーフグラフィック)" {
     initrd /casper/initrd
 }
 EOF
+
+# GRUB の Unicode フォント (日本語メニュー用) を同梱
+mkdir -p "$IMAGE/boot/grub/fonts"
+cp /usr/share/grub/unicode.pf2 "$IMAGE/boot/grub/fonts/unicode.pf2"
 
 # ---- 6. ISO 生成: grub-mkrescue が BIOS(El Torito)+UEFI(ESP)+isohybrid を
 #         すべて面倒みる。Rufus / dd でそのまま USB に書ける ----------------
