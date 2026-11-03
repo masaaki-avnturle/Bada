@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Bada Search 単語補完 — SourceTree 論文・ソースコード検索 (大画面)</title>
+<style>
+/* 広島大学医学部附属病院の薬剤検索端末のような「黒い大画面 + ポップアップ補完メニュー」。
+   高コントラスト・大きな文字・キーボード操作 (↑↓ Enter Esc)。 */
+:root{
+  --bg:#000000; --fg:#e8ffe8; --dim:#5f8f6a; --edge:#17351f;
+  --green:#3cff8e; --amber:#ffcf4a; --cyan:#4fe8ff; --red:#ff6a6a;
+  --sel:#0a3a1e; --seledge:#3cff8e;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,"Noto Sans Mono CJK JP",monospace;
+  --sans:"Hiragino Kaku Gothic ProN","Noto Sans JP","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);display:flex;flex-direction:column;overflow:hidden}
+#top{display:flex;align-items:center;gap:14px;padding:12px 22px;border-bottom:1px solid var(--edge);flex:none}
+#top .brand{font-size:19px;font-weight:bold;color:var(--green);letter-spacing:.04em;text-shadow:0 0 12px #0f5}
+#top .brand small{color:var(--dim);font-weight:normal;font-size:12px;margin-left:8px;text-shadow:none}
+#top .grow{flex:1}
+button{font:inherit;color:var(--fg);background:#05140a;border:1px solid var(--edge);border-radius:8px;padding:8px 14px;cursor:pointer}
+button:hover{border-color:var(--green);box-shadow:0 0 8px #0f53}
+button.primary{background:linear-gradient(135deg,#0b3,#085);border:none;color:#021;font-weight:bold}
+a.link{color:var(--cyan);font-size:12.5px;text-decoration:none;border-bottom:1px dotted var(--cyan)}
+#repo{color:var(--cyan);font-family:var(--mono);font-size:12px;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+#stage{flex:1;display:flex;flex-direction:column;align-items:center;padding:26px 22px 0;overflow:hidden}
+#searchwrap{width:100%;max-width:1000px;position:relative;flex:none}
+#prompt{font-size:14px;color:var(--amber);margin-bottom:8px;letter-spacing:.05em}
+#q{width:100%;font-family:var(--mono);font-size:30px;color:var(--green);background:#030b06;
+   border:2px solid var(--edge);border-radius:12px;padding:16px 20px;caret-color:var(--green);
+   text-shadow:0 0 10px #0f54}
+#q:focus{outline:none;border-color:var(--green);box-shadow:0 0 22px #0f54 inset,0 0 14px #0f53}
+#q::placeholder{color:#2d5a3a}
+
+/* ポップアップ補完メニュー */
+#popup{position:absolute;left:0;right:0;top:100%;margin-top:8px;z-index:20;
+  background:#020a05;border:2px solid var(--green);border-radius:12px;
+  box-shadow:0 18px 60px #000,0 0 26px #0f53;max-height:min(58vh,560px);overflow-y:auto;display:none}
+#popup.on{display:block}
+#popup .phead{position:sticky;top:0;background:#031a0e;color:var(--amber);font-size:12px;
+  padding:7px 16px;border-bottom:1px solid var(--edge);letter-spacing:.05em}
+.cand{display:flex;align-items:baseline;gap:14px;padding:11px 18px;cursor:pointer;border-bottom:1px solid #0c2616}
+.cand:last-child{border-bottom:none}
+.cand .term{font-family:var(--mono);font-size:21px;color:var(--fg);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cand .term b{color:var(--green);text-shadow:0 0 8px #0f55}
+.cand .meta{font-size:12.5px;color:var(--dim);font-family:var(--mono);white-space:nowrap}
+.cand .tag{font-size:10.5px;padding:1px 7px;border-radius:99px;border:1px solid var(--edge);color:var(--amber)}
+.cand.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--seledge)}
+.cand.sel .meta{color:#9fe8b6}
+
+#results{width:100%;max-width:1000px;flex:1;overflow-y:auto;margin-top:18px;padding-bottom:16px}
+#hint{color:var(--dim);text-align:center;margin-top:10vh;line-height:2.1;font-size:15px}
+#hint .big{font-size:52px;filter:drop-shadow(0 0 16px #0f5)}
+#hint .kbd{font-family:var(--mono);background:#05170c;border:1px solid var(--edge);border-radius:6px;padding:1px 8px;color:var(--green)}
+.rfile{border:1px solid var(--edge);border-radius:11px;margin-bottom:12px;overflow:hidden;background:#020a05}
+.rfile .rh{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#041711;cursor:pointer}
+.rfile .rh .rel{font-family:var(--mono);font-size:15px;color:var(--cyan);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rfile .rh .lang{font-size:11px;padding:1px 10px;border-radius:99px;border:1px solid var(--edge);color:var(--amber)}
+.rfile .rh .cnt{font-size:12px;color:var(--dim)}
+.rfile .rh button{padding:3px 11px;font-size:12px}
+.rfile .ln{display:flex;font-family:var(--mono);font-size:14px;border-top:1px solid #0c2616;padding:4px 16px;white-space:pre-wrap;word-break:break-all}
+.rfile .ln .no{color:var(--dim);min-width:58px;text-align:right;padding-right:14px;flex:none;user-select:none}
+mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-shadow:none}
+::-webkit-scrollbar{width:12px}::-webkit-scrollbar-thumb{background:#123;border-radius:6px}
+
+#status{flex:none;padding:8px 22px;border-top:1px solid var(--edge);font-size:12.5px;color:var(--dim);min-height:34px;font-family:var(--mono)}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #0c2616;border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="top">
+  <div class="brand">🏥 Bada Search 単語補完<small>SourceTree 論文・ソースコード検索 — 大画面端末</small></div>
+  <div class="grow"></div>
+  <span id="repo">(未選択)</span>
+  <button id="pick" class="primary">📂 リポジトリを選択</button>
+  <button id="reindex" disabled>↻ 再索引</button>
+  <a class="link" href="index.html" title="従来の詳細ビューへ">詳細ビュー →</a>
+</div>
+
+<div id="stage">
+  <div id="searchwrap">
+    <div id="prompt">▌ 探す単語を入力してください — 途中まで打つと候補が下に出ます(薬剤検索と同じ)。<span style="color:var(--dim)">↑↓で選択 / Enterで確定 / Escで閉じる</span></div>
+    <input id="q" autocomplete="off" spellcheck="false" placeholder="例: kauffman / jonesKey / 量子多項式 / pdf …" disabled/>
+    <div id="popup" role="listbox" aria-label="補完候補"></div>
+  </div>
+  <div id="results"></div>
+  <div id="hint">
+    <div class="big">🔎</div>
+    リポジトリを選択するか、SourceTree のカスタム操作から <span class="kbd">$REPO</span> 付きで起動してください。<br/>
+    論文(PDF)とソースコードから単語を索引し、入力途中で候補をポップアップ表示します。
+  </div>
+</div>
+<div id="status"></div>
+
+<script src="demo-data.js"></script>
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var api = window.badaSearch || null;
+  var curDir = null, vocabReady = false, sel = -1, items = [], lastQ = "";
+
+  /* ── ブラウザ プレビュー / スモークテスト用の内蔵デモ (Electron ブリッジなし時) ── */
+  var demo = (!api && window.BADA_DEMO) ? makeDemoApi(window.BADA_DEMO) : null;
+  var bridge = api || demo;
+
+  function setStatus(h){ $("status").innerHTML = h || ""; }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  /* ── 補完ポップアップ ── */
+  function closePopup(){ $("popup").classList.remove("on"); $("popup").innerHTML=""; items=[]; sel=-1; }
+  function renderPopup(res, q){
+    items = (res && res.items) || [];
+    sel = items.length ? 0 : -1;
+    if (!items.length){ closePopup(); return; }
+    var ql = q.trim().toLowerCase();
+    var rows = items.map(function(it, i){
+      var disp = esc(it.t), low = it.t.toLowerCase(), pos = low.indexOf(ql);
+      if (ql && pos >= 0){
+        disp = esc(it.t.slice(0,pos)) + "<b>" + esc(it.t.slice(pos,pos+ql.length)) + "</b>" + esc(it.t.slice(pos+ql.length));
+      }
+      var tag = it.kind === "substr" ? '<span class="tag">部分</span>' : '<span class="tag">前方</span>';
+      return '<div class="cand' + (i===sel?' sel':'') + '" data-i="'+i+'" role="option">' +
+             '<span class="term">'+disp+'</span>'+tag+
+             '<span class="meta">'+it.count+' 件 / '+it.files+' ファイル</span></div>';
+    }).join("");
+    var p = $("popup");
+    p.innerHTML = '<div class="phead">候補 '+items.length+' 件'+(res.total>items.length?' (ほか '+(res.total-items.length)+')':'')+' — 選んで Enter で全文検索</div>'+rows;
+    p.classList.add("on");
+    Array.prototype.forEach.call(p.querySelectorAll(".cand"), function(el){
+      el.addEventListener("mouseenter", function(){ setSel(parseInt(el.getAttribute("data-i"),10)); });
+      el.addEventListener("mousedown", function(ev){ ev.preventDefault(); choose(parseInt(el.getAttribute("data-i"),10)); });
+    });
+  }
+  function setSel(i){
+    var cands = $("popup").querySelectorAll(".cand");
+    if (!cands.length) return;
+    if (i < 0) i = cands.length - 1; if (i >= cands.length) i = 0;
+    if (sel >= 0 && cands[sel]) cands[sel].classList.remove("sel");
+    sel = i; cands[sel].classList.add("sel");
+    cands[sel].scrollIntoView({ block:"nearest" });
+  }
+  function choose(i){
+    if (i < 0 || i >= items.length || !items[i]) return;
+    var term = items[i].t;                 /* closePopup が items を空にする前に確保 */
+    $("q").value = term;
+    closePopup();
+    runSearch(term);
+  }
+
+  var cdeb = null;
+  function onInput(){
+    var q = $("q").value;
+    clearTimeout(cdeb);
+    if (!q.trim()){ closePopup(); return; }
+    cdeb = setTimeout(function(){
+      if (!bridge || !vocabReady) return;
+      Promise.resolve(bridge.complete(q, { limit: 30 })).then(function(res){
+        if ($("q").value !== q) return;         /* 入力が進んでいたら破棄 */
+        if (res && res.error){ setStatus("⚠ "+esc(res.error)); return; }
+        renderPopup(res, q);
+      });
+    }, 110);
+  }
+
+  /* ── 全文検索 (候補確定時 or Enter) ── */
+  function runSearch(q){
+    if (!bridge || !curDir){ return; }
+    if (!q || !q.trim()){ $("results").innerHTML=""; return; }
+    setStatus('<span class="spin"></span>検索中: '+esc(q));
+    Promise.resolve(bridge.search(q, {})).then(function(r){
+      if (r && r.error){ setStatus("⚠ "+esc(r.error)); return; }
+      lastQ = q;
+      $("hint").style.display = "none";
+      setStatus("「"+esc(q)+"」 → "+r.total+" 件ヒット / "+r.files+" ファイル");
+      renderResults(r, q);
+    });
+  }
+  function highlight(line, q){
+    var t = esc(line);
+    try {
+      var terms = q.split(/\s+/).filter(Boolean).map(function(x){
+        return new RegExp(x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"), "gi"); });
+      terms.forEach(function(re){ t = t.replace(re, function(m){ return "\u0001"+m+"\u0002"; }); });
+    } catch(e){}
+    return t.replace(/\u0001/g,"<mark>").replace(/\u0002/g,"</mark>");
+  }
+  function renderResults(r, q){
+    var hits = (r && r.hits) || [];
+    if (!hits.length){ $("results").innerHTML = '<div style="color:var(--dim);text-align:center;margin-top:8vh">ヒットなし — 別の単語をお試しください</div>'; return; }
+    var out = hits.map(function(h){
+      return '<div class="rfile"><div class="rh">'+
+        '<span class="rel">'+esc(h.rel)+'</span>'+
+        '<span class="lang">'+esc(h.lang)+'</span>'+
+        '<span class="cnt">'+h.count+' 件</span>'+
+        '<button data-open="'+encodeURIComponent(h.path||h.rel)+'">開く</button>'+
+        '</div>'+
+        h.matches.slice(0,10).map(function(m){
+          return '<div class="ln"><span class="no">'+m.line+'</span><span>'+highlight(m.text,q)+'</span></div>';
+        }).join("")+
+        (h.count>10?'<div class="ln"><span class="no">…</span><span style="color:var(--dim)">ほか '+(h.count-10)+' 件</span></div>':'')+
+        '</div>';
+    }).join("");
+    $("results").innerHTML = out;
+    Array.prototype.forEach.call($("results").querySelectorAll("button[data-open]"), function(b){
+      b.onclick = function(e){ e.stopPropagation(); if (api) api.openFile(decodeURIComponent(b.getAttribute("data-open"))); };
+    });
+  }
+
+  /* ── キーボード操作 ── */
+  $("q").addEventListener("input", onInput);
+  $("q").addEventListener("keydown", function(e){
+    var open = $("popup").classList.contains("on");
+    if (e.key === "ArrowDown"){ if(open){ e.preventDefault(); setSel(sel+1);} }
+    else if (e.key === "ArrowUp"){ if(open){ e.preventDefault(); setSel(sel-1);} }
+    else if (e.key === "Enter"){
+      e.preventDefault();
+      if (open && sel >= 0) choose(sel);
+      else { closePopup(); runSearch($("q").value); }
+    }
+    else if (e.key === "Escape"){ closePopup(); }
+  });
+  document.addEventListener("click", function(e){
+    if (!e.target.closest("#searchwrap")) closePopup();
+  });
+
+  /* ── 索引 + 語彙構築 ── */
+  function afterIndex(info){
+    curDir = info.root;
+    $("repo").textContent = info.root;
+    $("reindex").disabled = false;
+    setStatus('<span class="spin"></span>単語を索引中…');
+    Promise.resolve(bridge.buildVocab()).then(function(v){
+      vocabReady = true;
+      $("q").disabled = false; $("q").focus();
+      setStatus("索引完了 — "+info.files+" ファイル / 語彙 "+(v&&v.size!=null?v.size:"?")+" 語。単語を入力してください。");
+    });
+  }
+  function indexDir(dir){
+    if (!bridge){ setStatus("Electron ブリッジがありません (BadaSearch.exe から起動してください)"); return; }
+    vocabReady = false; $("q").disabled = true; $("results").innerHTML=""; closePopup();
+    setStatus('<span class="spin"></span>索引作成中: '+esc(dir));
+    Promise.resolve(bridge.buildIndex(dir)).then(afterIndex);
+  }
+  $("pick").onclick = function(){
+    if (!api){ if(demo) indexDir("(デモ)"); return; }
+    api.chooseFolder().then(function(dir){ if (dir) indexDir(dir); });
+  };
+  $("reindex").onclick = function(){ if (curDir) indexDir(curDir); };
+
+  (function boot(){
+    if (!bridge){ setStatus("ブラウザ プレビュー: 検索は BadaSearch.exe で有効 (デモデータ未読込)"); return; }
+    if (!api && demo){                              /* デモ: 自動で索引済みにする */
+      setStatus("デモモード — 内蔵サンプルで単語補完を体験できます");
+      indexDir("(デモ: サンプル論文・コード)");
+      return;
+    }
+    Promise.resolve(api.startupRepo()).then(function(repo){
+      if (repo) indexDir(repo);
+      else setStatus("リポジトリを選択してください (SourceTree からは $REPO 付きで自動)");
+    });
+  })();
+
+  /* ── 内蔵デモ API (bridge 互換) ── */
+  function makeDemoApi(data){
+    var vocab = null;
+    return {
+      buildIndex: function(){ return Promise.resolve({ root:"(demo)", files:data.docs.length, scanned:data.docs.length, langs:data.langs }); },
+      buildVocab: function(){ vocab = data.terms.slice().sort(function(a,b){return b.count-a.count;}); return Promise.resolve({ size: vocab.length }); },
+      complete: function(prefix, opts){
+        var limit=(opts&&opts.limit)||30, p=String(prefix||"").trim().toLowerCase();
+        if(!p) return Promise.resolve({ items: vocab.slice(0,limit), total: vocab.length });
+        var pre=[],sub=[];
+        vocab.forEach(function(e){ var i=e.t.toLowerCase().indexOf(p); if(i===0)pre.push(e); else if(i>0)sub.push(e); });
+        var its=pre.slice(0,limit).map(function(e){var c=copy(e);c.kind="prefix";return c;});
+        if(its.length<limit) its=its.concat(sub.slice(0,limit-its.length).map(function(e){var c=copy(e);c.kind="substr";return c;}));
+        return Promise.resolve({ items: its, total: pre.length+sub.length });
+      },
+      search: function(q){
+        var ql=q.toLowerCase(), hits=[];
+        data.docs.forEach(function(d){
+          var ms=[]; d.lines.forEach(function(ln,i){ if(ln.toLowerCase().indexOf(ql)>=0) ms.push({line:i+1,text:ln}); });
+          if(ms.length) hits.push({ rel:d.rel, path:d.rel, lang:d.lang, count:ms.length, matches:ms });
+        });
+        hits.sort(function(a,b){return b.count-a.count;});
+        var total=hits.reduce(function(s,h){return s+h.count;},0);
+        return Promise.resolve({ query:q, hits:hits, total:total, files:hits.length });
+      }
+    };
+    function copy(e){ return { t:e.t, count:e.count, files:e.files }; }
+  }
+})();
+</script>
+</body>
+</html>

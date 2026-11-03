@@ -14,6 +14,7 @@ const core = require(path.join(__dirname, "core", "searchcore.js"));
 
 let win = null;
 let index = null;
+let vocab = null;
 
 /* SourceTree カスタム操作: 引数の最後にリポジトリパスが渡る ($REPO) */
 function argvRepo(){
@@ -29,10 +30,10 @@ function argvRepo(){
 
 function createWindow(){
   win = new BrowserWindow({
-    width: 1060,
-    height: 780,
-    backgroundColor: "#0b0e14",
-    title: "Bada Search — SourceTree 付属 PDF・ソースコード検索",
+    width: 1280,
+    height: 860,
+    backgroundColor: "#000000",
+    title: "Bada Search — SourceTree 付属 単語補完検索 (論文・ソースコード)",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -44,7 +45,9 @@ function createWindow(){
     if (/^https?:\/\//i.test(d.url)) shell.openExternal(d.url);
     return { action: "deny" };
   });
-  win.loadFile(path.join(__dirname, "www", "index.html"));
+  /* 既定は広島大学病院の薬剤検索風の黒い大画面 (単語補完 + ポップアップメニュー)。
+     従来の詳細ビューは www/index.html (画面内のリンクから行き来できる)。 */
+  win.loadFile(path.join(__dirname, "www", "complete.html"));
 }
 
 ipcMain.handle("choose-folder", async function(){
@@ -54,10 +57,21 @@ ipcMain.handle("choose-folder", async function(){
 });
 ipcMain.handle("build-index", function(ev, dir){
   index = core.buildIndex(dir);
+  vocab = null;                                   /* 語彙は次の build-vocab で作り直す */
   return {
     root: index.root, files: index.files.length, scanned: index.scanned,
     langs: index.langs, errors: index.errors.slice(0, 20), builtAt: index.builtAt
   };
+});
+ipcMain.handle("build-vocab", function(){
+  if (!index) return { error: "先にフォルダをインデックスしてください" };
+  vocab = core.buildVocab(index, {});
+  return { size: vocab.size, builtAt: vocab.builtAt };
+});
+ipcMain.handle("complete", function(ev, prefix, opts){
+  if (!vocab) return { items: [], total: 0 };
+  try { return core.complete(vocab, prefix, opts || {}); }
+  catch (e){ return { items: [], total: 0, error: e.message }; }
 });
 ipcMain.handle("search", function(ev, query, opts){
   if (!index) return { error: "先にフォルダをインデックスしてください" };

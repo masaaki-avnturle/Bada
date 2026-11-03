@@ -226,10 +226,89 @@ function search(index, query, opts){
   return { query: query, hits: hits, total: total, files: hits.length };
 }
 
+/* ── 単語補完エンジン (広島大学病院の薬剤検索のようなインクリメンタル補完) ──
+ *
+ * インデックス済みの論文 (PDF テキスト) とソースコードから「単語」を抽出して
+ * 語彙 (vocabulary) を作り、入力途中の文字列に対して補完候補をランク付きで
+ * 返します。候補を選ぶと、その語で本文・コードを横断検索できます。
+ *   ・ASCII 識別子/単語: [A-Za-z_][A-Za-z0-9_]+  (例 jonesKey, jones_polynomial)
+ *   ・和文の語: ひらがな/カタカナ/漢字の連続 (例 量子多項式)
+ * 補完は「前方一致」を最優先し、足りなければ「部分一致」で補います
+ * (頻度の高い順)。薬剤名検索と同じく、数文字打つだけで候補が絞り込まれます。
+ */
+function tokenizeLine(line){
+  var toks = [];
+  var m;
+  var reA = /[A-Za-z_][A-Za-z0-9_]+/g;                       /* 英数字識別子 (len>=2) */
+  while ((m = reA.exec(line))) toks.push(m[0]);
+  var reJ = /[぀-ゟ゠-ヿ㐀-鿿豈-﫿ｦ-ﾟ]+/g; /* 和文の連続 */
+  while ((m = reJ.exec(line))) toks.push(m[0]);
+  return toks;
+}
+function buildVocab(index, opts){
+  opts = opts || {};
+  var minLen = opts.minLen || 2;
+  var maxTermLen = opts.maxTermLen || 48;
+  var maxTerms = opts.maxTerms || 120000;
+  var map = new Map();                                       /* lower -> entry */
+  (index.files || []).forEach(function(f){
+    var localSeen = new Set();                               /* ファイル内の重複除去 (files 計上用) */
+    for (var i = 0; i < f.lines.length; i++){
+      var toks = tokenizeLine(f.lines[i]);
+      for (var j = 0; j < toks.length; j++){
+        var t = toks[j];
+        if (t.length < minLen || t.length > maxTermLen) continue;
+        var key = t.toLowerCase();
+        var e = map.get(key);
+        if (!e){ e = { lower: key, count: 0, files: 0, casings: Object.create(null) }; map.set(key, e); }
+        e.count++;
+        e.casings[t] = (e.casings[t] || 0) + 1;
+        if (!localSeen.has(key)){ e.files++; localSeen.add(key); }
+      }
+    }
+  });
+  /* 頻度降順に整列し、代表表記 (最頻ケーシング) を決めて配列化 */
+  var terms = [];
+  map.forEach(function(e){
+    var disp = e.lower, best = -1;
+    for (var c in e.casings){ if (e.casings[c] > best){ best = e.casings[c]; disp = c; } }
+    terms.push({ t: disp, lower: e.lower, count: e.count, files: e.files });
+  });
+  terms.sort(function(a, b){ return b.count - a.count || (a.lower < b.lower ? -1 : 1); });
+  if (terms.length > maxTerms) terms = terms.slice(0, maxTerms);
+  return { terms: terms, size: terms.length, builtAt: new Date().toISOString() };
+}
+function complete(vocab, prefix, opts){
+  opts = opts || {};
+  var limit = opts.limit || 30;
+  var terms = (vocab && vocab.terms) || [];
+  var p = String(prefix == null ? "" : prefix).trim().toLowerCase();
+  if (!p) return { prefix: prefix, items: terms.slice(0, limit).map(clone), total: terms.length };
+  var pre = [], sub = [];
+  for (var i = 0; i < terms.length; i++){
+    var idx = terms[i].lower.indexOf(p);
+    if (idx === 0) pre.push(terms[i]);
+    else if (idx > 0 && sub.length < limit * 8) sub.push(terms[i]);
+  }
+  /* terms は既に頻度降順なので pre/sub もその順。前方一致を優先。 */
+  var items = pre.slice(0, limit).map(clone);
+  for (var k = 0; k < items.length; k++) items[k].kind = "prefix";
+  if (items.length < limit){
+    var extra = sub.slice(0, limit - items.length).map(clone);
+    for (var n = 0; n < extra.length; n++) extra[n].kind = "substr";
+    items = items.concat(extra);
+  }
+  return { prefix: prefix, items: items, total: pre.length + sub.length };
+  function clone(e){ return { t: e.t, lower: e.lower, count: e.count, files: e.files }; }
+}
+
 module.exports = {
   LANGS: LANGS,
   langOf: langOf,
   extractPdfText: extractPdfText,
   buildIndex: buildIndex,
-  search: search
+  search: search,
+  tokenizeLine: tokenizeLine,
+  buildVocab: buildVocab,
+  complete: complete
 };

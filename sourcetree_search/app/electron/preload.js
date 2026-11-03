@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("badaSearch", {
   chooseFolder: function(){ return ipcRenderer.invoke("choose-folder"); },
   buildIndex:  function(dir){ return ipcRenderer.invoke("build-index", dir); },
+  buildVocab:  function(){ return ipcRenderer.invoke("build-vocab"); },
+  complete:    function(prefix, opts){ return ipcRenderer.invoke("complete", prefix, opts); },
   search:      function(q, opts){ return ipcRenderer.invoke("search", q, opts); },
   openFile:    function(p){ return ipcRenderer.invoke("open-file", p); },
   revealFile:  function(p){ return ipcRenderer.invoke("reveal-file", p); },

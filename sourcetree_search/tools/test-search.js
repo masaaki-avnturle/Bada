@@ -91,6 +91,40 @@ ok(threw, "invalid regex reports an error");
 const r7 = core.search(idx, "多項式");
 ok(r7.files === 1 && r7.hits[0].rel === "doc/notes.md", "Japanese text search works");
 
+/* ── 単語補完エンジン (薬剤検索風インクリメンタル補完) ── */
+const vocab = core.buildVocab(idx);
+ok(vocab.size > 0, "buildVocab produces a vocabulary — " + vocab.size + " terms");
+const lowers = vocab.terms.map(function(t){ return t.lower; });
+const disps = vocab.terms.map(function(t){ return t.t; });
+ok(lowers.indexOf("kauffman") >= 0, "vocabulary contains source/PDF identifier 'kauffman' (case-insensitive key)");
+ok(lowers.indexOf("jones_polynomial") >= 0, "vocabulary contains 'jones_polynomial'");
+ok(disps.some(function(t){ return t === "jonesKey"; }), "camelCase identifier preserved as display 'jonesKey'");
+ok(disps.some(function(t){ return t.indexOf("多項式") >= 0; }),
+   "Japanese term from paper/markdown is in vocabulary");
+
+const cp = core.complete(vocab, "kauf");
+ok(cp.items.length > 0 && cp.items[0].t.toLowerCase().indexOf("kauf") === 0,
+   "complete('kauf') returns prefix matches, most-frequent first — top=" + (cp.items[0]||{}).t);
+ok(cp.items[0].count >= 1 && cp.items[0].files >= 1, "completion items carry count + file totals");
+
+const cj = core.complete(vocab, "jones");
+ok(cj.items.some(function(i){ return i.t === "jones_polynomial"; }),
+   "complete('jones') suggests jones_polynomial");
+
+const csub = core.complete(vocab, " racket");   /* 前方一致ゼロ → 部分一致で bracket を拾う */
+ok(csub.items.some(function(i){ return i.t.toLowerCase().indexOf("bracket") >= 0 && i.kind === "substr"; }),
+   "complete falls back to substring matches when no prefix match ('racket' -> bracket)");
+
+const cempty = core.complete(vocab, "");
+ok(cempty.items.length > 0, "empty prefix lists the most frequent terms");
+
+const cnone = core.complete(vocab, "zzqqxx-nope");
+ok(cnone.items.length === 0 && cnone.total === 0, "unknown prefix yields no candidates");
+
+/* 補完 → その語で全文検索できる (単語補完検索の往復) */
+const picked = core.complete(vocab, "kauf").items[0].t;
+ok(core.search(idx, picked).files >= 1, "a completed term can be searched across the corpus");
+
 /* ── リポジトリ実物の PDF でも落ちない (テキスト有無は問わない) ── */
 const repoPdf = path.join(__dirname, "..", "..", "Bada#.pdf");
 if (fs.existsSync(repoPdf)){
