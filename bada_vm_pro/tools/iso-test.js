@@ -68,31 +68,40 @@ ok(idx && Buffer.from(idx.data).toString("utf8") === payload, "file content roun
 const emp = parsed.files.find(function(f){ return f.name === "EMPTY.TXT"; });
 ok(emp && emp.size === 0, "empty file round-trips with size 0");
 
-/* ── 実物のライブ CD/USB (isolinux ISO) を build-iso.sh でビルドして検査 ──
- * 配布 ISO は Rufus が「ISO イメージモード」で認識できるよう、本物の
- * isolinux (syslinux) で組む。xorriso/isolinux が無い環境ではスキップ。 */
+/* ── 実物のライブ CD/USB (レガシー GRUB マルチブート ISO) を検査 ──
+ * 配布 ISO は GRUB (i386-pc / レガシー BIOS) で組み、GRUB を MBR の
+ * マルチ OS セレクタにする (Bada VM Pro は末尾パーティション, Windows は
+ * 前方パーティションを chainload)。grub-mkrescue が無い環境ではスキップ。 */
 const cp = require("child_process");
-function hasXorriso(){
-  try { cp.execSync("command -v xorriso", { stdio: "ignore" }); return true; } catch (e){ return false; }
+function has(cmd){
+  try { cp.execSync("command -v " + cmd, { stdio: "ignore" }); return true; } catch (e){ return false; }
 }
-if (hasXorriso()){
+if (has("grub-mkrescue") && has("xorriso")){
+  /* grub.cfg の構文チェック (grub-script-check があれば) */
+  if (has("grub-script-check")){
+    cp.execSync("grub-script-check " + JSON.stringify(path.join(__dirname, "grub", "grub.cfg")), { stdio: "inherit" });
+    ok(true, "grub.cfg passes grub-script-check");
+  }
+  /* install スクリプトの構文チェック */
+  cp.execSync("bash -n " + JSON.stringify(path.join(__dirname, "install-grub-multiboot.sh")), { stdio: "inherit" });
+  ok(true, "install-grub-multiboot.sh is valid bash");
+  /* 実際に ISO をビルド */
   cp.execSync("bash " + JSON.stringify(path.join(__dirname, "build-iso.sh")), { stdio: "inherit" });
   const live = new Uint8Array(fs.readFileSync(path.join(__dirname, "..", "dist", "BadaVMPro-live.iso")));
   const lp = parseIso(live);
   ok(lp.volumeId === "BADAVMPRO_LIVE", "live ISO volume id");
-  ok(lp.bootable, "live ISO is El Torito bootable");
-  ok(lp.hybrid && lp.hybrid.sectors > 0, "live ISO carries an isohybrid MBR (USB DD fallback)");
+  ok(lp.bootable, "live ISO is El Torito bootable (GRUB legacy)");
   const names = lp.files.map(function(f){ return f.name; });
-  /* Rufus が ISO モードで認識する鍵 = 本物の isolinux/isolinux.bin の存在 */
-  ok(names.indexOf("isolinux/isolinux.bin") >= 0, "live ISO contains a real isolinux bootloader (Rufus ISO mode)");
-  ok(names.indexOf("isolinux/ldlinux.c32") >= 0, "live ISO contains ldlinux.c32");
-  ok(names.indexOf("INDEX.HTM") >= 0 && names.indexOf("README.TXT") >= 0, "live ISO carries INDEX.HTM + README.TXT");
+  /* レガシー GRUB の鍵 = boot/grub/grub.cfg の存在 */
+  ok(names.indexOf("boot/grub/grub.cfg") >= 0, "live ISO contains boot/grub/grub.cfg (legacy GRUB multiboot)");
+  ok(names.indexOf("INDEX.HTM") >= 0, "live ISO carries INDEX.HTM");
+  ok(names.some(function(n){ return /install/i.test(n); }), "live ISO carries the multiboot installer");
   const htm = lp.files.find(function(f){ return f.name === "INDEX.HTM"; });
   const orig = fs.readFileSync(path.join(__dirname, "..", "index.html"));
   ok(htm && htm.size === orig.length && Buffer.compare(Buffer.from(htm.data), orig) === 0,
      "INDEX.HTM on the ISO is byte-identical to bada_vm_pro/index.html (in-app mount reads the real ISO)");
 } else {
-  console.log("skip - xorriso/isolinux not installed; live-ISO build checked in CI (build-iso.sh)");
+  console.log("skip - grub-mkrescue/xorriso not installed; live-ISO build checked in CI (build-iso.sh)");
 }
 
 console.log(failed === 0 ? "\nALL ISO TESTS PASSED" : "\n" + failed + " TEST(S) FAILED");
