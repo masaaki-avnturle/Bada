@@ -100,6 +100,20 @@ apt_try openssh-server xinetd screen \
 apt_try falkon evince mpv ristretto mousepad pcmanfm lxtask \
   software-properties-common apt-transport-https gnupg
 
+# ---- 印刷: CUPS + ドライバ一式 + GUI 設定 ----
+#   USB プリンタ (ipp-usb でドライバ不要機も) / ネットワークプリンタ (avahi で
+#   AirPrint・IPP Everywhere を自動検出、cups-browsed で共有プリンタを自動追加)。
+#   ドライバ: printer-driver-all (gutenprint=Epson/Canon 等, hplip=HP, brlaser=Brother,
+#   foo2zjs, splix, ...)。GUI は system-config-printer、ブラウザなら http://localhost:631
+apt_try cups cups-client cups-bsd cups-filters cups-browsed ipp-usb \
+  avahi-daemon libnss-mdns printer-driver-all hplip openprinting-ppds \
+  system-config-printer system-config-printer-udev sane-utils simple-scan
+systemctl enable cups cups-browsed avahi-daemon ipp-usb 2>/dev/null || true
+# ライブ環境の自動ログインユーザ (casper → user-setup が作る bada) を
+# プリンタ管理 (lpadmin)・スキャナ・音声/映像グループに入れる
+echo 'user-setup passwd/user-default-groups string adm cdrom dip lpadmin plugdev sudo netdev audio video scanner' \
+  | debconf-set-selections
+
 # ---- TeX: texlive-full (日本語 platex/uplatex/lualatex-ja 含む全パッケージ) ----
 #   PDF マニュアル (texlive-doc, 約 2GB) だけは ISO を軽くするため展開しない。
 #   必要なら /etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc を消して
@@ -340,6 +354,16 @@ Terminal=false
 Icon=drive-harddisk
 Categories=System;
 EOF
+cat > /etc/skel/Desktop/printers.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=プリンターの設定
+Comment=USB / ネットワークプリンターを追加して印刷 (CUPS)
+Exec=system-config-printer
+Terminal=false
+Icon=printer
+Categories=Settings;
+EOF
 cat > /etc/skel/Desktop/install-badaos-simple.desktop <<EOF
 [Desktop Entry]
 Type=Application
@@ -422,6 +446,7 @@ fi
 
 # ---- 要求パッケージの最終確認 (1 つでも欠けたらビルド失敗) ----
 REQUIRED="openssh-server xinetd network-manager iptables dnsmasq-base apt
+  cups cups-filters cups-browsed avahi-daemon printer-driver-all system-config-printer
   fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
   screen mlterm xterm w9wm lightdm xserver-xorg
   vim vim-gtk3 emacs neovim texlive-full texlive-lang-japanese
@@ -430,7 +455,7 @@ MISSING=""
 for p in $REQUIRED; do dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"; done
 if [ -n "$MISSING" ]; then echo "FATAL: 必須パッケージが入っていません:$MISSING"; exit 1; fi
 echo "required packages OK"
-for c in sshd xinetd screen mlterm vim gvim emacs nvim platex uplatex lualatex pdflatex; do
+for c in sshd xinetd cupsd lp lpstat system-config-printer screen mlterm vim gvim emacs nvim platex uplatex lualatex pdflatex; do
   command -v "$c" >/dev/null 2>&1 || { echo "FATAL: コマンド $c がありません"; exit 1; }
 done
 echo "required commands OK"

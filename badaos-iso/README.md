@@ -13,6 +13,7 @@
 - **ssh**: `openssh-server` を有効化。ホスト鍵は ISO に焼き込まず、**初回起動時にその PC 固有の鍵を生成**(ライブ環境では先に `passwd` でパスワードを設定)
 - **xinetd**: 有効化済み。サンプルサービス `/etc/xinetd.d/bada-info`(TCP 7777, 既定は無効)
 - **apt**: 起動時に `badaos-apt-check` が Bada の apt リポジトリの到達確認(未公開なら自動で無効化しエラーを出さない)→ `apt update`。`sudo apt install <pkg>` / `badaos-apps`(GUI)でアプリを追加
+- **印刷 (プリンター)**: **CUPS** + ドライバ一式 `printer-driver-all`(Epson/Canon=gutenprint、HP=hplip、Brother=brlaser など)。**USB プリンタ**(ipp-usb でドライバ不要機も)と **ネットワークプリンタ**(avahi で AirPrint / IPP Everywhere を自動検出、cups-browsed で共有プリンタを自動追加)。デスクトップの「プリンターの設定」(`system-config-printer`)か、ブラウザで `http://localhost:631` から追加。ユーザーは `lpadmin` グループ所属なので管理者パスワードなしで追加可。スキャナ用に simple-scan も同梱
 - **TeX**: **texlive-full**(日本語 platex / uplatex / lualatex-ja 含む全パッケージ。PDF マニュアル texlive-doc のみ容量のため未展開 → `/etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc` を消して再インストールで追加可)
 - **エディタ**: **vim** / **gvim** / **emacs**(AUCTeX・emacs-mozc 付き)/ neovim / vim-latexsuite
 - **端末/アプリ**: **mlterm**(日本語 UTF-8)・**screen**(UTF-8 設定済み)・xterm、ブラウザ **Falkon**、PDF **Evince**、動画 **mpv**、画像 Ristretto/GPicView、ファイル PCManFM、エディタ Mousepad/vim/emacs/neovim、電卓、アーカイバ、タスクマネージャ、ネットワーク設定 (nm-applet / nm-connection-editor)

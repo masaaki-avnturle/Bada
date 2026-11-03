@@ -100,7 +100,9 @@ cp -f /etc/resolv.conf /mnt/etc/resolv.conf 2>/dev/null || true
 
 emit 80 "ユーザー ${USER_NAME} を作成中"
 chroot /mnt /bin/bash -e <<CHROOT
-id "${USER_NAME}" >/dev/null 2>&1 || useradd -m -s /bin/bash -G sudo,adm,cdrom,plugdev,netdev,audio,video "${USER_NAME}"
+# 存在するグループだけに入れる (lpadmin=プリンタ管理, scanner=スキャナ)
+GRPS=\$(for g in sudo adm cdrom dip plugdev netdev audio video lpadmin scanner; do getent group \$g >/dev/null && printf '%s,' \$g; done; true)
+id "${USER_NAME}" >/dev/null 2>&1 || useradd -m -s /bin/bash -G "\${GRPS%,}" "${USER_NAME}"
 echo "${USER_NAME}:${PASS}" | chpasswd
 # lightdm 自動ログインを新ユーザー + w9wm セッションに
 mkdir -p /etc/lightdm/lightdm.conf.d
