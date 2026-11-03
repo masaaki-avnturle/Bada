@@ -12,6 +12,9 @@
  *   6. スワイプ / フリック検出 (移動量・ピーク速度・方向一貫率) と跳躍量
  *   7. トランスポート状態機械 (HOLD / SHUTTLE / FLICK / LOST) と時刻更新・再生駆動方式
  *   8. 表示ヘルパ (タイムコード / フィルムストリップ / かき分け変位 / ゾーン)
+ *   9. なめらか再生エンジン — スルーレート制限 / フレームキャッシュ (キー・最寄り探索・
+ *      スライディングウィンドウ・先読み順) / シーク計画 / 中割りブレンド / 再生方式 /
+ *      モーションブラー / レターボックス / 被覆率 / 動画ファイル判定
  */
 "use strict";
 const fs = require("fs");
@@ -275,6 +278,148 @@ console.log("8. 表示ヘルパ (タイムコード / フィルムストリッ�
   ok(s1.sun.x > s0.sun.x, "デモ映像: 時刻に対して太陽が移動 (巻き戻し可能な純関数)");
   ok(S.demoSceneState(10, 150).tick === 300, "デモ映像のフレーム番号 = t·30");
   ok(S.clamp(5, 0, 1) === 1 && S.clamp(-5, 0, 1) === 0, "clamp");
+}
+
+console.log("9. なめらか再生エンジン (フレームキャッシュ駆動パイプライン)");
+{
+  // --- スルーレート制限 (加速度) ---
+  ok(S.slewRate(0, 16, 0.1, 22) === 2.2, "加速度 22×/s で 0.1 秒なら +2.2 までしか動かない");
+  ok(S.slewRate(2, 2.1, 1, 22) === 2.1, "差が 1 ステップ未満なら目標へ到達 (行き過ぎない)");
+  ok(S.slewRate(16, 0, 0.1, 22) === 13.8, "減速も同じ加速度で滑らかに");
+  ok(S.slewRate(5, -5, 0.1, 22) === 2.8, "符号をまたぐ減速 (早送り→巻き戻し) も連続");
+  ok(S.slewRate(3, 9, 0, 22) === 9, "dt=0 は目標そのまま (0 除算なし)");
+  let r = 0;
+  for (let i = 0; i < 100; i++) r = S.slewRate(r, -8, 1 / 60, 22);
+  near(r, -8, 1e-9, "十分な時間で目標速度に収束");
+
+  // --- フレームキー ---
+  ok(S.frameKey(0, 15) === 0 && S.frameKey(1, 15) === 15, "時刻 → キー");
+  ok(S.frameKey(1.03, 15) === 15, "最寄りキーに丸める");
+  near(S.keyTime(30, 15), 2, 1e-9, "キー → 時刻");
+
+  // --- 最寄りキャッシュ探索 ---
+  const have = [10, 11, 12, 20];
+  const has = function(k){ return have.indexOf(k) >= 0; };
+  ok(S.nearestCachedKey(has, 11, 5) === 11, "完全一致を最優先");
+  ok(S.nearestCachedKey(has, 13, 5) === 12, "無ければ最寄りを返す");
+  ok(S.nearestCachedKey(has, 16, 3) === null, "maxDist を超えたら null (諦めてシークへ)");
+  ok(S.nearestCachedKey(has, 16, 4) === 12 || S.nearestCachedKey(has, 16, 4) === 20, "距離同点はどちらか一方");
+  ok(S.nearestCachedKey(function(){ return false; }, 5, 10) === null, "空キャッシュ → null");
+
+  // --- スライディングウィンドウと破棄 ---
+  const win = S.cacheWindow(100, 30);
+  ok(win.lo === 70 && win.hi === 130, "再生ヘッドの前後 ±radius が保持範囲");
+  const ev = S.keysToEvict([60, 70, 100, 130, 131], 70, 130);
+  ok(ev.length === 2 && ev.indexOf(60) >= 0 && ev.indexOf(131) >= 0, "窓の外だけ破棄 (境界は保持)");
+  ok(S.cacheBudget(30, 15) === 901, "保持上限 = 2·radius·fps + 1 枚");
+
+  // --- 先読み順 ---
+  const got = [100, 101, 102];
+  const has2 = function(k){ return got.indexOf(k) >= 0; };
+  const fwd = S.prefetchTargets(101, has2, 10, 1, 3);
+  ok(fwd[0] === 103, "前進中は進行方向の欠けコマを最優先");
+  ok(fwd.indexOf(100) < 0 && fwd.indexOf(102) < 0, "既に持っているコマは要求しない");
+  const back = S.prefetchTargets(101, has2, 10, -1, 1);
+  ok(back[0] === 99, "巻き戻し中は後方を優先 (これが滑らかさの肝)");
+  ok(S.prefetchTargets(101, function(){ return true; }, 10, 1, 4).length === 0, "全部あれば要求ゼロ");
+  ok(S.prefetchTargets(101, has2, 10, 1, 2).length === 2, "limit を超えない");
+
+  // --- シーク計画 (同時 1 本 / 微小シーク抑制) ---
+  ok(S.seekPlan(10, 20, false, { duration: 60 }).time === 20, "必要ならシークを発行");
+  ok(S.seekPlan(10, 20, true, { duration: 60 }) === null, "直前のシーク完了待ちなら発行しない (キュー詰まり防止)");
+  ok(S.seekPlan(10, 10.01, false, { duration: 60 }) === null, "微小シークは無駄なので発行しない");
+  ok(S.seekPlan(10, 999, false, { duration: 60 }).time === 60, "尺でクランプ");
+  ok(S.seekPlan(10, -5, false, { duration: 60 }).time === 0, "先頭でクランプ");
+
+  // --- 中割りブレンド ---
+  near(S.blendAlpha(1.0, 1.0, 1.1), 0, 1e-9, "コマ A 上では A のみ");
+  near(S.blendAlpha(1.05, 1.0, 1.1), 0.5, 1e-9, "中間なら 50% ブレンド");
+  near(S.blendAlpha(1.05, 1.1, 1.0), 0.5, 1e-9, "巻き戻し方向 (B < A) でも対称に効く");
+  ok(S.blendAlpha(5, 1, 1) === 0, "同一時刻 → 0 (0 除算なし)");
+
+  // --- 再生方式 ---
+  ok(S.playbackPlan(0).mode === "hold", "停止 → HOLD (キャッシュの静止画)");
+  ok(S.playbackPlan(1).mode === "native" && S.playbackPlan(1).playbackRate === 1, "等速 → デコーダの通常再生");
+  ok(S.playbackPlan(4).mode === "native", "×4 までは通常再生 (最も滑らか)");
+  ok(S.playbackPlan(8).mode === "cache", "×8 はフレームキャッシュ描画");
+  ok(S.playbackPlan(-1).mode === "cache", "巻き戻しは必ずキャッシュ描画 (シーク駆動のカクつきを回避)");
+
+  // --- モーションブラー ---
+  ok(S.blurAlpha(1) === 0, "等速ではブラーなし");
+  ok(S.blurAlpha(16) > S.blurAlpha(4) && S.blurAlpha(4) > 0, "速いほど強く残像を残す");
+  ok(S.blurAlpha(100) <= 0.55 + 1e-9, "上限でクランプ (残像が焼き付かない)");
+  ok(S.blurAlpha(-16) === S.blurAlpha(16), "巻き戻しでも同じ強さ");
+
+  // --- レターボックス ---
+  const rc = S.containRect(1920, 1080, 800, 800);
+  near(rc.w, 800, 1e-9, "横長映像は幅いっぱい");
+  near(rc.h, 450, 1e-9, "アスペクト比を保つ");
+  near(rc.y, 175, 1e-9, "上下中央に配置");
+  const rc2 = S.containRect(1080, 1920, 800, 800);
+  near(rc2.h, 800, 1e-9, "縦長映像 (スマホ撮影) は高さいっぱい");
+  ok(S.containRect(0, 0, 100, 50).w === 100, "サイズ不明なら全面");
+
+  // --- キャッシュ被覆率 (ストリップ下の緑バー) ---
+  const keys = [];
+  for (let i = 0; i <= 150; i++) keys.push(i);          // 0〜10 秒 @15fps
+  const cov = S.coverageSpans(keys, 15, 60, 6);          // 60 秒を 6 分割 = 10 秒ずつ
+  near(cov[0], 1, 1e-9, "取得済みの区間は被覆率 1");
+  ok(cov[2] === 0 && cov[5] === 0, "未取得の区間は 0");
+  ok(S.coverageSpans(keys, 15, 0, 6).length === 0, "尺不明なら空");
+
+  // --- 先読みスキャンの区間選択 ---
+  const cachedSet = [];
+  for (let k = 100; k <= 140; k++) cachedSet.push(k);        // 100..140 だけ取得済み
+  const hasC = function(k){ return cachedSet.indexOf(k) >= 0; };
+  const below = S.gapBelow(120, 60, hasC);
+  ok(below.end === 99 && below.start === 60, "再生ヘッド直下の欠け区間をまとめて特定");
+  ok(S.gapBelow(120, 100, hasC) === null, "下が埋まっていれば null");
+  const seg = S.scanSegment(120, 60, 200, hasC);
+  ok(seg.start === 60 && seg.end === 99, "巻き戻し方向 (下) の区間を優先して流す");
+  const seg2 = S.scanSegment(120, 100, 200, hasC);
+  ok(seg2.start === 141 && seg2.end === 200, "下が埋まっていれば上方向の区間");
+  ok(S.scanSegment(120, 100, 140, hasC) === null, "窓が埋まっていれば null (スキャン完了)");
+  ok(S.firstMissingKey(100, 140, hasC) === null && S.firstMissingKey(95, 140, hasC) === 95,
+     "窓内の最初の欠けキー");
+  const w = S.windowKeysFor(50, 20, 15, 60);
+  ok(w.lo === 450 && w.hi === 900, "保持窓は尺でクランプ (t=50±20 → 30..60 秒)");
+  ok(S.windowKeysFor(2, 20, 15, 60).lo === 0, "先頭付近では 0 で止まる");
+  near(S.windowCoverage(100, 140, hasC), 1, 1e-9, "全部あれば充足率 1");
+  near(S.windowCoverage(90, 140, hasC), 41 / 51, 1e-9, "欠けがあれば比率で返る");
+
+  // --- 先読み速度の適応制御 ---
+  ok(S.adaptScanRate(4, 0.4) < 4, "取りこぼしが多ければ減速 (穴あき再走査を避ける)");
+  ok(S.adaptScanRate(4, 0.0) > 4, "取りこぼしが無ければ加速");
+  ok(S.adaptScanRate(4, 0.08) === 4, "適正域では据え置き (ハンチング防止)");
+  ok(S.adaptScanRate(1, 0.9, { min: 1 }) === 1, "下限でクランプ");
+  ok(S.adaptScanRate(8, 0, { max: 8 }) === 8, "上限でクランプ");
+
+  // --- スクラブ・ラダー (全編の粗いキャッシュ) ---
+  near(S.ladderSpacing(60, 600, 0.5), 0.5, 1e-9, "短い動画は最小間隔 0.5 秒");
+  near(S.ladderSpacing(1200, 600, 0.5), 2, 1e-9, "20 分なら 2 秒間隔 (枚数上限を守る)");
+  near(S.ladderSpacing(0, 600, 0.5), 0.5, 1e-9, "尺不明でも既定間隔");
+  ok(S.ladderSpacing(7200, 600, 0.5) * 600 === 7200, "長尺でも総枚数は上限ちょうど");
+  near(S.ladderFpsFor(1200, 600, 0.5), 0.5, 1e-9, "ラダー fps = 1/間隔");
+
+  const fine = [150];                                  // 10 秒だけ細キャッシュ (15fps)
+  const lad = [20];                                    // 10 秒付近のラダー (0.5s 間隔 → key 20)
+  const hasF = function(k){ return fine.indexOf(k) >= 0; };
+  const hasL = function(k){ return lad.indexOf(k) >= 0; };
+  const p1 = S.pickFrameSource(10, hasF, 15, hasL, 2);
+  ok(p1.tier === "fine" && p1.key === 150, "細キャッシュがあればそれを使う (最高画質・中割り可)");
+  ok(S.pickFrameSource(10.4, hasF, 15, hasL, 2).tier === "fine",
+     "±0.8 秒までは細キャッシュの最寄りコマで足りる");
+  const p2 = S.pickFrameSource(11.0, hasF, 15, hasL, 2);
+  ok(p2 && p2.tier === "ladder" && p2.key === 20,
+     "細キャッシュの射程を外れたらラダーから描く (高速スクラブ時)");
+  ok(S.pickFrameSource(40, hasF, 15, hasL, 2) === null, "どちらも無ければ null (デコーダ任せ)");
+
+  // --- 受け入れるファイル ---
+  ok(S.isVideoFile("movie.mp4", "video/mp4") === true, "MIME が動画なら受け入れ");
+  ok(S.isVideoFile("clip.MOV", "") === true, "MIME 空でも拡張子で判定 (Android 対策)");
+  ok(S.isVideoFile("scene.webm") === true && S.isVideoFile("a.mkv") === true, "webm / mkv も受け入れ");
+  ok(S.isVideoFile("photo.png", "image/png") === false, "画像は拒否");
+  ok(S.isVideoFile("", "") === false, "名前も型も無ければ拒否");
 }
 
 console.log("");

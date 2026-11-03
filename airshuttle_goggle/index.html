@@ -7,7 +7,7 @@
 <!--
   エアシャトル・ゴーグル (AirShuttle Goggle)
   ──────────────────────────────────────────
-  ゴーグル型コンピュータの HUD で「実写映像」を再生し、
+  ゴーグル型コンピュータの HUD で「任意の実写動画」を再生し、
   カメラに写った手を空中で “かき分ける” 動作だけで
   巻き戻し (REW) / 早送り (FF) / コマ送り / ホールドを行うスクラブ卓。
 
@@ -16,21 +16,27 @@
   オリジナル実装です (作品・権利者とは一切関係ありません)。
 
   単一 HTML・依存ゼロ・外部通信ゼロ。映像はすべて端末内で処理し、
-  カメラ画像はどこにも送信しません (ハンド認識はすべてローカル)。
+  カメラ画像も動画ファイルもどこにも送信しません。
 
-  搭載エンジン:
-    1. ハンド・セグメンテーション — YCbCr 肌色クロマ帯 + フレーム間動きエネルギー
-    2. 連結成分ラベリング (4 近傍) による最大ブロブ抽出 → 手の位置・大きさ・充填率
-    3. One Euro Filter (Casiez et al. 2012) による低遅延スムージング
-    4. シャトル則 — 不感帯 + べき乗カーブ + 編集卓デテント (×0.25〜×16)
-    5. スワイプ/フリック検出 — 窓内ピーク速度・移動量・方向一貫率
-    6. トランスポート状態機械 — HOLD / SHUTTLE / FLICK / LOST を純関数で決定
+  ■ 滑らかさのための映像パイプライン (v2)
+    <video> の currentTime を毎フレーム書き換える「シーク駆動」は、
+    圧縮動画ではキーフレーム復号が間に合わずカクつく。そこで:
+
+      1. 再生ヘッド周辺のフレームを ImageBitmap の
+         スライディングウィンドウ・キャッシュに貯める
+         (requestVideoFrameCallback で復号済みフレームを捕捉)
+      2. 巻き戻し・高速早送りはキャッシュから直接描画 (デコーダ非依存)
+      3. 欠けている区間は「同時 1 本」のシークキューで背景補填しつつ、
+         最寄りフレームを表示し続ける (止まらない)
+      4. キャッシュ間隔より細かい時刻は前後コマをブレンドして中割り
+      5. 速度はスルーレート制限 (加速度) で滑らかに追従
+      6. 等速〜×4 の順再生はデコーダ本来の再生が最も滑らかなのでそれを使う
 -->
 <style>
   :root {
     --bg: #04060b; --panel: #0a0f1a; --panel2: #0e1626; --line: #1b2a44;
     --cyan: #49e0e8; --amber: #e0a23c; --rose: #e05a72; --green: #55d08a;
-    --text: #d8e6f4; --dim: #7f93ad; --grid: rgba(73,224,232,.16);
+    --text: #d8e6f4; --dim: #7f93ad;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: var(--bg); color: var(--text);
@@ -55,24 +61,28 @@
     border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
     box-shadow: 0 0 0 1px rgba(73,224,232,.12), 0 18px 46px rgba(0,0,0,.6); }
   .goggle video, .goggle canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .goggle video { object-fit: contain; background: #000; }
-  #stage { object-fit: contain; }
-  #hud { pointer-events: none; }
-  #touchpad { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
-  .goggle::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  .goggle video { object-fit: contain; background: #000; z-index: 0; }
+  #stage { z-index: 1; }
+  #hud { z-index: 2; pointer-events: none; }
+  #touchpad { position: absolute; inset: 0; z-index: 3; touch-action: none; cursor: crosshair; }
+  .goggle::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 4;
     background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 3px);
     mix-blend-mode: multiply; }
-  .goggle .vig { position: absolute; inset: 0; pointer-events: none;
+  .goggle .vig { position: absolute; inset: 0; pointer-events: none; z-index: 4;
     background: radial-gradient(ellipse at center, rgba(0,0,0,0) 52%, rgba(0,0,0,.72) 100%); }
+  #drop { position: absolute; inset: 0; z-index: 5; display: none; align-items: center;
+    justify-content: center; background: rgba(4,12,20,.86); border: 3px dashed var(--cyan);
+    border-radius: 12px; color: var(--cyan); font-size: 1.2rem; letter-spacing: .06em; }
+  #drop.on { display: flex; }
 
-  .strip { margin-top: 10px; width: 100%; height: 76px; background: var(--panel);
+  .strip { margin-top: 10px; width: 100%; height: 84px; background: var(--panel);
     border: 1px solid var(--line); border-radius: 10px; display: block; touch-action: none; }
 
-  .readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  .readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
     gap: 10px; margin-top: 10px; }
   .ro { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  .ro .lbl { color: var(--dim); font-size: .72rem; letter-spacing: .1em; }
-  .ro .val { font-size: 1.15rem; margin-top: 3px; font-variant-numeric: tabular-nums;
+  .ro .lbl { color: var(--dim); font-size: .7rem; letter-spacing: .1em; }
+  .ro .val { font-size: 1.1rem; margin-top: 3px; font-variant-numeric: tabular-nums;
     font-family: "SFMono-Regular", Consolas, "Courier New", monospace; color: var(--cyan); }
   .ro .val.amber { color: var(--amber); } .ro .val.rose { color: var(--rose); }
   .ro .val.green { color: var(--green); } .ro .val.dim { color: var(--dim); }
@@ -86,6 +96,9 @@
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   label.file { display: inline-block; }
   label.file input { display: none; }
+  input.url { flex: 1 1 220px; min-width: 160px; background: var(--panel2);
+    border: 1px solid var(--line); color: var(--text); border-radius: 9px;
+    padding: 8px 10px; font-size: .84rem; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
   .seg button { background: var(--panel2); color: var(--dim); border: 0; padding: 8px 13px;
     font-size: .84rem; cursor: pointer; }
@@ -98,7 +111,7 @@
     margin: 10px 0 2px; font-size: .84rem; }
   .slider .nm { color: var(--dim); grid-column: 1 / -1; font-size: .78rem; }
   .slider input[type=range] { width: 100%; accent-color: var(--cyan); }
-  .slider .v { font-family: Consolas, monospace; color: var(--cyan); min-width: 56px; text-align: right; }
+  .slider .v { font-family: Consolas, monospace; color: var(--cyan); min-width: 60px; text-align: right; }
   canvas.mono { width: 100%; background: #000; border: 1px solid var(--line); border-radius: 8px; display: block; }
   table.t { width: 100%; border-collapse: collapse; font-size: .86rem; margin-top: 6px; }
   table.t th, table.t td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; }
@@ -111,14 +124,14 @@
   .about code { background: var(--panel2); border-radius: 5px; padding: 1px 6px; font-size: .82rem; }
   .warn { border-color: var(--amber); color: var(--amber); }
   footer { text-align: center; color: var(--dim); font-size: .78rem; margin-top: 26px; line-height: 1.9; }
-  @media (max-width: 560px) { header h1 { font-size: 1.22rem; } .ro .val { font-size: 1rem; } }
+  @media (max-width: 560px) { header h1 { font-size: 1.22rem; } .ro .val { font-size: .98rem; } }
 </style>
 </head>
 <body>
 <header>
   <h1><span class="k">エアシャトル</span>・ゴーグル <span class="k">—</span> AirShuttle Goggle</h1>
-  <p class="sub">ゴーグル HUD の実写映像を、空中で手を<strong>かき分ける</strong>だけで巻き戻し・早送り。<br>
-    カメラ映像は端末内だけで処理し、外部には一切送信しません。</p>
+  <p class="sub">好きな動画を放り込んで、空中で手を<strong>かき分ける</strong>だけで巻き戻し・早送り。<br>
+    フレームキャッシュ駆動で、巻き戻しも高速送りも<strong>なめらか</strong>。映像は端末内だけで処理します。</p>
 </header>
 
 <nav id="tabs">
@@ -132,11 +145,12 @@
 <!-- ================= スクラブ卓 ================= -->
 <section class="pane on" id="pane-scrub">
   <div class="goggle" id="goggle">
-    <video id="stage" playsinline webkit-playsinline muted></video>
-    <canvas id="demo"></canvas>
+    <video id="src" playsinline webkit-playsinline muted preload="auto"></video>
+    <canvas id="stage"></canvas>
     <canvas id="hud"></canvas>
     <div class="vig"></div>
     <div id="touchpad"></div>
+    <div id="drop">⬇ ここに動画ファイルをドロップ</div>
   </div>
 
   <canvas id="strip" class="strip"></canvas>
@@ -146,10 +160,12 @@
     <div class="ro"><div class="lbl">TRANSPORT</div><div class="val amber" id="ro-rate">⏸ HOLD</div></div>
     <div class="ro"><div class="lbl">HAND</div><div class="val dim" id="ro-hand">— 未検出</div></div>
     <div class="ro"><div class="lbl">GESTURE</div><div class="val green" id="ro-ges">IDLE</div></div>
+    <div class="ro"><div class="lbl">ENGINE</div><div class="val dim" id="ro-eng">—</div></div>
+    <div class="ro"><div class="lbl">FRAME CACHE</div><div class="val dim" id="ro-cache">0 枚</div></div>
   </div>
 
   <div class="bar">
-    <label class="file btn cy">🎬 実写映像を開く<input type="file" id="file" accept="video/*"></label>
+    <label class="file btn cy">🎬 動画を開く<input type="file" id="file" accept="video/*"></label>
     <button class="btn" id="btn-demo">🌆 デモ映像</button>
     <button class="btn am" id="btn-cam">📷 ハンド認識 開始</button>
     <div class="seg" id="seg-input">
@@ -157,18 +173,26 @@
       <button data-mode="pointer">🖱 ポインタ</button>
     </div>
     <button class="btn" id="btn-play">▶ 再生 / 停止</button>
+    <button class="btn" id="btn-mute">🔇 消音中</button>
     <button class="btn" id="btn-full">⛶ 全画面</button>
   </div>
-  <p class="note" id="msg">映像を開くか「デモ映像」を押し、<strong>ハンド認識 開始</strong>でカメラを許可してください。
-    画面中央が中立位置です — 手を<strong>左へかき分ける</strong>と巻き戻し、<strong>右へかき分ける</strong>と早送り。
-    素早く払うと<strong>フリック跳躍</strong>、手を握ると<strong>ホールド</strong>。手を上げるほど高速、下げるほど微調整になります。</p>
+  <div class="bar">
+    <input class="url" id="url" type="url" placeholder="動画の URL / パスを貼り付け (http(s):// または file://)">
+    <button class="btn" id="btn-url">🔗 URL から読み込む</button>
+    <button class="btn" id="btn-scan">⚡ 先読みスキャン</button>
+  </div>
+  <p class="note" id="msg">動画ファイルを<strong>ドラッグ＆ドロップ</strong>するか「🎬 動画を開く」で選んでください
+    (URL 貼り付けも可)。画面中央が中立位置です — 手を<strong>左へかき分ける</strong>と巻き戻し、
+    <strong>右へかき分ける</strong>と早送り。素早く払うと<strong>フリック跳躍</strong>、手を握ると<strong>ホールド</strong>。
+    手を上げるほど高速、下げるほど微調整になります。</p>
 </section>
 
 <!-- ================= ハンド較正 ================= -->
 <section class="pane" id="pane-cal">
-  <h2 class="sec">✋ ハンド較正 — 認識と操作感の調整</h2>
+  <h2 class="sec">✋ ハンド較正 — 認識・操作感・なめらかさの調整</h2>
   <p class="note">左は認識マスク (白 = 手と判定された画素、十字 = 重心)。肌色クロマ帯と動きエネルギーの
-    2 条件で抽出しているため、背景に肌色の壁や木目があるときは「動き必須」を強めてください。</p>
+    2 条件で抽出しているため、背景に肌色の壁や木目があるときは「動き必須」を強めてください。
+    右下の<strong>なめらかさ</strong>は映像パイプラインの設定です。</p>
   <div class="row2">
     <div class="card">
       <h3>認識モニタ</h3>
@@ -179,6 +203,7 @@
         <tr><th>充填率 (握り判定)</th><td id="cal-fill">—</td></tr>
         <tr><th>動きエネルギー</th><td id="cal-motion">—</td></tr>
         <tr><th>処理フレームレート</th><td id="cal-fps">—</td></tr>
+        <tr><th>キャッシュ / 描画</th><td id="cal-cache">—</td></tr>
       </table>
     </div>
     <div class="card">
@@ -196,10 +221,28 @@
       <div class="slider"><span class="nm">動き必須しきい値 (背景の肌色を除去)</span>
         <input type="range" id="p-motion" min="0" max="60" step="2" value="14"><span class="v" id="v-motion">14</span></div>
       <div class="bar">
-        <button class="btn" id="p-detent">デテント: ON</button>
+        <button class="btn" id="p-detent">デテント: OFF</button>
         <button class="btn" id="p-mirror">鏡像: ON</button>
         <button class="btn" id="p-reset">既定値に戻す</button>
       </div>
+    </div>
+    <div class="card">
+      <h3>なめらかさ (映像パイプライン)</h3>
+      <div class="slider"><span class="nm">速度の加速度 — 小さいほど滑らか、大きいほど機敏 (×/秒)</span>
+        <input type="range" id="p-accel" min="4" max="80" step="2" value="22"><span class="v" id="v-accel">22</span></div>
+      <div class="slider"><span class="nm">キャッシュ fps — 高いほど滑らか・重い</span>
+        <input type="range" id="p-cfps" min="6" max="30" step="1" value="15"><span class="v" id="v-cfps">15</span></div>
+      <div class="slider"><span class="nm">キャッシュ保持範囲 (再生ヘッドの前後・秒)</span>
+        <input type="range" id="p-crad" min="5" max="120" step="5" value="20"><span class="v" id="v-crad">20</span></div>
+      <div class="slider"><span class="nm">キャッシュ解像度 (横px) — 低いほど省メモリ</span>
+        <input type="range" id="p-cw" min="160" max="640" step="80" value="320"><span class="v" id="v-cw">320</span></div>
+      <div class="bar">
+        <button class="btn on" id="p-blend">中割りブレンド: ON</button>
+        <button class="btn on" id="p-blur">モーションブラー: ON</button>
+      </div>
+      <p class="note" style="margin-top:10px">巻き戻しと ×4 超の早送りは、復号済みフレームの
+        キャッシュから描画します (デコーダのシーク待ちを挟まないので途切れません)。
+        未訪問の区間はシークキューが背景で補填し、その間も最寄りのコマを表示し続けます。</p>
     </div>
   </div>
 </section>
@@ -207,14 +250,16 @@
 <!-- ================= テレメトリ ================= -->
 <section class="pane" id="pane-tele">
   <h2 class="sec">📊 テレメトリ — 手の軌跡とシャトル出力</h2>
-  <p class="note">上段: 手の水平位置 x (シアン) と One Euro 平滑後 (白)。下段: 決定されたシャトル速度 (正 = 早送り / 負 = 巻き戻し)。
-    フリック検出はマゼンタの縦線で示されます。</p>
+  <p class="note">上段: 手の水平位置 x (シアン) と One Euro 平滑後 (白)。下段: 目標速度 (細線) と
+    スルーレート制限後の実速度 (太線)。フリック検出はマゼンタの縦線です。</p>
   <canvas id="plot" class="mono" width="900" height="300"></canvas>
   <div class="readout">
     <div class="ro"><div class="lbl">PEAK SPEED (/s)</div><div class="val" id="t-peak">0.00</div></div>
     <div class="ro"><div class="lbl">TRAVEL</div><div class="val" id="t-travel">0.00</div></div>
     <div class="ro"><div class="lbl">FLICKS</div><div class="val amber" id="t-flicks">0</div></div>
     <div class="ro"><div class="lbl">LOST FRAMES</div><div class="val rose" id="t-lost">0</div></div>
+    <div class="ro"><div class="lbl">CACHE HIT</div><div class="val green" id="t-hit">—</div></div>
+    <div class="ro"><div class="lbl">SEEKS</div><div class="val dim" id="t-seeks">0</div></div>
   </div>
 </section>
 
@@ -223,23 +268,43 @@
   <h2 class="sec">📖 原理と使い方</h2>
   <div class="about">
     <h3>1. 何をするアプリか</h3>
-    ゴーグル型コンピュータの HUD 風画面で<strong>実写映像</strong>を再生し、
+    ゴーグル型コンピュータの HUD 風画面で<strong>任意の実写動画</strong>を再生し、
     Web カメラに写った<strong>手の動き</strong>だけで時間軸を操作します。
-    マウス・キーボード・タッチにも同じエンジンが割り当てられているので、カメラが無い環境でも同じ操作感で使えます。
+    動画は<strong>ドラッグ＆ドロップ</strong>・ファイル選択・URL 貼り付けのいずれでも投入でき、
+    端末外には一切送信されません。マウス・タッチにも同じエンジンが割り当たっているので、
+    カメラが無い環境でも同じ操作感で使えます。
 
     <h3>2. ジェスチャ仕様</h3>
     <ul>
       <li><strong>かき分け (シャトル)</strong> — 画面中央が中立。手を左右へずらすと、変位に応じた速度で
-        巻き戻し / 早送り。速度は <code>r = ±R·((|dx|−dz)/(span−dz))^γ</code> で、
-        編集卓のデテント <code>×0.25 / 0.5 / 1 / 2 / 4 / 8 / 16</code> に吸着します。</li>
+        巻き戻し / 早送り。速度は <code>r = ±R·((|dx|−dz)/(span−dz))^γ</code> の連続値で、
+        さらに<strong>スルーレート制限</strong> <code>|dr/dt| ≤ a</code> を通すため、手がぶれても映像は滑らかに加減速します。</li>
       <li><strong>高さ = 精度</strong> — 手を上げるほど最大速度に近づき、下げるほど微速。
         <code>scale(y) = lo + (hi−lo)·(1−y)</code>。コマ単位の追い込みは手を下げて行います。</li>
       <li><strong>フリック (跳躍)</strong> — 素早く払うと窓内ピーク速度に応じて
         <code>clamp(k·v^1.3, 2s, 120s)</code> 秒だけ一気に飛びます。</li>
-      <li><strong>ホールド</strong> — 手を握る (ブロブ充填率が上がる) と即停止。手が画面外に出た場合も安全側で停止します。</li>
+      <li><strong>ホールド</strong> — 手を握ると即停止。手が画面外に出た場合も安全側で停止します。</li>
     </ul>
 
-    <h3>3. ハンド認識パイプライン (すべて端末内)</h3>
+    <h3>3. なめらかさの仕組み (映像パイプライン)</h3>
+    <code>&lt;video&gt;</code> の <code>currentTime</code> を毎フレーム書き換える素朴なシーク駆動は、
+    圧縮動画では直前のキーフレームからの復号が間に合わず、巻き戻し・高速送りで必ずカクつきます。本アプリは:
+    <ul>
+      <li><strong>フレームキャッシュ</strong> — <code>requestVideoFrameCallback</code> で復号済みフレームを
+        <code>ImageBitmap</code> として捕捉し、再生ヘッドの前後 ±N 秒だけを保持する
+        スライディングウィンドウに貯めます (範囲外は破棄して <code>close()</code>)。</li>
+      <li><strong>キャッシュ描画</strong> — 巻き戻しと ×4 超の早送りはキャッシュから直接描くため、
+        デコーダのシーク待ちが再生に現れません。</li>
+      <li><strong>背景補填</strong> — 未訪問区間では「同時 1 本」のシークキューが欠けたコマを取りに行き、
+        その間も最寄りのコマを表示し続けます (映像が止まらない)。</li>
+      <li><strong>中割りブレンド</strong> — キャッシュ間隔より細かい時刻では前後コマを
+        <code>α = (t−t_A)/(t_B−t_A)</code> で重ね、擬似的にフレームレートを上げます。</li>
+      <li><strong>モーションブラー</strong> — 高速域では直前の描画を薄く残し、コマ飛びを目で滑らかに繋ぎます。</li>
+      <li><strong>等速〜×4</strong> — デコーダ本来の連続再生が最も滑らかなので、その領域では
+        <code>playbackRate</code> による通常再生に自動で切り替えます (このとき音声も再生)。</li>
+    </ul>
+
+    <h3>4. ハンド認識パイプライン (すべて端末内)</h3>
     <ul>
       <li><strong>肌色抽出</strong> — RGB を YCbCr に変換し <code>77 ≤ Cb ≤ 133</code>、<code>133 ≤ Cr ≤ 177</code>、
         かつ彩度のある画素のみ採用 (無彩色の壁・紙を除外)。</li>
@@ -250,21 +315,15 @@
         静止時のふるえを消しつつ素早い払いには遅れない。</li>
     </ul>
 
-    <h3>4. 再生系</h3>
-    <ul>
-      <li><code>×1〜×4</code> の順再生はブラウザ内蔵の <code>playbackRate</code>、
-        それを超える早送りと<strong>すべての巻き戻し</strong>は
-        <code>currentTime += r·Δt</code> の手動シークで駆動します
-        (HTML5 の playbackRate は負値を取れないため)。</li>
-      <li>下部の<strong>フィルムストリップ</strong>は、スクラブ中に通過したフレームを実際に焼き付けていきます。
-        手を近づけるとフィルムが左右に<strong>かき分けられ</strong>、その隙間に現在位置の拡大コマが現れます。</li>
-    </ul>
+    <h3>5. キーボード操作</h3>
+    <code>Space</code> 再生/停止、<code>←→</code> コマ送り (Shift で 10 秒)、<code>J/K/L</code>、
+    <code>Home/End</code>、<code>M</code> 消音切替。ポインタモードでは Shift を押しながらのドラッグが「握り」です。
 
-    <h3>5. プライバシー</h3>
-    カメラ映像・映像ファイルはいずれも端末のメモリ内でのみ処理され、ネットワーク送信・保存は行いません。
+    <h3>6. プライバシー</h3>
+    カメラ映像・動画ファイルはいずれも端末のメモリ内でのみ処理され、ネットワーク送信・保存は行いません。
     アプリは外部 CDN も参照しない単一 HTML です (完全オフライン動作)。
 
-    <h3>6. 権利表記</h3>
+    <h3>7. 権利表記</h3>
     本アプリは、ゴーグル型端末で映像を手で操作するという<strong>演出に着想を得た独自実装</strong>であり、
     特定のアニメ作品・登場人物・権利者とは一切関係がなく、作品の素材も一切含みません。
     再生される映像は利用者自身が選んだファイルです。
@@ -650,41 +709,269 @@ function demoSceneState(t, duration){
   };
 }
 
+
+/* ==========================================================================
+ *  7. なめらか再生エンジン (v2) — フレームキャッシュ駆動の映像パイプライン
+ *
+ *  <video> の currentTime を毎フレーム書き換えるシーク駆動は、圧縮動画では
+ *  直前キーフレームからの復号が間に合わずカクつく。そこで復号済みフレームを
+ *  キャッシュし、巻き戻し・高速送りはそこから描く。以下はその純ロジック。
+ * ========================================================================== */
+
+/* 速度のスルーレート制限 (加速度制限)。目標速度へ一定の加速度で寄せることで、
+   手のぶれや不感帯の出入りがそのまま映像のガタつきにならないようにする。 */
+function slewRate(cur, target, dt, accel){
+  cur = cur || 0; target = target || 0;
+  if (!(dt > 0)) return target;
+  if (accel == null) accel = 22;
+  var step = accel * dt;
+  var d = target - cur;
+  if (Math.abs(d) <= step) return target;
+  return cur + (d > 0 ? step : -step);
+}
+
+/* 時刻 ↔ キャッシュのフレームキー (整数) */
+function frameKey(t, fps){ return Math.round((t || 0) * (fps || 15)); }
+function keyTime(k, fps){ return k / (fps || 15); }
+
+/* key から外側へ探索し、キャッシュ済みの最寄りキーを返す (maxDist 以内、無ければ null)。
+   has は「そのキーを持っているか」を返す述語。 */
+function nearestCachedKey(has, key, maxDist){
+  if (has(key)) return key;
+  var m = maxDist || 0;
+  for (var d = 1; d <= m; d++){
+    if (has(key - d)) return key - d;
+    if (has(key + d)) return key + d;
+  }
+  return null;
+}
+
+/* 再生ヘッド周辺だけを保持するスライディングウィンドウ */
+function cacheWindow(centerKey, radiusKeys){
+  return { lo: centerKey - radiusKeys, hi: centerKey + radiusKeys };
+}
+function keysToEvict(keys, lo, hi){
+  var out = [];
+  for (var i = 0; i < keys.length; i++) if (keys[i] < lo || keys[i] > hi) out.push(keys[i]);
+  return out;
+}
+/* 保持上限 (枚数) */
+function cacheBudget(radiusSec, fps){ return Math.max(1, Math.round(2 * radiusSec * fps + 1)); }
+
+/* 欠けているコマの取得順。進行方向を優先し、近い順に最大 limit 件返す。 */
+function prefetchTargets(centerKey, has, radiusKeys, dir, limit){
+  var out = [], lim = limit == null ? 4 : limit;
+  var d1 = dir < 0 ? -1 : 1;
+  for (var d = 1; d <= radiusKeys && out.length < lim; d++){
+    var a = centerKey + d1 * d;
+    if (!has(a)) { out.push(a); if (out.length >= lim) break; }
+    var b = centerKey - d1 * d;
+    if (!has(b)) out.push(b);
+  }
+  return out;
+}
+
+/* シーク計画: 同時に 1 本だけ、微小シークは発行しない (キュー詰まり防止)。 */
+function seekPlan(cur, want, pending, cfg){
+  cfg = cfg || {};
+  if (pending) return null;
+  var minDelta = cfg.minDelta == null ? 0.05 : cfg.minDelta;
+  var d = cfg.duration;
+  var target = (d > 0) ? clamp(want, 0, d) : Math.max(0, want);
+  if (Math.abs(target - (cur || 0)) < minDelta) return null;
+  return { time: target };
+}
+
+/* 中割りブレンド係数: 時刻 t が前後コマ tA..tB のどこにあるか (0..1)。 */
+function blendAlpha(t, tA, tB){
+  if (tB === tA) return 0;
+  return clamp((t - tA) / (tB - tA), 0, 1);
+}
+
+/* 再生方式:
+     hold   … 停止 (キャッシュの静止画を表示)
+     native … 等速〜×4 の順再生。デコーダ本来の再生が最も滑らかなので任せる
+     cache  … 巻き戻し / 高速送り。フレームキャッシュから描画する          */
+function playbackPlan(rate, cfg){
+  var d = videoDriveMode(rate, cfg);
+  return {
+    mode: d.mode === "manual" ? "cache" : (d.mode === "paused" ? "hold" : "native"),
+    playbackRate: d.playbackRate
+  };
+}
+
+/* モーションブラー量 — 高速域ほど前フレームを残してコマ飛びを目で繋ぐ。 */
+function blurAlpha(rate, cfg){
+  cfg = cfg || {};
+  var lo = cfg.from == null ? 1.5 : cfg.from;
+  var hi = cfg.to == null ? 10 : cfg.to;
+  var mx = cfg.max == null ? 0.55 : cfg.max;
+  var a = Math.abs(rate || 0);
+  if (a <= lo) return 0;
+  return clamp((a - lo) / Math.max(1e-6, hi - lo), 0, 1) * mx;
+}
+
+/* アスペクト比を保って収める矩形 (レターボックス) */
+function containRect(sw, sh, dw, dh){
+  if (!(sw > 0) || !(sh > 0)) return { x: 0, y: 0, w: dw, h: dh };
+  var s = Math.min(dw / sw, dh / sh);
+  var w = sw * s, h = sh * s;
+  return { x: (dw - w) / 2, y: (dh - h) / 2, w: w, h: h };
+}
+
+/* フィルムストリップ下のキャッシュ被覆率 (セルごとに 0..1) */
+function coverageSpans(keys, fps, duration, cells){
+  var out = [];
+  if (!(duration > 0) || !(cells > 0)) return out;
+  var expect = Math.max(1, (duration / cells) * fps);
+  var counts = [], i;
+  for (i = 0; i < cells; i++) counts.push(0);
+  for (i = 0; i < keys.length; i++){
+    var t = keyTime(keys[i], fps);
+    if (t < 0 || t > duration) continue;
+    counts[clamp(Math.floor(t / duration * cells), 0, cells - 1)]++;
+  }
+  for (i = 0; i < cells; i++) out.push(clamp(counts[i] / expect, 0, 1));
+  return out;
+}
+
+/* 窓 [lo..hi] のうち最初に欠けているキー (先読み再生の開始点) */
+function firstMissingKey(lo, hi, has){
+  for (var k = lo; k <= hi; k++) if (!has(k)) return k;
+  return null;
+}
+
+/* 再生ヘッド t を中心に、尺に収まる保持窓 (キー単位) を返す */
+function windowKeysFor(t, radiusSec, fps, duration){
+  var lo = Math.max(0, frameKey(Math.max(0, (t || 0) - radiusSec), fps));
+  var end = (duration > 0) ? Math.min(duration, (t || 0) + radiusSec) : (t || 0) + radiusSec;
+  var hi = frameKey(end, fps);
+  return { lo: lo, hi: Math.max(lo, hi) };
+}
+
+/* 窓の充足率 (0..1) — 先読みの進捗 */
+function windowCoverage(lo, hi, has){
+  var n = hi - lo + 1;
+  if (n <= 0) return 1;
+  var c = 0;
+  for (var k = lo; k <= hi; k++) if (has(k)) c++;
+  return c / n;
+}
+
+/* 再生ヘッドの直下にある「欠けの連続区間」。巻き戻しはこちらを先に埋める。 */
+function gapBelow(center, lo, has){
+  var k = center;
+  while (k >= lo && has(k)) k--;
+  if (k < lo) return null;
+  var start = k;
+  while (start > lo && !has(start - 1)) start--;
+  return { start: start, end: k };
+}
+
+/* 先読み再生で次に流すべき区間 [start..end]。
+   下方向 (巻き戻し先) を優先し、無ければ上方向。全部あれば null。
+   区間単位で “順再生しながら捕捉” するため、1 コマずつシークするより桁違いに速い。 */
+function scanSegment(center, lo, hi, has){
+  var g = gapBelow(center, lo, has);
+  if (g) return g;
+  var k = center;
+  while (k <= hi && has(k)) k++;
+  if (k > hi) return null;
+  var end = k;
+  while (end < hi && !has(end + 1)) end++;
+  return { start: k, end: end };
+}
+
+/* 先読み再生の速度制御。速すぎると取りこぼし (キーの飛び) が出て
+   再走査が必要になり、かえって遅くなる。取りこぼし率を見て調整する。 */
+function adaptScanRate(cur, missRatio, cfg){
+  cfg = cfg || {};
+  var lo = cfg.min == null ? 1 : cfg.min;
+  var hi = cfg.max == null ? 8 : cfg.max;
+  var r = cur || 1;
+  if (missRatio > 0.15) r = r * 0.7;
+  else if (missRatio < 0.02) r = r * 1.15;
+  return clamp(r, lo, hi);
+}
+
+/* ───── スクラブ・ラダー (全編をカバーする粗いキャッシュ) ─────
+   ×16 の巻き戻しは 1 秒で 16 秒ぶんの映像を消費するため、再生ヘッド周辺の
+   細かいキャッシュ (±N 秒) はどうしても追い越される。そこで「全編を等間隔で
+   間引いた低解像度のコマ」を別に保持し、高速移動中はそこから描く。
+   速く動くほど必要なコマ間隔は粗くてよい、という性質を利用している。 */
+function ladderSpacing(duration, maxFrames, minSpacing){
+  var lo = minSpacing == null ? 0.5 : minSpacing;
+  if (!(duration > 0)) return lo;
+  return Math.max(lo, duration / (maxFrames || 600));
+}
+function ladderFpsFor(duration, maxFrames, minSpacing){
+  return 1 / ladderSpacing(duration, maxFrames, minSpacing);
+}
+
+/* 時刻 t をどのキャッシュ段から描くか決める。
+   細キャッシュ → ラダー → (どちらも無ければ null = デコーダの現フレーム)。 */
+function pickFrameSource(t, hasFine, fineFps, hasLadder, lfps){
+  var a = nearestCachedKey(hasFine, frameKey(t, fineFps), Math.max(2, Math.round(fineFps * 0.8)));
+  if (a !== null) return { tier: "fine", key: a, fps: fineFps };
+  var b = nearestCachedKey(hasLadder, frameKey(t, lfps), 2);
+  if (b !== null) return { tier: "ladder", key: b, fps: lfps };
+  return null;
+}
+
+/* 受け入れる動画かの判定 (ドラッグ＆ドロップ / ファイル選択の共通ゲート)。
+   MIME が空の端末もあるため拡張子でも判定する。 */
+function isVideoFile(name, type){
+  if (type && /^video\//i.test(type)) return true;
+  return /\.(mp4|m4v|mov|webm|ogv|ogg|mkv|avi|3gp|ts|m2ts|mpg|mpeg|wmv|flv)$/i.test(name || "");
+}
+
 /* ==========================================================================
  *  アプリケーション層 (DOM)
  * ========================================================================== */
 var ST = {
-  mode: "hand", camOn: false, source: "none", playing: false,
-  time: 0, rate: 0, hold: false, duration: 0, fps: 30,
-  demoDuration: 150,
+  mode: "hand", camOn: false, source: "none", playing: false, muted: true,
+  time: 0, rate: 0, rateTarget: 0, hold: false, duration: 0, fps: 30,
+  demoDuration: 150, engine: "—", objectURL: null, scanning: false, tainted: false, autoScan: true,
   hand: null, handRaw: null, pose: "none", lost: 0, flicks: 0,
   samples: [], trail: [], tele: [], lastMask: null, maskDims: [0, 0],
-  motion: 0, procFps: 0, lastEvent: "idle",
+  motion: 0, procFps: 0, lastEvent: "idle", tier: "", scanTier: "",
+  hits: 0, misses: 0, seeks: 0,
   cfg: { deadzone: 0.07, maxRate: 16, gamma: 2.2, span: 0.45, flickGain: 6,
-         beta: 0.35, motionThreshold: 14, detent: true, mirror: true },
+         beta: 0.35, motionThreshold: 14, detent: false, mirror: true,
+         accel: 22, cacheFps: 15, cacheRadiusSec: 20, cacheWidth: 320,
+         blend: true, blur: true, prefetchSec: 6, scanRate: 3, scanRateLadder: 8,
+         ladderMax: 600, ladderMinSpacing: 0.5, ladderWidth: 192 },
   pointer: { active: false, x: 0.5, y: 0.5, grab: false }
 };
 var EL = {}, camVideo = null, camStream = null, work = null, workCtx = null,
-    prevPixels = null, filtX = null, filtY = null, thumbs = [], thumbW = 112, thumbH = 63,
-    lastThumbAt = 0, flickCooldownUntil = 0, lastProcAt = 0, procAcc = 0, procN = 0;
+    stageCtx = null, prevPixels = null, filtX = null, filtY = null,
+    thumbs = [], thumbW = 112, thumbH = 63, lastThumbAt = 0,
+    flickCooldownUntil = 0, lastProcAt = 0, procN = 0,
+    frames = null, ladder = null, capturing = 0, seeking = false, rvfcArmed = false,
+    lastEvictAt = 0, prevMode = "", lastDrawnKey = null, lastScanAt = 0,
+    scanCheckAt = 0, scanCheckTime = 0, lastMaintainAt = 0, seekStartedAt = 0;
 var STRIP_CELLS = 26;
 
 function $(id){ return document.getElementById(id); }
 
 function init(){
-  ["stage", "demo", "hud", "strip", "touchpad", "goggle", "mask", "plot", "msg", "file",
-   "ro-tc", "ro-rate", "ro-hand", "ro-ges", "btn-demo", "btn-cam", "btn-play", "btn-full",
-   "cal-area", "cal-pos", "cal-fill", "cal-motion", "cal-fps",
-   "t-peak", "t-travel", "t-flicks", "t-lost", "seg-input",
+  ["src", "stage", "hud", "strip", "touchpad", "goggle", "drop", "mask", "plot", "msg",
+   "file", "url", "btn-url", "btn-scan", "btn-demo", "btn-cam", "btn-play", "btn-mute", "btn-full",
+   "ro-tc", "ro-rate", "ro-hand", "ro-ges", "ro-eng", "ro-cache",
+   "cal-area", "cal-pos", "cal-fill", "cal-motion", "cal-fps", "cal-cache",
+   "t-peak", "t-travel", "t-flicks", "t-lost", "t-hit", "t-seeks", "seg-input",
    "p-dz", "p-max", "p-gamma", "p-flick", "p-beta", "p-motion",
-   "p-detent", "p-mirror", "p-reset"].forEach(function(id){ EL[id] = $(id); });
+   "p-detent", "p-mirror", "p-reset",
+   "p-accel", "p-cfps", "p-crad", "p-cw", "p-blend", "p-blur"].forEach(function(id){ EL[id] = $(id); });
 
+  frames = new Map(); ladder = new Map();
   filtX = oneEuroFilter({ minCutoff: 1.0, beta: ST.cfg.beta });
   filtY = oneEuroFilter({ minCutoff: 1.0, beta: ST.cfg.beta });
   work = document.createElement("canvas"); work.width = 160; work.height = 120;
   workCtx = work.getContext("2d", { willReadFrequently: true });
+  stageCtx = EL.stage.getContext("2d");
 
-  bindTabs(); bindControls(); bindPointer(); bindKeys(); bindSliders();
+  bindTabs(); bindControls(); bindDrop(); bindPointer(); bindKeys(); bindSliders(); bindVideo();
   resizeCanvases();
   window.addEventListener("resize", resizeCanvases);
   requestAnimationFrame(tick);
@@ -714,19 +1001,32 @@ function setMsg(text, warn){
 function bindControls(){
   EL.file.addEventListener("change", function(e){
     var f = e.target.files && e.target.files[0];
-    if (!f) return;
-    loadVideoFile(f);
+    if (f) loadVideoFile(f);
+  });
+  EL["btn-url"].addEventListener("click", function(){
+    var u = (EL.url.value || "").trim();
+    if (u) loadVideoURL(u);
+  });
+  EL.url.addEventListener("keydown", function(e){
+    if (e.key === "Enter"){ var u = (EL.url.value || "").trim(); if (u) loadVideoURL(u); }
   });
   EL["btn-demo"].addEventListener("click", startDemo);
   EL["btn-cam"].addEventListener("click", function(){ ST.camOn ? stopCamera() : startCamera(); });
   EL["btn-play"].addEventListener("click", function(){
     ST.playing = !ST.playing;
+    if (ST.playing) stopScan("play");
     EL["btn-play"].classList.toggle("on", ST.playing);
+  });
+  EL["btn-mute"].addEventListener("click", toggleMute);
+  EL["btn-scan"].addEventListener("click", function(){
+    if (ST.source !== "file"){ setMsg("先読みスキャンは動画ファイルを開いてから使えます。", true); return; }
+    if (ST.scanning){ ST.autoScan = false; stopScan("user"); }
+    else { ST.autoScan = true; ST.playing = false; EL["btn-play"].classList.remove("on"); startScan(false); }
   });
   EL["btn-full"].addEventListener("click", function(){
     var g = EL.goggle;
-    if (document.fullscreenElement) { document.exitFullscreen(); }
-    else if (g.requestFullscreen) { g.requestFullscreen(); }
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (g.requestFullscreen) g.requestFullscreen();
   });
   var segs = EL["seg-input"].querySelectorAll("button");
   for (var i = 0; i < segs.length; i++){
@@ -741,33 +1041,366 @@ function bindControls(){
   }
 }
 
-function loadVideoFile(f){
-  var url = URL.createObjectURL(f);
-  ST.source = "file"; ST.time = 0; thumbs = [];
-  EL.stage.style.display = "block"; EL.demo.style.display = "none";
-  EL.stage.src = url;
-  EL.stage.addEventListener("loadedmetadata", function onmeta(){
-    EL.stage.removeEventListener("loadedmetadata", onmeta);
-    ST.duration = EL.stage.duration || 0;
-    ST.time = 0;
-    setMsg("読み込み完了: <strong>" + f.name + "</strong> (" + formatTimecode(ST.duration, ST.fps) +
-           ")。手を左右にかき分けてスクラブしてください。", false);
-  });
-  EL.stage.load();
+function toggleMute(){
+  ST.muted = !ST.muted;
+  EL["btn-mute"].textContent = ST.muted ? "🔇 消音中" : "🔊 音声 ON";
+  EL["btn-mute"].classList.toggle("on", !ST.muted);
+  if (EL.src) EL.src.muted = ST.muted;
 }
 
+/* ---------- 動画の投入 (ドラッグ＆ドロップ / ファイル / URL) ---------- */
+function bindDrop(){
+  var depth = 0;
+  function show(on){ EL.drop.classList.toggle("on", on); }
+  ["dragenter", "dragover"].forEach(function(ev){
+    document.addEventListener(ev, function(e){
+      e.preventDefault();
+      if (ev === "dragenter") depth++;
+      show(true);
+    });
+  });
+  document.addEventListener("dragleave", function(e){
+    e.preventDefault();
+    if (--depth <= 0){ depth = 0; show(false); }
+  });
+  document.addEventListener("drop", function(e){
+    e.preventDefault(); depth = 0; show(false);
+    var dt = e.dataTransfer;
+    if (!dt) return;
+    if (dt.files && dt.files.length){
+      var f = dt.files[0];
+      if (isVideoFile(f.name, f.type)) loadVideoFile(f);
+      else setMsg("「" + f.name + "」は動画として認識できませんでした。mp4 / webm / mov などを入れてください。", true);
+      return;
+    }
+    var u = dt.getData && dt.getData("text/uri-list") || (dt.getData && dt.getData("text"));
+    if (u) loadVideoURL(u.trim());
+  });
+}
+
+function loadVideoFile(f){
+  if (!isVideoFile(f.name, f.type)){
+    setMsg("「" + f.name + "」は動画として認識できませんでした。", true);
+    return;
+  }
+  if (ST.objectURL){ URL.revokeObjectURL(ST.objectURL); ST.objectURL = null; }
+  ST.objectURL = URL.createObjectURL(f);
+  attachSource(ST.objectURL, f.name);
+}
+
+function loadVideoURL(u){
+  if (!/^(https?:|file:|blob:)/i.test(u)){
+    setMsg("URL は http(s):// / file:// / blob: で指定してください。", true);
+    return;
+  }
+  attachSource(u, u.replace(/^.*\//, "") || u);
+}
+
+function attachSource(url, label){
+  stopScan("switch");
+  clearCache();
+  thumbs = [];
+  ST.source = "file"; ST.time = 0; ST.rate = 0; ST.rateTarget = 0;
+  ST.duration = 0; ST.scanning = false; ST.tainted = false; ST.hits = 0; ST.misses = 0; ST.seeks = 0;
+  EL["btn-scan"].classList.remove("on");
+  var v = EL.src;
+  v.pause();
+  v.src = url;
+  v.muted = ST.muted;
+  v.load();
+  setMsg("読み込み中: <strong>" + label + "</strong> …", false);
+}
+
+function bindVideo(){
+  var v = EL.src;
+  v.addEventListener("loadedmetadata", function(){
+    ST.duration = v.duration && isFinite(v.duration) ? v.duration : 0;
+    ST.time = 0;
+    try { v.currentTime = 0; } catch (e) {}
+    setMsg("読み込み完了 (" + formatTimecode(ST.duration, ST.fps) +
+           " / " + v.videoWidth + "×" + v.videoHeight + ")。" +
+           "手を<strong>左へかき分けると巻き戻し</strong>、<strong>右へで早送り</strong>。" +
+           "<strong>⚡ 先読み</strong>を自動で開始しました — 緑のバーが伸びた範囲は巻き戻しも等速なみに滑らかです。", false);
+    pumpCapture();
+    startScan(true);
+  });
+  v.addEventListener("seeked", function(){
+    seeking = false;
+    captureFrame(v.currentTime);
+  });
+  v.addEventListener("error", function(){
+    setMsg("この動画を再生できませんでした (コーデック未対応、または URL にアクセスできません)。" +
+           "mp4 (H.264) / webm などをお試しください。", true);
+    ST.source = "none";
+  });
+  v.addEventListener("play", pumpCapture);
+}
+
+/* ---------- フレームキャッシュ ---------- */
+function framesHas(k){ return frames.has(k); }
+function ladderHas(k){ return ladder.has(k); }
+function ladderFps(){ return ladderFpsFor(ST.duration, ST.cfg.ladderMax, ST.cfg.ladderMinSpacing); }
+
+function clearCache(){
+  if (!frames) return;
+  frames.forEach(function(f){ if (f && f.bmp && f.bmp.close) f.bmp.close(); });
+  frames.clear();
+  ladder.forEach(function(f){ if (f && f.bmp && f.bmp.close) f.bmp.close(); });
+  ladder.clear();
+  lastDrawnKey = null;
+}
+
+/* ラダーは低解像度の canvas コピーで同期的に作る (非同期の取りこぼしを避ける)。
+   破棄しないので、一度通った場所は動画の端から端まで高速スクラブできる。 */
+function captureLadder(t){
+  var v = EL.src;
+  if (!v || v.readyState < 2 || !v.videoWidth || !(ST.duration > 0)) return;
+  var lfps = ladderFps();
+  var k = frameKey(t, lfps);
+  if (ladder.has(k)) return;
+  if (Math.abs(keyTime(k, lfps) - t) > 0.5 / lfps) return;
+  var w = Math.min(ST.cfg.ladderWidth, v.videoWidth);
+  var h = Math.max(1, Math.round(v.videoHeight * (w / v.videoWidth)));
+  try {
+    var cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    cv.getContext("2d").drawImage(v, 0, 0, w, h);
+    ladder.set(k, { bmp: cv, w: w, h: h });
+  } catch (e) { noteTaint(e); }
+}
+
+function storeFrame(k, bmp, w, h){
+  if (frames.has(k)){ if (bmp && bmp.close) bmp.close(); return; }
+  frames.set(k, { bmp: bmp, w: w, h: h });
+}
+
+function captureFrame(t){
+  if (ST.source !== "file") return;
+  var v = EL.src;
+  if (!v || v.readyState < 2 || !v.videoWidth) return;
+  if (capturing >= 4) return;
+  captureLadder(t);
+  var k = frameKey(t, ST.cfg.cacheFps);
+  if (frames.has(k)) return;
+  var w = Math.min(ST.cfg.cacheWidth, v.videoWidth);
+  var h = Math.max(1, Math.round(v.videoHeight * (w / v.videoWidth)));
+  capturing++;
+  if (typeof createImageBitmap === "function"){
+    createImageBitmap(v, { resizeWidth: w, resizeHeight: h, resizeQuality: "low" })
+      .then(function(bmp){ capturing--; storeFrame(k, bmp, w, h); })
+      .catch(function(e){ capturing--; noteTaint(e); captureFrameCanvas(k, w, h); });
+  } else {
+    capturing--;
+    captureFrameCanvas(k, w, h);
+  }
+}
+/* createImageBitmap が使えない環境向けのフォールバック (canvas コピー) */
+function captureFrameCanvas(k, w, h){
+  if (frames.has(k)) return;
+  try {
+    var cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    cv.getContext("2d").drawImage(EL.src, 0, 0, w, h);
+    frames.set(k, { bmp: cv, w: w, h: h });
+  } catch (e) { noteTaint(e); }
+}
+
+/* 別オリジン (CORS ヘッダ無し) の動画は canvas が汚染され、
+   復号フレームを読み出せない = キャッシュを作れない。
+   その場合は従来どおりシーク駆動にフォールバックし、理由を一度だけ伝える。 */
+function noteTaint(e){
+  if (ST.tainted) return;
+  if (!e || (e.name !== "SecurityError" && !/taint|insecure|cross/i.test(String(e.message || e)))) return;
+  ST.tainted = true;
+  setMsg("この動画は別オリジン配信のため、ブラウザの制約でフレームを読み出せません " +
+         "(キャッシュ無効 = 巻き戻しはシーク駆動)。<strong>ファイルとして開く</strong>か、" +
+         "ドラッグ＆ドロップで投入すると完全になめらかになります。", true);
+}
+
+/* 復号済みフレームを取りこぼさないためのポンプ */
+function pumpCapture(){
+  var v = EL.src;
+  if (!v || !v.requestVideoFrameCallback || rvfcArmed) return;
+  rvfcArmed = true;
+  v.requestVideoFrameCallback(function(now, meta){
+    rvfcArmed = false;
+    captureFrame(meta && meta.mediaTime != null ? meta.mediaTime : v.currentTime);
+    pumpCapture();
+  });
+}
+
+function evictFrames(ts){
+  if (ts - lastEvictAt < 400) return;
+  lastEvictAt = ts;
+  var radius = Math.round(ST.cfg.cacheRadiusSec * ST.cfg.cacheFps);
+  var win = cacheWindow(frameKey(ST.time, ST.cfg.cacheFps), radius);
+  var keys = [];
+  frames.forEach(function(v, k){ keys.push(k); });
+  var dead = keysToEvict(keys, win.lo, win.hi);
+  for (var i = 0; i < dead.length; i++){
+    var f = frames.get(dead[i]);
+    if (f && f.bmp && f.bmp.close) f.bmp.close();
+    frames.delete(dead[i]);
+  }
+}
+
+/* ユーザー操作による明示的なシーク */
+function requestSeek(t){
+  var v = EL.src;
+  if (ST.source !== "file" || v.readyState < 1) return;
+  try { v.currentTime = clamp(t, 0, ST.duration || t); seeking = true; seekStartedAt = nowMs(); } catch (e) {}
+}
+
+/* 欠けているコマを「同時 1 本」のシークで背景補填する */
+function serviceSeeks(t, rate){
+  var v = EL.src;
+  if (ST.source !== "file" || v.readyState < 1) return;
+  /* 目標が現在位置と同じ等の理由で seeked が来ないことがある。
+     取りこぼすと補填が永久に止まるので、時間切れで解除する。 */
+  if (seeking && nowMs() - seekStartedAt > 500) seeking = false;
+  var fps = ST.cfg.cacheFps;
+  var k = frameKey(t, fps);
+  var want = null;
+  if (!frames.has(k)) want = t;
+  else {
+    var tg = prefetchTargets(k, framesHas, Math.round(ST.cfg.prefetchSec * fps), rate < 0 ? -1 : 1, 1);
+    if (tg.length) want = keyTime(tg[0], fps);
+  }
+  if (want === null) return;
+  var plan = seekPlan(v.currentTime, want, seeking, { duration: ST.duration, minDelta: 1 / (fps * 2) });
+  if (plan){
+    ST.seeks++;
+    try { v.currentTime = plan.time; seeking = true; seekStartedAt = nowMs(); } catch (e) { seeking = false; }
+  }
+}
+
+/* ---------- 先読みスキャン (高速再生でキャッシュを一気に充填) ----------
+   シークを 1 コマずつ繰り返すより、×4 で流しながら復号済みフレームを
+   requestVideoFrameCallback で捕捉する方が 1 桁速い (ディスプレイに提示される
+   60 Hz ぶんのフレームをそのまま拾えるため)。映像は canvas 越しにしか
+   見えないので、スキャン中もユーザーには再生ヘッドのコマが静止して見える。 */
+function scanWindow(){
+  return windowKeysFor(ST.time, ST.cfg.cacheRadiusSec, ST.cfg.cacheFps, ST.duration);
+}
+function scanProgress(){
+  var w = scanWindow();
+  var fine = windowCoverage(w.lo, w.hi, framesHas);
+  if (!(ST.duration > 0)) return fine;
+  var lfps = ladderFps();
+  var lad = windowCoverage(0, frameKey(ST.duration, lfps), ladderHas);
+  return lad * 0.5 + fine * 0.5;
+}
+function startScan(auto){
+  if (ST.source !== "file" || ST.tainted) return;
+  ST.quietScan = !!auto && ST.seenScanDone;
+  ST.scanning = true;
+  lastScanAt = 0; scanCheckAt = 0; scanCheckTime = 0;
+  EL["btn-scan"].classList.add("on");
+  if (!auto) setMsg("⚡ 先読みスキャン中 — 再生ヘッドの前後 ±" + ST.cfg.cacheRadiusSec +
+                    " 秒のコマを貯めています (スクラブ中は自動で中断します)。", false);
+}
+function stopScan(reason){
+  if (!ST.scanning) return;
+  ST.scanning = false;
+  EL["btn-scan"].classList.remove("on");
+  var v = EL.src;
+  if (v && !v.paused) v.pause();
+  try { if (v) v.playbackRate = 1; } catch (e) {}
+  if (reason === "done") ST.seenScanDone = true;
+  if (reason === "done" && !ST.quietScan)
+    setMsg("⚡ 先読み完了 — 緑のバーの範囲は、巻き戻しも高速送りもキャッシュから描画されます。", false);
+  ST.quietScan = false;
+}
+/* 戻り値 true = スキャンが映像要素を占有中 (通常の一時停止・シークをしない)
+
+   2 段構え:
+     第 1 相 ラダー … 全編を粗く (既定 0.5 秒間隔) 高速再生で埋める。
+                      数秒で「どこへでも高速スクラブできる」状態になる。
+     第 2 相 細     … 再生ヘッド周辺 ±N 秒を cacheFps で埋める。
+                      ゆっくりの巻き戻しやコマ送りが滑らかになる。
+   どちらも「順再生しながら復号済みフレームを捕捉」する方式で、
+   取りこぼし率を見て再生速度を自動調整する。 */
+function serviceScan(rate, ts){
+  var v = EL.src;
+  if (!ST.scanning) return false;
+  if (ST.tainted){ stopScan("taint"); return false; }
+  /* スクラブ中はスキャンを中断し、映像要素を手放す
+     (未キャッシュ区間のシーク補填を走らせるため) */
+  if (rate !== 0){ if (!v.paused) v.pause(); return false; }
+  if (ts - lastScanAt < 150) return true;                       // play() の反映待ち
+
+  var fps = ST.cfg.cacheFps, lfps = ladderFps();
+  var seg = null, tier = "ladder";
+  if (ST.duration > 0){
+    var ls = scanSegment(frameKey(ST.time, lfps), 0, frameKey(ST.duration, lfps), ladderHas);
+    if (ls) seg = { start: keyTime(ls.start, lfps), end: keyTime(ls.end, lfps) };
+  }
+  if (!seg){
+    tier = "fine";
+    var w = scanWindow();
+    var fs = scanSegment(frameKey(ST.time, fps), w.lo, w.hi, framesHas);
+    if (!fs){ stopScan("done"); return false; }
+    seg = { start: keyTime(fs.start, fps), end: keyTime(fs.end, fps) };
+  }
+  if (tier !== ST.scanTier){ ST.scanTier = tier; scanCheckAt = 0; if (!v.paused) v.pause(); }
+  lastScanAt = ts;
+
+  var wantRate = tier === "ladder" ? ST.cfg.scanRateLadder : ST.cfg.scanRate;
+  if (v.paused){
+    if (Math.abs(v.currentTime - seg.start) > 0.3){ try { v.currentTime = seg.start; } catch (e) {} }
+    v.muted = true;
+    try { v.playbackRate = clamp(wantRate, 0.5, 16); } catch (e) {}
+    var pr = v.play();
+    if (pr && pr.catch) pr.catch(function(){ stopScan("err"); });
+  } else if (v.currentTime > seg.end + 0.6){
+    v.pause();                                                   // 区間を埋め終えたら次の区間へ
+  } else {
+    /* 取りこぼし率 (いま埋めている段の被覆の欠け) を見て再生速度を調整。
+       速すぎると穴が開き、再走査でかえって遅くなる。 */
+    if (scanCheckAt === 0){ scanCheckAt = ts; scanCheckTime = v.currentTime; }
+    else if (ts - scanCheckAt > 800){
+      var kfps = tier === "ladder" ? lfps : fps;
+      var hasFn = tier === "ladder" ? ladderHas : framesHas;
+      var a = frameKey(Math.min(scanCheckTime, v.currentTime), kfps);
+      var b = frameKey(Math.max(scanCheckTime, v.currentTime), kfps);
+      if (b > a){
+        var miss = 1 - windowCoverage(a, b, hasFn);
+        var nr = adaptScanRate(wantRate, miss, { min: 1, max: 16 });
+        if (tier === "ladder") ST.cfg.scanRateLadder = nr; else ST.cfg.scanRate = nr;
+        try { v.playbackRate = clamp(nr, 0.5, 16); } catch (e) {}
+      }
+      scanCheckAt = ts; scanCheckTime = v.currentTime;
+    }
+  }
+  return true;
+}
+
+/* 再生ヘッドが飛んだ後なども、停止中は周辺キャッシュを自動で維持する。
+   (これがあるのでユーザーは「巻き戻したい場所で少し待つ」だけでよい) */
+function maintainScan(ts, rate){
+  if (ST.source !== "file" || ST.tainted || !ST.autoScan) return;
+  if (ST.scanning || ST.playing || rate !== 0) return;
+  if (ts - lastMaintainAt < 1500) return;
+  lastMaintainAt = ts;
+  if (scanProgress() < 0.9) startScan(true);
+}
+
+/* ---------- デモ映像 ---------- */
 function startDemo(){
-  ST.source = "demo"; ST.duration = ST.demoDuration; ST.time = 0; thumbs = [];
-  EL.stage.pause(); EL.stage.removeAttribute("src"); EL.stage.load();
-  EL.stage.style.display = "none"; EL.demo.style.display = "block";
+  stopScan("switch");
+  clearCache(); thumbs = [];
+  var v = EL.src;
+  v.pause(); v.removeAttribute("src"); v.load();
+  if (ST.objectURL){ URL.revokeObjectURL(ST.objectURL); ST.objectURL = null; }
+  ST.source = "demo"; ST.duration = ST.demoDuration; ST.time = 0;
+  ST.rate = 0; ST.rateTarget = 0; ST.scanning = false;
+  EL["btn-scan"].classList.remove("on");
   buildDemoThumbs();
   setMsg("デモ映像 (手続き生成・" + ST.demoDuration + "秒) を読み込みました。" +
-         "実写ファイルは「🎬 実写映像を開く」から。", false);
+         "自分の動画は<strong>ドラッグ＆ドロップ</strong>か「🎬 動画を開く」から。", false);
 }
 
-/* Android (Cordova) 版では WebView の getUserMedia より前に
-   端末の実行時パーミッションを取得しておく必要がある。
-   ブラウザ / Electron ではプラグインが無いのでそのまま次へ進む。 */
+/* ---------- カメラ (ハンド認識) ---------- */
 function ensureCameraPermission(next){
   var g = (typeof window !== "undefined") ? window : null;
   var perms = g && g.cordova && g.cordova.plugins && g.cordova.plugins.permissions;
@@ -815,6 +1448,7 @@ function stopCamera(){
   EL["btn-cam"].classList.remove("on");
 }
 
+/* ---------- 入力バインド ---------- */
 function bindPointer(){
   var pad = EL.touchpad;
   function pos(e){
@@ -852,6 +1486,7 @@ function bindPointer(){
 
 function bindKeys(){
   document.addEventListener("keydown", function(e){
+    if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
     var d = ST.duration || 0;
     if (e.key === " "){ ST.playing = !ST.playing; EL["btn-play"].classList.toggle("on", ST.playing); e.preventDefault(); }
     else if (e.key === "ArrowLeft")  seekTo(currentTime() - (e.shiftKey ? 10 : 1 / ST.fps));
@@ -859,53 +1494,76 @@ function bindKeys(){
     else if (e.key === "j" || e.key === "J") seekTo(currentTime() - 10);
     else if (e.key === "l" || e.key === "L") seekTo(currentTime() + 10);
     else if (e.key === "k" || e.key === "K") ST.playing = false;
+    else if (e.key === "m" || e.key === "M") toggleMute();
     else if (e.key === "Home") seekTo(0);
     else if (e.key === "End" && d) seekTo(d);
   });
 }
 
 function bindSliders(){
-  function wire(id, vid, key, fmt){
+  function wire(id, vid, key, fmt, after){
     EL[id].addEventListener("input", function(){
       var v = parseFloat(EL[id].value);
       ST.cfg[key] = v;
       $(vid).textContent = fmt ? fmt(v) : String(v);
-      if (key === "beta"){ filtX.setBeta(v); filtY.setBeta(v); }
+      if (after) after(v);
     });
   }
   wire("p-dz", "v-dz", "deadzone", function(v){ return v.toFixed(2); });
   wire("p-max", "v-max", "maxRate", function(v){ return String(v); });
   wire("p-gamma", "v-gamma", "gamma", function(v){ return v.toFixed(1); });
   wire("p-flick", "v-flick", "flickGain", function(v){ return v.toFixed(1); });
-  wire("p-beta", "v-beta", "beta", function(v){ return v.toFixed(2); });
+  wire("p-beta", "v-beta", "beta", function(v){ return v.toFixed(2); },
+       function(v){ filtX.setBeta(v); filtY.setBeta(v); });
   wire("p-motion", "v-motion", "motionThreshold", function(v){ return String(v); });
+  wire("p-accel", "v-accel", "accel", function(v){ return String(v); });
+  wire("p-cfps", "v-cfps", "cacheFps", function(v){ return String(v); }, function(){ clearCache(); });
+  wire("p-crad", "v-crad", "cacheRadiusSec", function(v){ return String(v); });
+  wire("p-cw", "v-cw", "cacheWidth", function(v){ return String(v); }, function(){ clearCache(); });
+
   EL["p-detent"].addEventListener("click", function(){
     ST.cfg.detent = !ST.cfg.detent;
     EL["p-detent"].textContent = "デテント: " + (ST.cfg.detent ? "ON" : "OFF");
+    EL["p-detent"].classList.toggle("on", ST.cfg.detent);
   });
   EL["p-mirror"].addEventListener("click", function(){
     ST.cfg.mirror = !ST.cfg.mirror;
     EL["p-mirror"].textContent = "鏡像: " + (ST.cfg.mirror ? "ON" : "OFF");
   });
+  EL["p-blend"].addEventListener("click", function(){
+    ST.cfg.blend = !ST.cfg.blend;
+    EL["p-blend"].textContent = "中割りブレンド: " + (ST.cfg.blend ? "ON" : "OFF");
+    EL["p-blend"].classList.toggle("on", ST.cfg.blend);
+  });
+  EL["p-blur"].addEventListener("click", function(){
+    ST.cfg.blur = !ST.cfg.blur;
+    EL["p-blur"].textContent = "モーションブラー: " + (ST.cfg.blur ? "ON" : "OFF");
+    EL["p-blur"].classList.toggle("on", ST.cfg.blur);
+  });
   EL["p-reset"].addEventListener("click", function(){
-    var d = { deadzone: 0.07, maxRate: 16, gamma: 2.2, flickGain: 6, beta: 0.35, motionThreshold: 14 };
-    ST.cfg.deadzone = d.deadzone; ST.cfg.maxRate = d.maxRate; ST.cfg.gamma = d.gamma;
-    ST.cfg.flickGain = d.flickGain; ST.cfg.beta = d.beta; ST.cfg.motionThreshold = d.motionThreshold;
+    var d = { deadzone: 0.07, maxRate: 16, gamma: 2.2, flickGain: 6, beta: 0.35,
+              motionThreshold: 14, accel: 22, cacheFps: 15, cacheRadiusSec: 20, cacheWidth: 320 };
+    Object.keys(d).forEach(function(k){ ST.cfg[k] = d[k]; });
     EL["p-dz"].value = d.deadzone; $("v-dz").textContent = d.deadzone.toFixed(2);
     EL["p-max"].value = d.maxRate; $("v-max").textContent = String(d.maxRate);
     EL["p-gamma"].value = d.gamma; $("v-gamma").textContent = d.gamma.toFixed(1);
     EL["p-flick"].value = d.flickGain; $("v-flick").textContent = d.flickGain.toFixed(1);
     EL["p-beta"].value = d.beta; $("v-beta").textContent = d.beta.toFixed(2);
     EL["p-motion"].value = d.motionThreshold; $("v-motion").textContent = String(d.motionThreshold);
+    EL["p-accel"].value = d.accel; $("v-accel").textContent = String(d.accel);
+    EL["p-cfps"].value = d.cacheFps; $("v-cfps").textContent = String(d.cacheFps);
+    EL["p-crad"].value = d.cacheRadiusSec; $("v-crad").textContent = String(d.cacheRadiusSec);
+    EL["p-cw"].value = d.cacheWidth; $("v-cw").textContent = String(d.cacheWidth);
     filtX.setBeta(d.beta); filtY.setBeta(d.beta);
+    clearCache();
   });
 }
 
 function resizeCanvases(){
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  [EL.demo, EL.hud].forEach(function(c){
+  var r = EL.goggle.getBoundingClientRect();
+  [EL.stage, EL.hud].forEach(function(c){
     if (!c) return;
-    var r = EL.goggle.getBoundingClientRect();
     c.width = Math.max(320, Math.round(r.width * dpr));
     c.height = Math.max(180, Math.round(r.height * dpr));
   });
@@ -917,15 +1575,11 @@ function resizeCanvases(){
 }
 
 /* ---------- 時間軸アクセス ---------- */
-function currentTime(){
-  if (ST.source === "file" && EL.stage.readyState >= 1) return EL.stage.currentTime || 0;
-  return ST.time;
-}
+function currentTime(){ return ST.time; }
 function seekTo(t){
   var d = ST.duration || 0;
-  t = d > 0 ? clamp(t, 0, d) : Math.max(0, t);
-  ST.time = t;
-  if (ST.source === "file" && EL.stage.readyState >= 1) EL.stage.currentTime = t;
+  ST.time = d > 0 ? clamp(t, 0, d) : Math.max(0, t);
+  if (ST.source === "file") requestSeek(ST.time);
 }
 
 /* ---------- 入力: カメラからの手 ---------- */
@@ -949,7 +1603,7 @@ function readHandFromCamera(dt){
   return hand;
 }
 
-/* ---------- 入力: ポインタ / タッチ (カメラ無しでも同じ操作則) ---------- */
+/* ---------- 入力: ポインタ / タッチ ---------- */
 function readHandFromPointer(dt){
   if (!ST.pointer.active){ filtX.reset(); filtY.reset(); return null; }
   ST.handRaw = { x: ST.pointer.x, y: ST.pointer.y };
@@ -994,52 +1648,129 @@ function tick(ts){
     deadzone: ST.cfg.deadzone, maxRate: ST.cfg.maxRate, gamma: ST.cfg.gamma, span: ST.cfg.span,
     detent: ST.cfg.detent, flickGain: ST.cfg.flickGain, duration: ST.duration, loop: false
   };
-  var st = { time: currentTime(), rate: ST.rate, hold: ST.hold };
-  var nt = nextTransport(st, input, dt, cfg);
-  var rate = effectiveRate(nt, ST.playing);
-  ST.rate = nt.rate; ST.hold = nt.hold; ST.lastEvent = nt.event;
+  var nt = nextTransport({ time: currentTime(), rate: ST.rate, hold: ST.hold }, input, dt, cfg);
+  ST.rateTarget = effectiveRate(nt, ST.playing);
+  /* スルーレート制限で滑らかに加減速。ホールド / ロストは速やかに止める。 */
+  var acc = (nt.hold || nt.event === "lost") ? ST.cfg.accel * 4 : ST.cfg.accel;
+  ST.rate = slewRate(ST.rate, ST.rateTarget, dt, acc);
+  if (Math.abs(ST.rate) < 0.02) ST.rate = 0;
+  ST.hold = nt.hold; ST.lastEvent = nt.event;
 
-  applyTransport(nt, rate, dt);
+  applyTransport(nt, ST.rate, dt);
+  maintainScan(ts, ST.rate);
+  evictFrames(ts);
   captureThumb(ts);
-  drawHUD(input, nt, rate);
-  drawStrip(input, rate);
-  updateReadouts(nt, rate);
+  drawHUD(input, nt, ST.rate);
+  drawStrip(input, ST.rate);
+  updateReadouts(nt, ST.rate);
   if ($("pane-cal").classList.contains("on")) drawMask();
   if ($("pane-tele").classList.contains("on")) drawPlot();
 
   ST.tele.push({ t: ts, raw: ST.handRaw ? ST.handRaw.x : null,
-                 filt: hand ? hand.x : null, rate: rate, flick: input.swipe ? 1 : 0 });
+                 filt: hand ? hand.x : null, rate: ST.rate, target: ST.rateTarget,
+                 flick: input.swipe ? 1 : 0 });
   while (ST.tele.length > 600) ST.tele.shift();
 
-  procAcc += nowMs() - t0; procN++;
-  if (procN >= 30){ ST.procFps = procN / Math.max(1e-6, (ts - lastProcAt) / 1000); lastProcAt = ts; procN = 0; procAcc = 0; }
+  procN++;
+  if (procN >= 30){ ST.procFps = procN / Math.max(1e-6, (ts - lastProcAt) / 1000); lastProcAt = ts; procN = 0; }
+}
+
+/* ---------- 映像の描画 (なめらか再生パイプライン) ---------- */
+function drawVideoElement(ctx, W, H){
+  var v = EL.src;
+  if (!v || v.readyState < 2 || !v.videoWidth) return false;
+  var r = containRect(v.videoWidth, v.videoHeight, W, H);
+  ctx.drawImage(v, r.x, r.y, r.w, r.h);
+  return true;
+}
+function drawCached(f, ctx, W, H, alpha){
+  if (!f || !f.bmp) return false;
+  var r = containRect(f.w, f.h, W, H);
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.drawImage(f.bmp, r.x, r.y, r.w, r.h);
+  ctx.globalAlpha = 1;
+  return true;
+}
+/* キャッシュから時刻 t のコマを描く。前後コマがあれば中割りブレンドする。 */
+function drawFrameAt(t, ctx, W, H){
+  var fps = ST.cfg.cacheFps;
+  var pick = pickFrameSource(t, framesHas, fps, ladderHas, ladderFps());
+  if (pick === null){ ST.misses++; return false; }
+  ST.hits++;
+  var store = pick.tier === "fine" ? frames : ladder;
+  drawCached(store.get(pick.key), ctx, W, H, 1);
+  lastDrawnKey = pick.key;
+  ST.tier = pick.tier;
+  if (ST.cfg.blend && pick.tier === "fine"){
+    var ta = keyTime(pick.key, fps);
+    var b = (ta <= t) ? pick.key + 1 : pick.key - 1;
+    if (frames.has(b)){
+      var al = blendAlpha(t, ta, keyTime(b, fps));
+      if (al > 0.03) drawCached(frames.get(b), ctx, W, H, Math.min(al, 1));
+    }
+  }
+  return true;
 }
 
 function applyTransport(nt, rate, dt){
-  if (ST.source === "demo"){
-    ST.time = advanceTime(currentTime() + nt.jump, rate, dt, ST.duration, false);
-    drawDemo(EL.demo.getContext("2d"), ST.time, EL.demo.width, EL.demo.height);
-    return;
-  }
-  if (ST.source !== "file" || EL.stage.readyState < 1){
-    drawIdle(EL.demo.getContext("2d"), EL.demo.width, EL.demo.height);
-    return;
-  }
-  var v = EL.stage;
-  if (nt.jump) { v.currentTime = clamp(v.currentTime + nt.jump, 0, ST.duration); }
-  var drive = videoDriveMode(rate, { nativeMax: 4 });
-  if (drive.mode === "native"){
-    v.playbackRate = drive.playbackRate;
-    if (v.paused) { var pr = v.play(); if (pr && pr.catch) pr.catch(function(){}); }
-  } else if (drive.mode === "manual"){
-    if (!v.paused) v.pause();
-    v.currentTime = advanceTime(v.currentTime, rate, dt, ST.duration, false);
-  } else {
-    if (!v.paused) v.pause();
-  }
-  ST.time = v.currentTime;
-}
+  var ctx = stageCtx, W = EL.stage.width, H = EL.stage.height;
+  /* モーションブラー: 直前の描画を薄く残してコマ飛びを目で繋ぐ */
+  var blur = ST.cfg.blur ? blurAlpha(rate) : 0;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "rgba(0,0,0," + (1 - blur).toFixed(3) + ")";
+  ctx.fillRect(0, 0, W, H);
 
+  if (ST.source === "demo"){
+    ST.engine = "DEMO";
+    ST.time = advanceTime(currentTime() + nt.jump, rate, dt, ST.duration, false);
+    drawDemo(ctx, ST.time, W, H);
+    return;
+  }
+  var v = EL.src;
+  if (ST.source !== "file" || !v || v.readyState < 1){
+    ST.engine = "—";
+    drawIdle(ctx, W, H);
+    return;
+  }
+
+  if (nt.jump){
+    ST.time = clamp(ST.time + nt.jump, 0, ST.duration || ST.time);
+    requestSeek(ST.time);
+  }
+
+  var plan = playbackPlan(rate, { nativeMax: 4 });
+  if (plan.mode === "native"){
+    /* 等速〜×4: デコーダ本来の連続再生が最も滑らか。音声もここで鳴る。 */
+    if (prevMode !== "native"){ requestSeek(ST.time); }
+    ST.engine = "NATIVE ×" + plan.playbackRate.toFixed(2);
+    try { v.playbackRate = clamp(plan.playbackRate, 0.0625, 16); } catch (e) {}
+    v.muted = ST.muted;
+    if (v.paused){ var pr = v.play(); if (pr && pr.catch) pr.catch(function(){}); }
+    ST.time = v.currentTime;
+    if (!drawVideoElement(ctx, W, H)) drawFrameAt(ST.time, ctx, W, H);
+    captureFrame(v.currentTime);
+    prevMode = "native";
+    return;
+  }
+
+  /* hold / cache: 仮想再生ヘッドを自前で進め、キャッシュから描画する
+     (デコーダのシーク待ちを再生に持ち込まない = 途切れない) */
+  var scanning = serviceScan(rate, nowMs());
+  if (!scanning){
+    if (!v.paused) v.pause();
+    v.muted = true;
+  }
+  ST.time = advanceTime(ST.time, rate, dt, ST.duration, false);
+  ST.engine = scanning && !rate
+    ? "SCAN ⚡ " + Math.round(scanProgress() * 100) + "% " + (ST.scanTier === "ladder" ? "粗" : "細")
+    : (plan.mode === "hold" ? "HOLD" : (rate < 0 ? "CACHE ◀ ×" : "CACHE ▶ ×") + Math.abs(rate).toFixed(1));
+  if (!drawFrameAt(ST.time, ctx, W, H)){
+    /* キャッシュが無い区間では、とりあえず復号済みの現フレームを出して間を繋ぐ */
+    drawVideoElement(ctx, W, H);
+  }
+  if (!scanning) serviceSeeks(ST.time, rate);
+  prevMode = plan.mode;
+}
 /* ---------- デモ映像の描画 (時刻の純関数) ---------- */
 function drawDemo(ctx, t, W, H){
   var s = demoSceneState(t, ST.duration || ST.demoDuration);
@@ -1079,17 +1810,21 @@ function drawDemo(ctx, t, W, H){
   ctx.fillText(formatTimecode(t, ST.fps), W * 0.035, H * 0.062);
 }
 
+
 function drawIdle(ctx, W, H){
   ctx.fillStyle = "#04060b"; ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = "rgba(73,224,232,.25)"; ctx.lineWidth = Math.max(1, W / 900);
+  ctx.strokeStyle = "rgba(73,224,232,.22)"; ctx.lineWidth = Math.max(1, W / 900);
   for (var i = 1; i < 4; i++){
     ctx.beginPath(); ctx.moveTo(W * i / 4, 0); ctx.lineTo(W * i / 4, H); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, H * i / 4); ctx.lineTo(W, H * i / 4); ctx.stroke();
   }
-  ctx.fillStyle = "rgba(216,230,244,.75)";
-  ctx.font = Math.round(H * 0.05) + "px 'Hiragino Sans','Noto Sans JP',sans-serif";
+  ctx.fillStyle = "rgba(216,230,244,.8)";
+  ctx.font = Math.round(H * 0.052) + "px 'Hiragino Sans','Noto Sans JP',sans-serif";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText("NO SIGNAL — 実写映像を開くか、デモ映像を選択", W / 2, H / 2);
+  ctx.fillText("NO SIGNAL", W / 2, H * 0.44);
+  ctx.fillStyle = "rgba(73,224,232,.85)";
+  ctx.font = Math.round(H * 0.040) + "px 'Hiragino Sans','Noto Sans JP',sans-serif";
+  ctx.fillText("動画ファイルをここにドロップ / 🎬 動画を開く / 🌆 デモ映像", W / 2, H * 0.56);
   ctx.textAlign = "left";
 }
 
@@ -1199,6 +1934,8 @@ function drawHUD(input, nt, rate){
 }
 
 /* ---------- フィルムストリップ (手でかき分けられるコマ) ---------- */
+
+/* ---------- フィルムストリップ (手でかき分けられるコマ) ---------- */
 function captureThumb(ts){
   if (!(ST.duration > 0)) return;
   if (ts - lastThumbAt < 90) return;
@@ -1208,8 +1945,14 @@ function captureThumb(ts){
   var cv = document.createElement("canvas");
   cv.width = thumbW; cv.height = thumbH;
   var cx = cv.getContext("2d");
-  if (ST.source === "file" && EL.stage.readyState >= 2){
-    try { cx.drawImage(EL.stage, 0, 0, thumbW, thumbH); } catch (e) { return; }
+  if (ST.source === "file"){
+    var k = frameKey(currentTime(), ST.cfg.cacheFps);
+    var nk = nearestCachedKey(framesHas, k, ST.cfg.cacheFps);
+    try {
+      if (nk !== null) cx.drawImage(frames.get(nk).bmp, 0, 0, thumbW, thumbH);
+      else if (EL.src.readyState >= 2) cx.drawImage(EL.src, 0, 0, thumbW, thumbH);
+      else return;
+    } catch (e) { return; }
   } else if (ST.source === "demo"){
     drawDemo(cx, filmstripTimes(ST.duration, STRIP_CELLS)[idx], thumbW, thumbH);
   } else return;
@@ -1228,27 +1971,46 @@ function buildDemoThumbs(){
 function drawStrip(input, rate){
   var c = EL.strip, ctx = c.getContext("2d"), W = c.width, H = c.height;
   ctx.fillStyle = "#0a0f1a"; ctx.fillRect(0, 0, W, H);
-  var pad = H * 0.16, cw = W / STRIP_CELLS, ch = H - pad * 2;
+  var covH = Math.max(4, H * 0.07);
+  var pad = H * 0.15, cw = W / STRIP_CELLS, ch = H - pad * 2 - covH;
   var handX = input.present ? input.x : -1;
   var strength = input.present ? (input.pose === "grab" ? 0.2 : 1) * cw * 1.25 : 0;
   var cur = ST.duration > 0 ? stripCellIndex(currentTime(), ST.duration, STRIP_CELLS) : -1;
 
+  var cellTimes = filmstripTimes(ST.duration, STRIP_CELLS);
+  var lfps = (ST.source === "file" && ST.duration > 0) ? ladderFps() : 0;
   for (var i = 0; i < STRIP_CELLS; i++){
     var cellX = (i + 0.5) / STRIP_CELLS;
     var off = handX >= 0 ? partOffset(cellX, handX, strength, 0.16) : 0;
-    var x = i * cw + off + 1;
-    var w = cw - 2;
+    var x = i * cw + off + 1, w = cw - 2;
+    /* 先読みで貯めた「スクラブ・ラダー」からコマを借りて、
+       一度も通っていない位置でもフィルムが絵で埋まるようにする */
+    var lk = (lfps && !thumbs[i] && cellTimes[i] != null)
+      ? nearestCachedKey(ladderHas, frameKey(cellTimes[i], lfps), 4) : null;
     if (thumbs[i]) ctx.drawImage(thumbs[i], x, pad, w, ch);
+    else if (lk !== null && ladder.get(lk)) ctx.drawImage(ladder.get(lk).bmp, x, pad, w, ch);
     else { ctx.fillStyle = "#0e1626"; ctx.fillRect(x, pad, w, ch); }
     ctx.strokeStyle = (i === cur) ? "#49e0e8" : "rgba(27,42,68,.9)";
     ctx.lineWidth = (i === cur) ? 2 : 1;
     ctx.strokeRect(x, pad, w, ch);
   }
   /* パーフォレーション (フィルムの送り穴) */
-  ctx.fillStyle = "rgba(216,230,244,.28)";
+  ctx.fillStyle = "rgba(216,230,244,.26)";
   for (var px = 0; px < W; px += Math.max(8, cw / 3)){
-    ctx.fillRect(px, pad * 0.28, Math.max(3, cw / 8), pad * 0.42);
-    ctx.fillRect(px, H - pad * 0.7, Math.max(3, cw / 8), pad * 0.42);
+    ctx.fillRect(px, pad * 0.26, Math.max(3, cw / 8), pad * 0.4);
+  }
+  /* キャッシュ被覆バー — どの区間が「なめらかに」巻き戻せるか */
+  if (ST.source === "file" && ST.duration > 0){
+    var cells = STRIP_CELLS * 4, keys = [];
+    frames.forEach(function(v, k){ keys.push(k); });
+    var cov = coverageSpans(keys, ST.cfg.cacheFps, ST.duration, cells);
+    var bw = W / cells, by = H - covH - 2;
+    ctx.fillStyle = "rgba(27,42,68,.9)"; ctx.fillRect(0, by, W, covH);
+    for (var m = 0; m < cov.length; m++){
+      if (cov[m] <= 0) continue;
+      ctx.fillStyle = "rgba(85,208,138," + (0.3 + 0.7 * cov[m]).toFixed(3) + ")";
+      ctx.fillRect(m * bw, by, Math.max(1, bw), covH);
+    }
   }
   /* 再生ヘッド */
   if (ST.duration > 0){
@@ -1268,47 +2030,33 @@ function updateReadouts(nt, rate){
     EL["ro-hand"].textContent = "x " + ST.hand.x.toFixed(2) + " / y " + ST.hand.y.toFixed(2);
     EL["ro-hand"].className = "val";
   } else {
-    EL["ro-hand"].textContent = ST.mode === "hand" && !ST.camOn ? "— カメラ停止中" : "— 未検出";
+    EL["ro-hand"].textContent = (ST.mode === "hand" && !ST.camOn) ? "— カメラ停止中" : "— 未検出";
     EL["ro-hand"].className = "val dim";
   }
   var ev = { flick: "FLICK", hold: "HOLD", shuttle: "SHUTTLE", neutral: "NEUTRAL", lost: "LOST", idle: "IDLE" };
   EL["ro-ges"].textContent = ev[nt.event] || nt.event;
+  EL["ro-eng"].textContent = ST.engine + (ST.tainted ? " (CORS)" : "");
+  EL["ro-eng"].className = "val " + (/NATIVE/.test(ST.engine) ? "green" : (/CACHE/.test(ST.engine) ? "" : "dim"));
+  var n = frames ? frames.size : 0;
+  EL["ro-cache"].textContent = n + "+" + (ladder ? ladder.size : 0) + " 枚" +
+    (ST.scanning ? " ⚡" : "") + (ST.tier === "ladder" ? " (粗)" : "");
+  EL["ro-cache"].className = "val " + (n > 0 ? "" : "dim");
 
   EL["cal-area"].textContent = ST.hand ? String(ST.hand.area) : "—";
   EL["cal-pos"].textContent = ST.hand ? (ST.hand.x.toFixed(3) + " / " + ST.hand.y.toFixed(3)) : "—";
   EL["cal-fill"].textContent = ST.hand ? (ST.hand.fill.toFixed(3) + "  (" + ST.pose + ")") : "—";
   EL["cal-motion"].textContent = ST.camOn ? ST.motion.toFixed(1) : "—";
   EL["cal-fps"].textContent = ST.procFps ? ST.procFps.toFixed(0) + " fps" : "—";
+  EL["cal-cache"].textContent = n + " 枚 / " + ST.engine;
 
   var sw = detectSwipe(ST.samples, {});
   EL["t-peak"].textContent = sw ? sw.speed.toFixed(2) : "0.00";
   EL["t-travel"].textContent = sw ? sw.travel.toFixed(2) : "0.00";
   EL["t-flicks"].textContent = String(ST.flicks);
   EL["t-lost"].textContent = String(ST.lost);
-}
-
-/* ---------- 較正タブ: 認識マスク ---------- */
-function drawMask(){
-  var c = EL.mask, ctx = c.getContext("2d");
-  var w = ST.maskDims[0], h = ST.maskDims[1];
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, c.width, c.height);
-  if (!ST.lastMask || !w) {
-    ctx.fillStyle = "rgba(127,147,173,.9)"; ctx.font = "11px Consolas, monospace";
-    ctx.fillText("camera off", 8, 18);
-    return;
-  }
-  var img = ctx.createImageData(w, h);
-  for (var i = 0, p = 0; i < w * h; i++, p += 4){
-    var v = ST.lastMask[i] ? 255 : 12;
-    img.data[p] = v; img.data[p + 1] = v; img.data[p + 2] = ST.lastMask[i] ? 255 : 26; img.data[p + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  if (ST.hand){
-    var mx = (ST.cfg.mirror ? (1 - ST.hand.x) : ST.hand.x) * c.width, my = ST.hand.y * c.height;
-    ctx.strokeStyle = "#e0a23c"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(mx - 8, my); ctx.lineTo(mx + 8, my);
-    ctx.moveTo(mx, my - 8); ctx.lineTo(mx, my + 8); ctx.stroke();
-  }
+  var tot = ST.hits + ST.misses;
+  EL["t-hit"].textContent = tot ? Math.round(ST.hits / tot * 100) + "%" : "—";
+  EL["t-seeks"].textContent = String(ST.seeks);
 }
 
 /* ---------- テレメトリ ---------- */
@@ -1321,28 +2069,21 @@ function drawPlot(){
   ctx.beginPath(); ctx.moveTo(0, top + (H - top) / 2); ctx.lineTo(W, top + (H - top) / 2); ctx.stroke();
   var n = ST.tele.length; if (n < 2) return;
   function px(i){ return i / (n - 1) * W; }
-  ctx.strokeStyle = "#49e0e8"; ctx.beginPath();
-  for (var i = 0; i < n; i++){
-    var v = ST.tele[i].raw; if (v == null) continue;
-    var y = v * top;
-    if (i === 0) ctx.moveTo(px(i), y); else ctx.lineTo(px(i), y);
+  function line(get, color, width){
+    ctx.strokeStyle = color; ctx.lineWidth = width || 1; ctx.beginPath();
+    var started = false;
+    for (var i = 0; i < n; i++){
+      var y = get(ST.tele[i]);
+      if (y == null) continue;
+      if (!started){ ctx.moveTo(px(i), y); started = true; } else ctx.lineTo(px(i), y);
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.beginPath();
-  for (var j = 0; j < n; j++){
-    var f = ST.tele[j].filt; if (f == null) continue;
-    var y2 = f * top;
-    if (j === 0) ctx.moveTo(px(j), y2); else ctx.lineTo(px(j), y2);
-  }
-  ctx.stroke();
-  var maxR = Math.max(1, ST.cfg.maxRate), mid = top + (H - top) / 2;
-  ctx.strokeStyle = "#55d08a"; ctx.beginPath();
-  for (var k = 0; k < n; k++){
-    var r = ST.tele[k].rate || 0;
-    var y3 = mid - clamp(r / maxR, -1, 1) * (H - top) / 2 * 0.92;
-    if (k === 0) ctx.moveTo(px(k), y3); else ctx.lineTo(px(k), y3);
-  }
-  ctx.stroke();
+  line(function(s){ return s.raw == null ? null : s.raw * top; }, "#49e0e8", 1);
+  line(function(s){ return s.filt == null ? null : s.filt * top; }, "rgba(255,255,255,.85)", 1);
+  var maxR = Math.max(1, ST.cfg.maxRate), mid = top + (H - top) / 2, half = (H - top) / 2 * 0.92;
+  line(function(s){ return mid - clamp((s.target || 0) / maxR, -1, 1) * half; }, "rgba(85,208,138,.45)", 1);
+  line(function(s){ return mid - clamp((s.rate || 0) / maxR, -1, 1) * half; }, "#55d08a", 2);
   ctx.strokeStyle = "rgba(224,90,180,.8)";
   for (var q = 0; q < n; q++){
     if (!ST.tele[q].flick) continue;
@@ -1350,7 +2091,7 @@ function drawPlot(){
   }
   ctx.fillStyle = "rgba(127,147,173,.9)"; ctx.font = "12px Consolas, monospace";
   ctx.fillText("hand x (raw / filtered)", 8, 16);
-  ctx.fillText("shuttle rate  ±" + maxR + "×", 8, top + 16);
+  ctx.fillText("shuttle rate  ±" + maxR + "×  (細線 = 目標 / 太線 = スルーレート制限後)", 8, top + 16);
 }
 
 document.addEventListener("DOMContentLoaded", init);
