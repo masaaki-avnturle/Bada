@@ -76,6 +76,23 @@ latent からは決定的に次を復号します:
 ⑧ 設定に Anthropic の API キーを入れると、全体把握の結果 (未解釈の節を含む) を Claude (既定 Opus 5.5) に渡して、
 部品の組み合わせを超えた自由な形のアプリを生成させます。結果は同じ検証にかけ、不合格なら内蔵エンジンの結果を使います。キーは端末内にのみ保存されます。
 
+## 💻 ソースコード化 (⑥)
+
+錬成のあと、全体把握した仕様を**人が読めて実行できるソースコード**に変換します。
+記録・管理 (records) は、項目ごとの入力・一覧・検索・並べ替え・CSV 書き出しを持つ
+**実際に動く CLI アプリ**として生成されます:
+
+| 言語 | 実行 |
+|:--|:--|
+| **Python** | `python3 app.py` |
+| **Node.js** | `node app.js` |
+| **Bada 言語** | `BadaInterp` / 量子ラボ |
+
+その他のモジュールは、仕様をデータとして埋め込んだ**構文的に正しい雛形**として生成します
+(完成した動作は HTML アプリ版が担います)。言語を選んで画面で確認し、1 ファイルずつ、または
+**全言語まとめて ZIP** で保存できます。生成される Python / Node は構文検査と実行 (追加→一覧→CSV)
+まで単体テストで確かめています。
+
 ## 📄 論文
 
 [`paper/BadaGPT_Telegraph_paper.pdf`](paper/BadaGPT_Telegraph_paper.pdf) ([Markdown](paper/BadaGPT_Telegraph_paper.md)) —
@@ -98,6 +115,7 @@ bada_gpt_telegraph/
 │   ├── engine.js           ← ZIP / PDF / Markdown・Bada インタプリタ・Ξ・Jones・モールス・FSK
 │   ├── comprehend.js       ← 全体把握
 │   ├── silent.js           ← サイレント・トーク (非言語 → トランスフォーマー → latent → 文章・画像・Bada)
+│   ├── codegen.js          ← ソースコード化 (仕様 → Python / Node / Bada の動くソース)
 │   ├── generate.js         ← 14 部品・HTML 組み立て・検証
 │   ├── paper.js            ← 論文・ビルド一式・Claude (任意)
 │   ├── ui.js / shell.html  ← 画面

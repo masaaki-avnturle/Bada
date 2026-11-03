@@ -95,9 +95,10 @@ GPT::paper                   # 論文
 | `src/comprehend.js` | 320 | 全体把握 (節分割・対応付け・網羅率) |
 | `src/silent.js` | 471 | サイレント・トーク (ジェスチャー / 非言語アトム・トランスフォーマー・latent → 文章 / 画像 / Bada) |
 | `src/generate.js` | 779 | 14 種の実行時部品、HTML 組み立て、検証 |
+| `src/codegen.js` | 281 | ソースコード化 (仕様 → Python / Node / Bada の動くソース) |
 | `src/paper.js` | 435 | 論文の自動執筆、ビルド一式、Claude (任意) |
 | `src/ui.js` | 545 | 画面 |
-| `tools/engine-test.js` | 286 | 単体テスト 132 件 |
+| `tools/engine-test.js` | 328 | 単体テスト 143 件 |
 | `tools/evaluate.js` | 114 | 第 7 章の評価の再現 |
 
 `tools/build.js` がこれらを 1 枚の `index.html` に埋め込み、同じファイルを Cordova (Android) と Electron (Windows / Linux) に同梱する。
@@ -192,11 +193,21 @@ latent からは四つを決定的に復号する: (a) **本と同じ分量ま�
 
 ---
 
+## 6.6 拡張：ソースコード化
+
+文章化された思いを、HTML アプリだけでなく**人が読めて実行できるソースコード**に変換する拡張を加えた。全体把握した仕様 (モジュール・対象・項目と型・機能) を、生成器がソースコードに写す。
+
+記録・管理 (records) を主とする仕様は、**実際に動く CLI アプリ**として生成する。Python (`python3 app.py`) と Node.js (`node app.js`) のいずれも、項目ごとの入力・一覧・検索・並べ替え・CSV / JSON 書き出しを持ち、データを端末内のファイルに保存する (依存ライブラリなし)。それ以外のモジュール (タイマー・お絵かき等) は言語とデバイスに依存するため、仕様をデータとして埋め込んだ**構文的に正しい雛形**として生成し、拡張点を TODO で示す。完成した動作は HTML アプリ版が担う。Bada はいずれの場合も Bada 言語のプログラム (`BadaInterp` で実行可能) を生成する。全言語をまとめて ZIP で保存できる。
+
+生成されるコードは生成器の中でテンプレートとして組み立てられ、利用者の項目名などは文字列として安全に埋め込む。単体テスト (第 7.1 節) で、生成した Python を `py_compile`、Node を `node --check` にかけて構文を確かめ、さらに records の Python / Node を実際に実行して「追加 → 一覧 → CSV 書き出し」が動き、JSON と CSV がファイルに書かれることを確認した。
+
+---
+
 ## 7. 評価
 
 ### 7.1 単体テスト
 
-`tools/engine-test.js` の 132 件 (サイレント・トークのトランスフォーマー、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
+`tools/engine-test.js` の 143 件 (サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
 
 ### 7.2 開発用の依頼集合 (24 件)
 
@@ -287,7 +298,7 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 132 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 143 件
 node bada_gpt_telegraph/tools/evaluate.js           # 7.2 開発用の依頼集合
 node bada_gpt_telegraph/tools/evaluate.js --heldout # 7.3 未見の依頼集合
 ```

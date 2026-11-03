@@ -21,7 +21,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const ctx = { console, TextEncoder, TextDecoder, atob, btoa, Uint8Array, Float32Array, Map };
 vm.createContext(ctx);
-for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/generate.js", "src/paper.js"]) {
+for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/generate.js", "src/codegen.js", "src/paper.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), ctx, { filename: f });
 }
 const E = (expr) => vm.runInContext(expr, ctx);
@@ -206,6 +206,48 @@ section("生成と検証");
   ok(!bad.ok && bad.checks.filter(c => !c.ok).length === 2, "検証が構文エラーと外部読み込みを検出");
   ok(call("extractScripts", "<script>a()</script><script type=\"application/x-bada\">set x = 1</script><script src=\"x.js\"></script>").length === 1, "JS 以外・src 付きの script は対象外");
   ok(call("fileBase", "本の管理/アプリ: v1?") === "本の管理アプリ_v1" && call("fileBase", "") === "badagpt-app", "ファイル名の整形");
+}
+
+/* 3.5 ソースコード化 */
+section("ソースコード化 (思い → ソースコード)");
+{
+  const cp = require("child_process");
+  const os = require("os");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bgt-cg-"));
+  const recSpec = call("comprehend", "本を管理したい。タイトル、著者、評価。並べ替えと検索、CSV書き出し。");
+  const otherSpec = call("comprehend", "ポモドーロタイマーと単語帳クイズのアプリ。音で知らせて。");
+  ok(call("isRecords", recSpec) && !call("isRecords", otherSpec), "records 判定");
+  for (const spec of [recSpec, otherSpec]) {
+    const tag = spec === recSpec ? "records" : "scaffold";
+    const py = call("generateSource", spec, "python");
+    const pf = path.join(tmp, tag + ".py"); fs.writeFileSync(pf, py.files[0].data);
+    let pyOk = true, pyErr = ""; try { cp.execFileSync("python3", ["-c", "import py_compile,sys; py_compile.compile(" + JSON.stringify(pf) + ", doraise=True)"], { stdio: "pipe" }); } catch (e) { pyOk = false; pyErr = String(e.stderr || e).slice(0, 120); }
+    ok(pyOk, "Python が構文的に正しい (" + tag + ") " + pyErr);
+    const nd = call("generateSource", spec, "node");
+    const nf = path.join(tmp, tag + ".js"); fs.writeFileSync(nf, nd.files[0].data);
+    let ndOk = true, ndErr = ""; try { cp.execFileSync("node", ["--check", nf], { stdio: "pipe" }); } catch (e) { ndOk = false; ndErr = String(e.stderr || e).slice(0, 120); }
+    ok(ndOk, "Node が構文的に正しい (" + tag + ") " + ndErr);
+    const bd = call("generateSource", spec, "bada");
+    let bOk = true; try { new (E("BadaInterp"))(() => {}).run(bd.files[0].data); } catch (e) { bOk = false; }
+    ok(bOk, "Bada が実行できる (" + tag + ")");
+  }
+  /* records の Python / Node が実際に動く (追加→一覧→CSV→終了) */
+  const pf = path.join(tmp, "run.py"); fs.writeFileSync(pf, call("generateSource", recSpec, "python").files[0].data);
+  const rdir = fs.mkdtempSync(path.join(os.tmpdir(), "bgt-run-"));
+  let pyRun = "";
+  try { pyRun = cp.execFileSync("python3", [pf], { input: "a\n量子\nディラック\n5\nl\ne\nq\n", cwd: rdir, stdio: "pipe", timeout: 10000 }).toString(); } catch (e) { pyRun = String(e.stdout || "") + String(e.stderr || ""); }
+  ok(/量子/.test(pyRun) && /ディラック/.test(pyRun) && fs.readdirSync(rdir).some((f) => /\.csv$/.test(f)), "生成した Python CLI が実際に動く (追加・一覧・CSV)");
+  const nf = path.join(tmp, "run.js"); fs.writeFileSync(nf, call("generateSource", recSpec, "node").files[0].data);
+  const ndir = fs.mkdtempSync(path.join(os.tmpdir(), "bgt-runn-"));
+  let ndRun = "";
+  try { ndRun = cp.execFileSync("node", [nf], { input: "a\nNode本\n佐藤\n3\nl\ne\nq\n", cwd: ndir, stdio: "pipe", timeout: 10000 }).toString(); } catch (e) { ndRun = String(e.stdout || "") + String(e.stderr || ""); }
+  ok(/Node本/.test(ndRun) && fs.readdirSync(ndir).some((f) => /\.csv$/.test(f)), "生成した Node CLI が実際に動く (追加・一覧・CSV)");
+  /* 全言語 ZIP */
+  const proj = call("sourceProject", recSpec);
+  ok(proj.some((f) => f.path === "python/app.py") && proj.some((f) => f.path === "node/app.js") && proj.some((f) => f.path === "bada/app.bada") && proj.some((f) => f.path === "README.txt"), "sourceProject が全言語 + README");
+  const z = call("zipBuild", proj);
+  ok(z[0] === 0x50 && z[1] === 0x4B, "ソース ZIP の署名");
+  try { fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(rdir, { recursive: true, force: true }); fs.rmSync(ndir, { recursive: true, force: true }); } catch (e) { /* 後始末 */ }
 }
 
 /* 4. 論文 */

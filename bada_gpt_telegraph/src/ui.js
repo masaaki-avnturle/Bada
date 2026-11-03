@@ -285,6 +285,7 @@
         }
         state[cmd] = "done"; renderSteps(state);
       }
+      renderCode();
       blog("✓ 錬成完了: " + cur.spec.title);
       var hist = LS.get("history", []);
       hist.unshift({ t: Date.now(), title: cur.spec.title, input: text, coverage: cur.spec.coverage });
@@ -333,6 +334,27 @@
     if (!cur || !cur.paper) return;
     if (!cur.pdf) cur.pdf = pdfFromJpegs(renderPages(cur.paper), cur.gen.slug);
     report(saveBytes(cur.gen.file + "-paper.pdf", cur.pdf, "application/pdf"));
+  };
+
+  /* ═══ ⑥ ソースコード化 ═══ */
+  $("codeLang").innerHTML = CODE_LANGS.map(function (l) { return '<option value="' + l.id + '">' + l.label + "</option>"; }).join("");
+  var codeGen = null;
+  function renderCode() {
+    if (!cur || !cur.spec) return;
+    $("codeCard").classList.remove("hidden");
+    codeGen = generateSource(cur.spec, $("codeLang").value);
+    $("codeView").textContent = codeGen.files[0].data;
+    $("codeNote").textContent = codeGen.note;
+  }
+  $("codeLang").onchange = renderCode;
+  $("dlCode").onclick = function () {
+    if (!cur || !cur.spec) return;
+    if (!codeGen) renderCode();
+    report(saveBytes(cur.gen.file + "." + codeGen.ext, utf8(codeGen.files[0].data), "text/plain"));
+  };
+  $("dlCodeZip").onclick = function () {
+    if (!cur || !cur.spec) return;
+    report(saveBytes(cur.gen.file + "-source.zip", zipBuild(sourceProject(cur.spec)), "application/zip"));
   };
 
   /* 論文を A4 画像ページに描く (日本語は端末のフォントで描画) */
