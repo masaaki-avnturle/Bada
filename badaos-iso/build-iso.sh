@@ -48,8 +48,14 @@ apt-get install -y --no-install-recommends \
 rm -rf "$WORK"; mkdir -p "$CHROOT" "$IMAGE" "$OUT"
 
 # ---- 1. 最小 Ubuntu を debootstrap ------------------------------------------
-debootstrap --arch="$ARCH" --variant=minbase \
-  --include=ca-certificates,gnupg "$SUITE" "$CHROOT" "$MIRROR"
+#   ミラーの一時的なダウンロード失敗に備えて最大 4 回やり直す
+for try in 1 2 3 4; do
+  debootstrap --arch="$ARCH" --variant=minbase \
+    --include=ca-certificates,gnupg "$SUITE" "$CHROOT" "$MIRROR" && break
+  [ "$try" = 4 ] && { echo "FATAL: debootstrap に失敗"; exit 1; }
+  echo "debootstrap 失敗 (試行 $try) — やり直します"; sleep $(( try * 10 ))
+  rm -rf "$CHROOT"; mkdir -p "$CHROOT"
+done
 
 # chroot 用マウント (proc/sys/devpts が無いと initramfs 更新等が失敗する)
 mount --bind /dev       "$CHROOT/dev"
