@@ -214,9 +214,15 @@ search --no-floppy --set=root --file /casper/vmlinuz
 set prefix=($root)/boot/grub
 configfile ($root)/boot/grub/grub.cfg
 EOF
-grub-mkimage -O x86_64-efi -o "$IMAGE/efi/boot/bootx64.efi" -p /boot/grub -c "$WORK/efi-early.cfg" \
-  part_gpt part_msdos fat exfat ntfs iso9660 search search_fs_file normal configfile \
-  linux echo test ls all_video efi_gop efi_uga gfxterm font gzio
+# ホストの GRUB の版によって無いモジュールがある (例: 新しい版には efi_uga が無い) ので、存在するものだけ入れる
+EFI_MODS=""
+for m in part_gpt part_msdos fat exfat ntfs iso9660 search search_fs_file normal configfile \
+         linux echo test ls all_video efi_gop efi_uga gfxterm font gzio; do
+  [ -f "/usr/lib/grub/x86_64-efi/$m.mod" ] && EFI_MODS="$EFI_MODS $m"
+done
+echo "UEFI loader modules:$EFI_MODS"
+# shellcheck disable=SC2086
+grub-mkimage -O x86_64-efi -o "$IMAGE/efi/boot/bootx64.efi" -p /boot/grub -c "$WORK/efi-early.cfg" $EFI_MODS
 # grub.cfg の insmod 用に UEFI モジュールもツリーに置く (grub-mkrescue も入れるが念のため)
 mkdir -p "$IMAGE/boot/grub/x86_64-efi"
 cp /usr/lib/grub/x86_64-efi/*.mod /usr/lib/grub/x86_64-efi/*.lst "$IMAGE/boot/grub/x86_64-efi/" 2>/dev/null || true
