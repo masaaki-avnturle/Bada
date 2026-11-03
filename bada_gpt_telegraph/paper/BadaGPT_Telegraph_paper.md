@@ -95,10 +95,11 @@ GPT::paper                   # 論文
 | `src/comprehend.js` | 320 | 全体把握 (節分割・対応付け・網羅率) |
 | `src/silent.js` | 471 | サイレント・トーク (ジェスチャー / 非言語アトム・トランスフォーマー・latent → 文章 / 画像 / Bada) |
 | `src/generate.js` | 779 | 14 種の実行時部品、HTML 組み立て、検証 |
+| `src/bio.js` | 124 | 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ) |
 | `src/codegen.js` | 281 | ソースコード化 (仕様 → Python / Node / Bada の動くソース) |
 | `src/paper.js` | 435 | 論文の自動執筆、ビルド一式、Claude (任意) |
-| `src/ui.js` | 545 | 画面 |
-| `tools/engine-test.js` | 328 | 単体テスト 143 件 |
+| `src/ui.js` | 640 | 画面 |
+| `tools/engine-test.js` | 352 | 単体テスト 156 件 |
 | `tools/evaluate.js` | 114 | 第 7 章の評価の再現 |
 
 `tools/build.js` がこれらを 1 枚の `index.html` に埋め込み、同じファイルを Cordova (Android) と Electron (Windows / Linux) に同梱する。
@@ -203,11 +204,19 @@ latent からは四つを決定的に復号する: (a) **本と同じ分量ま�
 
 ---
 
+## 6.7 拡張：体のサイン (自己バイオフィードバック) と、行わないこと
+
+利用者が**自分の**指先をカメラに当てて得る脈波 (PPG) から心拍数と心拍変動 (RMSSD) を、マイクの音量包絡から呼吸数を推定し、落ち着き指数にまとめる (BadaGPT改の信号処理を移植。合成信号で心拍 55 / 72 / 110 bpm を誤差 2 bpm 以内、呼吸 6 / 12 / 20 回/分を 0.5 以内で推定することを単体テストで確認)。結果はサイレント・トークの latent に**気分のヒント (静か / 軽やか / 勢い の tone アトム) としてだけ**加わる。体の信号がアプリのモジュール・対象・項目を決めることはなく、依頼文のモジュールと対象が変わらないことを単体テストの不変条件とした。
+
+**行わないこと (明記).** 本システムは、赤外線カメラや温度計で他人の体内情報や思考を読み取る機能を持たず、またそれを主張しない。皮膚温や赤外線画像から思考の内容や言語を推定することは科学的にできない。ガンマ関数の大域的部分積分多様体と Jones 多項式は本システムでは思考実験の可視化であり、センサーではない。体のサインは本人が自分を測る自己計測 (同意が前提) に限る。
+
+---
+
 ## 7. 評価
 
 ### 7.1 単体テスト
 
-`tools/engine-test.js` の 143 件 (サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
+`tools/engine-test.js` の 156 件 (体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
 
 ### 7.2 開発用の依頼集合 (24 件)
 
@@ -298,7 +307,7 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 143 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 156 件
 node bada_gpt_telegraph/tools/evaluate.js           # 7.2 開発用の依頼集合
 node bada_gpt_telegraph/tools/evaluate.js --heldout # 7.3 未見の依頼集合
 ```

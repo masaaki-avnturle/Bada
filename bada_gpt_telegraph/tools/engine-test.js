@@ -21,7 +21,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const ctx = { console, TextEncoder, TextDecoder, atob, btoa, Uint8Array, Float32Array, Map };
 vm.createContext(ctx);
-for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/generate.js", "src/codegen.js", "src/paper.js"]) {
+for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/bio.js", "src/generate.js", "src/codegen.js", "src/paper.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), ctx, { filename: f });
 }
 const E = (expr) => vm.runInContext(expr, ctx);
@@ -91,6 +91,30 @@ section("サイレント・トーク (非言語 → トランスフォーマー 
   ok(pgA.document.target > pgA.document.target * 0 && call("gestureProcess", gestA, {}).document.chars > 100, "分量未指定でも広がりから文章量が決まる");
   const paperG = call("writePaper", sgA, call("generateApp", sgA), call("verifyApp", call("generateApp", sgA).html, sgA), { silent: pgA });
   ok(/動きから読み取った内容/.test(paperG) && /\| 動きの特徴 \| 値 \| 意味 \|/.test(paperG), "論文にジェスチャー読み取りの表");
+}
+
+/* 0.5 体のサイン (自己バイオフィードバック → 気分のヒントのみ) */
+section("体のサイン (本人の心拍・呼吸 → 気分のヒント)");
+{
+  const ppg = (bpm, fs, sec, drift) => { const s = []; const T = 60 / bpm; for (let i = 0; i < fs * sec; i++) { const t = i / fs, ph = (t / T) % 1; s.push({ t, v: 200 - 25 * Math.exp(-Math.pow((ph - 0.15) / 0.08, 2)) + (drift ? 3 * Math.sin(t * 0.3) : 0) }); } return s; };
+  for (const [bpm, drift] of [[72, false], [55, true], [110, false]]) {
+    const r = call("ppgAnalyze", ppg(bpm, 30, 20, drift));
+    ok(Math.abs(r.bpm - bpm) < 2, "PPG 心拍推定 " + bpm + " bpm → " + r.bpm.toFixed(1));
+  }
+  const br = (rate, fs, sec) => { const s = []; for (let i = 0; i < fs * sec; i++) { const t = i / fs; s.push({ t, v: 0.5 + 0.3 * Math.sin(2 * Math.PI * rate / 60 * t) }); } return s; };
+  for (const rate of [6, 12, 20]) { const b = call("breathAnalyze", br(rate, 20, 60)); ok(Math.abs(b - rate) < 0.5, "呼吸数推定 " + rate + " → " + b.toFixed(2)); }
+  ok(call("calmIndex", 80, 6) === 100 && call("calmIndex", 10, 20) < 10 && isNaN(call("calmIndex", NaN, NaN)), "落ち着き指数の範囲と未計測");
+  const calmA = call("bioToAtoms", { bpm: 58, rmssd: 85, breath: 6 }), urg = call("bioToAtoms", { bpm: 115, rmssd: 12, breath: 22 }), mid = call("bioToAtoms", { bpm: 75, rmssd: 40, breath: 12 });
+  ok(calmA.atoms.join() === "calm" && urg.atoms.join() === "urgent" && mid.atoms.join() === "joy", "体のサイン → 気分アトム (calm / urgent / joy)");
+  const toneOnly = [calmA, urg, mid].every((b) => b.atoms.every((a) => E("ATOM_BY_ID")[a].cat === "tone"));
+  ok(toneOnly, "体のサインは tone アトムだけを返す (モジュール・対象・項目は決めない)");
+  ok(calmA.readout.some((r) => /心拍数/.test(r.label)) && calmA.readout.some((r) => /アプリの中身は決めません/.test(r.meant)), "読み取り内容に正直な注記");
+  ok(call("bioToAtoms", {}).atoms.length === 0 && isNaN(call("ppgAnalyze", []).bpm) && isNaN(call("breathAnalyze", [])), "未計測・短い入力でも落ちない");
+  /* 気分アトムは latent を変えるが、依頼文のモジュールは変えない */
+  const base = ["book", "records", "sort"], withBio = base.concat(calmA.atoms);
+  const r0 = call("silentToRequest", base, call("silentEncode", base)), r1 = call("silentToRequest", withBio, call("silentEncode", withBio));
+  ok(JSON.stringify(call("silentEncode", base).pooled) !== JSON.stringify(call("silentEncode", withBio).pooled), "気分アトムは latent に効く");
+  ok(r0.tags.mods.join() === r1.tags.mods.join() && r0.tags.entity === r1.tags.entity, "気分アトムは依頼文のモジュール・対象を変えない");
 }
 
 /* 1. 電信エンジン */

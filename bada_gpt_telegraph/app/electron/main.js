@@ -44,10 +44,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  /* FSK 受信 (マイク) だけを許可し、それ以外の権限要求は断る */
+  /* FSK 受信 (マイク) と「体のサイン」(本人の指先 PPG のカメラ) だけを許可し、それ以外の権限要求は断る */
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb, details) => {
-    const audioOnly = permission === "media" && (details.mediaTypes || []).every((t) => t === "audio");
-    cb(audioOnly);
+    const mediaOnly = permission === "media" && (details.mediaTypes || []).every((t) => t === "audio" || t === "video");
+    cb(mediaOnly);
   });
   createWindow();
 });

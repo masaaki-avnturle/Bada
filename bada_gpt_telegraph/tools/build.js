@@ -13,7 +13,7 @@ const root = path.join(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 
 /* engine → comprehend → generate → paper の順に連結 (後のファイルが前の関数を使う) */
-const ENGINE_FILES = ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/generate.js", "src/codegen.js", "src/paper.js"];
+const ENGINE_FILES = ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/bio.js", "src/generate.js", "src/codegen.js", "src/paper.js"];
 const engine = ENGINE_FILES.map(read).join("\n");
 const ui = read("src/ui.js");
 for (const [name, src] of [["engine", engine], ["ui.js", ui]]) {

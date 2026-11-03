@@ -126,6 +126,26 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
   <div id="silent-strip" class="sstrip" style="margin-top:8px"><span class="muted">グリフをタップして並べてください。</span></div>
   <div class="row"><button class="btn" id="silent-undo">⌫ 1つ戻す</button><button class="btn" id="silent-clear">クリア</button></div>
  </details>
+ <details style="margin-top:6px"><summary>🫀 体のサイン — 自分の心拍・呼吸を気分のヒントとして添える (任意)</summary>
+  <div class="muted" style="margin:8px 0"><b>自分の指先</b>をカメラのレンズに軽く当てると脈波 (PPG) から心拍数と心拍変動を、マイクから呼吸数を測り、落ち着き指数にまとめます。結果は<b>気分のヒント (静か / 軽やか / 勢い) としてだけ</b> latent に添えられ、アプリの中身は決めません。<b>他人の思考や体内情報を読む機能ではありません</b> (通常のカメラで、本人が自分を測る自己計測です。皮膚温や赤外線から思考や言語を推定することは科学的にできません)。</div>
+  <div class="row">
+   <button class="btn" id="bio-start">🫀 指先を当てて測る (約 20 秒)</button>
+   <button class="btn hidden" id="bio-stop">⏹ 中止</button>
+   <span class="muted" id="bio-stat">未計測</span>
+  </div>
+  <div class="row">
+   <video id="bio-video" playsinline muted style="width:96px;height:72px;border-radius:8px;background:#000;display:none"></video>
+   <canvas id="bio-wave" style="flex:1;height:72px;border-radius:8px;background:#06090f;border:1px solid rgba(130,170,240,.14)"></canvas>
+  </div>
+  <div class="grid" style="margin-top:8px">
+   <div class="tile ok"><div class="k">心拍数</div><div class="v" id="bio-bpm">—</div></div>
+   <div class="tile"><div class="k">心拍変動 RMSSD</div><div class="v" id="bio-rmssd">—</div></div>
+   <div class="tile"><div class="k">呼吸</div><div class="v" id="bio-breath">—</div></div>
+   <div class="tile acc"><div class="k">落ち着き指数</div><div class="v" id="bio-calm">—</div></div>
+  </div>
+  <div id="bio-readout" class="sreadout" style="margin-top:8px"><div class="muted">計測すると、ここに何がどの気分になったかを表示します。</div></div>
+  <div class="row"><button class="btn" id="bio-apply" disabled>この気分を思いに添える</button><button class="btn" id="bio-clear">外す</button><span class="muted" id="bio-applied"></span></div>
+ </details>
  <div id="silent-out" class="hidden">
   <label style="margin-top:10px">読み取った思い (動きを固定の規則で言葉にした内訳)</label>
   <div id="silent-readout" class="sreadout"></div>
@@ -1488,6 +1508,131 @@ function silentProcess(ids, opts) {
     imagery: latentToImagery(enc, opts.images || 3),
     bada: latentToBada(ids, enc, req)
   };
+}
+
+/*
+ * bio.js — BadaGPT電信「体のサイン (感覚入力・バイオフィードバック)」
+ *
+ * 利用者が **自分の** 指先をカメラに当てて得る脈波 (PPG) から心拍数と心拍変動
+ * (RMSSD) を、マイクの音量包絡から呼吸数を推定し、落ち着き指数にまとめる。
+ * 結果はサイレント・トークの latent に **気分のヒント (tone アトム) としてだけ**
+ * 加わる。BadaGPT改 (bada_gpt_kai) の信号処理を移植したもの。
+ *
+ * 正直な範囲 (重要):
+ *   - 心拍・呼吸は「体の状態」であり、思考の内容は読み取れない。本モジュールが
+ *     アプリの中身 (モジュール・項目・対象) を決めることはなく、調子 (静か /
+ *     軽やか / 勢い) だけを latent に添える。
+ *   - 赤外線カメラや温度計で他人の思考を読む機能ではない。通常のカメラで、
+ *     利用者本人が自分の指先を当てて測る (同意が前提の自己計測)。
+ *   - 皮膚温・赤外線から言語や思考を推定することは科学的にできない。
+ */
+"use strict";
+
+function movingAverage(xs, w) {
+  var out = new Array(xs.length), s = 0, q = [];
+  for (var i = 0; i < xs.length; i++) {
+    q.push(xs[i]); s += xs[i];
+    if (q.length > w) s -= q.shift();
+    out[i] = s / q.length;
+  }
+  return out;
+}
+
+function median(xs) {
+  if (!xs.length) return NaN;
+  var a = xs.slice().sort(function (p, q) { return p - q; }), m = a.length >> 1;
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+/* samples: [{t: 秒, v: 輝度}] (指先をカメラに当てた PPG) → { bpm, rmssd, peaks } */
+function ppgAnalyze(samples) {
+  if (!samples || samples.length < 30) return { bpm: NaN, rmssd: NaN, peaks: [] };
+  var dur = samples[samples.length - 1].t - samples[0].t;
+  if (dur < 4) return { bpm: NaN, rmssd: NaN, peaks: [] };
+  var fs = (samples.length - 1) / dur;
+  /* 血液は光を吸収するので輝度を反転し、ゆっくりした変動を除いて平滑化 */
+  var v = samples.map(function (s) { return -s.v; });
+  var base = movingAverage(v, Math.max(3, Math.round(fs * 1.0)));
+  var d = v.map(function (x, i) { return x - base[i]; });
+  var sm = movingAverage(d, Math.max(1, Math.round(fs * 0.12)));
+  var sd = Math.sqrt(sm.reduce(function (a, x) { return a + x * x; }, 0) / sm.length) || 1;
+  var minGap = 0.33, peaks = [];
+  for (var i = 2; i < sm.length - 2; i++) {
+    if (sm[i] > 0.3 * sd && sm[i] >= sm[i - 1] && sm[i] >= sm[i - 2] && sm[i] > sm[i + 1] && sm[i] >= sm[i + 2]) {
+      var t = samples[i].t;
+      if (peaks.length && t - peaks[peaks.length - 1].t < minGap) {
+        if (sm[i] > peaks[peaks.length - 1].a) peaks[peaks.length - 1] = { t: t, a: sm[i] };
+      } else peaks.push({ t: t, a: sm[i] });
+    }
+  }
+  var ibis = [];
+  for (var k = 1; k < peaks.length; k++) {
+    var ibi = peaks[k].t - peaks[k - 1].t;
+    if (ibi >= 0.33 && ibi <= 1.5) ibis.push(ibi);
+  }
+  if (ibis.length < 3) return { bpm: NaN, rmssd: NaN, peaks: peaks };
+  var med = median(ibis);
+  /* 中央値から大きく外れた拍間隔 (誤検出) を除外 */
+  var good = ibis.filter(function (x) { return Math.abs(x - med) < 0.25 * med; });
+  /* 平均を使う (中央値だとフレーム周期 1/30 秒に量子化された値に張り付く) */
+  var bpm = 60 / (good.reduce(function (a, x) { return a + x; }, 0) / good.length);
+  var diffs = [];
+  for (var j = 1; j < good.length; j++) diffs.push(Math.pow((good[j] - good[j - 1]) * 1000, 2));
+  var rmssd = diffs.length ? Math.sqrt(diffs.reduce(function (a, x) { return a + x; }, 0) / diffs.length) : NaN;
+  return { bpm: bpm, rmssd: rmssd, peaks: peaks };
+}
+
+/* samples: [{t: 秒, v: マイク音量 (RMS)}] → 呼吸数 (回/分)。
+ * 包絡を 0.6 秒で平滑化し 8 秒の基線を引いて、ヒステリシス付きの上向き交差を数える。 */
+function breathAnalyze(samples) {
+  if (!samples || samples.length < 30) return NaN;
+  var dur = samples[samples.length - 1].t - samples[0].t;
+  if (dur < 12) return NaN;
+  var fs = (samples.length - 1) / dur;
+  var v = movingAverage(samples.map(function (s) { return s.v; }), Math.max(1, Math.round(fs * 0.6)));
+  var base = movingAverage(v, Math.max(3, Math.round(fs * 8)));
+  var d = v.map(function (x, i) { return x - base[i]; });
+  var sd = Math.sqrt(d.reduce(function (a, x) { return a + x * x; }, 0) / d.length);
+  if (!(sd > 1e-6)) return NaN;
+  var hi = 0.3 * sd, lo = -0.3 * sd, state = d[0] > 0 ? 1 : -1, ups = [];
+  for (var i = 1; i < d.length; i++) {
+    if (state < 0 && d[i] > hi) { state = 1; ups.push(samples[i].t); }
+    else if (state > 0 && d[i] < lo) state = -1;
+  }
+  if (ups.length < 2) return NaN;
+  var span = ups[ups.length - 1] - ups[0];
+  var rate = (ups.length - 1) / span * 60;
+  return rate >= 2 && rate <= 40 ? rate : NaN;
+}
+
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+/* 落ち着き指数 0..100: 心拍変動 (RMSSD) が大きく、呼吸が毎分 6 回 (共鳴呼吸) に近いほど高い */
+function calmIndex(rmssd, breath) {
+  var parts = [];
+  if (isFinite(rmssd)) parts.push(clamp01(rmssd / 80));
+  if (isFinite(breath)) parts.push(clamp01(1 - Math.abs(breath - 6) / 12));
+  if (!parts.length) return NaN;
+  return 100 * parts.reduce(function (a, x) { return a + x; }, 0) / parts.length;
+}
+
+/* 体のサイン → 気分のヒント (tone アトムのみ) + 読み取り内容。
+ * モジュール・対象・項目は決して返さない (体の信号はアプリの中身を決めない)。 */
+function bioToAtoms(bio) {
+  bio = bio || {};
+  var atoms = [], readout = [];
+  var bpm = bio.bpm, rmssd = bio.rmssd, breath = bio.breath;
+  var calm = calmIndex(rmssd, breath);
+  if (isFinite(bpm)) readout.push({ label: "心拍数", value: Math.round(bpm) + " bpm", meant: bpm > 100 ? "速い (勢い)" : bpm < 60 ? "ゆっくり (静か)" : "ふつう" });
+  if (isFinite(rmssd)) readout.push({ label: "心拍変動 RMSSD", value: Math.round(rmssd) + " ms", meant: rmssd >= 50 ? "余裕がある" : "緊張ぎみ" });
+  if (isFinite(breath)) readout.push({ label: "呼吸", value: breath.toFixed(1) + " 回/分", meant: breath <= 8 ? "深くゆっくり" : breath >= 18 ? "浅く速い" : "ふつう" });
+  if (isFinite(calm)) readout.push({ label: "落ち着き指数", value: Math.round(calm) + " / 100", meant: calm >= 65 ? "静かな調子 → 落ち着いた構成" : calm < 35 ? "勢いのある調子 → 音で知らせる" : "軽やかな調子" });
+  if (!readout.length) return { atoms: [], readout: [], calm: NaN };
+  if (isFinite(calm) ? calm >= 65 : (isFinite(bpm) && bpm < 60)) atoms.push("calm");
+  else if ((isFinite(calm) && calm < 35) || (isFinite(bpm) && bpm > 100)) atoms.push("urgent");
+  else atoms.push("joy");
+  readout.push({ label: "添える気分", value: atoms.join(","), meant: "調子のヒントとしてだけ latent に加えます (アプリの中身は決めません)" });
+  return { atoms: atoms, readout: readout, calm: calm };
 }
 
 /*
@@ -3463,6 +3608,75 @@ function extractHtml(text) {
   $("silent-undo").onclick = function () { silentSeq.pop(); saveSeq(); renderStrip(); };
   $("silent-clear").onclick = function () { silentSeq = []; saveSeq(); renderStrip(); };
 
+  /* 🫀 体のサイン: 本人の指先 PPG (カメラ) と呼吸 (マイク) → 気分の tone アトムとしてだけ添える */
+  var bioAtoms = [], bioReadout = [], bioLast = null, bioStream = null, bioTimer = null, bioProc = null, bioSrc = null;
+  var bwave = $("bio-wave"), bwx = bwave.getContext("2d");
+  function bioStat(m) { $("bio-stat").textContent = m; }
+  function drawBioWave(samples) {
+    var dpr = window.devicePixelRatio || 1, W = bwave.clientWidth, H = 72;
+    if (bwave.width !== W * dpr) { bwave.width = W * dpr; bwave.height = H * dpr; bwx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    bwx.clearRect(0, 0, W, H); if (samples.length < 2) return;
+    var tail = samples.slice(-Math.min(samples.length, 300)), mn = Infinity, mx = -Infinity;
+    tail.forEach(function (s) { mn = Math.min(mn, s.v); mx = Math.max(mx, s.v); });
+    bwx.strokeStyle = "rgba(92,208,138,.9)"; bwx.lineWidth = 1.2; bwx.beginPath();
+    tail.forEach(function (s, i) { var x = i / (tail.length - 1) * W, y = H - 6 - (mx > mn ? (s.v - mn) / (mx - mn) : 0.5) * (H - 12); if (i) bwx.lineTo(x, y); else bwx.moveTo(x, y); });
+    bwx.stroke();
+  }
+  function bioCleanup() {
+    clearInterval(bioTimer); bioTimer = null;
+    try { bioProc && bioProc.disconnect(); bioSrc && bioSrc.disconnect(); } catch (e) { /* 既に停止 */ }
+    try { bioStream && bioStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { /* 既に停止 */ }
+    bioStream = null; $("bio-video").style.display = "none"; $("bio-start").classList.remove("hidden"); $("bio-stop").classList.add("hidden");
+  }
+  function bioFinish(ppg, mic) {
+    bioCleanup();
+    var r = ppgAnalyze(ppg), breath = breathAnalyze(mic), calm = calmIndex(r.rmssd, breath);
+    bioLast = { bpm: r.bpm, rmssd: r.rmssd, breath: breath, calm: calm };
+    $("bio-bpm").textContent = isFinite(r.bpm) ? Math.round(r.bpm) + " bpm" : "—";
+    $("bio-rmssd").textContent = isFinite(r.rmssd) ? Math.round(r.rmssd) + " ms" : "—";
+    $("bio-breath").textContent = isFinite(breath) ? breath.toFixed(1) + " 回/分" : "—";
+    $("bio-calm").textContent = isFinite(calm) ? Math.round(calm) + " / 100" : "—";
+    var b = bioToAtoms(bioLast);
+    if (!b.readout.length) {
+      $("bio-readout").innerHTML = '<div class="muted">脈波を検出できませんでした。指先でレンズを軽く覆い、明るい場所でもう一度お試しください (呼吸はマイクの近くで静かに)。</div>';
+      $("bio-apply").disabled = true; bioStat("計測できませんでした"); return;
+    }
+    $("bio-readout").innerHTML = b.readout.map(function (r2) { return '<div class="rrow"><i>' + escHtml(r2.label) + '</i><b>' + escHtml(r2.value) + '</b><span>' + escHtml(r2.meant) + "</span></div>"; }).join("");
+    $("bio-apply").disabled = false; bioStat("計測しました (" + ppg.length + " フレーム)");
+  }
+  $("bio-start").onclick = function () {
+    var ppg = [], mic = [], t0 = performance.now(), DUR = 20000;
+    androidPerm("CAMERA").then(function () { return androidPerm("RECORD_AUDIO"); }).then(function () {
+      return navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 320 }, height: { ideal: 240 } }, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    }).then(function (stream) {
+      bioStream = stream;
+      var vid = $("bio-video"); vid.srcObject = stream; vid.style.display = ""; vid.play().catch(function () { /* autoplay 制限 */ });
+      var vt = stream.getVideoTracks()[0];
+      if (vt && vt.applyConstraints) vt.applyConstraints({ advanced: [{ torch: true }] }).catch(function () { /* ライト非対応 */ });
+      var c = ctx(); bioSrc = c.createMediaStreamSource(stream); bioProc = c.createScriptProcessor(2048, 1, 1);
+      bioProc.onaudioprocess = function (e) { var d = e.inputBuffer.getChannelData(0), sum = 0; for (var i = 0; i < d.length; i++) sum += d[i] * d[i]; mic.push({ t: (performance.now() - t0) / 1000, v: Math.sqrt(sum / d.length) }); };
+      bioSrc.connect(bioProc); bioProc.connect(c.destination);
+      var sc = document.createElement("canvas"); sc.width = 32; sc.height = 24; var sx2 = sc.getContext("2d", { willReadFrequently: true });
+      $("bio-start").classList.add("hidden"); $("bio-stop").classList.remove("hidden");
+      bioTimer = setInterval(function () {
+        var el = performance.now() - t0;
+        try {
+          sx2.drawImage(vid, 0, 0, 32, 24); var px = sx2.getImageData(0, 0, 32, 24).data, r = 0;
+          for (var i = 0; i < px.length; i += 4) r += px[i];
+          ppg.push({ t: el / 1000, v: r / (px.length / 4) });
+        } catch (e) { /* フレーム未到着 */ }
+        drawBioWave(ppg); bioStat("計測中… " + Math.ceil((DUR - el) / 1000) + " 秒 (指先を動かさないで)");
+        if (el >= DUR) bioFinish(ppg, mic);
+      }, 33);
+      $("bio-stop").onclick = function () { bioCleanup(); bioStat("中止しました"); };
+    }).catch(function (e) { bioCleanup(); bioStat("カメラ / マイクを開始できません: " + (e && e.message || e)); });
+  };
+  $("bio-apply").onclick = function () {
+    if (!bioLast) return; var b = bioToAtoms(bioLast); bioAtoms = b.atoms; bioReadout = b.readout;
+    $("bio-applied").textContent = "添えました: " + bioAtoms.join(", ") + " (気分のヒントのみ)";
+  };
+  $("bio-clear").onclick = function () { bioAtoms = []; bioReadout = []; $("bio-applied").textContent = "外しました"; };
+
   /* 🌫 思いを描く面: イメージした思いを連続した動きで入力。正規化した {x,y,t} を記録する。 */
   var gcv = $("silent-field"), gctx = gcv.getContext("2d"), gstrokes = [], gcur = null, gdrawing = false, gstart = 0;
   function gfit() {
@@ -3515,13 +3729,17 @@ function extractHtml(text) {
   function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function runSilent() {
     var proc, readout, srcLabel;
+    /* 補い: 無言のグリフ + 体のサイン (気分の tone アトムのみ) */
+    var supp = silentSeq.concat(bioAtoms);
+    var suppLabel = (silentSeq.length ? "グリフ " + silentSeq.length + " 個" : "") + (bioAtoms.length ? (silentSeq.length ? " + " : "") + "体のサイン" : "");
     if (hasGesture()) {
-      proc = gestureProcess(gstrokes, volOpt());
-      /* グリフも足されていれば補いとして末尾に加える */
-      if (silentSeq.length) { proc = silentProcess(proc.atoms.concat(silentSeq).concat(proc.seq.filter(function (s) { return s.indexOf("g:") === 0; })), volOpt()); }
-      readout = (proc.readout || []); srcLabel = "描いた思い" + (silentSeq.length ? " + グリフ " + silentSeq.length + " 個" : "");
-    } else if (silentSeq.length) {
-      proc = silentProcess(silentSeq.slice(), volOpt()); readout = null; srcLabel = "グリフ " + silentSeq.length + " 個";
+      var gp = gestureProcess(gstrokes, volOpt());
+      proc = supp.length ? silentProcess(gp.atoms.concat(supp).concat(gp.seq.filter(function (s) { return s.indexOf("g:") === 0; })), volOpt()) : gp;
+      proc.features = gp.features;
+      readout = (gp.readout || []).concat(bioAtoms.length ? bioReadout : []);
+      srcLabel = "描いた思い" + (suppLabel ? " + " + suppLabel : "");
+    } else if (supp.length) {
+      proc = silentProcess(supp.slice(), volOpt()); readout = bioAtoms.length ? bioReadout : null; srcLabel = suppLabel;
     } else {
       $("silent-outstate").innerHTML = '<span class="err">上の面に思いを描いてください (グリフだけでも可)。</span>'; return;
     }

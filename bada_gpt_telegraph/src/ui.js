@@ -471,6 +471,75 @@
   $("silent-undo").onclick = function () { silentSeq.pop(); saveSeq(); renderStrip(); };
   $("silent-clear").onclick = function () { silentSeq = []; saveSeq(); renderStrip(); };
 
+  /* 🫀 体のサイン: 本人の指先 PPG (カメラ) と呼吸 (マイク) → 気分の tone アトムとしてだけ添える */
+  var bioAtoms = [], bioReadout = [], bioLast = null, bioStream = null, bioTimer = null, bioProc = null, bioSrc = null;
+  var bwave = $("bio-wave"), bwx = bwave.getContext("2d");
+  function bioStat(m) { $("bio-stat").textContent = m; }
+  function drawBioWave(samples) {
+    var dpr = window.devicePixelRatio || 1, W = bwave.clientWidth, H = 72;
+    if (bwave.width !== W * dpr) { bwave.width = W * dpr; bwave.height = H * dpr; bwx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    bwx.clearRect(0, 0, W, H); if (samples.length < 2) return;
+    var tail = samples.slice(-Math.min(samples.length, 300)), mn = Infinity, mx = -Infinity;
+    tail.forEach(function (s) { mn = Math.min(mn, s.v); mx = Math.max(mx, s.v); });
+    bwx.strokeStyle = "rgba(92,208,138,.9)"; bwx.lineWidth = 1.2; bwx.beginPath();
+    tail.forEach(function (s, i) { var x = i / (tail.length - 1) * W, y = H - 6 - (mx > mn ? (s.v - mn) / (mx - mn) : 0.5) * (H - 12); if (i) bwx.lineTo(x, y); else bwx.moveTo(x, y); });
+    bwx.stroke();
+  }
+  function bioCleanup() {
+    clearInterval(bioTimer); bioTimer = null;
+    try { bioProc && bioProc.disconnect(); bioSrc && bioSrc.disconnect(); } catch (e) { /* 既に停止 */ }
+    try { bioStream && bioStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { /* 既に停止 */ }
+    bioStream = null; $("bio-video").style.display = "none"; $("bio-start").classList.remove("hidden"); $("bio-stop").classList.add("hidden");
+  }
+  function bioFinish(ppg, mic) {
+    bioCleanup();
+    var r = ppgAnalyze(ppg), breath = breathAnalyze(mic), calm = calmIndex(r.rmssd, breath);
+    bioLast = { bpm: r.bpm, rmssd: r.rmssd, breath: breath, calm: calm };
+    $("bio-bpm").textContent = isFinite(r.bpm) ? Math.round(r.bpm) + " bpm" : "—";
+    $("bio-rmssd").textContent = isFinite(r.rmssd) ? Math.round(r.rmssd) + " ms" : "—";
+    $("bio-breath").textContent = isFinite(breath) ? breath.toFixed(1) + " 回/分" : "—";
+    $("bio-calm").textContent = isFinite(calm) ? Math.round(calm) + " / 100" : "—";
+    var b = bioToAtoms(bioLast);
+    if (!b.readout.length) {
+      $("bio-readout").innerHTML = '<div class="muted">脈波を検出できませんでした。指先でレンズを軽く覆い、明るい場所でもう一度お試しください (呼吸はマイクの近くで静かに)。</div>';
+      $("bio-apply").disabled = true; bioStat("計測できませんでした"); return;
+    }
+    $("bio-readout").innerHTML = b.readout.map(function (r2) { return '<div class="rrow"><i>' + escHtml(r2.label) + '</i><b>' + escHtml(r2.value) + '</b><span>' + escHtml(r2.meant) + "</span></div>"; }).join("");
+    $("bio-apply").disabled = false; bioStat("計測しました (" + ppg.length + " フレーム)");
+  }
+  $("bio-start").onclick = function () {
+    var ppg = [], mic = [], t0 = performance.now(), DUR = 20000;
+    androidPerm("CAMERA").then(function () { return androidPerm("RECORD_AUDIO"); }).then(function () {
+      return navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 320 }, height: { ideal: 240 } }, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    }).then(function (stream) {
+      bioStream = stream;
+      var vid = $("bio-video"); vid.srcObject = stream; vid.style.display = ""; vid.play().catch(function () { /* autoplay 制限 */ });
+      var vt = stream.getVideoTracks()[0];
+      if (vt && vt.applyConstraints) vt.applyConstraints({ advanced: [{ torch: true }] }).catch(function () { /* ライト非対応 */ });
+      var c = ctx(); bioSrc = c.createMediaStreamSource(stream); bioProc = c.createScriptProcessor(2048, 1, 1);
+      bioProc.onaudioprocess = function (e) { var d = e.inputBuffer.getChannelData(0), sum = 0; for (var i = 0; i < d.length; i++) sum += d[i] * d[i]; mic.push({ t: (performance.now() - t0) / 1000, v: Math.sqrt(sum / d.length) }); };
+      bioSrc.connect(bioProc); bioProc.connect(c.destination);
+      var sc = document.createElement("canvas"); sc.width = 32; sc.height = 24; var sx2 = sc.getContext("2d", { willReadFrequently: true });
+      $("bio-start").classList.add("hidden"); $("bio-stop").classList.remove("hidden");
+      bioTimer = setInterval(function () {
+        var el = performance.now() - t0;
+        try {
+          sx2.drawImage(vid, 0, 0, 32, 24); var px = sx2.getImageData(0, 0, 32, 24).data, r = 0;
+          for (var i = 0; i < px.length; i += 4) r += px[i];
+          ppg.push({ t: el / 1000, v: r / (px.length / 4) });
+        } catch (e) { /* フレーム未到着 */ }
+        drawBioWave(ppg); bioStat("計測中… " + Math.ceil((DUR - el) / 1000) + " 秒 (指先を動かさないで)");
+        if (el >= DUR) bioFinish(ppg, mic);
+      }, 33);
+      $("bio-stop").onclick = function () { bioCleanup(); bioStat("中止しました"); };
+    }).catch(function (e) { bioCleanup(); bioStat("カメラ / マイクを開始できません: " + (e && e.message || e)); });
+  };
+  $("bio-apply").onclick = function () {
+    if (!bioLast) return; var b = bioToAtoms(bioLast); bioAtoms = b.atoms; bioReadout = b.readout;
+    $("bio-applied").textContent = "添えました: " + bioAtoms.join(", ") + " (気分のヒントのみ)";
+  };
+  $("bio-clear").onclick = function () { bioAtoms = []; bioReadout = []; $("bio-applied").textContent = "外しました"; };
+
   /* 🌫 思いを描く面: イメージした思いを連続した動きで入力。正規化した {x,y,t} を記録する。 */
   var gcv = $("silent-field"), gctx = gcv.getContext("2d"), gstrokes = [], gcur = null, gdrawing = false, gstart = 0;
   function gfit() {
@@ -523,13 +592,17 @@
   function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function runSilent() {
     var proc, readout, srcLabel;
+    /* 補い: 無言のグリフ + 体のサイン (気分の tone アトムのみ) */
+    var supp = silentSeq.concat(bioAtoms);
+    var suppLabel = (silentSeq.length ? "グリフ " + silentSeq.length + " 個" : "") + (bioAtoms.length ? (silentSeq.length ? " + " : "") + "体のサイン" : "");
     if (hasGesture()) {
-      proc = gestureProcess(gstrokes, volOpt());
-      /* グリフも足されていれば補いとして末尾に加える */
-      if (silentSeq.length) { proc = silentProcess(proc.atoms.concat(silentSeq).concat(proc.seq.filter(function (s) { return s.indexOf("g:") === 0; })), volOpt()); }
-      readout = (proc.readout || []); srcLabel = "描いた思い" + (silentSeq.length ? " + グリフ " + silentSeq.length + " 個" : "");
-    } else if (silentSeq.length) {
-      proc = silentProcess(silentSeq.slice(), volOpt()); readout = null; srcLabel = "グリフ " + silentSeq.length + " 個";
+      var gp = gestureProcess(gstrokes, volOpt());
+      proc = supp.length ? silentProcess(gp.atoms.concat(supp).concat(gp.seq.filter(function (s) { return s.indexOf("g:") === 0; })), volOpt()) : gp;
+      proc.features = gp.features;
+      readout = (gp.readout || []).concat(bioAtoms.length ? bioReadout : []);
+      srcLabel = "描いた思い" + (suppLabel ? " + " + suppLabel : "");
+    } else if (supp.length) {
+      proc = silentProcess(supp.slice(), volOpt()); readout = bioAtoms.length ? bioReadout : null; srcLabel = suppLabel;
     } else {
       $("silent-outstate").innerHTML = '<span class="err">上の面に思いを描いてください (グリフだけでも可)。</span>'; return;
     }
