@@ -1,4 +1,4 @@
-name: Bada Search app build (SourceTree companion, Windows EXE)
+name: Bada Search app build (SourceTree companion, Windows EXE + Android APK)
 
 # sourcetree_search/ の「Bada Search」— SourceTree (Windows 10/11) に
 # カスタム操作 ($REPO) で付属させる PDF・ソースコード検索エンジン。
@@ -46,6 +46,11 @@ jobs:
           set -e
           node sourcetree_search/tools/test-cinevim.js | tee /tmp/cv.out
           grep -q "ALL CINEVIM TESTS PASSED" /tmp/cv.out
+      - name: Engine copy is in sync (core == www, browser/APK uses the www copy)
+        run: |
+          set -e
+          diff sourcetree_search/core/searchcore.js sourcetree_search/app/www/searchcore.js
+          echo "searchcore.js: core and www copies are byte-identical"
 
   windows-exe:
     runs-on: windows-latest
@@ -77,3 +82,62 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
           files: sourcetree_search/app/electron/dist/*.exe
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        # setup-android@v3 の既定 packages ('tools' 等) は現行 SDK から
+        # 削除され sdkmanager が exit 1 になるため既定インストールを無効化。
+        # 必要なパッケージは次の明示ステップで導入する。
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Build debug APK (Cordova; browser search + BadaCineVim, start=complete.html)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="sourcetree_search"
+          cordova create cordova-build io.github.masaaki_avnturle.badasearch BadaSearch
+          rm -rf cordova-build/www
+          cp -r "$APP/app/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/badasearch-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badasearch-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk

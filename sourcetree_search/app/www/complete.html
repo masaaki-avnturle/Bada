@@ -78,6 +78,7 @@ mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-
   <div class="grow"></div>
   <span id="repo">(未選択)</span>
   <button id="pick" class="primary">📂 リポジトリを選択</button>
+  <input type="file" id="filepick" multiple style="display:none"/>
   <button id="reindex" disabled>↻ 再索引</button>
   <a class="link" href="index.html" title="従来の詳細ビューへ">詳細ビュー →</a>
 </div>
@@ -97,6 +98,8 @@ mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-
 </div>
 <div id="status"></div>
 
+<script src="searchcore.js"></script>
+<script src="searchweb.js"></script>
 <script src="demo-data.js"></script>
 <script src="cinevim.js"></script>
 <script>
@@ -106,9 +109,10 @@ mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-
   var api = window.badaSearch || null;
   var curDir = null, vocabReady = false, sel = -1, items = [], lastQ = "";
 
-  /* ── ブラウザ プレビュー / スモークテスト用の内蔵デモ (Electron ブリッジなし時) ── */
-  var demo = (!api && window.BADA_DEMO) ? makeDemoApi(window.BADA_DEMO) : null;
-  var bridge = api || demo;
+  /* ── ブリッジ選択: Electron (badaSearch) → ブラウザ/APK (Web インデクサ) → デモ ── */
+  var web = (!api && window.BadaSearchWeb) ? window.BadaSearchWeb.makeWebBridge() : null;
+  var demo = (!api && !web && window.BADA_DEMO) ? makeDemoApi(window.BADA_DEMO) : null;
+  var bridge = api || web || demo;
 
   function setStatus(h){ $("status").innerHTML = h || ""; }
   function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -257,32 +261,60 @@ mark{background:var(--amber);color:#1a1200;border-radius:2px;padding:0 2px;text-
     Promise.resolve(bridge.buildVocab()).then(function(v){
       vocabReady = true;
       $("q").disabled = false; $("q").focus();
-      setStatus("索引完了 — "+info.files+" ファイル / 語彙 "+(v&&v.size!=null?v.size:"?")+" 語。単語を入力してください。");
+      setStatus("索引完了 — "+info.files+" ファイル / 語彙 "+(v&&v.size!=null?v.size:"?")+" 語。単語を入力してください。"+(info.note||""));
     });
   }
   function indexDir(dir){
-    if (!bridge){ setStatus("Electron ブリッジがありません (BadaSearch.exe から起動してください)"); return; }
+    if (!bridge){ setStatus("ブリッジがありません"); return; }
     vocabReady = false; $("q").disabled = true; $("results").innerHTML=""; closePopup();
     setStatus('<span class="spin"></span>索引作成中: '+esc(dir));
     Promise.resolve(bridge.buildIndex(dir)).then(afterIndex);
   }
+  /* ブラウザ/APK: 選択ファイルから索引 */
+  function indexFiles(fileList){
+    if (!web || !fileList || !fileList.length){ return; }
+    vocabReady = false; $("q").disabled = true; $("results").innerHTML=""; closePopup();
+    setStatus('<span class="spin"></span>'+fileList.length+' 件を索引中…');
+    bridge.buildFromFiles(fileList, function(i,n,rel){
+      setStatus('<span class="spin"></span>索引中 '+i+'/'+n+'： '+esc(rel||""));
+    }).then(function(info){
+      if (!info.files){ setStatus("対象ファイル (ソース/PDF) が見つかりませんでした。別のフォルダ/ファイルをお試しください。"); $("q").disabled=true; return; }
+      var note = info.skippedPdf ? (" (PDF " + info.skippedPdf + " 件はテキスト抽出不可/未対応でスキップ)") : "";
+      afterIndex({ root: "選択ファイル (" + info.files + ")", files: info.files, note: note });
+    });
+  }
   $("pick").onclick = function(){
-    if (!api){ if(demo) indexDir("(デモ)"); return; }
-    api.chooseFolder().then(function(dir){ if (dir) indexDir(dir); });
+    if (api){ api.chooseFolder().then(function(dir){ if (dir) indexDir(dir); }); return; }
+    if (web){ $("filepick").click(); return; }        /* ブラウザ/APK: ファイル選択 */
+    if (demo){ indexDir("(デモ: サンプル論文・コード)"); }
   };
-  $("reindex").onclick = function(){ if (curDir) indexDir(curDir); };
+  (function(){
+    var fp = $("filepick");
+    try { fp.setAttribute("webkitdirectory", ""); fp.setAttribute("directory", ""); } catch(e){}
+    fp.addEventListener("change", function(){ indexFiles(fp.files); });
+  })();
+  $("reindex").onclick = function(){
+    if (api && curDir){ indexDir(curDir); }
+    else if (web){ $("filepick").click(); }
+    else if (demo){ indexDir("(デモ: サンプル論文・コード)"); }
+  };
 
   (function boot(){
-    if (!bridge){ setStatus("ブラウザ プレビュー: 検索は BadaSearch.exe で有効 (デモデータ未読込)"); return; }
-    if (!api && demo){                              /* デモ: 自動で索引済みにする */
-      setStatus("デモモード — 内蔵サンプルで単語補完を体験できます");
-      indexDir("(デモ: サンプル論文・コード)");
+    if (!bridge){ setStatus("検索機能を読み込めません"); return; }
+    if (api){
+      Promise.resolve(api.startupRepo()).then(function(repo){
+        if (repo) indexDir(repo);
+        else setStatus("リポジトリを選択してください (SourceTree からは $REPO 付きで自動)");
+      });
       return;
     }
-    Promise.resolve(api.startupRepo()).then(function(repo){
-      if (repo) indexDir(repo);
-      else setStatus("リポジトリを選択してください (SourceTree からは $REPO 付きで自動)");
-    });
+    if (web){
+      var pdf = window.BadaSearchWeb.hasInflate ? "" : " (この環境では PDF 抽出は無効)";
+      setStatus("「📂 リポジトリを選択」でフォルダ/ファイルを選ぶと、論文(PDF)とソースを索引して単語補完できます" + pdf);
+      return;
+    }
+    setStatus("デモモード — 内蔵サンプルで単語補完を体験できます");
+    indexDir("(デモ: サンプル論文・コード)");
   })();
 
   /* ── 内蔵デモ API (bridge 互換) ── */

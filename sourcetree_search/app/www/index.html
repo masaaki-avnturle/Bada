@@ -61,6 +61,7 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
 </header>
 <div id="toolbar">
   <button id="pick" class="primary">📂 リポジトリ/フォルダを選択</button>
+  <input type="file" id="filepick" multiple style="display:none"/>
   <button id="reindex" disabled>↻ 再インデックス</button>
   <span id="repopath">(未選択 — SourceTree のカスタム操作から $REPO 付きで起動すると自動で開きます)</span>
 </div>
@@ -93,12 +94,16 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
 </div>
 <div id="status"></div>
 
+<script src="searchcore.js"></script>
+<script src="searchweb.js"></script>
 <script src="cinevim.js"></script>
 <script>
 (function(){
   "use strict";
   var $ = function(id){ return document.getElementById(id); };
   var api = window.badaSearch || null;
+  var web = (!api && window.BadaSearchWeb) ? window.BadaSearchWeb.makeWebBridge() : null;
+  var bridge = api || web;
   var curDir = null, searching = false, pending = false;
 
   function setStatus(html){ $("status").innerHTML = html || ""; }
@@ -147,6 +152,19 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
     var info = await api.buildIndex(dir);
     renderIndexInfo(info);
   }
+  /* ブラウザ/APK: 選択ファイルから索引 */
+  async function indexFiles(fileList){
+    if (!web || !fileList || !fileList.length) return;
+    $("results").innerHTML = "";
+    setStatus('<span class="spin"></span>' + fileList.length + ' 件を索引中…');
+    var info = await web.buildFromFiles(fileList, function(i,n,rel){
+      setStatus('<span class="spin"></span>索引中 ' + i + '/' + n + '： ' + escHtml(rel||""));
+    });
+    if (!info.files){ setStatus("対象ファイル (ソース/PDF) が見つかりませんでした。"); return; }
+    info.note = info.skippedPdf ? (" (PDF " + info.skippedPdf + " 件はスキップ)") : "";
+    renderIndexInfo(info);
+    if (info.note) setStatus($("status").textContent + info.note);
+  }
 
   function opts(){
     return { regex: $("oRegex").checked, caseSensitive: $("oCase").checked,
@@ -154,13 +172,13 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
   }
 
   async function doSearch(){
-    if (!api || !curDir) return;
+    if (!bridge || !curDir) return;
     var q = $("q").value;
     if (!q.trim()){ $("results").innerHTML = ""; setStatus(""); return; }
     if (searching){ pending = true; return; }
     searching = true;
     var o = opts();
-    var r = await api.search(q, o);
+    var r = await bridge.search(q, o);
     searching = false;
     if (pending){ pending = false; doSearch(); return; }
     if (r.error){ setStatus("⚠ " + escHtml(r.error)); return; }
@@ -172,8 +190,8 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
         '<span class="lang">' + escHtml(h.lang) + '</span>' +
         '<span class="cnt">' + h.count + ' 件</span>' +
         '<button data-cine="' + encodeURIComponent(h.path) + '" data-line="' + ((h.matches[0]&&h.matches[0].line)||1) + '">🎬 CineVim</button>' +
-        '<button data-open="' + encodeURIComponent(h.path) + '">開く</button>' +
-        '<button data-reveal="' + encodeURIComponent(h.path) + '">📁</button>' +
+        (api ? ('<button data-open="' + encodeURIComponent(h.path) + '">開く</button>' +
+                '<button data-reveal="' + encodeURIComponent(h.path) + '">📁</button>') : "") +
         "</div><div class=\"lines\">" +
         h.matches.slice(0, 12).map(function(m){
           return '<div class="ln"><span class="no">' + m.line + '</span><span>' + highlight(m.text, q, o) + "</span></div>";
@@ -195,15 +213,15 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
     });
   }
 
-  /* BadaCineVim: 付属のシネマ風 Vim ビューア/エディタでファイルを開く */
+  /* BadaCineVim: 付属のシネマ風 Vim ビューア/エディタでファイルを開く (融合) */
   function openCine(p, line, q){
-    if (!api || !window.BadaCineVim) return;
-    Promise.resolve(api.fileText(p)).then(function(res){
+    if (!bridge || !window.BadaCineVim) return;
+    Promise.resolve(bridge.fileText(p)).then(function(res){
       if (!res || res.error){ setStatus("⚠ " + escHtml((res&&res.error)||"ファイルを開けません")); return; }
       window.BadaCineVim.open({
         name: res.name, lines: res.lines, lang: res.lang, readonly: res.readonly,
         gotoLine: line, search: q,
-        onSave: function(text){ return Promise.resolve(api.saveFile(p, text)); }
+        onSave: function(text){ return Promise.resolve(bridge.saveFile(p, text)); }
       });
     });
   }
@@ -216,13 +234,22 @@ mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
     $(id).addEventListener("input", function(){ clearTimeout(deb); deb = setTimeout(doSearch, 300); });
   });
   $("pick").onclick = async function(){
-    if (!api) return;
-    var dir = await api.chooseFolder();
-    if (dir) indexDir(dir);
+    if (api){ var dir = await api.chooseFolder(); if (dir) indexDir(dir); return; }
+    if (web){ $("filepick").click(); }
   };
-  $("reindex").onclick = function(){ if (curDir) indexDir(curDir); };
+  (function(){
+    var fp = $("filepick"); if (!fp) return;
+    try { fp.setAttribute("webkitdirectory", ""); fp.setAttribute("directory", ""); } catch(e){}
+    fp.addEventListener("change", function(){ indexFiles(fp.files); });
+  })();
+  $("reindex").onclick = function(){ if (api && curDir){ indexDir(curDir); } else if (web){ $("filepick").click(); } };
 
   (async function boot(){
+    if (web){
+      var pdf = window.BadaSearchWeb.hasInflate ? "" : " (この環境では PDF 抽出は無効)";
+      setStatus("「📂 リポジトリ/フォルダを選択」でファイルを選ぶと、PDF とソースを横断検索できます" + pdf);
+      return;
+    }
     if (!api){ setStatus("ブラウザ プレビュー モード (検索機能は BadaSearch.exe で有効)"); return; }
     try {
       var exe = await api.appPath();

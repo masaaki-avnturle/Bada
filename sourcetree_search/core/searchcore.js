@@ -8,10 +8,17 @@
  * をインデックスし、AND 検索 / 正規表現検索を行番号つきで返します。
  * Node 標準モジュール (fs / path / zlib) のみに依存。
  */
+/* UMD: Node (Electron メイン / テスト) とブラウザ (APK / Web) の両方で動きます。
+   fs/path/zlib は Node でのみ読み込み、buildIndex/extractPdfText (Node 専用) で使用。
+   純粋関数 (langOf / tokenizeLine / buildVocab / complete / search) はブラウザでも動作。 */
+(function (global) {
 "use strict";
-const fs = require("fs");
-const path = require("path");
-const zlib = require("zlib");
+var isNode = (typeof module !== "undefined" && module.exports);
+var fs = null, path = null, zlib = null;
+if (isNode) { try { fs = require("fs"); path = require("path"); zlib = require("zlib"); } catch (e) {} }
+
+function baseName(f){ return String(f).split(/[\\/]/).pop(); }
+function extName(f){ var b = baseName(f); var i = b.lastIndexOf("."); return i > 0 ? b.slice(i) : ""; }
 
 /* ── 言語判定 (拡張子 → 言語名) ── */
 const LANGS = {
@@ -35,11 +42,11 @@ const MAX_FILE = 8 * 1024 * 1024;      /* 8MB 超は読まない */
 const MAX_FILES = 20000;
 
 function langOf(file){
-  const base = path.basename(file).toLowerCase();
+  const base = baseName(file).toLowerCase();
   if (base === "makefile") return "Makefile";
   if (base === "dockerfile") return "Dockerfile";
   if (base === "rakefile" || base === "gemfile") return "Ruby";
-  return LANGS[path.extname(base)] || null;
+  return LANGS[extName(base)] || null;
 }
 
 /* ── PDF テキスト抽出 ─────────────────────────────────────────── */
@@ -302,7 +309,7 @@ function complete(vocab, prefix, opts){
   function clone(e){ return { t: e.t, lower: e.lower, count: e.count, files: e.files }; }
 }
 
-module.exports = {
+var API = {
   LANGS: LANGS,
   langOf: langOf,
   extractPdfText: extractPdfText,
@@ -312,3 +319,6 @@ module.exports = {
   buildVocab: buildVocab,
   complete: complete
 };
+if (isNode) module.exports = API;
+if (typeof global !== "undefined") global.BadaSearchCore = API;
+})(typeof globalThis !== "undefined" ? globalThis : this);

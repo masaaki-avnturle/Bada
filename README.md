@@ -223,11 +223,14 @@ Git GUI **SourceTree** のカスタム操作 (`$REPO`) に登録して付属ア�
 
 **🎬 付属エディタ BadaCineVim**: 検索結果の各ファイルの「🎬 CineVim」ボタンで、そのファイルを **Vim スタイルのシネマ風モーダル・エディタ**で開き、該当行へ自動ジャンプ。`h j k l`/`w b`/`gg G`/`x dd`/`i a o`/`/`検索/`:w`保存/`:q`閉じる に対応(論文 PDF は読み取り専用)。リポジトリの mini-Vim (`neovim/omega-vim.c`) を Web/Electron 用に純 JS で作り直した付属物です。
 
+**🎬 BadaCineVim 融合**: 検索結果はそのまま付属の Vim スタイル・ビューア/エディタ (BadaCineVim) で開けます (該当行へジャンプ・`/`検索・`h j k l`・PDF は閲覧専用)。
+
 | プラットフォーム | 入手 |
 |:---|:---|
-| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaSearch-Setup-*-x64.exe` (インストーラ) / `BadaSearch-Portable-*-x64.exe` (インストール不要) |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaSearch-Setup-*-x64.exe` / `BadaSearch-Portable-*-x64.exe` |
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `badasearch-debug.apk`(端末のファイル/フォルダを選んで検索 + CineVim) |
 
-SourceTree への登録: ツール → オプション → カスタム操作 → スクリプトに `BadaSearch.exe`、パラメータに `$REPO`。ビルドは [`sourcetree-search-build.yml`](.github/workflows/sourcetree-search-build.yml) が自動実行します (`stsearch-v*` タグ / `workflow_dispatch`)。詳細は [`sourcetree_search/README.md`](sourcetree_search/README.md) を参照。
+SourceTree への登録: ツール → オプション → カスタム操作 → スクリプトに `BadaSearch.exe`、パラメータに `$REPO`。APK は SourceTree/Node が無い端末向けに、選んだファイルをブラウザ側エンジンで索引します(PDF は `DecompressionStream` で展開)。起動画面はどちらも広島大学病院風の黒い大画面(単語補完)。ビルドは [`sourcetree-search-build.yml`](.github/workflows/sourcetree-search-build.yml) が自動実行 (`stsearch-v*` タグ / `workflow_dispatch`)。詳細は [`sourcetree_search/README.md`](sourcetree_search/README.md) を参照。
 
 ### 🎬 Bada 映画カウントダウンエディタ (BadaCineCountdown)
 

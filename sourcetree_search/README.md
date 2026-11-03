@@ -39,18 +39,31 @@ TypeScript/Python/Ruby/Java/Go/Rust/PHP/C#/Swift/Kotlin/Shell/SQL/HTML/CSS/Bada/
 > 由来: リポジトリの mini-Vim 実装 (`neovim/omega-vim.c`) の操作系を、Web/Electron の
 > Bada Search に合わせて純 JS で作り直した付属エディタです。
 
-## ⬇️ ダウンロード (Windows 10 / 11)
+## ⬇️ ダウンロード
 
 [Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
 
-| ファイル | 内容 |
-|:---|:---|
-| `BadaSearch-Setup-*-x64.exe` | NSIS インストーラ (インストール先変更可) |
-| `BadaSearch-Portable-*-x64.exe` | インストール不要のポータブル版 |
+| プラットフォーム | ファイル | 使い方 |
+|:---|:---|:---|
+| **Windows 10 / 11** | `BadaSearch-Setup-*-x64.exe` / `BadaSearch-Portable-*-x64.exe` | SourceTree のカスタム操作から / 単体でも |
+| **Android** | `badasearch-debug.apk` | 端末のファイルを選んで単語補完検索 + CineVim |
 
 ビルドは [`sourcetree-search-build.yml`](../.github/workflows/sourcetree-search-build.yml)
-が自動実行します (`stsearch-v*` タグを push すると Release に添付、
+が自動実行します (`stsearch-v*` タグを push すると Release に EXE と APK を添付、
 または Actions の `workflow_dispatch` で `release_tag` を指定)。
+
+### 🖥️📱 EXE と APK (BadaCineVim を融合)
+
+- **Windows EXE** — Electron。SourceTree のカスタム操作 (`$REPO`) から起動し、
+  リポジトリを Node でインデックスして横断検索。起動画面は広島大学病院風の
+  黒い大画面(単語補完)で、結果は **BadaCineVim** で編集もできます (`:w` 保存)。
+- **Android APK** — 同じ黒い大画面を Cordova で収録。SourceTree/Node が無い端末では、
+  **端末内のファイル/フォルダを選ぶ**とブラウザ側エンジン (`searchweb.js`) が
+  PDF(`DecompressionStream` で展開)とソースを索引し、単語補完 → 検索 →
+  **BadaCineVim**(閲覧専用)で該当行へジャンプ、までを 1 アプリで行います。
+
+検索エンジン `searchcore.js` は Node(EXE)でもブラウザ(APK)でも動く UMD で、
+両者で同一のコードを使います(CI が core/www の同一性を検証)。
 
 ## 🌳 SourceTree に付属させる手順
 
