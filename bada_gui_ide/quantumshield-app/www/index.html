@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada QuantumShield — 侵入時 量子クレデンシャル自動変更</title>
+<style>
+:root{
+  --bg:#04060a; --panel:#0b111c; --panel2:#101a2a; --edge:#1d2c44;
+  --text:#d7e3f4; --dim:#7d92b0; --accent:#43d9ad; --accent2:#4aa8ff;
+  --warn:#ff6b81; --gold:#ffd166; --red:#ff5a6a; --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif;min-height:100vh;padding-bottom:40px}
+header{padding:16px 18px 12px;border-bottom:1px solid var(--edge);background:linear-gradient(180deg,#0a1322,var(--bg))}
+header h1{font-size:19px}header h1 .ic{margin-right:8px}
+header .sub{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.7}
+header .sub code{color:var(--accent)}
+main{max-width:1000px;margin:0 auto;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+.card{background:var(--panel2);border:1px solid var(--edge);border-radius:12px;padding:14px}
+.card h2{font-size:14px;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.full{grid-column:1/-1}
+.svc{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.svc.rot{animation:flash .9s ease}
+@keyframes flash{0%{box-shadow:0 0 0 0 var(--accent)}40%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:none}}
+.svc .nm{font-weight:bold;color:var(--gold);text-transform:uppercase;letter-spacing:.05em}
+.svc .gen{float:right;font-size:11px;color:var(--dim)}
+.kv{display:flex;gap:8px;font-family:var(--mono);font-size:12.5px;padding:2px 0}
+.kv .k{color:var(--dim);min-width:84px}
+.kv .v{color:var(--text);word-break:break-all}
+.kv .v.chg{color:var(--accent);font-weight:bold}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+button{font:inherit;color:#04120c;background:linear-gradient(135deg,#14b88a,#0f8f6c);border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-weight:bold;font-size:13px}
+button.atk{background:linear-gradient(135deg,#d05a5a,#a33)}
+button.ghost{background:var(--panel);color:var(--dim);border:1px solid var(--edge);font-weight:normal}
+button:active{transform:translateY(1px)}
+select{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--edge);border-radius:7px;padding:6px 8px}
+.badge{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;border:1px solid var(--edge);color:var(--dim)}
+.badge.ok{color:var(--accent);border-color:var(--accent)}
+.badge.red{color:var(--red);border-color:var(--red)}
+.status{margin-top:8px;font-size:12.5px;min-height:18px;line-height:1.6}
+.status.block{color:var(--red)}.status.ok{color:var(--accent)}
+#log{max-height:240px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;line-height:1.6}
+#log .e{padding:2px 0;border-bottom:1px dashed #14203444}
+#log .intrusion{color:var(--warn)}#log .rotate{color:var(--accent)}#log .block{color:var(--red)}
+#log .owner-ok{color:var(--accent2)}#log .boot{color:var(--dim)}
+.qk{font-family:var(--mono);font-size:11px;color:var(--accent);word-break:break-all}
+.threat{height:10px;background:#0d1119;border-radius:5px;overflow:hidden;margin-top:4px}
+.threat i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--gold),var(--red))}
+footer{text-align:center;color:var(--dim);font-size:11px;margin-top:18px;line-height:1.8}
+footer a{color:var(--accent2)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="ic">🛡️</span>Bada QuantumShield</h1>
+  <div class="sub">
+    量子暗号アプリ (Jones 多項式量子暗号) の<b>防御応用</b>。ハッカーが対象 PC に<b>接触</b>(ポートスキャン / 不正接続 /
+    総当たり / 盗んだ資格情報) すると、量子システムが即座にそのサービスの<b>ポート・IP・パスワードを量子鍵に同期して変更</b>し、
+    攻撃者を締め出します(ムービング・ターゲット・ディフェンス)。正規の持ち主は<code>結び目(量子鍵)</code>を知っているので
+    次の資格情報を計算して追従できます。<b>概念シミュレーション</b>(実機・実ネットワークには触れません)。
+  </div>
+</header>
+<main>
+  <div class="card full">
+    <h2>🔑 量子鍵 (守る対象 PC)
+      <span style="margin-left:auto;font-weight:normal;color:var(--dim);font-size:12px">結び目を変えると鍵全体が変わります</span>
+    </h2>
+    <div class="btns">
+      <span style="align-self:center;color:var(--dim);font-size:12.5px">結び目 (量子鍵):</span>
+      <select id="knot"></select>
+      <button class="ghost" id="reset">🔄 デバイス再初期化</button>
+      <span class="badge" id="threatBadge">脅威 0</span>
+    </div>
+    <div class="threat"><i id="threatBar" style="width:0%"></i></div>
+  </div>
+
+  <div class="card">
+    <h2>🖥️ 対象 PC のサービス / 資格情報</h2>
+    <div id="services"></div>
+    <div class="status" id="pcStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>🥷 攻撃者コンソール</h2>
+    <div style="font-size:12.5px;color:var(--dim);margin-bottom:8px">
+      攻撃対象サービスを選び、接触を試みます。接触した瞬間に量子ローテーションが発火します。
+    </div>
+    <div class="btns" style="margin-bottom:8px">
+      <span style="align-self:center;color:var(--dim);font-size:12.5px">対象:</span>
+      <select id="atkSvc"></select>
+    </div>
+    <div class="btns">
+      <button class="atk" data-type="scan">🔍 ポートスキャン</button>
+      <button class="atk" data-type="bruteforce">🔨 総当たり</button>
+      <button class="atk" data-type="exploit">💥 エクスプロイト</button>
+    </div>
+    <div class="btns" style="margin-top:8px">
+      <button class="atk" id="steal">🗝️ 資格情報を盗む</button>
+      <button class="atk ghost" id="useStolen" style="color:var(--red)">盗んだ資格情報で接続</button>
+    </div>
+    <div class="status block" id="atkStatus"></div>
+    <div style="margin-top:8px;font-size:11.5px;color:var(--dim)">盗んだ資格情報(攻撃者の手元):</div>
+    <div class="kv"><span class="k">port</span><span class="v" id="stPort">—</span></div>
+    <div class="kv"><span class="k">ip</span><span class="v" id="stIp">—</span></div>
+    <div class="kv"><span class="k">password</span><span class="v" id="stPw">—</span></div>
+  </div>
+
+  <div class="card">
+    <h2>🙆 正規の持ち主</h2>
+    <div style="font-size:12.5px;color:var(--dim);margin-bottom:8px">
+      正規の持ち主は結び目(量子鍵)を共有しているので、ローテーション後の現在の資格情報を計算して接続できます。
+    </div>
+    <div class="btns">
+      <span style="align-self:center;color:var(--dim);font-size:12.5px">サービス:</span>
+      <select id="ownSvc"></select>
+      <button id="ownerConnect">🔐 量子鍵で接続</button>
+      <button class="ghost" id="fakeConnect" style="color:var(--warn)">違う結び目で接続 (偽)</button>
+    </div>
+    <div class="status" id="ownStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>📜 監査ログ (append-only)</h2>
+    <div id="log"></div>
+  </div>
+
+  <footer>
+    Bada QuantumShield — <a href="https://github.com/masaaki-avnturle/Bada">masaaki-avnturle/Bada</a> ·
+    量子暗号 (qcrypto.js) の防御応用 · ムービング・ターゲット・ディフェンス · 概念シミュレーション · MIT
+  </footer>
+</main>
+
+<script src="qcrypto.js"></script>
+<script src="qshield.js"></script>
+<script>
+(function(){
+  "use strict";
+  var QS = window.BadaQShield, QC = window.BadaQC;
+  var $ = function(id){ return document.getElementById(id); };
+  var dev = null, stolen = null, rotatedSvc = null;
+
+  function fillSelect(sel, items){ sel.innerHTML=""; items.forEach(function(v){ var o=document.createElement("option"); o.value=v; o.textContent=v; sel.appendChild(o); }); }
+  QC.KNOTS.forEach(function(k){ var o=document.createElement("option"); o.value=k.id; o.textContent=k.name; $("knot").appendChild(o); });
+
+  function init(){
+    dev = QS.createDevice(parseInt($("knot").value,10));
+    stolen = null; rotatedSvc = null;
+    fillSelect($("atkSvc"), Object.keys(dev.services));
+    fillSelect($("ownSvc"), Object.keys(dev.services));
+    $("stPort").textContent="—"; $("stIp").textContent="—"; $("stPw").textContent="—";
+    $("atkStatus").textContent=""; $("ownStatus").textContent=""; $("pcStatus").textContent="";
+    render();
+  }
+  function mask(pw){ return pw.slice(0,3) + "•••••••••" + pw.slice(-2); }
+  function render(){
+    var box=$("services"); box.innerHTML="";
+    Object.keys(dev.services).forEach(function(name){
+      var s=dev.services[name], c=s.creds;
+      var el=document.createElement("div");
+      el.className="svc"+(rotatedSvc===name?" rot":"");
+      el.innerHTML='<span class="gen">世代 '+s.gen+'</span><div class="nm">'+name+'</div>'+
+        '<div class="kv"><span class="k">port</span><span class="v'+(rotatedSvc===name?' chg':'')+'">'+c.port+'</span></div>'+
+        '<div class="kv"><span class="k">bind ip</span><span class="v'+(rotatedSvc===name?' chg':'')+'">'+c.ip+'</span></div>'+
+        '<div class="kv"><span class="k">password</span><span class="v'+(rotatedSvc===name?' chg':'')+'">'+mask(c.password)+'</span></div>';
+      box.appendChild(el);
+    });
+    var t=dev.threat;
+    $("threatBadge").textContent="脅威 "+t;
+    $("threatBadge").className="badge"+(t>0?" red":"");
+    $("threatBar").style.width=Math.min(100,t*6)+"%";
+    var log=$("log"); log.innerHTML="";
+    dev.log.forEach(function(e){
+      var d=document.createElement("div"); d.className="e "+e.kind;
+      d.textContent=e.at.slice(11,19)+"  "+e.text; log.appendChild(d);
+    });
+    rotatedSvc=null;
+  }
+  function flash(name){ rotatedSvc=name; render(); }
+
+  function doAttack(type){
+    var svc=$("atkSvc").value;
+    var attempt={ type:type, from:"203.0.113."+(Math.floor(Math.random()*254)+1) };
+    if (stolen && stolen.svc===svc){ attempt.port=stolen.port; attempt.ip=stolen.ip; attempt.password=stolen.password; }
+    var r=QS.attackerTouch(dev, svc, attempt);
+    flash(svc);
+    $("atkStatus").textContent="⛔ "+r.message+" (新 port "+dev.services[svc].creds.port+")";
+    $("atkStatus").className="status block";
+  }
+  document.querySelectorAll("button.atk[data-type]").forEach(function(b){
+    b.onclick=function(){ doAttack(b.getAttribute("data-type")); };
+  });
+  $("steal").onclick=function(){
+    var svc=$("atkSvc").value, c=dev.services[svc].creds;
+    stolen={ svc:svc, port:c.port, ip:c.ip, password:c.password };
+    $("stPort").textContent=c.port; $("stIp").textContent=c.ip; $("stPw").textContent=c.password;
+    $("atkStatus").textContent="🗝️ "+svc+" の現在の資格情報を盗みました(が、使えば接触で失効します)";
+    $("atkStatus").className="status";
+  };
+  $("useStolen").onclick=function(){
+    if (!stolen){ $("atkStatus").textContent="先に資格情報を盗んでください"; return; }
+    $("atkSvc").value=stolen.svc;
+    var r=QS.attackerTouch(dev, stolen.svc, { type:"connect", from:"198.51.100.66",
+      port:stolen.port, ip:stolen.ip, password:stolen.password });
+    flash(stolen.svc);
+    $("atkStatus").textContent="⛔ 盗んだ資格情報で接続 → "+r.message+"(接触と同時に量子ローテーションし失効。新 port "+dev.services[stolen.svc].creds.port+")";
+    $("atkStatus").className="status block";
+  };
+  $("ownerConnect").onclick=function(){
+    var svc=$("ownSvc").value;
+    var r=QS.ownerConnect(dev, svc, dev.knotId);
+    render();
+    $("ownStatus").textContent=(r.ok?"✓ ":"✗ ")+r.message+(r.ok?" (port "+r.creds.port+" / パスワード "+r.creds.password+")":"");
+    $("ownStatus").className="status "+(r.ok?"ok":"block");
+  };
+  $("fakeConnect").onclick=function(){
+    var svc=$("ownSvc").value;
+    var wrong=(dev.knotId+1)%QC.KNOTS.length;
+    var r=QS.ownerConnect(dev, svc, wrong);
+    render();
+    $("ownStatus").textContent="✗ "+r.message+" — 偽の持ち主は量子鍵(結び目)を知らないため接続不能";
+    $("ownStatus").className="status block";
+  };
+  $("knot").onchange=init; $("reset").onclick=init;
+  init();
+})();
+</script>
+</body>
+</html>
