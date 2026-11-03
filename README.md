@@ -197,7 +197,7 @@ zone:// の **Jones 多項式量子暗号**を単独アプリにしたもの。�
 | **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-vm-pro-debug.apk` |
 | **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (インストーラ / ポータブル) |
 | **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
-| **ライブ CD / USB** (ISO) | Releases / [Actions](https://github.com/masaaki-avnturle/Bada/actions) の `BadaVMPro-live.iso` — **レガシー BIOS の GRUB (i386-pc) マルチブート ISO**。他 OS と共存インストール可: Bada VM Pro は**ディスク末尾パーティション**、Windows は**前方パーティションのまま chainload**、GRUB が MBR のマルチ OS セレクタ(先頭ヘッダを占有しない)。`install-grub-multiboot.sh` で非破壊インストール。VM Pro 自身もアプリメニューから ISO を `/mnt/cdrom` にマウント可能 |
+| **ライブ CD / USB** (ISO) | Releases / [Actions](https://github.com/masaaki-avnturle/Bada/actions) の `BadaVMPro-live.iso` — **レガシー BIOS の GRUB (i386-pc) マルチブート ISO**。他 OS と**裏表デュアルブート**で共存可: Windows(表・前方)と Bada(裏・末尾)の**間に WIN 属性の専用 BOOT パーティション**を作り GRUB 本体を配置(先頭ヘッダを占有しない)。VMware Pro 16 対応・`install-grub-multiboot.sh` で非破壊インストール。VM Pro 自身もアプリメニューから ISO を `/mnt/cdrom` にマウント可能 |
 | **どこでも** (単一 HTML) | [`bada_vm_pro/index.html`](bada_vm_pro/index.html) をダウンロードして開くだけ |
 
 ビルドは [`badavmpro-app-build.yml`](.github/workflows/badavmpro-app-build.yml) が自動実行します (`badavmpro-v*` タグで Release へ添付 / `workflow_dispatch`)。詳細は [`bada_vm_pro/README.md`](bada_vm_pro/README.md) を参照。

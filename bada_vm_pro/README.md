@@ -15,42 +15,52 @@ x-terminal-emulator / terminal)を載せた、依存ゼロの **単一 HTML** (`
 | **Ubuntu** | Releases から `BadaVMPro-*-x86_64.AppImage` / `BadaVMPro-*-amd64.deb` |
 | **ライブ CD / USB (ISO)** | Releases / Actions アーティファクトから `BadaVMPro-live.iso` — **レガシー BIOS の GRUB (i386-pc) マルチブート ISO**。ブートすると GRUB メニューで複数 OS を選べます。マウントして `INDEX.HTM` をブラウザで開けば OS が起動。ISO は [`tools/build-iso.sh`](tools/build-iso.sh) (grub-mkrescue) が生成 |
 
-### 🧩 他の OS と共存させる — レガシー GRUB マルチブート
+### 🧩 他の OS と共存させる — 裏表デュアルブート (専用 BOOT 区画)
 
-Bada VM Pro を**先頭ヘッダを占有せず**、Windows など他の OS と共存させてインストールできます。
-配置は次のとおり:
+Bada VM Pro を**先頭ヘッダを占有せず**、Windows と「裏表(front/back)」のデュアルブートで
+共存インストールできます。Bada 用パーティションを作るとき、**Windows と Bada の「間」に
+WIN 属性(FAT・ブートフラグ付き)のブートローダー専用パーティション**も同時に作り、
+そこへ GRUB 本体を置きます:
 
 ```
 ハードディスク (MBR / レガシー BIOS)
- ┌─────────────┬──────────────────────────┬──────────────┐
- │ MBR: GRUB   │ Windows パーティション    │ Bada VM Pro  │
- │ (マルチOS   │ (前方・そのまま chainload)│ パーティション│
- │  セレクタ)  │                          │ (末尾・新規)  │
- └─────────────┴──────────────────────────┴──────────────┘
-   起動時に GRUB メニューで Windows / Bada VM Pro / 既存OS を選択
+ ┌──────────┬─────────────────────┬──────────────────────┬────────────────┐
+ │ MBR      │ Windows             │ BOOT 専用パーティション │ Bada VM Pro    │
+ │ (最小    │ (前方・表/おもて)    │ (中間・WIN属性/boot旗)  │ (末尾・裏/うら) │
+ │ ブート   │ そのまま chainload  │ GRUB 本体 + grub.cfg    │ INDEX.HTM      │
+ │ ストラップ)│                     │ (ラベル BADABOOT)       │ (BADAVMPRO)    │
+ └──────────┴─────────────────────┴──────────────────────┴────────────────┘
+   起動時に GRUB メニューで Windows(表) / Bada VM Pro(裏) / 既存OS を選択
 ```
 
-- **GRUB を MBR のマルチ OS セレクタ**にします(先頭ヘッダは OS が占有しません)。
-- **Windows は前方パーティションのまま**残し、GRUB が `chainloader` で起動します。
-- **Bada VM Pro はディスク末尾の新規パーティション**(ラベル `BADAVMPRO`)に入れます。
+- **GRUB 本体・モジュール・`grub.cfg` は専用 BOOT パーティション**(Windows と Bada の間)に
+  置きます。先頭ヘッダや Windows/Bada の中には入れません。
+  ※ レガシー BIOS では MBR 先頭 440B に GRUB の**最小ブートストラップ**だけが入ります
+  (BIOS の仕様上これは避けられません)。設定・本体は専用パーティション側です。
+- 専用 BOOT パーティションには **WIN 属性(ブートフラグ / FAT 型)** を付けます。
+- **Windows は前方パーティション(表)のまま**残し、GRUB が `chainloader` で起動します。
+- **Bada VM Pro はディスク末尾(裏)の新規パーティション**(ラベル `BADAVMPRO`)。
   既存パーティションは一切消しません。
+- **VMware Workstation Pro 16** の仮想ディスクでも同じレイアウトでデュアルブートできます。
 
 インストールは既存の Ubuntu などから(**既定は下見・非破壊**、`--apply` で実行):
 
 ```
 sudo bash bada_vm_pro/tools/install-grub-multiboot.sh            # 下見 (何も書き込まない)
 sudo bash bada_vm_pro/tools/install-grub-multiboot.sh --apply    # 実行
-   オプション: --disk /dev/sdX  --size <MiB(既定512)>
+   オプション: --disk /dev/sdX  --size <MiB(既定512)>  --boot-size <MiB(既定128)>
 ```
 
-インストーラは「ディスク末尾の空き領域に FAT32 の Bada パーティションを作成 → `INDEX.HTM`
-を配置 → GRUB(i386-pc / レガシー)を MBR に導入 → Windows(chainload)/ Bada VM Pro /
-既存 OS を選べる `grub.cfg` を生成」します。OS 本体は `INDEX.HTM` なので、起動後は
-どの PC のブラウザで開いても w9wm デスクトップが動きます。
+インストーラは「ディスク末尾の空きに **① WIN 属性の BOOT 専用パーティション(fat16・boot旗)**
+→ **② Bada パーティション(fat32・BADAVMPRO)** の順で 2 区画を作成 → ① に GRUB(i386-pc /
+レガシー)本体と `grub.cfg` を導入(MBR は最小ブートストラップのみ)→ ② に `INDEX.HTM` を配置 →
+Windows(表)/ Bada VM Pro(裏)/ 既存 OS を選べる `grub.cfg` を生成」します。OS 本体は
+`INDEX.HTM` なので、起動後はどの PC のブラウザで開いても w9wm デスクトップが動きます。
 
-> QEMU での実ブート検証済み: **GNU GRUB 2.12(レガシー BIOS)**がマルチ OS メニューを表示し、
-> 「Windows」を選ぶと前方パーティションを `chainloader +1` で起動することをスクリーンショットで確認。
-> ライブ ISO 単体でも GRUB メニューが出ます。
+> QEMU での実ブート検証済み(裏表 3 区画のインストール済みディスク): **中間の専用 BOOT
+> パーティション上の GNU GRUB 2.12** が裏表メニューを表示し、「Windows(表)」を選ぶと前方
+> パーティションを `chainloader +1` で起動することをスクリーンショットで確認。ライブ ISO 単体でも
+> GRUB メニューが出ます。
 
 ネイティブ版は [`badavmpro-app-build.yml`](../.github/workflows/badavmpro-app-build.yml) がビルドします
 (`badavmpro-v*` タグを push するか、Actions の `workflow_dispatch` で `release_tag` を指定)。

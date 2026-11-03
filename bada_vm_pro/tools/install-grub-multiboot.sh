@@ -1,26 +1,36 @@
 #!/usr/bin/env bash
 #
-# install-grub-multiboot.sh — Bada VM Pro をレガシー GRUB マルチブートで
-#                             既存 OS と共存インストールする
+# install-grub-multiboot.sh — Bada VM Pro をレガシー GRUB デュアルブートで
+#                             既存 OS (Windows) と共存インストールする
 #
-# 方針 (先頭ヘッダを占有しない・他 OS と共存):
-#   1. ディスク *末尾* の空き領域に Bada VM Pro 用の新規パーティションを作る
-#      (既存パーティションは一切消さない / FAT32・ラベル BADAVMPRO)。
-#   2. そこへ OS 本体 (INDEX.HTM) と GRUB の /boot を置く。
-#   3. GRUB (i386-pc / レガシー BIOS) を MBR に入れ、「マルチ OS セレクタ」
-#      にする。Windows は前方パーティションのまま chainload。
-#   4. 生成する grub.cfg で Windows / Bada VM Pro / 既存 OS を選べる。
+# 「裏表 (front/back)」3 パーティション構成 (先頭ヘッダを占有しない):
+#
+#   [ Windows           ] [ BOOT (専用)        ] [ Bada VM Pro       ]
+#   [ 前方・表(おもて)   ] [ WIN属性/ブートフラグ ] [ 末尾・裏(うら)    ]
+#   [ そのまま chainload ] [ GRUB 本体+grub.cfg  ] [ INDEX.HTM (OS本体) ]
+#                     ↑ Windows と Bada の「間」に専用ブートローダー区画
+#
+#   ・Bada VM Pro 用パーティションを作るとき、その手前に「WIN 属性
+#     (FAT・ブートフラグ付き) のブートローダー専用パーティション」も作る。
+#   ・GRUB (i386-pc / レガシー BIOS) の本体・モジュール・grub.cfg はこの
+#     専用 BOOT パーティションに置く (先頭ヘッダや Windows/Bada の中ではない)。
+#     ※ レガシー BIOS では MBR 先頭 440B に GRUB の最小ブートストラップだけ
+#       が入る (これは BIOS の仕様上避けられない)。設定・モジュール本体は
+#       専用パーティション側。
+#   ・起動時に GRUB メニューで Windows(表) / Bada VM Pro(裏) / 既存OS を選択。
+#   ・VMware Workstation Pro 16 の仮想ディスクでも同じレイアウトでデュアル
+#     ブートできる。
 #
 # 安全:
-#   ・既定は *下見 (ドライラン)*。何も書き込まず、実行予定の手順と、検出した
-#     ディスク・パーティション・末尾空き領域・Windows パーティションを表示。
-#   ・実際に書き込むのは --apply を付けたときだけ (root 必須)。
+#   ・既定は *下見 (ドライラン)*。何も書き込まず計画のみ表示。
+#   ・実際に書き込むのは --apply のときだけ (root 必須)。
 #   ・末尾の空き領域にしか手を付けず、既存パーティションのデータは保持。
 #
 # 使い方:
 #   sudo bash install-grub-multiboot.sh                 # 下見
 #   sudo bash install-grub-multiboot.sh --apply         # 実行
-#   オプション: --disk /dev/sdX  --size <MiB(既定512)>  --os-html <path>
+#   オプション: --disk /dev/sdX  --size <MiB(既定512)>
+#               --boot-size <MiB(既定128)>  --os-html <path>
 #
 set -euo pipefail
 
@@ -29,15 +39,17 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 APPLY=0
 DISK=""
 SIZE_MIB=512
+BOOT_SIZE_MIB=128
 OS_HTML=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) APPLY=1 ;;
     --disk) DISK="$2"; shift ;;
     --size) SIZE_MIB="$2"; shift ;;
+    --boot-size) BOOT_SIZE_MIB="$2"; shift ;;
     --os-html) OS_HTML="$2"; shift ;;
     -h|--help)
-      sed -n '2,33p' "$0"; exit 0 ;;
+      sed -n '2,46p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
   shift
@@ -73,7 +85,7 @@ say "対象ディスク: $DISK"
 say "現在のパーティション:"
 parted -s "$DISK" unit MiB print 2>/dev/null | sed 's/^/    /' || true
 
-# 末尾の空き領域を検出 (parted の free リストで、ディスク末尾に接する最後の Free)
+# 末尾の空き領域を検出
 DISK_END_MIB="$(parted -ms "$DISK" unit MiB print free 2>/dev/null | awk -F: '/^BYT;/{next} $1=="'"$DISK"'"||$1~/^\/dev/{gsub(/MiB/,"",$2); dend=$2} END{print dend}')"
 read -r FREE_START FREE_END FREE_SIZE < <(
   parted -ms "$DISK" unit MiB print free 2>/dev/null | awk -F: '
@@ -82,24 +94,26 @@ read -r FREE_START FREE_END FREE_SIZE < <(
 
 say "ディスク末尾: ${DISK_END_MIB:-?} MiB / 末尾空き: start=${FREE_START:-?} end=${FREE_END:-?} size=${FREE_SIZE:-?} MiB"
 
-# Windows (前方) パーティションの検出: NTFS を優先 (ブロックデバイス時)。
-# 画像ファイルを --disk に渡した下見では lsblk が使えないので非致命にする。
+# Windows (前方・表) パーティションの検出
 WIN_PART="$(lsblk -rno NAME,FSTYPE "$DISK" 2>/dev/null | awk '$2=="ntfs"{print "/dev/"$1; exit}')" || WIN_PART=""
 WIN_HINT="(未検出 — Windows が無い構成かもしれません)"
 [ -n "$WIN_PART" ] && WIN_HINT="$WIN_PART (NTFS)"
-say "Windows パーティション (前方・chainload 対象): $WIN_HINT"
+say "Windows パーティション (前方・表・chainload 対象): $WIN_HINT"
 
-# 計画の提示
-NEW_START="${FREE_START:-0}"
-NEW_END_CALC=""
-if [ -n "${FREE_START:-}" ]; then NEW_END_CALC="$(awk "BEGIN{print $NEW_START + $SIZE_MIB}")"; fi
+# 計画: 末尾空きに BOOT(専用) → Bada の順で 2 区画
+B_START="${FREE_START:-0}"
+B_END="$(awk "BEGIN{print ${FREE_START:-0} + $BOOT_SIZE_MIB}")"
+V_START="$B_END"
+V_END="$(awk "BEGIN{print $V_START + $SIZE_MIB}")"
 say ""
-say "=== 実行計画 (末尾パーティションに Bada VM Pro / GRUB を MBR へ) ==="
-say "  1) parted $DISK mkpart primary fat32 ${NEW_START}MiB ${NEW_END_CALC:-+${SIZE_MIB}M}MiB  (末尾の空きのみ使用)"
-say "  2) mkfs.vfat -n BADAVMPRO <新パーティション>"
-say "  3) INDEX.HTM / BANNER.TXT を新パーティションへコピー"
-say "  4) grub-install --target=i386-pc --boot-directory=<mnt>/boot --recheck $DISK   (GRUB を MBR へ)"
-say "  5) <mnt>/boot/grub/grub.cfg を生成: Windows(chainload) / Bada VM Pro / 既存OS"
+say "=== 実行計画 (裏表 3 パーティション / GRUB は専用 BOOT 区画へ) ==="
+say "  Windows(表)  … 前方パーティションのまま (chainload)"
+say "  1) BOOT 専用: parted mkpart primary fat16 ${B_START}MiB ${B_END}MiB + set boot on (WIN属性)"
+say "     → GRUB 本体 (i386-pc) + grub.cfg をここへ。ラベル BADABOOT"
+say "  2) Bada(裏) : parted mkpart primary fat32 ${V_START}MiB ${V_END}MiB  (ラベル BADAVMPRO)"
+say "     → INDEX.HTM / BANNER.TXT をここへ"
+say "  3) grub-install --target=i386-pc --boot-directory=<BOOT>/boot $DISK (MBR は最小ブートストラップのみ)"
+say "  4) <BOOT>/boot/grub/grub.cfg 生成: Windows(表) / Bada VM Pro(裏) / 既存OS"
 say ""
 
 if [ "$APPLY" -ne 1 ]; then
@@ -113,26 +127,15 @@ fi
 need mkfs.vfat dosfstools
 need grub-install grub-pc-bin
 [ -n "${FREE_START:-}" ] && [ -n "${FREE_END:-}" ] || die "末尾の空き領域を特定できませんでした。手動でパーティションを用意してください。"
-# 末尾空きがディスク末尾に接しているか確認 (共存のため先頭側は触らない)
 if [ -n "${DISK_END_MIB:-}" ]; then
   gap="$(awk "BEGIN{d=$DISK_END_MIB-$FREE_END; print (d<0?-d:d)}")"
   awk "BEGIN{exit !($gap <= 2)}" || die "検出した空き領域がディスク末尾ではありません。先頭側は触りません。中止します。"
 fi
+need_total="$(awk "BEGIN{print $BOOT_SIZE_MIB + $SIZE_MIB}")"
 avail="$(awk "BEGIN{print $FREE_END-$FREE_START}")"
-awk "BEGIN{exit !($avail >= $SIZE_MIB)}" || die "末尾空きが不足 (${avail}MiB < ${SIZE_MIB}MiB)。--size を小さくしてください。"
+awk "BEGIN{exit !($avail >= $need_total)}" || die "末尾空きが不足 (${avail}MiB < ${need_total}MiB)。--size / --boot-size を小さくしてください。"
 
-END_MIB="$(awk "BEGIN{print $FREE_START + $SIZE_MIB}")"
-say "パーティション作成: ${FREE_START}MiB .. ${END_MIB}MiB"
-parted -s "$DISK" unit MiB mkpart primary fat32 "$FREE_START" "$END_MIB"
-NEWNO="$(parted -ms "$DISK" print | tail -1 | cut -d: -f1)"
-parted -s "$DISK" set "$NEWNO" lba on || true
-partprobe "$DISK" 2>/dev/null || true; sleep 1
-
-# 子デバイス名 (loop/nvme/mmcblk は pN、sd/vd/hd は N)
 base="$(basename "$DISK")"
-if [[ "$base" =~ [0-9]$ ]]; then NEWDEV="${DISK}p${NEWNO}"; else NEWDEV="${DISK}${NEWNO}"; fi
-
-# udev の無い最小環境向け: /sys からパーティションの /dev ノードを補完
 ensure_node(){
   local dev="$1" name; name="$(basename "$dev")"
   [ -b "$dev" ] && return 0
@@ -141,24 +144,47 @@ ensure_node(){
     local mm; mm="$(cat "$sysf")"; mknod "$dev" b "${mm%%:*}" "${mm##*:}" 2>/dev/null || true
   fi
 }
-ensure_node "$NEWDEV"
-[ -b "$NEWDEV" ] || die "新パーティションのデバイスが見つかりません: $NEWDEV"
-say "新パーティション: $NEWDEV"
+dev_for_no(){ local n="$1"; if [[ "$base" =~ [0-9]$ ]]; then echo "${DISK}p${n}"; else echo "${DISK}${n}"; fi; }
 
-mkfs.vfat -n BADAVMPRO "$NEWDEV" >/dev/null
-MNT="$(mktemp -d)"
-mount "$NEWDEV" "$MNT"
-install -D "$OS_HTML" "$MNT/INDEX.HTM"
-cp "$HERE/grub/banner.txt" "$MNT/BANNER.TXT" 2>/dev/null || cp "$HERE/BANNER.TXT" "$MNT/BANNER.TXT" 2>/dev/null || true
+# 1) BOOT 専用パーティション (Windows と Bada の間・WIN属性)
+say "BOOT 専用パーティション作成: ${B_START}MiB .. ${B_END}MiB (fat16 / boot flag)"
+parted -s "$DISK" unit MiB mkpart primary fat16 "$B_START" "$B_END"
+BOOTNO="$(parted -ms "$DISK" print | tail -1 | cut -d: -f1)"
+parted -s "$DISK" set "$BOOTNO" boot on            # ← WIN 属性 (アクティブ/ブートフラグ)
+parted -s "$DISK" set "$BOOTNO" lba on || true
+# 2) Bada VM Pro パーティション (裏・末尾)
+say "Bada VM Pro パーティション作成: ${V_START}MiB .. ${V_END}MiB (fat32 / BADAVMPRO)"
+parted -s "$DISK" unit MiB mkpart primary fat32 "$V_START" "$V_END"
+VNO="$(parted -ms "$DISK" print | tail -1 | cut -d: -f1)"
+parted -s "$DISK" set "$VNO" lba on || true
+partprobe "$DISK" 2>/dev/null || true; sleep 1
 
-# GRUB (レガシー) を MBR へ。/boot は Bada パーティション上に置く。
-grub-install --target=i386-pc --boot-directory="$MNT/boot" --recheck "$DISK"
+BOOTDEV="$(dev_for_no "$BOOTNO")"; ensure_node "$BOOTDEV"
+VDEV="$(dev_for_no "$VNO")";       ensure_node "$VDEV"
+[ -b "$BOOTDEV" ] || die "BOOT パーティションのデバイスが見つかりません: $BOOTDEV"
+[ -b "$VDEV" ] || die "Bada パーティションのデバイスが見つかりません: $VDEV"
+say "BOOT=$BOOTDEV  Bada=$VDEV"
 
-# grub.cfg を具体的なパーティションで生成
+# フォーマット
+mkfs.vfat -F 16 -n BADABOOT "$BOOTDEV" >/dev/null
+mkfs.vfat -F 32 -n BADAVMPRO "$VDEV" >/dev/null
+
+# Bada(裏) に OS 本体を配置
+VMNT="$(mktemp -d)"; mount "$VDEV" "$VMNT"
+install -D "$OS_HTML" "$VMNT/INDEX.HTM"
+cp "$HERE/grub/banner.txt" "$VMNT/BANNER.TXT" 2>/dev/null || cp "$HERE/BANNER.TXT" "$VMNT/BANNER.TXT" 2>/dev/null || true
+sync; umount "$VMNT"; rmdir "$VMNT"
+
+# BOOT(専用) に GRUB を配置。MBR には最小ブートストラップのみ、本体はここ。
+BMNT="$(mktemp -d)"; mount "$BOOTDEV" "$BMNT"
+grub-install --target=i386-pc --boot-directory="$BMNT/boot" --recheck "$DISK"
+cp "$HERE/grub/banner.txt" "$BMNT/boot/BANNER.TXT" 2>/dev/null || true
+
+# grub.cfg を BOOT 区画に生成
 WIN_ENTRY=""
 if [ -n "$WIN_PART" ]; then
   WIN_NO="$(echo "$WIN_PART" | grep -o '[0-9]*$')"
-  WIN_ENTRY="menuentry \"Windows  (chainload)\" --class windows {
+  WIN_ENTRY="menuentry \"Windows  (表 / front — chainload)\" --class windows {
   insmod part_msdos
   insmod ntfs
   insmod chain
@@ -167,19 +193,23 @@ if [ -n "$WIN_PART" ]; then
   chainloader +1
 }"
 fi
-mkdir -p "$MNT/boot/grub"
-cat > "$MNT/boot/grub/grub.cfg" <<CFG
+mkdir -p "$BMNT/boot/grub"
+cat > "$BMNT/boot/grub/grub.cfg" <<CFG
+# Bada VM Pro — 裏表デュアルブート (専用 BOOT パーティション上の GRUB)
 set timeout=15
 set default=0
+insmod part_msdos
+insmod fat
+insmod ntfs
+insmod chain
+insmod search_label
 insmod all_video
 insmod gfxterm
 if loadfont unicode ; then set gfxmode=auto; terminal_output gfxterm; fi
 set menu_color_normal=cyan/black
 set menu_color_highlight=black/cyan
 
-menuentry "Bada VM Pro  (quantum Bada OS / w9wm desktop)" --class bada {
-  insmod fat
-  insmod search_label
+menuentry "Bada VM Pro  (裏 / back — quantum Bada OS / w9wm desktop)" --class bada {
   search --no-floppy --label --set=root BADAVMPRO
   echo ""
   if [ -f /BANNER.TXT ]; then cat /BANNER.TXT ; fi
@@ -192,7 +222,6 @@ menuentry "Bada VM Pro  (quantum Bada OS / w9wm desktop)" --class bada {
 ${WIN_ENTRY}
 
 menuentry "Boot from the first hard disk (existing OS)" {
-  insmod chain
   set root=(hd0)
   chainloader +1
 }
@@ -202,7 +231,9 @@ menuentry "Reboot" { reboot }
 menuentry "Shut down" { halt }
 CFG
 
-sync
-umount "$MNT"; rmdir "$MNT"
-say "完了: GRUB (レガシー) を $DISK の MBR に導入し、Bada VM Pro を末尾パーティション $NEWDEV に配置しました。"
-say "再起動すると GRUB メニューで Windows / Bada VM Pro / 既存 OS を選べます。"
+sync; umount "$BMNT"; rmdir "$BMNT"
+say "完了: 裏表 3 パーティション構成を作成しました。"
+say "  Windows(表) = 前方パーティション (chainload)"
+say "  BOOT(専用)  = $BOOTDEV  (WIN属性/boot flag, GRUB 本体+grub.cfg)"
+say "  Bada(裏)    = $VDEV  (BADAVMPRO, INDEX.HTM)"
+say "再起動 (VMware Pro 16 等) すると GRUB メニューで Windows / Bada VM Pro を選べます。"
