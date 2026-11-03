@@ -229,6 +229,19 @@ Git GUI **SourceTree** のカスタム操作 (`$REPO`) に登録して付属ア�
 
 SourceTree への登録: ツール → オプション → カスタム操作 → スクリプトに `BadaSearch.exe`、パラメータに `$REPO`。ビルドは [`sourcetree-search-build.yml`](.github/workflows/sourcetree-search-build.yml) が自動実行します (`stsearch-v*` タグ / `workflow_dispatch`)。詳細は [`sourcetree_search/README.md`](sourcetree_search/README.md) を参照。
 
+### 🎬 Bada 映画カウントダウンエディタ (BadaCineCountdown)
+
+映画冒頭の**フィルムリーダー(カウントダウン)**— クラシックな SMPTE ユニバーサル・リーダー(1 秒で 1 回転する掃引ハンド・大きな数字・全画面十字・外周リング・グレイン・ビネット・整数フラッシュ・ビープ)— を編集してプレビューし、**WebM 動画 / PNG / 設定 JSON / 単体 HTML プレーヤー**として書き出すエディタ(依存ゼロ・端末内完結)。BadaCineVim と同じシネマ路線の付属アプリ:
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `cinecountdown-debug.apk` |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaCineCountdown-Setup-*-x64.exe` / `BadaCineCountdown-Portable-*-x64.exe` |
+| **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaCineCountdown-*.AppImage` / `.deb` |
+| **どこでも** (HTML) | [`bada_gui_ide/cinecountdown-app/www/`](bada_gui_ide/cinecountdown-app/www/) の `index.html` をブラウザで開くだけ |
+
+ビルドは [`cinecountdown-app-build.yml`](.github/workflows/cinecountdown-app-build.yml) が自動実行します (`cinecountdown-v*` タグで Release 添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bada_gui_ide/cinecountdown-app/README.md`](bada_gui_ide/cinecountdown-app/README.md) を参照。
+
 ### 🔌 Ω-USB Resume — 接触不良 USB メモリの復旧アプリ
 
 接触不良・未認可・プラグプレイ不発で使えなくなった USB を、物理修理なしにソフト側から復旧(レジューム)するアプリ。機械語記述子の n進数のズレを複素回転体 e^(iθ) の閉軌道平均で訂正し、可積分系のエントロピー不変量 Ξ で検証してから再認可 → 電源 → 再列挙します(既定はシミュレーション・非破壊):
