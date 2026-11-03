@@ -21,7 +21,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const ctx = { console, TextEncoder, TextDecoder, atob, btoa, Uint8Array, Float32Array, Map };
 vm.createContext(ctx);
-for (const f of ["src/engine.js", "src/comprehend.js", "src/generate.js", "src/paper.js"]) {
+for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/generate.js", "src/paper.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), ctx, { filename: f });
 }
 const E = (expr) => vm.runInContext(expr, ctx);
@@ -32,6 +32,43 @@ function ok(cond, name) {
   if (cond) { pass++; } else { fail++; console.log("  ✗ " + name); }
 }
 function section(t) { console.log("■ " + t); }
+
+/* 0. サイレント・トーク (非言語思考入力・トランスフォーマー) */
+section("サイレント・トーク (非言語 → トランスフォーマー → latent)");
+{
+  const atoms = E("SILENT_ATOMS");
+  ok(Array.isArray(atoms) && atoms.length >= 30 && atoms.every((a) => a.g && a.id && a.tags), "非言語アトム辞書 (30 種以上・グリフとタグ)");
+  const ids = ["book", "records", "sort", "cool", "windows", "book_vol"];
+  const enc1 = call("silentEncode", ids), enc2 = call("silentEncode", ids);
+  ok(JSON.stringify(enc1.pooled) === JSON.stringify(enc2.pooled), "トランスフォーマーは決定的 (同じ入力 → 同じ latent)");
+  ok(enc1.seq.length === ids.length && enc1.pooled.length === E("SILENT_CFG").D, "latent の形 (系列長 × 次元)");
+  let rowsOk = true, maxErr = 0;
+  enc1.attention.forEach((r) => { const s = r.reduce((a, b) => a + b, 0); maxErr = Math.max(maxErr, Math.abs(s - 1)); if (Math.abs(s - 1) > 1e-9) rowsOk = false; });
+  ok(rowsOk && enc1.attention.length > 0, "自己注意の各行が確率分布 (行和=1, 誤差 " + maxErr.toExponential(1) + ")");
+  const diff = call("silentEncode", ["money", "budget", "graph", "warm", "android"]);
+  ok(JSON.stringify(diff.pooled) !== JSON.stringify(enc1.pooled), "異なる非言語入力 → 異なる latent");
+  ok(JSON.stringify(call("silentEncode", ids).pooled) === JSON.stringify(call("silentEncode", ids.slice().reverse()).pooled) === false, "順序が latent に効く (位置エンコード)");
+  const req = call("silentToRequest", ids, enc1);
+  ok(/本/.test(req.text) && /並べ替え/.test(req.text) && /Windows/.test(req.text), "言語変換: latent → 依頼文");
+  const spec = call("comprehend", req.text);
+  ok(spec.modules.some((m) => m.id === "records") && spec.coverage >= 0.5, "依頼文が全体把握に通る (下流と接続)");
+  const short = call("latentToDocument", ids, enc1, { targetChars: 1200 });
+  const long = call("latentToDocument", ids, enc1, { targetChars: 24000 });
+  ok(short.markdown.startsWith("# ") && short.chars >= 400, "文章展開: Markdown の見出しと最小量");
+  ok(long.chars > short.chars * 3, "文章の分量が目標に応じて増える (本と同じ分量まで)");
+  ok(short.markdown === call("latentToDocument", ids, enc1, { targetChars: 1200 }).markdown, "文章展開も決定的");
+  const imgs = call("latentToImagery", enc1, 4);
+  ok(imgs.length === 4 && imgs.every((s) => /^<svg[\s\S]*<\/svg>$/.test(s)), "イメージ生成 (SVG)");
+  const bada = call("latentToBada", ids, enc1, req);
+  let parsed = true; try { new (E("BadaInterp"))(() => {}).run(bada); } catch (e) { parsed = false; }
+  ok(parsed && /Tele::send/.test(bada) && /GPT::generate/.test(bada), "Bada 言語プログラムが構文エラーなく実行できる");
+  const proc = call("silentProcess", ids, { targetChars: 2000 });
+  ok(proc.request && proc.document && proc.imagery.length && proc.bada && proc.tags, "silentProcess が全成果物を返す");
+  ok(call("silentToRequest", [], call("silentEncode", [])).text.length > 0 && call("silentEncode", []).seq.length === 0, "空入力でも落ちない");
+  const gp = call("generateApp", spec);
+  const paperMd = call("writePaper", spec, gp, call("verifyApp", gp.html, spec), { silent: proc });
+  ok(/### 2.0 サイレント・トーク/.test(paperMd) && paperMd.includes(proc.seq.join(" / ")), "論文にサイレント・トーク由来の節");
+}
 
 /* 1. 電信エンジン */
 section("電信エンジン");

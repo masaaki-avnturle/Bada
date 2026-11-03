@@ -51,6 +51,17 @@ function writePaper(spec, gen, ver, meta) {
   L.push("");
   L.push("## 2. 方法");
   L.push("");
+  if (meta.silent && meta.silent.seq && meta.silent.seq.length) {
+    var sv = meta.silent;
+    L.push("### 2.0 サイレント・トーク (非言語思考入力) 由来");
+    L.push("");
+    L.push("この依頼は言葉ではなく、利用者が並べた非言語のアトム (" + sv.seq.join(" / ") + ") と手描きから作られた。" +
+      "アトム列は固定の重みを持つ小さなトランスフォーマー (自己注意 " + SILENT_CFG.L + " 層・多頭) で言語化されていない潜在表現 (latent) に変換され、" +
+      "latent から (a) 本と同じ分量まで展開できる文章 (" + (sv.document ? sv.document.chars.toLocaleString("ja-JP") : "?") + " 字)、(b) イメージ " +
+      ((sv.imagery && sv.imagery.length) || 0) + " 枚、(c) Bada 言語のプログラム、(d) 次節以降に渡す依頼文「" + sv.request + "」を決定的に復号した。" +
+      "トランスフォーマーは利用者が並べたアトムを処理するもので、脳の信号は読み取らない。");
+    L.push("");
+  }
   L.push("### 2.1 電信による入力");
   L.push("");
   L.push("依頼文は BADA グラビトン電信の送信プログラム (Bada 言語) によって符号化され、BadaGPT へ配信される。" +

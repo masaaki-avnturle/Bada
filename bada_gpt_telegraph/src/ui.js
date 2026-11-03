@@ -279,7 +279,7 @@
           if (!cur.ver.ok || !cur.runtime.ok) { state[cmd] = "fail"; renderSteps(state); continue; }
         }
         else if (cmd === "paper") {
-          cur.paper = writePaper(cur.spec, cur.gen, cur.ver, { author: $("author").value.trim(), metrics: M, engine: cur.engine, runtime: cur.runtime });
+          cur.paper = writePaper(cur.spec, cur.gen, cur.ver, { author: $("author").value.trim(), metrics: M, engine: cur.engine, runtime: cur.runtime, silent: lastSilent });
           cur.pdf = null;
           $("paperView").innerHTML = mdToHtml(cur.paper); $("paperCard").classList.remove("hidden");
         }
@@ -418,4 +418,95 @@
   $("saveKey").onclick = function () { LS.set("apiKey", $("apiKey").value.trim()); LS.set("model", $("model").value); $("apiKey").value = ""; keyState(); };
   $("clearKey").onclick = function () { LS.set("apiKey", ""); keyState(); };
   keyState();
+
+  /* ═════════════ ⓪ サイレント・トーク (非言語思考入力) ═════════════ */
+  var lastSilent = null;
+  var CAT_LABEL = { tone: "感情・質感", domain: "領域", object: "対象", action: "動作", scale: "分量", platform: "環境" };
+  var silentSeq = LS.get("silentSeq", []);
+  function buildPalette() {
+    var cats = {};
+    SILENT_ATOMS.forEach(function (a) { (cats[a.cat] = cats[a.cat] || []).push(a); });
+    var html = "";
+    ["tone", "domain", "object", "action", "scale", "platform"].forEach(function (c) {
+      if (!cats[c]) return;
+      html += '<div class="spal-grp"><span class="lbl">' + CAT_LABEL[c] + '</span><div class="gl">' +
+        cats[c].map(function (a) { return '<div class="sglyph" data-id="' + a.id + '" title="' + a.id + '">' + a.g + "</div>"; }).join("") + "</div></div>";
+    });
+    $("silent-palette").innerHTML = html;
+    $("silent-palette").onclick = function (e) {
+      var t = e.target.closest(".sglyph"); if (!t) return;
+      silentSeq.push(t.getAttribute("data-id")); saveSeq(); renderStrip();
+    };
+  }
+  function saveSeq() { LS.set("silentSeq", silentSeq); }
+  function renderStrip() {
+    var el = $("silent-strip");
+    if (!silentSeq.length) { el.innerHTML = '<span class="muted">グリフをタップして並べてください。</span>'; return; }
+    el.innerHTML = silentSeq.map(function (id, i) { var a = ATOM_BY_ID[id]; return '<span class="schip" data-i="' + i + '" title="タップで削除">' + (a ? a.g : "?") + "</span>"; }).join("");
+    el.onclick = function (e) { var t = e.target.closest(".schip"); if (!t) return; silentSeq.splice(+t.getAttribute("data-i"), 1); saveSeq(); renderStrip(); };
+  }
+  buildPalette(); renderStrip();
+  $("silent-undo").onclick = function () { silentSeq.pop(); saveSeq(); renderStrip(); };
+  $("silent-clear").onclick = function () { silentSeq = []; saveSeq(); renderStrip(); };
+
+  /* 手描き (感覚入力): ストローク数を latent の種として非言語列に足す */
+  var scv = $("silent-sketch"), sctx2 = scv.getContext("2d"), sdrawing = false, slast = null, sStrokes = 0;
+  function sfit() { scv.width = scv.clientWidth; scv.height = 120; sctx2.fillStyle = "#fff"; sctx2.fillRect(0, 0, scv.width, scv.height); }
+  function spt(e) { var r = scv.getBoundingClientRect(); return { x: (e.clientX - r.left) * scv.width / r.width, y: (e.clientY - r.top) * scv.height / r.height }; }
+  scv.onpointerdown = function (e) { sdrawing = true; slast = spt(e); sStrokes++; scv.setPointerCapture(e.pointerId); };
+  scv.onpointermove = function (e) { if (!sdrawing) return; var p = spt(e); sctx2.strokeStyle = "#2a3550"; sctx2.lineWidth = 2.5; sctx2.lineCap = "round"; sctx2.beginPath(); sctx2.moveTo(slast.x, slast.y); sctx2.lineTo(p.x, p.y); sctx2.stroke(); slast = p; };
+  scv.onpointerup = scv.onpointercancel = function () { sdrawing = false; };
+  $("silent-sketchclr").onclick = function () { sStrokes = 0; sfit(); };
+  setTimeout(sfit, 0);
+
+  function fullSeq() {
+    var seq = silentSeq.slice();
+    if (sStrokes > 0) seq.push("sketch:" + Math.min(6, sStrokes)); /* 感覚入力をトランスフォーマーへ */
+    return seq;
+  }
+  function drawHeat(cv, rows, absMax) {
+    var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight || 90;
+    cv.width = W * dpr; cv.height = H * dpr; var x = cv.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+    if (!rows.length) return;
+    var r = rows.length, c = rows[0].length, cw = W / c, ch = H / r;
+    for (var i = 0; i < r; i++) for (var j = 0; j < c; j++) {
+      var v = rows[i][j] / (absMax || 1), hue = v >= 0 ? 200 : 20, light = 20 + Math.min(60, Math.abs(v) * 60);
+      x.fillStyle = "hsl(" + hue + ",80%," + light + "%)"; x.fillRect(j * cw, i * ch, cw + 0.5, ch + 0.5);
+    }
+  }
+  function runSilent() {
+    var seq = fullSeq();
+    if (!seq.length) { $("silent-outstate").innerHTML = '<span class="err">グリフを並べてください (手描きだけでも可)。</span>'; return; }
+    var proc = silentProcess(seq, { targetChars: +$("silent-vol").value, images: 3 });
+    lastSilent = { seq: seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags };
+    $("silent-out").classList.remove("hidden");
+    var amax = 0; proc.enc.seq.forEach(function (row) { row.forEach(function (v) { amax = Math.max(amax, Math.abs(v)); }); });
+    drawHeat($("silent-latent"), proc.enc.seq, amax);
+    var att = proc.enc.attention.slice(0, seq.length); /* 最初のヘッドぶん */
+    drawHeat($("silent-att"), att.length ? att : [[0]], 1);
+    $("silent-imgs").innerHTML = proc.imagery.join("");
+    $("silent-req").textContent = proc.request;
+    $("silent-doc").innerHTML = mdToHtml(proc.document.markdown);
+    $("silent-doc-sum").textContent = "📖 本と同じ分量まで展開した文章 (" + proc.document.chars.toLocaleString("ja-JP") + " 字 / 目標 " + proc.document.target.toLocaleString("ja-JP") + " 字)";
+    $("silent-bada").textContent = proc.bada;
+    $("silent-outstate").textContent = "サイレント化しました。アトム " + seq.length + " 個 → latent " + proc.enc.pooled.length + " 次元。「錬成」で BadaGPT がアプリを作ります。";
+  }
+  $("silent-run").onclick = runSilent;
+  $("silent-send").onclick = function () {
+    if (!lastSilent) runSilent();
+    if (!lastSilent) return;
+    $("thought").value = lastSilent.request; LS.set("draft", lastSilent.request);
+    $("thought").scrollIntoView({ behavior: "smooth", block: "center" });
+    go();
+  };
+  function sfile() { return "silent-" + (lastSilent ? lastSilent.seq.filter(function (s) { return s.indexOf("sketch") < 0; }).slice(0, 4).join("-") : "thought"); }
+  $("silent-dl-doc").onclick = function () { if (lastSilent) report(saveBytes(sfile() + ".md", utf8(lastSilent.document.markdown), "text/markdown")); };
+  $("silent-dl-docpdf").onclick = function () { if (lastSilent) report(saveBytes(sfile() + ".pdf", pdfFromJpegs(renderPages(lastSilent.document.markdown), sfile()), "application/pdf")); };
+  $("silent-dl-bada").onclick = function () { if (lastSilent) report(saveBytes("silent.bada", utf8(lastSilent.bada), "text/plain")); };
+  $("silent-dl-img").onclick = function () {
+    if (!lastSilent) return;
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="' + (160 * lastSilent.imagery.length) + '">' +
+      lastSilent.imagery.map(function (s, i) { return '<g transform="translate(0,' + (i * 160) + ')">' + s.replace(/<\/?svg[^>]*>/g, "") + "</g>"; }).join("") + "</svg>";
+    report(saveBytes(sfile() + "-imagery.svg", utf8(svg), "image/svg+xml"));
+  };
 })();

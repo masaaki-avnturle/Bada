@@ -93,10 +93,11 @@ GPT::paper                   # 論文
 |---|---|---|
 | `src/engine.js` | 435 | ZIP / PDF / Markdown、Bada インタプリタ、Ξ、Jones、モールス、FSK |
 | `src/comprehend.js` | 320 | 全体把握 (節分割・対応付け・網羅率) |
+| `src/silent.js` | 347 | サイレント・トーク (非言語アトム・トランスフォーマー・latent → 文章 / 画像 / Bada) |
 | `src/generate.js` | 779 | 14 種の実行時部品、HTML 組み立て、検証 |
-| `src/paper.js` | 414 | 論文の自動執筆、ビルド一式、Claude (任意) |
-| `src/ui.js` | 421 | 画面 |
-| `tools/engine-test.js` | 226 | 単体テスト 104 件 |
+| `src/paper.js` | 425 | 論文の自動執筆、ビルド一式、Claude (任意) |
+| `src/ui.js` | 512 | 画面 |
+| `tools/engine-test.js` | 263 | 単体テスト 120 件 |
 | `tools/evaluate.js` | 114 | 第 7 章の評価の再現 |
 
 `tools/build.js` がこれらを 1 枚の `index.html` に埋め込み、同じファイルを Cordova (Android) と Electron (Windows / Linux) に同梱する。
@@ -179,11 +180,21 @@ API キーが設定されている場合、全体把握の結果 (未解釈の�
 
 ---
 
+## 6.5 拡張：サイレント・トーク (非言語思考入力)
+
+言葉を介さずに依頼を与える拡張を加えた。利用者はアプリを**無言のグリフ** (感情・領域・対象・動作・分量・環境の各カテゴリに属する 33 個のアトム)・**手描き**・**リズム**で並べる。この非言語の列を、固定の重みを持つ小さな**トランスフォーマー** (埋め込み 16 次元・自己注意 2 層・4 頭・位置エンコードつき) が、言語化されていない潜在表現 (latent) に変換する。重みは固定の疑似乱数で初期化され学習は行わないため、同じ入力は必ず同じ latent を与える (決定的)。自己注意の各行は確率分布になる (行和 = 1、実測誤差 2×10⁻¹⁶)。
+
+latent からは四つを決定的に復号する: (a) **本と同じ分量まで展開できる文章** (分量アトムに応じて素描〜約 96,000 字。latent と疑似乱数で駆動するテンプレート展開)、(b) **イメージ** (latent から生成する SVG)、(c) **Bada 言語のプログラム** `silent.bada` (`BadaInterp` が構文エラーなく実行できる)、(d) 以降の全体把握へ渡す**依頼文**。手描きのストローク数も非言語列に加わり latent を変える。
+
+正直な範囲として、これは利用者が**自分で並べたアトムと手描き**を処理するものであり、脳の信号は読み取らない。トランスフォーマーは学習済みの大規模言語モデルではなく、文章は意味のある新規の内容ではなく latent に駆動された展開である。単体テストで、決定性・注意行和・分量の増加・Bada プログラムの実行可能性・下流の全体把握との接続を検証した (第 7.1 節)。
+
+---
+
 ## 7. 評価
 
 ### 7.1 単体テスト
 
-`tools/engine-test.js` の 104 件 (Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
+`tools/engine-test.js` の 120 件 (サイレント・トークのトランスフォーマー、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
 
 ### 7.2 開発用の依頼集合 (24 件)
 
@@ -274,7 +285,7 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 104 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 120 件
 node bada_gpt_telegraph/tools/evaluate.js           # 7.2 開発用の依頼集合
 node bada_gpt_telegraph/tools/evaluate.js --heldout # 7.3 未見の依頼集合
 ```

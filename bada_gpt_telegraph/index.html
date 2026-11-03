@@ -75,6 +75,16 @@ td.ok{color:var(--ok)}td.ng{color:var(--warn)}
 #spectrum{width:100%;height:60px;margin-top:8px;border-radius:10px;background:#06090f;border:1px solid rgba(130,170,240,.14)}
 .note{font-size:9.5px;color:rgba(140,165,210,.6);line-height:1.8;margin-top:10px;text-align:center}
 details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--acc);font-weight:600}
+#silent-palette{display:flex;flex-wrap:wrap;gap:10px}
+.spal-grp{display:flex;flex-direction:column;gap:4px}
+.spal-grp .lbl{font-size:8px;letter-spacing:.14em;color:var(--txt2)}
+.spal-grp .gl{display:flex;gap:4px;flex-wrap:wrap}
+.sglyph{width:34px;height:34px;font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;border-radius:9px;background:rgba(30,42,70,.6);border:1px solid rgba(150,190,255,.2);cursor:pointer}
+.sglyph:active{transform:scale(.9)}.sglyph.on{background:rgba(143,208,255,.22);border-color:var(--acc)}
+.sstrip{min-height:40px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(0,0,0,.3);border:1px solid rgba(150,190,255,.18);border-radius:10px;padding:8px}
+.schip{font-size:15px;padding:4px 8px;border-radius:8px;background:rgba(143,208,255,.16);border:1px solid rgba(143,208,255,.35);cursor:pointer}
+.ssketch{width:100%;height:120px;display:block;border-radius:10px;background:#fff;touch-action:none;border:1px solid rgba(150,190,255,.2);margin:6px 0}
+.simgs{display:flex;gap:8px;flex-wrap:wrap}.simgs svg{border-radius:8px;border:1px solid rgba(150,190,255,.18)}
 </style>
 </head>
 <body>
@@ -84,6 +94,57 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
  <div class="sub">BadaGPT TELEGRAPH · 思考入力 → 電信 → 全体把握 → 設計 → 生成 → 検証 → 論文<br>
  依頼の全体を捉えてアプリケーションを錬成し、Android (APK) / Windows 10・11 / Linux へ · Bada 言語駆動</div>
 </header>
+
+<div class="card">
+ <h2>⓪ サイレント・トーク — 言葉を介さない思考入力 (非言語 → トランスフォーマー → latent)</h2>
+ <div class="muted" style="margin-bottom:8px">頭の中のアイデアを、言葉ではなく<b>無言のグリフ</b>・<b>手描き</b>・<b>リズム</b>で並べます。並べたアトムを<b>トランスフォーマー (自己注意)</b> が言語化されていない潜在表現 (latent) に変換し、そこから <b>本と同じ分量まで展開できる文章</b>・<b>イメージ</b>・<b>Bada 言語のプログラム</b>・BadaGPT への<b>依頼文</b>を復号します。</div>
+ <label>無言のグリフを選ぶ (タップで思考列へ追加)</label>
+ <div id="silent-palette"></div>
+ <label style="margin-top:10px">思考列 (非言語入力の並び)</label>
+ <div id="silent-strip" class="sstrip"><span class="muted">グリフをタップして並べてください。</span></div>
+ <div class="row">
+  <button class="btn" id="silent-undo">⌫ 1つ戻す</button>
+  <button class="btn" id="silent-clear">クリア</button>
+  <span class="muted">手描き (感覚入力):</span>
+  <button class="btn" id="silent-sketchclr">スケッチ消去</button>
+ </div>
+ <canvas id="silent-sketch" class="ssketch"></canvas>
+ <div class="row">
+  <label style="margin:0">文章の分量</label>
+  <select id="silent-vol" style="width:auto">
+   <option value="1200">素描 (約 1,200 字)</option>
+   <option value="6000" selected>短編 (約 6,000 字)</option>
+   <option value="24000">中編 (約 24,000 字)</option>
+   <option value="96000">本一冊 (約 96,000 字)</option>
+  </select>
+  <button class="btn" id="silent-run">🧠 サイレント化 (トランスフォーマー実行)</button>
+ </div>
+ <div id="silent-out" class="hidden">
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:10px">
+   <div class="tile"><div class="k">latent ヒートマップ (最終層)</div><canvas id="silent-latent" style="width:100%;height:90px;display:block;margin-top:4px"></canvas></div>
+   <div class="tile"><div class="k">自己注意 (行和=1 の注意行列・最終層)</div><canvas id="silent-att" style="width:100%;height:90px;display:block;margin-top:4px"></canvas></div>
+  </div>
+  <label style="margin-top:10px">イメージ (latent から生成・感覚出力)</label>
+  <div id="silent-imgs" class="simgs"></div>
+  <label style="margin-top:10px">言語変換 — BadaGPT への依頼文</label>
+  <div id="silent-req" class="mono" style="background:rgba(0,0,0,.3);border-radius:9px;padding:9px 11px;font-size:13px"></div>
+  <details style="margin-top:10px"><summary id="silent-doc-sum">📖 本と同じ分量まで展開した文章</summary>
+   <div class="paper" id="silent-doc" style="max-height:300px;margin-top:8px"></div></details>
+  <details style="margin-top:8px"><summary>🅱 Bada 言語のプログラム (silent.bada)</summary>
+   <pre class="mono" id="silent-bada" style="background:rgba(0,0,0,.3);border-radius:9px;padding:10px;font-size:11px;max-height:260px;overflow:auto;white-space:pre-wrap"></pre></details>
+  <div class="row">
+   <button class="main" id="silent-send" style="margin-top:6px">⚡ この非言語入力で BadaGPT に錬成させる</button>
+  </div>
+  <div class="row">
+   <button class="btn" id="silent-dl-doc">📝 文章 (Markdown)</button>
+   <button class="btn" id="silent-dl-docpdf">📄 文章 (PDF)</button>
+   <button class="btn" id="silent-dl-bada">🅱 silent.bada</button>
+   <button class="btn" id="silent-dl-img">🖼 イメージ (SVG)</button>
+  </div>
+  <div class="muted" id="silent-outstate"></div>
+ </div>
+ <div class="note" style="text-align:left;margin-top:10px">※ これは利用者が<b>自分で並べた非言語のアトムと手描き</b>を処理するもので、脳の信号は読み取りません。トランスフォーマーは固定の重みを持つ小さな自己注意ネットワーク (学習済み LLM ではない) で、同じ入力は必ず同じ出力になります。文章は latent に駆動された決定的なテンプレート展開です。</div>
+</div>
 
 <div class="card">
  <h2>① 思考入力 — 作りたいアプリを思い描くまま書く</h2>
@@ -933,6 +994,354 @@ function comprehend(input, opts) {
 }
 
 /*
+ * silent.js — BadaGPT電信「サイレント・トーク (非言語思考入力)」拡張
+ *
+ * 言葉を介さずに、頭の中のアイデアを **非言語のアトム** (無言のグリフ・
+ * 手描きのスケッチ・リズムのタップ) として並べ、それを本物の (小さく・
+ * 決定的な) **トランスフォーマー (自己注意)** で「言語化されていない潜在
+ * 表現 (latent)」へ変換する。この latent を復号して
+ *   ① 本と同じ分量まで展開できる文章 (言語変換)
+ *   ② それに合わせたイメージ (生成画像 = 決定的な SVG)
+ *   ③ Bada 言語のプログラム
+ *   ④ BadaGPT への思考入力 (依頼文)
+ * を作る。①〜④ は latent から決定的に導かれる。
+ *
+ * 正直な範囲: これは利用者が **自分で並べた非言語のアトム** を処理する
+ * もので、脳の信号を読み取る機能はない。トランスフォーマーは固定の重みを
+ * 持つ小さな自己注意ネットワーク (学習済み LLM ではない) で、同じ入力は
+ * 必ず同じ出力になる。文章は latent に駆動された決定的なテンプレート展開
+ * であり、意味のある新規の内容を創作するものではない。「サイレント・トーク」
+ * は利用者が選んだグリフ等を指し、他者の無言の発話を傍受するものではない。
+ */
+"use strict";
+
+/* ───────────── 決定的 PRNG (mulberry32) ───────────── */
+function mulberry32(seed) {
+  var a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashStr(s) {
+  var h = 2166136261 >>> 0;
+  s = String(s);
+  for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+/* ───────────── 非言語アトム (無言のグリフ) ─────────────
+ * 各アトムは「無言のグリフ」と、復号に使う弱いタグを持つ。
+ * タグはグリフの固定の意味としてパレットに表示される (利用者に見える)。 */
+var SILENT_ATOMS = [
+  /* 感情・質感 (tone) */
+  { id: "calm",    g: "◎", cat: "tone", tags: { mood: "calm" } },
+  { id: "joy",     g: "✦", cat: "tone", tags: { mood: "joy" } },
+  { id: "urgent",  g: "▲", cat: "tone", tags: { mood: "urgent", feat: "sound" } },
+  { id: "cool",    g: "❄", cat: "tone", tags: { theme: "dark", accent: "青" } },
+  { id: "warm",    g: "♨", cat: "tone", tags: { theme: "light", accent: "オレンジ" } },
+  { id: "vivid",   g: "⚡", cat: "tone", tags: { accent: "紫" } },
+  /* 領域 (domain) → モジュール */
+  { id: "records", g: "▤", cat: "domain", tags: { mod: "records" } },
+  { id: "time",    g: "◷", cat: "domain", tags: { mod: "timer" } },
+  { id: "money",   g: "₪", cat: "domain", tags: { mod: "budget" } },
+  { id: "note",    g: "✎", cat: "domain", tags: { mod: "notes" } },
+  { id: "task",    g: "☑", cat: "domain", tags: { mod: "todo" } },
+  { id: "sound",   g: "♪", cat: "domain", tags: { mod: "telegraph" } },
+  { id: "quantum", g: "⬡", cat: "domain", tags: { mod: "quantum" } },
+  { id: "measure", g: "📐", cat: "domain", tags: { mod: "convert" } },
+  { id: "learn",   g: "✚", cat: "domain", tags: { mod: "quiz" } },
+  /* 対象 (object) */
+  { id: "book",    g: "📖", cat: "object", tags: { entity: "本", mod: "records" } },
+  { id: "person",  g: "👤", cat: "object", tags: { entity: "人", mod: "records" } },
+  { id: "habit",   g: "🌱", cat: "object", tags: { mod: "habit" } },
+  { id: "draw",    g: "🎨", cat: "object", tags: { mod: "draw" } },
+  { id: "random",  g: "🎲", cat: "object", tags: { mod: "random" } },
+  { id: "count",   g: "⊞", cat: "object", tags: { mod: "counter" } },
+  /* 動作 (action) → 機能 */
+  { id: "find",    g: "🔍", cat: "action", tags: { feat: "search" } },
+  { id: "sort",    g: "⇅", cat: "action", tags: { feat: "sort" } },
+  { id: "graph",   g: "▦", cat: "action", tags: { feat: "chart" } },
+  { id: "export",  g: "⤓", cat: "action", tags: { feat: "export" } },
+  { id: "print",   g: "⎙", cat: "action", tags: { feat: "print" } },
+  /* 規模 (scale) → 文章の分量 */
+  { id: "small",   g: "·",  cat: "scale", tags: { volume: 0.25 } },
+  { id: "medium",  g: "◆", cat: "scale", tags: { volume: 1 } },
+  { id: "large",   g: "⬢", cat: "scale", tags: { volume: 3 } },
+  { id: "book_vol",g: "∞", cat: "scale", tags: { volume: 12 } },
+  /* 環境 (platform) */
+  { id: "android", g: "📱", cat: "platform", tags: { platform: "android" } },
+  { id: "windows", g: "🖥", cat: "platform", tags: { platform: "windows" } },
+  { id: "linux",   g: "🐧", cat: "platform", tags: { platform: "linux" } }
+];
+var ATOM_BY_ID = {};
+SILENT_ATOMS.forEach(function (a) { ATOM_BY_ID[a.id] = a; });
+
+/* ───────────── 行列ユーティリティ ───────────── */
+function zeros(r, c) { var m = []; for (var i = 0; i < r; i++) { m.push(new Array(c).fill(0)); } return m; }
+function randMat(r, c, rng, s) { var m = zeros(r, c); for (var i = 0; i < r; i++) for (var j = 0; j < c; j++) m[i][j] = (rng() * 2 - 1) * s; return m; }
+function matmul(A, B) {
+  var r = A.length, k = B.length, c = B[0].length, out = zeros(r, c);
+  for (var i = 0; i < r; i++) for (var j = 0; j < c; j++) { var s = 0; for (var t = 0; t < k; t++) s += A[i][t] * B[t][j]; out[i][j] = s; }
+  return out;
+}
+function addRes(A, B) { var out = zeros(A.length, A[0].length); for (var i = 0; i < A.length; i++) for (var j = 0; j < A[0].length; j++) out[i][j] = A[i][j] + B[i][j]; return out; }
+function layerNorm(A) {
+  var out = zeros(A.length, A[0].length);
+  for (var i = 0; i < A.length; i++) {
+    var row = A[i], n = row.length, mean = 0, j;
+    for (j = 0; j < n; j++) mean += row[j]; mean /= n;
+    var v = 0; for (j = 0; j < n; j++) v += (row[j] - mean) * (row[j] - mean); v /= n;
+    var sd = Math.sqrt(v + 1e-5);
+    for (j = 0; j < n; j++) out[i][j] = (row[j] - mean) / sd;
+  }
+  return out;
+}
+function softmaxRow(row) {
+  var mx = -Infinity, i; for (i = 0; i < row.length; i++) if (row[i] > mx) mx = row[i];
+  var s = 0, e = new Array(row.length);
+  for (i = 0; i < row.length; i++) { e[i] = Math.exp(row[i] - mx); s += e[i]; }
+  for (i = 0; i < row.length; i++) e[i] /= s;
+  return e;
+}
+function geluRow(A) { var out = zeros(A.length, A[0].length); for (var i = 0; i < A.length; i++) for (var j = 0; j < A[0].length; j++) { var x = A[i][j]; out[i][j] = 0.5 * x * (1 + Math.tanh(0.7978845608 * (x + 0.044715 * x * x * x))); } return out; }
+
+/* ───────────── トランスフォーマー (固定の重み・決定的) ───────────── */
+var SILENT_CFG = { D: 16, H: 4, L: 2, FF: 32, seed: 0x5A1E27 };
+
+function buildWeights(cfg) {
+  var rng = mulberry32(cfg.seed), layers = [];
+  for (var l = 0; l < cfg.L; l++) {
+    layers.push({
+      Wq: randMat(cfg.D, cfg.D, rng, 0.5), Wk: randMat(cfg.D, cfg.D, rng, 0.5),
+      Wv: randMat(cfg.D, cfg.D, rng, 0.5), Wo: randMat(cfg.D, cfg.D, rng, 0.5),
+      W1: randMat(cfg.D, cfg.FF, rng, 0.4), W2: randMat(cfg.FF, cfg.D, rng, 0.4)
+    });
+  }
+  return layers;
+}
+var SILENT_WEIGHTS = buildWeights(SILENT_CFG);
+
+/* アトム列 → 埋め込み行列 (各アトムの固定ベクトル + 位置エンコード) */
+function embedSequence(ids, cfg) {
+  var n = ids.length, X = zeros(n, cfg.D);
+  for (var i = 0; i < n; i++) {
+    var rng = mulberry32(hashStr("atom:" + ids[i]));
+    for (var j = 0; j < cfg.D; j++) {
+      var base = (rng() * 2 - 1);
+      var pos = (j % 2 === 0) ? Math.sin(i / Math.pow(1000, j / cfg.D)) : Math.cos(i / Math.pow(1000, (j - 1) / cfg.D));
+      X[i][j] = base + 0.3 * pos;
+    }
+  }
+  return X;
+}
+
+/* 1 層の自己注意 (多頭)。attRows に各ヘッドの注意行列 (行和=1) を記録する */
+function attentionLayer(X, W, cfg, attRows) {
+  var n = X.length, dh = cfg.D / cfg.H;
+  var Q = matmul(X, W.Wq), K = matmul(X, W.Wk), V = matmul(X, W.Wv);
+  var concat = zeros(n, cfg.D);
+  for (var h = 0; h < cfg.H; h++) {
+    var off = h * dh;
+    for (var i = 0; i < n; i++) {
+      var scores = new Array(n);
+      for (var jk = 0; jk < n; jk++) {
+        var dot = 0; for (var d = 0; d < dh; d++) dot += Q[i][off + d] * K[jk][off + d];
+        scores[jk] = dot / Math.sqrt(dh);
+      }
+      var att = softmaxRow(scores);
+      if (attRows) attRows.push(att);
+      for (var d2 = 0; d2 < dh; d2++) { var acc = 0; for (var jv = 0; jv < n; jv++) acc += att[jv] * V[jv][off + d2]; concat[i][off + d2] = acc; }
+    }
+  }
+  var O = matmul(concat, W.Wo);
+  return layerNorm(addRes(X, O));
+}
+function ffnLayer(X, W) {
+  var H1 = geluRow(matmul(X, W.W1));
+  var O = matmul(H1, W.W2);
+  return layerNorm(addRes(X, O));
+}
+
+/* 非言語アトム列 → latent。{ seq, pooled, attention } を返す */
+function silentEncode(ids, cfg) {
+  cfg = cfg || SILENT_CFG;
+  if (!ids || !ids.length) return { seq: [], pooled: new Array(cfg.D).fill(0), attention: [] };
+  var X = embedSequence(ids, cfg), attention = [];
+  for (var l = 0; l < cfg.L; l++) {
+    X = attentionLayer(X, SILENT_WEIGHTS[l], cfg, l === cfg.L - 1 ? attention : null);
+    X = ffnLayer(X, SILENT_WEIGHTS[l]);
+  }
+  var pooled = new Array(cfg.D).fill(0);
+  for (var i = 0; i < X.length; i++) for (var j = 0; j < cfg.D; j++) pooled[j] += X[i][j] / X.length;
+  return { seq: X, pooled: pooled, attention: attention };
+}
+
+/* ───────────── latent → 依頼文 (言語変換) ───────────── */
+function collectTags(ids) {
+  var mods = [], feats = {}, entity = "", theme = "", accent = "", mood = "", platforms = [], volume = 1, seen = {};
+  ids.forEach(function (id) {
+    var a = ATOM_BY_ID[id]; if (!a) return; var t = a.tags;
+    if (t.mod && !seen[t.mod]) { seen[t.mod] = 1; mods.push(t.mod); }
+    if (t.entity) entity = t.entity;
+    if (t.feat) feats[t.feat] = 1;
+    if (t.theme) theme = t.theme;
+    if (t.accent) accent = t.accent;
+    if (t.mood) mood = t.mood;
+    if (t.platform && platforms.indexOf(t.platform) < 0) platforms.push(t.platform);
+    if (typeof t.volume === "number") volume = Math.max(volume, t.volume);
+  });
+  return { mods: mods, feats: Object.keys(feats), entity: entity, theme: theme, accent: accent, mood: mood, platforms: platforms, volume: volume };
+}
+var MOD_PHRASE = {
+  records: "を記録・管理", timer: "タイマー", budget: "家計簿", notes: "メモ", todo: "ToDo リスト",
+  telegraph: "モールス電信", quantum: "量子回路", convert: "単位変換", quiz: "クイズ・単語帳",
+  habit: "習慣トラッカー", draw: "お絵かき", random: "抽選・サイコロ", counter: "カウンター"
+};
+var FEAT_PHRASE = { search: "検索", sort: "並べ替え", chart: "グラフ", export: "CSV で書き出し", print: "印刷" };
+var PLAT_PHRASE = { android: "スマホ", windows: "Windows", linux: "Linux" };
+
+/* 非言語アトム列 → BadaGPT への依頼文。latent の符号で表現を少し変える。 */
+function silentToRequest(ids, enc) {
+  var tg = collectTags(ids);
+  if (!tg.mods.length) tg.mods = ["notes"];
+  var p = enc && enc.pooled.length ? enc.pooled : [0];
+  var parts = [];
+  var want = [];
+  tg.mods.forEach(function (m) {
+    if (m === "records") want.push((tg.entity || "データ") + MOD_PHRASE.records);
+    else want.push(MOD_PHRASE[m] || m);
+  });
+  parts.push(want.join("と") + "のアプリ" + (p[0] >= 0 ? "を作りたい" : "がほしい") + "。");
+  if (tg.feats.length) parts.push(tg.feats.map(function (f) { return FEAT_PHRASE[f]; }).filter(Boolean).join("と") + "をしたい。");
+  var look = [];
+  if (tg.theme === "dark") look.push("暗い"); if (tg.theme === "light") look.push("明るい");
+  if (tg.accent) look.push(tg.accent + "色");
+  if (look.length) parts.push(look.join("") + "デザインで。");
+  if (tg.platforms.length) parts.push(tg.platforms.map(function (x) { return PLAT_PHRASE[x]; }).join("と") + "で使いたい。");
+  return { text: parts.join(""), tags: tg };
+}
+
+/* ───────────── latent → 本と同じ分量まで展開できる文章 ───────────── */
+var CH_TITLES = ["着想", "輪郭", "領域", "要素", "振る舞い", "見え方", "質感", "利用の情景", "周縁", "限界", "展開", "結び"];
+function latentToDocument(ids, enc, opts) {
+  opts = opts || {};
+  var tg = collectTags(ids);
+  var pooled = enc && enc.pooled.length ? enc.pooled : new Array(SILENT_CFG.D).fill(0);
+  /* 目標文字数: 規模アトムの volume × 基準。∞(book_vol)=12 で約 9.6 万字 (本一冊相当) */
+  var target = Math.round((opts.targetChars != null ? opts.targetChars : tg.volume * 8000));
+  target = Math.max(400, Math.min(target, 200000));
+  var rng = mulberry32((hashStr(ids.join(",")) ^ Math.round(Math.abs(pooled[0]) * 1e6)) >>> 0);
+  var subject = (tg.entity ? tg.entity + "を扱う" : "") + (tg.mods.map(function (m) { return (MOD_PHRASE[m] || m).replace(/^を/, ""); }).join("・")) + "アプリケーション";
+  var moodWord = { calm: "静かに", joy: "軽やかに", urgent: "すばやく", "": "着実に" }[tg.mood] || "着実に";
+  var out = ["# 思考ノート：" + subject, "", "> このノートは、言葉を介さずに並べた非言語のアトム (" +
+    ids.map(function (id) { return (ATOM_BY_ID[id] || {}).g || "?"; }).join(" ") + ") を、トランスフォーマーで latent に変換し、" +
+    "その latent から決定的に展開した文章です。意味のある新規の内容ではなく、着想を本と同じ分量まで膨らませた素描です。", ""];
+  var chN = Math.max(4, Math.min(CH_TITLES.length, Math.round(2 + tg.volume)));
+  var LEX_SUBJ = ["この着想", "その輪郭", "利用者", "画面", "ひとつの操作", "記録された要素", "全体", "細部", "入力", "結果"];
+  var LEX_VERB = ["立ち上がる", "静かに整えられる", "手のうちに収まる", "次第に像を結ぶ", "滑らかに流れる", "確かめられる", "積み重なる", "呼び戻される", "並べ替えられる", "照らし出される"];
+  var LEX_ADJ = ["透明な", "落ち着いた", "軽い", "確かな", "親しい", moodWord.replace(/に$/, "な"), "余白のある", "手触りのある"];
+  function sentence() {
+    var s = LEX_ADJ[Math.floor(rng() * LEX_ADJ.length)] + LEX_SUBJ[Math.floor(rng() * LEX_SUBJ.length)];
+    s += "は、" + moodWord + LEX_VERB[Math.floor(rng() * LEX_VERB.length)];
+    if (rng() < 0.5) s += "。そこでは" + LEX_SUBJ[Math.floor(rng() * LEX_SUBJ.length)] + "が" + LEX_VERB[Math.floor(rng() * LEX_VERB.length)];
+    return s + "。";
+  }
+  var len = out.join("\n").length;
+  for (var c = 0; c < chN && len < target; c++) {
+    var title = CH_TITLES[c] || ("章 " + (c + 1));
+    out.push("## " + (c + 1) + ". " + title); out.push("");
+    var paras = Math.max(2, Math.round(target / chN / 220));
+    for (var pgi = 0; pgi < paras && len < target; pgi++) {
+      var sents = 3 + Math.floor(rng() * 4), buf = "";
+      for (var s2 = 0; s2 < sents; s2++) buf += sentence();
+      out.push(buf); out.push("");
+      len += buf.length + 2;
+    }
+  }
+  out.push("---"); out.push("非言語アトム: " + ids.map(function (id) { var a = ATOM_BY_ID[id]; return a ? a.g + a.id : id; }).join(" / "));
+  var text = out.join("\n");
+  return { markdown: text, chars: text.length, target: target, chapters: chN };
+}
+
+/* ───────────── latent → イメージ (決定的な SVG) ───────────── */
+function latentToImagery(enc, n) {
+  n = n || 3;
+  var pooled = enc && enc.pooled.length ? enc.pooled : new Array(SILENT_CFG.D).fill(0);
+  var imgs = [];
+  for (var k = 0; k < n; k++) {
+    var rng = mulberry32((hashStr("img:" + k) ^ Math.round((pooled[k % pooled.length] || 0) * 1e6 + k * 97)) >>> 0);
+    var W = 220, H = 160, parts = [];
+    var hue = Math.floor((Math.abs(pooled[k % pooled.length] || 0) * 360 + k * 47) % 360);
+    parts.push('<rect width="' + W + '" height="' + H + '" fill="hsl(' + hue + ',40%,8%)"/>');
+    var shapes = 14 + Math.floor(rng() * 10);
+    for (var i = 0; i < shapes; i++) {
+      var x = rng() * W, y = rng() * H, r = 4 + rng() * 30;
+      var h2 = Math.floor((hue + rng() * 120) % 360), op = (0.2 + rng() * 0.5).toFixed(2);
+      if (rng() < 0.5) parts.push('<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="hsl(' + h2 + ',70%,60%)" opacity="' + op + '"/>');
+      else parts.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + r.toFixed(1) + '" height="' + r.toFixed(1) + '" fill="hsl(' + h2 + ',70%,55%)" opacity="' + op + '" transform="rotate(' + (rng() * 90).toFixed(1) + ' ' + x.toFixed(1) + ' ' + y.toFixed(1) + ')"/>');
+    }
+    imgs.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">' + parts.join("") + "</svg>");
+  }
+  return imgs;
+}
+
+/* ───────────── latent → Bada 言語のプログラム ─────────────
+ * BadaInterp で構文エラーなく実行できる Bada プログラムを組み立てる。 */
+function latentToBada(ids, enc, req) {
+  var tg = (req && req.tags) || collectTags(ids);
+  var pooled = enc && enc.pooled.length ? enc.pooled : new Array(SILENT_CFG.D).fill(0);
+  var H = (Math.abs(pooled[0] || 0) * 3 + 1).toFixed(2);
+  var n = 2 + (ids.length % 10);
+  var L = [];
+  L.push("# silent.bada — 非言語思考入力 (サイレント・トーク) から生成された Bada プログラム");
+  L.push("# アトム: " + ids.map(function (id) { return (ATOM_BY_ID[id] || {}).g || id; }).join(" "));
+  L.push("set entropy   = " + H);
+  L.push("set crossings = " + n);
+  L.push("set idea      = 0");
+  L.push('idea <- "silent telepathy-free non-verbal thought"');
+  L.push("idea -< 1.0");
+  L.push("idea >- idea");
+  L.push("Omega::push idea as thought_node");
+  L.push("print idea");
+  /* アトムの領域ごとに 1 行ずつ Bada 命令を積む */
+  tg.mods.forEach(function (m, i) {
+    L.push("set mod_" + i + " = " + (i + 1));
+    L.push('mod_' + i + ' <- "' + m + '"');
+    L.push("Omega::push mod_" + i + " as module_node");
+  });
+  L.push("Tele::encode");
+  L.push("Tele::knot crossings");
+  L.push("Tele::teleport");
+  L.push("Tele::graviton");
+  L.push("Tele::send");
+  L.push("GPT::comprehend");
+  L.push("GPT::plan");
+  L.push("GPT::generate");
+  L.push("GPT::verify");
+  L.push("GPT::paper");
+  return L.join("\n");
+}
+
+/* 非言語アトム列を 1 回で処理して全成果物を返す (UI/テスト兼用) */
+function silentProcess(ids, opts) {
+  opts = opts || {};
+  var enc = silentEncode(ids);
+  var req = silentToRequest(ids, enc);
+  return {
+    seq: ids.slice(),
+    enc: enc,
+    request: req.text,
+    tags: req.tags,
+    document: latentToDocument(ids, enc, opts),
+    imagery: latentToImagery(enc, opts.images || 3),
+    bada: latentToBada(ids, enc, req)
+  };
+}
+
+/*
  * generate.js — BadaGPT電信の「生成」と「検証」
  *
  * 仕様 (spec) のモジュールを組み合わせ、依存ゼロ・オフライン動作の
@@ -1765,6 +2174,17 @@ function writePaper(spec, gen, ver, meta) {
   L.push("");
   L.push("## 2. 方法");
   L.push("");
+  if (meta.silent && meta.silent.seq && meta.silent.seq.length) {
+    var sv = meta.silent;
+    L.push("### 2.0 サイレント・トーク (非言語思考入力) 由来");
+    L.push("");
+    L.push("この依頼は言葉ではなく、利用者が並べた非言語のアトム (" + sv.seq.join(" / ") + ") と手描きから作られた。" +
+      "アトム列は固定の重みを持つ小さなトランスフォーマー (自己注意 " + SILENT_CFG.L + " 層・多頭) で言語化されていない潜在表現 (latent) に変換され、" +
+      "latent から (a) 本と同じ分量まで展開できる文章 (" + (sv.document ? sv.document.chars.toLocaleString("ja-JP") : "?") + " 字)、(b) イメージ " +
+      ((sv.imagery && sv.imagery.length) || 0) + " 枚、(c) Bada 言語のプログラム、(d) 次節以降に渡す依頼文「" + sv.request + "」を決定的に復号した。" +
+      "トランスフォーマーは利用者が並べたアトムを処理するもので、脳の信号は読み取らない。");
+    L.push("");
+  }
   L.push("### 2.1 電信による入力");
   L.push("");
   L.push("依頼文は BADA グラビトン電信の送信プログラム (Bada 言語) によって符号化され、BadaGPT へ配信される。" +
@@ -2410,7 +2830,7 @@ function extractHtml(text) {
           if (!cur.ver.ok || !cur.runtime.ok) { state[cmd] = "fail"; renderSteps(state); continue; }
         }
         else if (cmd === "paper") {
-          cur.paper = writePaper(cur.spec, cur.gen, cur.ver, { author: $("author").value.trim(), metrics: M, engine: cur.engine, runtime: cur.runtime });
+          cur.paper = writePaper(cur.spec, cur.gen, cur.ver, { author: $("author").value.trim(), metrics: M, engine: cur.engine, runtime: cur.runtime, silent: lastSilent });
           cur.pdf = null;
           $("paperView").innerHTML = mdToHtml(cur.paper); $("paperCard").classList.remove("hidden");
         }
@@ -2549,6 +2969,97 @@ function extractHtml(text) {
   $("saveKey").onclick = function () { LS.set("apiKey", $("apiKey").value.trim()); LS.set("model", $("model").value); $("apiKey").value = ""; keyState(); };
   $("clearKey").onclick = function () { LS.set("apiKey", ""); keyState(); };
   keyState();
+
+  /* ═════════════ ⓪ サイレント・トーク (非言語思考入力) ═════════════ */
+  var lastSilent = null;
+  var CAT_LABEL = { tone: "感情・質感", domain: "領域", object: "対象", action: "動作", scale: "分量", platform: "環境" };
+  var silentSeq = LS.get("silentSeq", []);
+  function buildPalette() {
+    var cats = {};
+    SILENT_ATOMS.forEach(function (a) { (cats[a.cat] = cats[a.cat] || []).push(a); });
+    var html = "";
+    ["tone", "domain", "object", "action", "scale", "platform"].forEach(function (c) {
+      if (!cats[c]) return;
+      html += '<div class="spal-grp"><span class="lbl">' + CAT_LABEL[c] + '</span><div class="gl">' +
+        cats[c].map(function (a) { return '<div class="sglyph" data-id="' + a.id + '" title="' + a.id + '">' + a.g + "</div>"; }).join("") + "</div></div>";
+    });
+    $("silent-palette").innerHTML = html;
+    $("silent-palette").onclick = function (e) {
+      var t = e.target.closest(".sglyph"); if (!t) return;
+      silentSeq.push(t.getAttribute("data-id")); saveSeq(); renderStrip();
+    };
+  }
+  function saveSeq() { LS.set("silentSeq", silentSeq); }
+  function renderStrip() {
+    var el = $("silent-strip");
+    if (!silentSeq.length) { el.innerHTML = '<span class="muted">グリフをタップして並べてください。</span>'; return; }
+    el.innerHTML = silentSeq.map(function (id, i) { var a = ATOM_BY_ID[id]; return '<span class="schip" data-i="' + i + '" title="タップで削除">' + (a ? a.g : "?") + "</span>"; }).join("");
+    el.onclick = function (e) { var t = e.target.closest(".schip"); if (!t) return; silentSeq.splice(+t.getAttribute("data-i"), 1); saveSeq(); renderStrip(); };
+  }
+  buildPalette(); renderStrip();
+  $("silent-undo").onclick = function () { silentSeq.pop(); saveSeq(); renderStrip(); };
+  $("silent-clear").onclick = function () { silentSeq = []; saveSeq(); renderStrip(); };
+
+  /* 手描き (感覚入力): ストローク数を latent の種として非言語列に足す */
+  var scv = $("silent-sketch"), sctx2 = scv.getContext("2d"), sdrawing = false, slast = null, sStrokes = 0;
+  function sfit() { scv.width = scv.clientWidth; scv.height = 120; sctx2.fillStyle = "#fff"; sctx2.fillRect(0, 0, scv.width, scv.height); }
+  function spt(e) { var r = scv.getBoundingClientRect(); return { x: (e.clientX - r.left) * scv.width / r.width, y: (e.clientY - r.top) * scv.height / r.height }; }
+  scv.onpointerdown = function (e) { sdrawing = true; slast = spt(e); sStrokes++; scv.setPointerCapture(e.pointerId); };
+  scv.onpointermove = function (e) { if (!sdrawing) return; var p = spt(e); sctx2.strokeStyle = "#2a3550"; sctx2.lineWidth = 2.5; sctx2.lineCap = "round"; sctx2.beginPath(); sctx2.moveTo(slast.x, slast.y); sctx2.lineTo(p.x, p.y); sctx2.stroke(); slast = p; };
+  scv.onpointerup = scv.onpointercancel = function () { sdrawing = false; };
+  $("silent-sketchclr").onclick = function () { sStrokes = 0; sfit(); };
+  setTimeout(sfit, 0);
+
+  function fullSeq() {
+    var seq = silentSeq.slice();
+    if (sStrokes > 0) seq.push("sketch:" + Math.min(6, sStrokes)); /* 感覚入力をトランスフォーマーへ */
+    return seq;
+  }
+  function drawHeat(cv, rows, absMax) {
+    var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight || 90;
+    cv.width = W * dpr; cv.height = H * dpr; var x = cv.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+    if (!rows.length) return;
+    var r = rows.length, c = rows[0].length, cw = W / c, ch = H / r;
+    for (var i = 0; i < r; i++) for (var j = 0; j < c; j++) {
+      var v = rows[i][j] / (absMax || 1), hue = v >= 0 ? 200 : 20, light = 20 + Math.min(60, Math.abs(v) * 60);
+      x.fillStyle = "hsl(" + hue + ",80%," + light + "%)"; x.fillRect(j * cw, i * ch, cw + 0.5, ch + 0.5);
+    }
+  }
+  function runSilent() {
+    var seq = fullSeq();
+    if (!seq.length) { $("silent-outstate").innerHTML = '<span class="err">グリフを並べてください (手描きだけでも可)。</span>'; return; }
+    var proc = silentProcess(seq, { targetChars: +$("silent-vol").value, images: 3 });
+    lastSilent = { seq: seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags };
+    $("silent-out").classList.remove("hidden");
+    var amax = 0; proc.enc.seq.forEach(function (row) { row.forEach(function (v) { amax = Math.max(amax, Math.abs(v)); }); });
+    drawHeat($("silent-latent"), proc.enc.seq, amax);
+    var att = proc.enc.attention.slice(0, seq.length); /* 最初のヘッドぶん */
+    drawHeat($("silent-att"), att.length ? att : [[0]], 1);
+    $("silent-imgs").innerHTML = proc.imagery.join("");
+    $("silent-req").textContent = proc.request;
+    $("silent-doc").innerHTML = mdToHtml(proc.document.markdown);
+    $("silent-doc-sum").textContent = "📖 本と同じ分量まで展開した文章 (" + proc.document.chars.toLocaleString("ja-JP") + " 字 / 目標 " + proc.document.target.toLocaleString("ja-JP") + " 字)";
+    $("silent-bada").textContent = proc.bada;
+    $("silent-outstate").textContent = "サイレント化しました。アトム " + seq.length + " 個 → latent " + proc.enc.pooled.length + " 次元。「錬成」で BadaGPT がアプリを作ります。";
+  }
+  $("silent-run").onclick = runSilent;
+  $("silent-send").onclick = function () {
+    if (!lastSilent) runSilent();
+    if (!lastSilent) return;
+    $("thought").value = lastSilent.request; LS.set("draft", lastSilent.request);
+    $("thought").scrollIntoView({ behavior: "smooth", block: "center" });
+    go();
+  };
+  function sfile() { return "silent-" + (lastSilent ? lastSilent.seq.filter(function (s) { return s.indexOf("sketch") < 0; }).slice(0, 4).join("-") : "thought"); }
+  $("silent-dl-doc").onclick = function () { if (lastSilent) report(saveBytes(sfile() + ".md", utf8(lastSilent.document.markdown), "text/markdown")); };
+  $("silent-dl-docpdf").onclick = function () { if (lastSilent) report(saveBytes(sfile() + ".pdf", pdfFromJpegs(renderPages(lastSilent.document.markdown), sfile()), "application/pdf")); };
+  $("silent-dl-bada").onclick = function () { if (lastSilent) report(saveBytes("silent.bada", utf8(lastSilent.bada), "text/plain")); };
+  $("silent-dl-img").onclick = function () {
+    if (!lastSilent) return;
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="' + (160 * lastSilent.imagery.length) + '">' +
+      lastSilent.imagery.map(function (s, i) { return '<g transform="translate(0,' + (i * 160) + ')">' + s.replace(/<\/?svg[^>]*>/g, "") + "</g>"; }).join("") + "</svg>";
+    report(saveBytes(sfile() + "-imagery.svg", utf8(svg), "image/svg+xml"));
+  };
 })();
 
 </script>

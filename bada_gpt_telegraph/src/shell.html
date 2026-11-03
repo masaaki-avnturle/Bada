@@ -75,6 +75,16 @@ td.ok{color:var(--ok)}td.ng{color:var(--warn)}
 #spectrum{width:100%;height:60px;margin-top:8px;border-radius:10px;background:#06090f;border:1px solid rgba(130,170,240,.14)}
 .note{font-size:9.5px;color:rgba(140,165,210,.6);line-height:1.8;margin-top:10px;text-align:center}
 details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--acc);font-weight:600}
+#silent-palette{display:flex;flex-wrap:wrap;gap:10px}
+.spal-grp{display:flex;flex-direction:column;gap:4px}
+.spal-grp .lbl{font-size:8px;letter-spacing:.14em;color:var(--txt2)}
+.spal-grp .gl{display:flex;gap:4px;flex-wrap:wrap}
+.sglyph{width:34px;height:34px;font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;border-radius:9px;background:rgba(30,42,70,.6);border:1px solid rgba(150,190,255,.2);cursor:pointer}
+.sglyph:active{transform:scale(.9)}.sglyph.on{background:rgba(143,208,255,.22);border-color:var(--acc)}
+.sstrip{min-height:40px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(0,0,0,.3);border:1px solid rgba(150,190,255,.18);border-radius:10px;padding:8px}
+.schip{font-size:15px;padding:4px 8px;border-radius:8px;background:rgba(143,208,255,.16);border:1px solid rgba(143,208,255,.35);cursor:pointer}
+.ssketch{width:100%;height:120px;display:block;border-radius:10px;background:#fff;touch-action:none;border:1px solid rgba(150,190,255,.2);margin:6px 0}
+.simgs{display:flex;gap:8px;flex-wrap:wrap}.simgs svg{border-radius:8px;border:1px solid rgba(150,190,255,.18)}
 </style>
 </head>
 <body>
@@ -84,6 +94,57 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
  <div class="sub">BadaGPT TELEGRAPH · 思考入力 → 電信 → 全体把握 → 設計 → 生成 → 検証 → 論文<br>
  依頼の全体を捉えてアプリケーションを錬成し、Android (APK) / Windows 10・11 / Linux へ · Bada 言語駆動</div>
 </header>
+
+<div class="card">
+ <h2>⓪ サイレント・トーク — 言葉を介さない思考入力 (非言語 → トランスフォーマー → latent)</h2>
+ <div class="muted" style="margin-bottom:8px">頭の中のアイデアを、言葉ではなく<b>無言のグリフ</b>・<b>手描き</b>・<b>リズム</b>で並べます。並べたアトムを<b>トランスフォーマー (自己注意)</b> が言語化されていない潜在表現 (latent) に変換し、そこから <b>本と同じ分量まで展開できる文章</b>・<b>イメージ</b>・<b>Bada 言語のプログラム</b>・BadaGPT への<b>依頼文</b>を復号します。</div>
+ <label>無言のグリフを選ぶ (タップで思考列へ追加)</label>
+ <div id="silent-palette"></div>
+ <label style="margin-top:10px">思考列 (非言語入力の並び)</label>
+ <div id="silent-strip" class="sstrip"><span class="muted">グリフをタップして並べてください。</span></div>
+ <div class="row">
+  <button class="btn" id="silent-undo">⌫ 1つ戻す</button>
+  <button class="btn" id="silent-clear">クリア</button>
+  <span class="muted">手描き (感覚入力):</span>
+  <button class="btn" id="silent-sketchclr">スケッチ消去</button>
+ </div>
+ <canvas id="silent-sketch" class="ssketch"></canvas>
+ <div class="row">
+  <label style="margin:0">文章の分量</label>
+  <select id="silent-vol" style="width:auto">
+   <option value="1200">素描 (約 1,200 字)</option>
+   <option value="6000" selected>短編 (約 6,000 字)</option>
+   <option value="24000">中編 (約 24,000 字)</option>
+   <option value="96000">本一冊 (約 96,000 字)</option>
+  </select>
+  <button class="btn" id="silent-run">🧠 サイレント化 (トランスフォーマー実行)</button>
+ </div>
+ <div id="silent-out" class="hidden">
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:10px">
+   <div class="tile"><div class="k">latent ヒートマップ (最終層)</div><canvas id="silent-latent" style="width:100%;height:90px;display:block;margin-top:4px"></canvas></div>
+   <div class="tile"><div class="k">自己注意 (行和=1 の注意行列・最終層)</div><canvas id="silent-att" style="width:100%;height:90px;display:block;margin-top:4px"></canvas></div>
+  </div>
+  <label style="margin-top:10px">イメージ (latent から生成・感覚出力)</label>
+  <div id="silent-imgs" class="simgs"></div>
+  <label style="margin-top:10px">言語変換 — BadaGPT への依頼文</label>
+  <div id="silent-req" class="mono" style="background:rgba(0,0,0,.3);border-radius:9px;padding:9px 11px;font-size:13px"></div>
+  <details style="margin-top:10px"><summary id="silent-doc-sum">📖 本と同じ分量まで展開した文章</summary>
+   <div class="paper" id="silent-doc" style="max-height:300px;margin-top:8px"></div></details>
+  <details style="margin-top:8px"><summary>🅱 Bada 言語のプログラム (silent.bada)</summary>
+   <pre class="mono" id="silent-bada" style="background:rgba(0,0,0,.3);border-radius:9px;padding:10px;font-size:11px;max-height:260px;overflow:auto;white-space:pre-wrap"></pre></details>
+  <div class="row">
+   <button class="main" id="silent-send" style="margin-top:6px">⚡ この非言語入力で BadaGPT に錬成させる</button>
+  </div>
+  <div class="row">
+   <button class="btn" id="silent-dl-doc">📝 文章 (Markdown)</button>
+   <button class="btn" id="silent-dl-docpdf">📄 文章 (PDF)</button>
+   <button class="btn" id="silent-dl-bada">🅱 silent.bada</button>
+   <button class="btn" id="silent-dl-img">🖼 イメージ (SVG)</button>
+  </div>
+  <div class="muted" id="silent-outstate"></div>
+ </div>
+ <div class="note" style="text-align:left;margin-top:10px">※ これは利用者が<b>自分で並べた非言語のアトムと手描き</b>を処理するもので、脳の信号は読み取りません。トランスフォーマーは固定の重みを持つ小さな自己注意ネットワーク (学習済み LLM ではない) で、同じ入力は必ず同じ出力になります。文章は latent に駆動された決定的なテンプレート展開です。</div>
+</div>
 
 <div class="card">
  <h2>① 思考入力 — 作りたいアプリを思い描くまま書く</h2>
