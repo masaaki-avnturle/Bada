@@ -265,11 +265,52 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`yappa3d/`** | **Yappa 3D** — Bada 3D デザインアプリ · WebGL自前実装 · プリミティブ配置 (立方体/球/円柱/円錐/トーラス/平面) · シーンツリー + インスペクタ · GPUカラーピッキング選択 · OBJ+MTL書き出し / JSON保存 / PNG · Undo/Redo · 単一HTML/依存ゼロ | [→ 開く](yappa3d/) |
+| **`yappa_cad/`** | 🛠 **Yappa CAD** — 近未来ビークル CAD · 🚗近未来カー/🛸UFO宇宙船/🏍近未来バイクのパラメトリックテンプレート · **機能設計**(推進/浮上/電源/制御/センサー → 質量・推力・最高速度・電力収支・航続・浮上判定を自動算出) · ★ **Bada 言語インタープリタ内蔵**で機能拡張 (CAD API + macro 登録 + >> tuplespace 設計台帳) · 単一HTML/依存ゼロ | [→ 開く](yappa_cad/) |
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 | **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 | **`requiem/`** | 🕯 **Requiem** — 提出された録音から生成したレクイエム (MP4, ヘ短調, 5 楽章) · Krumhansl 調性推定 · フェーズボコーダ · 畳み込みリバーブ · グラニュラー合成 · `make_requiem.py` で再生成可能 | [→ 開く](requiem/) |
+
+---
+
+## 🛠 Yappa CAD — 近未来ビークル CAD (Bada 言語で機能拡張)
+
+**依存ゼロの単一 HTML** で動く、近未来の乗り物専用パラメトリック CAD です。WebGL レンダラも **Bada 言語インタープリタ**も 1 ファイルに自前実装しています。
+
+**👉 [`yappa_cad/index.html` を開く](yappa_cad/index.html)** / GitHub Pages: <https://masaaki-avnturle.github.io/Bada/yappa_cad/>
+
+- **ビークルテンプレート** — 🚗 近未来カー / 🛸 UFO 宇宙船 / 🏍 近未来バイクをワンクリック生成し、全長・直径・ホイール径などのスライダーで**パラメトリックに再生成**
+- **機能設計** — パーツに役割 (構造/キャビン/🔥推進 kN/🛸浮上 kN/🔋電源 kW/制御/センサー) を割当てると、総質量・総推力・推力重量比・最高速度・電力収支・電池容量・航続・**浮上可否**をリアルタイム算出し ✓/⚠ で設計判定
+- ★ **Bada 言語で機能拡張** — 内蔵 Bada インタープリタ (`:=` / `def f |a,b|` / `if` / `while` / `for in` / `print` / **`>> tuplespace`** 設計台帳) + CAD API (`part` `move` `rot` `scale` `paint` `assign` `vehicle` `spec_report` …)。`macro("名前","関数")` で自作 Bada 関数をツールバーのボタンとして登録(localStorage 永続化)。サンプル 5 本同梱
+- **CAD 基本機能** — 8 プリミティブ(ウェッジ/カプセル追加)、GPU ピッキング選択、ドラッグ移動、Undo/Redo、JSON 保存/読込、OBJ+MTL 書き出し、PNG、自動保存
+
+詳細は [`yappa_cad/README.md`](yappa_cad/README.md) を参照。
+
+---
+
+## 🧊 Yappa 3D — Bada 3D デザインアプリ
+
+**依存ゼロの単一 HTML** で動く 3D デザイン / モデリングアプリです(Yappa CAD のレンダリングエンジンの土台)。
+
+**👉 [`yappa3d/index.html` を開く](yappa3d/index.html)** / GitHub Pages: <https://masaaki-avnturle.github.io/Bada/yappa3d/>
+
+- **プリミティブ配置** — 立方体 / 球 / 円柱 / 円錐 / トーラス / 平面 を配置し、ドラッグで XZ 移動 (Shift で上下)、オービットカメラ + パン + ズーム(ピンチ対応)
+- **シーンツリー + インスペクタ** — 名前 / 位置 / 回転 / 拡大 / 色 / 光沢 / ワイヤーフレーム / 表示切替。GPU カラーピッキング選択 + 選択アウトライン
+- **保存と書き出し** — シーン JSON 保存 / 読込、**OBJ + MTL 書き出し**、PNG、localStorage 自動保存。Undo / Redo (Ctrl+Z / Ctrl+Y)
+
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+[Releases の yappa3d-v1.0.0](https://github.com/masaaki-avnturle/Bada/releases/tag/yappa3d-v1.0.0) からダウンロードできます:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `yappa3d-debug.apk` |
+| **Windows 10 / 11** | `Yappa3D-*-x64.exe` (NSIS インストーラ) / `Yappa3D-*-portable.exe` (ポータブル) |
+| **Ubuntu** | `Yappa3D-*-x86_64.AppImage` / `Yappa3D-*-amd64.deb` |
+
+ビルドは [`yappa3d-app-build.yml`](.github/workflows/yappa3d-app-build.yml) が実行します(`yappa3d-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`yappa3d/README.md`](yappa3d/README.md) を参照。
 
 ---
 
