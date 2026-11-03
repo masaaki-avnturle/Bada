@@ -228,8 +228,8 @@ cp /usr/share/grub/unicode.pf2 "$IMAGE/boot/grub/fonts/unicode.pf2"
 #         すべて面倒みる。Rufus / dd でそのまま USB に書ける ----------------
 grub-mkrescue -o "$OUT/$ISO_NAME" "$IMAGE" \
   --product-name "Bada VM Pro OS" --product-version "$VERSION" \
-  -- -volid "BADAVMPRO_OS" -iso-level 3
-# -iso-level 3: filesystem.squashfs が 4GiB を超えても ISO に格納できる (multi-extent)
+  -- -volid "BADAVMPRO_OS"
+# (各 squashfs は上で 4GiB 未満を確認済みなので ISO9660 の 1 ファイル上限にも収まる)
 
 test -s "$OUT/$ISO_NAME" || { echo "FATAL: ISO 生成に失敗"; exit 1; }
 echo "== built: $OUT/$ISO_NAME =="
