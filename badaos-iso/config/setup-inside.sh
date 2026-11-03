@@ -52,7 +52,7 @@ apt_try vim vim-gtk3 emacs neovim \
 # ---- 日本語入力 (fcitx-mozc + fcitx-configtool) ----
 #   fcitx-mozc の依存で fcitx 本体・モジュールが入る。recommends 込みで
 #   フロントエンド/モジュールを確実に揃える。
-apt_try_rec fcitx fcitx-mozc fcitx-configtool \
+apt_try_rec fcitx fcitx-mozc fcitx-config-gtk \
   fcitx-frontend-gtk3 fcitx-frontend-gtk2 fcitx-frontend-qt5 \
   fcitx-module-dbus fcitx-ui-classic im-config mozc-utils-gui
 # 既定の入力メソッドを fcitx に
@@ -91,6 +91,14 @@ apt_try qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-contro
   grub-common grub2-common grub-pc-bin grub-efi-amd64-bin os-prober
 # トリプルブート用: NTFS 検出/縮小、UEFI 起動メニュー登録、Secure Boot 用署名済み GRUB
 apt_try ntfs-3g efibootmgr fdisk shim-signed grub-efi-amd64-signed python3-minimal
+
+# ---- サーバ/ネットワーク: ssh・xinetd・NAT ルータ用ツール・screen ----
+apt_try openssh-server xinetd screen \
+  iptables dnsmasq-base network-manager-gnome \
+  iputils-ping dnsutils traceroute netcat-openbsd telnet rsync
+# ---- 一通りのアプリケーション (apt の deb。ブラウザ/PDF/動画/画像/端末) ----
+apt_try falkon evince mpv ristretto mousepad pcmanfm lxtask \
+  software-properties-common apt-transport-https gnupg
 
 # 独自 /etc/calamares 設定を使用 (build-iso.sh が config/calamares を配置済み)
 # ブラウザは同梱しない: Bada アプリは Electron 版 (.deb) を優先起動するため不要。
@@ -170,6 +178,114 @@ cat > /etc/skel/.xsessionrc <<'EOF'
 # Bada VM Pro OS: X 起動時のフック (w9wm-session から読まれる)
 xsetroot -solid "#0b0e14" 2>/dev/null || true
 EOF
+
+# ---- ssh: 起動時に「その PC 固有の」ホスト鍵を作る (ISO に鍵を焼き込まない) ----
+rm -f /etc/ssh/ssh_host_*
+cat > /etc/systemd/system/badaos-ssh-hostkeys.service <<'EOF'
+[Unit]
+Description=Bada VM Pro OS: generate SSH host keys on first boot
+Before=ssh.service
+ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-keygen -A
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable badaos-ssh-hostkeys.service ssh 2>/dev/null || true
+
+# ---- xinetd: 有効化。サンプルサービス bada-info (TCP 7777, 既定は無効) ----
+systemctl enable xinetd 2>/dev/null || true
+cat > /usr/local/bin/bada-info <<'EOF'
+#!/bin/sh
+echo "Bada VM Pro OS $(cat /etc/badaos-version 2>/dev/null) on $(hostname) — $(date)"
+EOF
+chmod 755 /usr/local/bin/bada-info
+cat > /etc/xinetd.d/bada-info <<'EOF'
+# Bada VM Pro OS のサンプル xinetd サービス (TCP 7777)。
+# 使うには disable = no にして `sudo systemctl restart xinetd`
+service bada-info
+{
+    disable     = yes
+    type        = UNLISTED
+    port        = 7777
+    socket_type = stream
+    protocol    = tcp
+    wait        = no
+    user        = nobody
+    server      = /usr/local/bin/bada-info
+}
+EOF
+echo "$VERSION" > /etc/badaos-version
+
+# ---- screen: UTF-8 / 日本語で使いやすい既定 ----
+cat > /etc/skel/.screenrc <<'EOF'
+defutf8 on
+defencoding utf8
+startup_message off
+defscrollback 10000
+hardstatus alwayslastline "%{= kw}[Bada VM Pro] %-w%{= Wk}%n %t%{-}%+w %=%Y-%m-%d %c"
+EOF
+
+# ---- NAT ルータ: badaos-nat on <外側IF> <内側IF> で IP マスカレード ----
+cat > /usr/local/bin/badaos-nat <<'EOF'
+#!/bin/sh
+# badaos-nat — この PC を NAT ルータにする (内側の PC を外側のネットワークへ出す)
+#   sudo badaos-nat on  <外側IF> <内側IF>   例: sudo badaos-nat on enp0s3 enp0s8
+#   sudo badaos-nat off <外側IF> <内側IF>
+#   sudo badaos-nat share <内側IF>          NetworkManager の「共有」(DHCP+NAT) を内側に設定
+#   badaos-nat status
+set -e
+case "$1" in
+  on)  [ -n "$3" ] || { echo "使い方: badaos-nat on <外側IF> <内側IF>"; exit 1; }
+       sysctl -qw net.ipv4.ip_forward=1
+       iptables -t nat -C POSTROUTING -o "$2" -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o "$2" -j MASQUERADE
+       iptables -C FORWARD -i "$3" -o "$2" -j ACCEPT 2>/dev/null || iptables -A FORWARD -i "$3" -o "$2" -j ACCEPT
+       iptables -C FORWARD -i "$2" -o "$3" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+         iptables -A FORWARD -i "$2" -o "$3" -m state --state RELATED,ESTABLISHED -j ACCEPT
+       echo "NAT 有効: $3 → $2" ;;
+  off) [ -n "$3" ] || { echo "使い方: badaos-nat off <外側IF> <内側IF>"; exit 1; }
+       iptables -t nat -D POSTROUTING -o "$2" -j MASQUERADE 2>/dev/null || true
+       iptables -D FORWARD -i "$3" -o "$2" -j ACCEPT 2>/dev/null || true
+       iptables -D FORWARD -i "$2" -o "$3" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+       sysctl -qw net.ipv4.ip_forward=0; echo "NAT 無効" ;;
+  share) [ -n "$2" ] || { echo "使い方: badaos-nat share <内側IF>"; exit 1; }
+       nmcli con add type ethernet ifname "$2" con-name "bada-share-$2" ipv4.method shared ipv6.method ignore
+       nmcli con up "bada-share-$2"; echo "$2 に DHCP+NAT 共有を設定しました" ;;
+  status|*) echo "ip_forward=$(sysctl -n net.ipv4.ip_forward)"; iptables -t nat -S POSTROUTING 2>/dev/null || true
+       nmcli -t -f DEVICE,STATE,CONNECTION dev 2>/dev/null || true ;;
+esac
+EOF
+chmod 755 /usr/local/bin/badaos-nat
+
+# ---- apt: Bada の apt リポジトリが未公開 (404) でも apt update がエラーにならないよう、
+#      起動時に到達確認して有効/無効を切り替え、そのあと apt update する ----
+cat > /usr/local/sbin/badaos-apt-check <<'EOF'
+#!/bin/sh
+L=/etc/apt/sources.list.d/bada.list; D=/etc/apt/sources.list.d/bada.list.disabled
+F="$L"; [ -f "$F" ] || F="$D"; [ -f "$F" ] || exit 0
+URL="$(sed -n 's#^deb \[[^]]*\] \([^ ]*\) \./.*#\1#p' "$F" | head -1)"
+if [ -n "$URL" ] && curl -fsIL --max-time 15 "${URL%/}/Packages" >/dev/null 2>&1; then
+  [ "$F" = "$D" ] && mv "$D" "$L"
+else
+  [ "$F" = "$L" ] && mv "$L" "$D"
+fi
+apt-get update -qq || true
+EOF
+chmod 755 /usr/local/sbin/badaos-apt-check
+cat > /etc/systemd/system/badaos-apt-check.service <<'EOF'
+[Unit]
+Description=Bada VM Pro OS: check Bada apt repository and run apt update
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/badaos-apt-check
+TimeoutStartSec=180
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable badaos-apt-check.service NetworkManager-wait-online.service 2>/dev/null || true
 
 # ---- ネットワーク: NetworkManager を有効化 (NAT/DHCP がそのまま通る) ----
 systemctl enable NetworkManager 2>/dev/null || true

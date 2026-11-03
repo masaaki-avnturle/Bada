@@ -58,7 +58,9 @@ jobs:
         id: v
         run: |
           TAG="${{ github.event.inputs.release_tag || github.ref_name }}"
-          VER="${TAG#badaos-v}"; [ -n "$VER" ] || VER="1.0.0"
+          # タグ (badaos-vX.Y.Z) ならその版、手動実行 (ブランチ) なら badaos-iso/VERSION の版
+          case "$TAG" in badaos-v*) VER="${TAG#badaos-v}" ;; *) VER="$(cat badaos-iso/VERSION)" ;; esac
+          [ -n "$VER" ] || VER="1.0.0"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "apt_base=https://github.com/${{ github.repository }}/releases/download/${TAG}/" >> "$GITHUB_OUTPUT"
