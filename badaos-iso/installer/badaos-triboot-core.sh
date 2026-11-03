@@ -213,9 +213,9 @@ gib(){ awk -v s="$1" -v b="$SECT" 'BEGIN{ if (s*b < 1073741824) printf "%dMiB", 
 # 5. 実行
 # ---------------------------------------------------------------------------
 [ -b "$DISK" ] || fail "$DISK はブロックデバイスではありません"
-SQUASH=""
-for c in /cdrom/casper/filesystem.squashfs /run/live/medium/casper/filesystem.squashfs /isodevice/casper/filesystem.squashfs; do
-  [ -f "$c" ] && { SQUASH="$c"; break; }
+SQUASH=""   # ライブメディアの casper ディレクトリ (squashfs は複数レイヤ)
+for c in /cdrom/casper /run/live/medium/casper /isodevice/casper; do
+  [ -f "$c/filesystem.squashfs" ] && { SQUASH="$c"; break; }
 done
 [ -n "$SQUASH" ] || fail "ライブシステム (filesystem.squashfs) が見つかりません"
 
@@ -265,7 +265,9 @@ mkfs.ext4 -F -L BADAVMPRO "$ROOT_DEV" >/dev/null
 mkdir -p "$MNT"; mount "$ROOT_DEV" "$MNT"
 
 emit 22 "システムをコピー中… (数分かかります)"
-unsquashfs -f -d "$MNT" "$SQUASH" >/dev/null
+for sq in "$SQUASH"/filesystem.squashfs "$SQUASH"/filesystem-*.squashfs; do
+  if [ -f "$sq" ]; then unsquashfs -f -d "$MNT" "$sq" >/dev/null || fail "$sq の展開に失敗"; fi
+done
 
 # 専用ブート FAT を /boot/efi に。GRUB 一式 (/boot/grub) も FAT 上に置く
 mkdir -p "$MNT/boot/efi"; mount "$BOOT_DEV" "$MNT/boot/efi"

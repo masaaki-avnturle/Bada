@@ -21,9 +21,9 @@ emit(){ printf '%s\n# %s\n' "$1" "$2"; }
 fail(){ echo "ERROR: $*" >&2; exit 1; }
 
 # ライブメディア上の squashfs を探す
-SQUASH=""
-for c in /cdrom/casper/filesystem.squashfs /run/live/medium/casper/filesystem.squashfs /isodevice/casper/filesystem.squashfs; do
-  [ -f "$c" ] && { SQUASH="$c"; break; }
+SQUASH=""   # ライブメディアの casper ディレクトリ (squashfs は複数レイヤ)
+for c in /cdrom/casper /run/live/medium/casper /isodevice/casper; do
+  [ -f "$c/filesystem.squashfs" ] && { SQUASH="$c"; break; }
 done
 [ -n "$SQUASH" ] || fail "ライブシステム (filesystem.squashfs) が見つかりません"
 
@@ -68,7 +68,9 @@ else
 fi
 
 emit 20 "システムをコピー中… (数分かかります)"
-unsquashfs -f -d /mnt "$SQUASH" >/dev/null
+for sq in "$SQUASH"/filesystem.squashfs "$SQUASH"/filesystem-*.squashfs; do
+  if [ -f "$sq" ]; then unsquashfs -f -d /mnt "$sq" >/dev/null || fail "$sq の展開に失敗"; fi
+done
 
 emit 72 "システム設定を書き込み中"
 ROOT_UUID="$(blkid -s UUID -o value "$ROOT")"

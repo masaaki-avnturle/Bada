@@ -74,7 +74,7 @@ Windows の**すぐ下**に **Bada VM Pro 専用ブートローダの FAT パー
 
 1. [Rufus](https://rufus.ie/) を起動し、USB メモリ(8GB 以上)を挿す
 2. **「選択」**で `BadaVMPro-OS-1.2.0-amd64.iso` を指定
-3. パーティション構成は **MBR**(BIOS/UEFI 両対応)。**書き込みモードは「DD イメージモード」**(texlive-full 入りで ISO 内のファイルが 4GB を超えることがあり、ISO イメージモード = FAT32 コピーでは失敗するため)
+3. パーティション構成は **MBR**(BIOS/UEFI 両対応)または GPT(UEFI)。**書き込みモードは「ISO イメージモード」(推奨)** で OK。texlive-full 入りでもシステムを 4GB 未満の squashfs 3 つ(`filesystem.squashfs` / `filesystem-tex.squashfs` / `filesystem-fonts.squashfs`)に分けているので FAT32 の USB にそのまま入ります。UEFI 用に `\EFI\BOOT\BOOTX64.EFI` も ISO 内に置いてあります(DD モードでも可)
 4. **「スタート」** →(確認が出たら)そのまま書き込み
 5. 対象 PC を USB から起動(BIOS/UEFI のブートメニューで USB を選択)
 
@@ -104,14 +104,14 @@ sudo apt install laevateinn bada-vm-pro   # ← あなたのリポジトリの a
 
 1. `badaos-iso/build-iso.sh` を **root** で実行(GitHub Actions の ubuntu-latest)
 2. 既存アプリ Release から `.deb` を取得して同梱
-3. `debootstrap` → chroot 設定(`config/setup-inside.sh`)→ `mksquashfs` → GRUB/isolinux → `xorriso` で ISO 生成
+3. `debootstrap` → chroot 設定(`config/setup-inside.sh`)→ `mksquashfs`(4GB 未満の 3 レイヤに分割)→ GRUB → `xorriso` で ISO 生成
 4. `tools/make-apt-repo.sh` が flat な apt 索引を生成
 5. ISO・チェックサム・apt 索引・`.deb` を Release に添付
 
 ---
 
 ⚠️ 注記
-- ISO ビルドは実際の Ubuntu パッケージを取得して行う**本物のディストロビルド**です(texlive-full 込みで 3〜5GB 程度。Rufus では「DD イメージモード」で書き込んでください)。
+- ISO ビルドは実際の Ubuntu パッケージを取得して行う**本物のディストロビルド**です(texlive-full 込みで 3〜5GB 程度。各ファイルは 4GB 未満なので Rufus の ISO イメージモードで書けます)。
 - `w9wm` は最小構成のためデスクトップ環境(パネル等)はありません。`xterm` からアプリを起動できます。
 - Laevateinn の実車 BLE 接続は読取専用・操縦対象はシミュレーション車両のまま(以前の設計を踏襲)。
 - ライブ環境の既定ユーザーは `bada`(sudo 可)。インストール時に任意のユーザーを作成できます。

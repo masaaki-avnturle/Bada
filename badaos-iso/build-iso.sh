@@ -136,14 +136,36 @@ test -s "$IMAGE/casper/vmlinuz" || { echo "FATAL: vmlinuz が空/欠落"; exit 1
 test -s "$IMAGE/casper/initrd"  || { echo "FATAL: initrd が空/欠落";  exit 1; }
 ls -lh "$IMAGE/casper/vmlinuz" "$IMAGE/casper/initrd"
 
-# filesystem.squashfs
-#   /boot は「除外しない」。除外するとインストール後のシステムにカーネルが
-#   入らず、実ディスクへ入れても起動できなくなるため。
-#   texlive-full を含むため xz + 1MiB ブロックで強めに圧縮する
-mksquashfs "$CHROOT" "$IMAGE/casper/filesystem.squashfs" \
-  -noappend -no-progress -wildcards -comp xz -b 1M \
-  -e "boot/grub" "proc/*" "sys/*" "run/*" "tmp/*"
+# ---- squashfs を「4GiB 未満の複数レイヤ」に分けて作る -------------------------
+#   Rufus の「ISO イメージモード」は ISO の中身を FAT32 の USB にコピーするため、
+#   1 ファイル 4GiB 以上は書けない。texlive-full 入りでも各ファイルが 4GiB 未満に
+#   なるよう、casper の多層起動 (casper/*.squashfs をすべて overlay で重ねる) を使う:
+#     filesystem.squashfs        … ベース (TeX 本体とフォント以外すべて)
+#     filesystem-tex.squashfs    … /usr/share/texlive (フォント以外), texmf
+#     filesystem-fonts.squashfs  … TeX のフォント, /usr/share/fonts
+#   /boot は「除外しない」(インストール後のシステムにカーネルを入れるため)。
 printf "%s" "$(du -sx --block-size=1 "$CHROOT" | cut -f1)" > "$IMAGE/casper/filesystem.size"
+LAYERS="$WORK/layers"; rm -rf "$LAYERS"; mkdir -p "$LAYERS"
+split_out(){ # $1=レイヤ名  $2...=chroot からの相対パス (同じ FS 内で mv するので一瞬)
+  local name="$1"; shift; mkdir -p "$LAYERS/$name"
+  for p in "$@"; do
+    [ -e "$CHROOT/$p" ] || continue
+    mkdir -p "$LAYERS/$name/$(dirname "$p")"
+    mv "$CHROOT/$p" "$LAYERS/$name/$p"
+    mkdir -p "$CHROOT/$p"            # 空の置き場所 (overlay で上のレイヤが見える)
+  done; }
+split_out fonts usr/share/texlive/texmf-dist/fonts usr/share/fonts
+split_out tex   usr/share/texlive usr/share/texmf var/lib/texmf
+SQ_OPTS="-noappend -no-progress -comp xz -b 1M"
+mksquashfs "$CHROOT" "$IMAGE/casper/filesystem.squashfs" $SQ_OPTS \
+  -wildcards -e "boot/grub" "proc/*" "sys/*" "run/*" "tmp/*"
+mksquashfs "$LAYERS/tex"   "$IMAGE/casper/filesystem-tex.squashfs"   $SQ_OPTS
+mksquashfs "$LAYERS/fonts" "$IMAGE/casper/filesystem-fonts.squashfs" $SQ_OPTS
+# FAT32 (Rufus ISO モード) の上限: 1 ファイル 4GiB 未満
+for f in "$IMAGE"/casper/*.squashfs; do
+  sz=$(stat -c %s "$f"); echo "layer $(basename "$f"): $(( sz / 1048576 )) MiB"
+  [ "$sz" -lt 4294967295 ] || { echo "FATAL: $f が 4GiB 以上です (FAT32 に入りません)。レイヤを分けてください"; exit 1; }
+done
 echo "Bada VM Pro OS ${VERSION}" > "$IMAGE/casper/filesystem.manifest"
 # casper が起動メディアを識別しやすいよう .disk/info を置く
 mkdir -p "$IMAGE/.disk"
@@ -179,6 +201,24 @@ menuentry "Bada VM Pro OS ${VERSION} (セーフグラフィック)" {
     initrd /casper/initrd
 }
 EOF
+
+# ---- Rufus「ISO イメージモード」(FAT32 USB にファイルコピー) 用の UEFI ローダ ----
+#   grub-mkrescue の UEFI ローダは ISO の UUID で自分を探すため、ファイルを
+#   コピーした USB では見つからないことがある。ISO の中に普通のファイルとして
+#   \EFI\BOOT\BOOTX64.EFI を置き、/casper/vmlinuz があるボリュームを探して
+#   /boot/grub/grub.cfg を読むようにする (ISO9660 / FAT32 / exFAT / NTFS どれでも可)。
+mkdir -p "$IMAGE/EFI/BOOT"
+cat > "$WORK/efi-early.cfg" <<'EOF'
+search --no-floppy --set=root --file /casper/vmlinuz
+set prefix=($root)/boot/grub
+configfile ($root)/boot/grub/grub.cfg
+EOF
+grub-mkimage -O x86_64-efi -o "$IMAGE/EFI/BOOT/BOOTX64.EFI" -p /boot/grub -c "$WORK/efi-early.cfg" \
+  part_gpt part_msdos fat exfat ntfs iso9660 search search_fs_file normal configfile \
+  linux echo test ls all_video efi_gop efi_uga gfxterm font gzio
+# grub.cfg の insmod 用に UEFI モジュールもツリーに置く (grub-mkrescue も入れるが念のため)
+mkdir -p "$IMAGE/boot/grub/x86_64-efi"
+cp /usr/lib/grub/x86_64-efi/*.mod /usr/lib/grub/x86_64-efi/*.lst "$IMAGE/boot/grub/x86_64-efi/" 2>/dev/null || true
 
 # GRUB の Unicode フォント (日本語メニュー用) を同梱
 mkdir -p "$IMAGE/boot/grub/fonts"
