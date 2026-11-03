@@ -53,14 +53,24 @@ function writePaper(spec, gen, ver, meta) {
   L.push("");
   if (meta.silent && meta.silent.seq && meta.silent.seq.length) {
     var sv = meta.silent;
+    var gestured = sv.readout && sv.readout.length;
     L.push("### 2.0 サイレント・トーク (非言語思考入力) 由来");
     L.push("");
-    L.push("この依頼は言葉ではなく、利用者が並べた非言語のアトム (" + sv.seq.join(" / ") + ") と手描きから作られた。" +
-      "アトム列は固定の重みを持つ小さなトランスフォーマー (自己注意 " + SILENT_CFG.L + " 層・多頭) で言語化されていない潜在表現 (latent) に変換され、" +
-      "latent から (a) 本と同じ分量まで展開できる文章 (" + (sv.document ? sv.document.chars.toLocaleString("ja-JP") : "?") + " 字)、(b) イメージ " +
+    L.push("この依頼は言葉ではなく、" + (gestured ? "利用者が頭に思い描いたものを連続した動き (ジェスチャー) で入力したもの" : "利用者が並べた非言語のアトム (" + sv.seq.join(" / ") + ")") +
+      "から作られた。" + (gestured ? "動きの速さ・広がり・向き・曲がり・リズム・重心を固定の規則で特徴量にし、そこから非言語のアトム列を導いた。" : "") +
+      "この列は固定の重みを持つ小さなトランスフォーマー (自己注意 " + SILENT_CFG.L + " 層・多頭) で言語化されていない潜在表現 (latent) に変換され、" +
+      "latent から (a) 文章 (" + (sv.document ? sv.document.chars.toLocaleString("ja-JP") : "?") + " 字)、(b) イメージ " +
       ((sv.imagery && sv.imagery.length) || 0) + " 枚、(c) Bada 言語のプログラム、(d) 次節以降に渡す依頼文「" + sv.request + "」を決定的に復号した。" +
-      "トランスフォーマーは利用者が並べたアトムを処理するもので、脳の信号は読み取らない。");
+      (gestured ? "これは利用者が描いた動きを読むもので" : "トランスフォーマーは利用者が並べたアトムを処理するもので") + "、脳の信号は読み取らない。");
     L.push("");
+    if (gestured) {
+      L.push("動きから読み取った内容 (固定の規則):");
+      L.push("");
+      L.push("| 動きの特徴 | 値 | 意味 |");
+      L.push("|---|---|---|");
+      sv.readout.forEach(function (r) { L.push("| " + mdCell(r.label) + " | " + mdCell(r.value) + " | " + mdCell(r.meant) + " |"); });
+      L.push("");
+    }
   }
   L.push("### 2.1 電信による入力");
   L.push("");

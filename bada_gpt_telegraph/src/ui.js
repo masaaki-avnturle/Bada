@@ -449,21 +449,39 @@
   $("silent-undo").onclick = function () { silentSeq.pop(); saveSeq(); renderStrip(); };
   $("silent-clear").onclick = function () { silentSeq = []; saveSeq(); renderStrip(); };
 
-  /* 手描き (感覚入力): ストローク数を latent の種として非言語列に足す */
-  var scv = $("silent-sketch"), sctx2 = scv.getContext("2d"), sdrawing = false, slast = null, sStrokes = 0;
-  function sfit() { scv.width = scv.clientWidth; scv.height = 120; sctx2.fillStyle = "#fff"; sctx2.fillRect(0, 0, scv.width, scv.height); }
-  function spt(e) { var r = scv.getBoundingClientRect(); return { x: (e.clientX - r.left) * scv.width / r.width, y: (e.clientY - r.top) * scv.height / r.height }; }
-  scv.onpointerdown = function (e) { sdrawing = true; slast = spt(e); sStrokes++; scv.setPointerCapture(e.pointerId); };
-  scv.onpointermove = function (e) { if (!sdrawing) return; var p = spt(e); sctx2.strokeStyle = "#2a3550"; sctx2.lineWidth = 2.5; sctx2.lineCap = "round"; sctx2.beginPath(); sctx2.moveTo(slast.x, slast.y); sctx2.lineTo(p.x, p.y); sctx2.stroke(); slast = p; };
-  scv.onpointerup = scv.onpointercancel = function () { sdrawing = false; };
-  $("silent-sketchclr").onclick = function () { sStrokes = 0; sfit(); };
-  setTimeout(sfit, 0);
-
-  function fullSeq() {
-    var seq = silentSeq.slice();
-    if (sStrokes > 0) seq.push("sketch:" + Math.min(6, sStrokes)); /* 感覚入力をトランスフォーマーへ */
-    return seq;
+  /* 🌫 思いを描く面: イメージした思いを連続した動きで入力。正規化した {x,y,t} を記録する。 */
+  var gcv = $("silent-field"), gctx = gcv.getContext("2d"), gstrokes = [], gcur = null, gdrawing = false, gstart = 0;
+  function gfit() {
+    gcv.width = gcv.clientWidth; gcv.height = 240; redrawField();
   }
+  function redrawField() {
+    gctx.clearRect(0, 0, gcv.width, gcv.height);
+    gctx.lineWidth = 2.5; gctx.lineCap = "round"; gctx.lineJoin = "round";
+    gstrokes.forEach(function (st, si) {
+      gctx.strokeStyle = "hsla(" + (200 + si * 24) % 360 + ",90%,68%,.9)"; gctx.beginPath();
+      st.forEach(function (p, i) { var x = p.x * gcv.width, y = p.y * gcv.height; if (i) gctx.lineTo(x, y); else gctx.moveTo(x, y); });
+      gctx.stroke();
+    });
+  }
+  function gpt(e) { var r = gcv.getBoundingClientRect(); return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)), t: (performance.now() - gstart) }; }
+  function fieldStat() {
+    var n = gstrokes.reduce(function (a, s) { return a + s.length; }, 0);
+    $("silent-field-stat").textContent = gstrokes.length ? ("ひと筆 " + gstrokes.length + " 本・点 " + n + " 個を描きました。") : "まだ何も描かれていません。";
+  }
+  gcv.onpointerdown = function (e) { if (!gstart) gstart = performance.now(); gdrawing = true; gcur = [gpt(e)]; gstrokes.push(gcur); gcv.setPointerCapture(e.pointerId); };
+  gcv.onpointermove = function (e) { if (!gdrawing) return; gcur.push(gpt(e)); redrawField(); };
+  gcv.onpointerup = gcv.onpointercancel = function () { gdrawing = false; fieldStat(); };
+  $("silent-field-undo").onclick = function () { gstrokes.pop(); redrawField(); fieldStat(); };
+  $("silent-field-clear").onclick = function () { gstrokes = []; gstart = 0; redrawField(); fieldStat(); };
+  /* リズムをタップ: 点の連なりとして記録 (無言のリズム入力) */
+  $("silent-tap").onclick = function () {
+    if (!gstart) gstart = performance.now();
+    var t = performance.now() - gstart, x = 0.5 + (Math.sin(t / 130) * 0.18), y = 0.5 + (Math.cos(t / 90) * 0.18);
+    gstrokes.push([{ x: x, y: y, t: t }, { x: x + 0.01, y: y + 0.01, t: t + 10 }]);
+    redrawField(); fieldStat();
+  };
+  setTimeout(gfit, 0); addEventListener("resize", function () { setTimeout(gfit, 0); });
+  function hasGesture() { return gstrokes.reduce(function (a, s) { return a + s.length; }, 0) >= 3; }
   function drawHeat(cv, rows, absMax) {
     var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight || 90;
     cv.width = W * dpr; cv.height = H * dpr; var x = cv.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
@@ -474,22 +492,37 @@
       x.fillStyle = "hsl(" + hue + ",80%," + light + "%)"; x.fillRect(j * cw, i * ch, cw + 0.5, ch + 0.5);
     }
   }
+  function volOpt() { var v = +$("silent-vol").value; return v > 0 ? { targetChars: v, images: 3 } : { images: 3 }; }
+  function renderReadout(readout) {
+    $("silent-readout").innerHTML = (readout && readout.length)
+      ? readout.map(function (r) { return '<div class="rrow"><i>' + escHtml(r.label) + '</i><b>' + escHtml(r.value) + '</b><span>' + escHtml(r.meant) + "</span></div>"; }).join("")
+      : '<div class="muted">グリフのみから構成しました (動きの読み取りはありません)。</div>';
+  }
+  function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function runSilent() {
-    var seq = fullSeq();
-    if (!seq.length) { $("silent-outstate").innerHTML = '<span class="err">グリフを並べてください (手描きだけでも可)。</span>'; return; }
-    var proc = silentProcess(seq, { targetChars: +$("silent-vol").value, images: 3 });
-    lastSilent = { seq: seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags };
+    var proc, readout, srcLabel;
+    if (hasGesture()) {
+      proc = gestureProcess(gstrokes, volOpt());
+      /* グリフも足されていれば補いとして末尾に加える */
+      if (silentSeq.length) { proc = silentProcess(proc.atoms.concat(silentSeq).concat(proc.seq.filter(function (s) { return s.indexOf("g:") === 0; })), volOpt()); }
+      readout = (proc.readout || []); srcLabel = "描いた思い" + (silentSeq.length ? " + グリフ " + silentSeq.length + " 個" : "");
+    } else if (silentSeq.length) {
+      proc = silentProcess(silentSeq.slice(), volOpt()); readout = null; srcLabel = "グリフ " + silentSeq.length + " 個";
+    } else {
+      $("silent-outstate").innerHTML = '<span class="err">上の面に思いを描いてください (グリフだけでも可)。</span>'; return;
+    }
+    lastSilent = { seq: proc.seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags, readout: readout, features: proc.features };
     $("silent-out").classList.remove("hidden");
+    renderReadout(readout);
     var amax = 0; proc.enc.seq.forEach(function (row) { row.forEach(function (v) { amax = Math.max(amax, Math.abs(v)); }); });
     drawHeat($("silent-latent"), proc.enc.seq, amax);
-    var att = proc.enc.attention.slice(0, seq.length); /* 最初のヘッドぶん */
-    drawHeat($("silent-att"), att.length ? att : [[0]], 1);
+    drawHeat($("silent-att"), proc.enc.attention.length ? proc.enc.attention.slice(0, proc.seq.length) : [[0]], 1);
     $("silent-imgs").innerHTML = proc.imagery.join("");
     $("silent-req").textContent = proc.request;
     $("silent-doc").innerHTML = mdToHtml(proc.document.markdown);
-    $("silent-doc-sum").textContent = "📖 本と同じ分量まで展開した文章 (" + proc.document.chars.toLocaleString("ja-JP") + " 字 / 目標 " + proc.document.target.toLocaleString("ja-JP") + " 字)";
+    $("silent-doc-sum").textContent = "📖 思いを展開した文章 (" + proc.document.chars.toLocaleString("ja-JP") + " 字 / 目標 " + proc.document.target.toLocaleString("ja-JP") + " 字)";
     $("silent-bada").textContent = proc.bada;
-    $("silent-outstate").textContent = "サイレント化しました。アトム " + seq.length + " 個 → latent " + proc.enc.pooled.length + " 次元。「錬成」で BadaGPT がアプリを作ります。";
+    $("silent-outstate").textContent = srcLabel + " → latent " + proc.enc.pooled.length + " 次元に変換しました。「錬成」で BadaGPT がアプリを作ります。";
   }
   $("silent-run").onclick = runSilent;
   $("silent-send").onclick = function () {
@@ -499,7 +532,7 @@
     $("thought").scrollIntoView({ behavior: "smooth", block: "center" });
     go();
   };
-  function sfile() { return "silent-" + (lastSilent ? lastSilent.seq.filter(function (s) { return s.indexOf("sketch") < 0; }).slice(0, 4).join("-") : "thought"); }
+  function sfile() { return "silent-" + (lastSilent ? lastSilent.seq.filter(function (s) { return s.indexOf("g:") < 0 && s.indexOf("sketch") < 0 && ATOM_BY_ID[s]; }).slice(0, 4).join("-") || "thought" : "thought"); }
   $("silent-dl-doc").onclick = function () { if (lastSilent) report(saveBytes(sfile() + ".md", utf8(lastSilent.document.markdown), "text/markdown")); };
   $("silent-dl-docpdf").onclick = function () { if (lastSilent) report(saveBytes(sfile() + ".pdf", pdfFromJpegs(renderPages(lastSilent.document.markdown), sfile()), "application/pdf")); };
   $("silent-dl-bada").onclick = function () { if (lastSilent) report(saveBytes("silent.bada", utf8(lastSilent.bada), "text/plain")); };

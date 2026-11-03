@@ -330,6 +330,130 @@ function latentToBada(ids, enc, req) {
   return L.join("\n");
 }
 
+/* ───────────── イメージした思い (ジェスチャー) → 特徴 ─────────────
+ * 利用者が「頭に思い描いたものを、言葉を介さずに連続した動きで描く」。
+ * その動き (ストロークの集まり) の速さ・広がり・向き・曲がり・リズム・重心を
+ * 固定の規則で特徴量にする。思考を読むのではなく、描かれた動きを読む。
+ * strokes: [[{x,y,t}, ...], ...]  x,y は 0..1 に正規化、t はミリ秒。 */
+function gestureFeatures(strokes) {
+  strokes = (strokes || []).filter(function (s) { return s && s.length; });
+  var f = {
+    strokes: strokes.length, points: 0, pathLen: 0, durationMs: 0,
+    minX: 1, minY: 1, maxX: 0, maxY: 0, cx: 0, cy: 0,
+    speedMean: 0, speedVar: 0, curvature: 0, dir: new Array(8).fill(0), rhythmVar: 0
+  };
+  if (!strokes.length) return f;
+  var speeds = [], sumX = 0, sumY = 0, tStart = Infinity, tEnd = -Infinity, prevAng = null, strokeStarts = [];
+  strokes.forEach(function (st) {
+    strokeStarts.push(st[0].t);
+    for (var i = 0; i < st.length; i++) {
+      var p = st[i];
+      f.points++; sumX += p.x; sumY += p.y;
+      f.minX = Math.min(f.minX, p.x); f.minY = Math.min(f.minY, p.y);
+      f.maxX = Math.max(f.maxX, p.x); f.maxY = Math.max(f.maxY, p.y);
+      if (p.t < tStart) tStart = p.t; if (p.t > tEnd) tEnd = p.t;
+      if (i > 0) {
+        var q = st[i - 1], dx = p.x - q.x, dy = p.y - q.y, len = Math.hypot(dx, dy), dt = Math.max(1, p.t - q.t);
+        f.pathLen += len;
+        if (len > 1e-4) {
+          speeds.push(len / dt * 1000);
+          var ang = Math.atan2(dy, dx);
+          var bin = Math.floor(((ang + Math.PI) / (2 * Math.PI)) * 8) % 8;
+          f.dir[bin] += len;
+          if (prevAng != null) { var da = Math.abs(ang - prevAng); if (da > Math.PI) da = 2 * Math.PI - da; f.curvature += da; }
+          prevAng = ang;
+        }
+      }
+    }
+  });
+  f.cx = sumX / f.points; f.cy = sumY / f.points;
+  f.durationMs = (tEnd > tStart) ? tEnd - tStart : 0;
+  if (speeds.length) {
+    var m = speeds.reduce(function (a, b) { return a + b; }, 0) / speeds.length;
+    f.speedMean = m;
+    f.speedVar = speeds.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / speeds.length;
+  }
+  if (strokeStarts.length > 1) {
+    var gaps = [];
+    for (var k = 1; k < strokeStarts.length; k++) gaps.push(strokeStarts[k] - strokeStarts[k - 1]);
+    var gm = gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length;
+    f.rhythmVar = gaps.reduce(function (a, b) { return a + (b - gm) * (b - gm); }, 0) / gaps.length;
+  }
+  return f;
+}
+
+/* 重心の 3×3 領域 → 主モジュール (どこに思いを描いたかで何のアプリかが決まる) */
+var GESTURE_GRID = [
+  ["note", "records", "task"],
+  ["draw", "quantum", "money"],
+  ["random", "habit", "time"]
+];
+var DIR_NAME = ["右", "右下", "下", "左下", "左", "左上", "上", "右上"];
+
+/* ジェスチャー特徴 → 非言語アトム列 + 読み取り内容 (利用者に見せる) */
+function gestureToAtoms(f) {
+  var atoms = [], feat = [], readout = [];
+  if (!f.points) return { atoms: [], feat: [], readout: [] };
+  function add(id) { if (id && atoms.indexOf(id) < 0) atoms.push(id); }
+  /* 重心 → 主モジュール */
+  var col = Math.min(2, Math.floor(f.cx * 3)), row = Math.min(2, Math.floor(f.cy * 3));
+  var primary = GESTURE_GRID[row][col];
+  add(primary);
+  var pa = ATOM_BY_ID[primary] || {}, pmod = (pa.tags && pa.tags.mod) || "";
+  var pname = (MOD_PHRASE[pmod] || MOD_PHRASE[primary] || primary).replace(/^を/, "");
+  readout.push({ label: "思いの重心", value: (["上", "中", "下"][row]) + "・" + (["左", "中", "右"][col]), meant: pname + " のアプリ" });
+  /* 広がり (pathLen) → 文章の分量・大きさ */
+  var vol = f.pathLen < 1.5 ? "small" : f.pathLen < 4 ? "medium" : f.pathLen < 8 ? "large" : "book_vol";
+  add(vol);
+  readout.push({ label: "広がり (動きの長さ)", value: f.pathLen.toFixed(2), meant: "分量 " + ({ small: "素描", medium: "短編", large: "中編", book_vol: "本一冊" }[vol]) });
+  /* 曲がり (curvature) → 気分・配色 */
+  var curv = f.curvature;
+  if (curv > 12) { add("urgent"); add("vivid"); readout.push({ label: "曲がりの多さ", value: curv.toFixed(1), meant: "勢いのある思い → 音で知らせる・紫" }); }
+  else if (curv < 3 && f.speedVar < 1e5) { add("calm"); readout.push({ label: "曲がりの少なさ", value: curv.toFixed(1), meant: "静かな思い → 落ち着いた構成" }); }
+  else { add("joy"); readout.push({ label: "動きの質", value: curv.toFixed(1), meant: "軽やかな思い" }); }
+  /* 重心の高さ → 明暗・色 */
+  if (f.cy < 0.4) { add("cool"); readout.push({ label: "上側に描いた", value: f.cy.toFixed(2), meant: "暗い青のデザイン" }); }
+  else if (f.cy > 0.6) { add("warm"); readout.push({ label: "下側に描いた", value: f.cy.toFixed(2), meant: "明るいオレンジのデザイン" }); }
+  /* 主な向き → 機能 */
+  var domBin = 0, domVal = -1;
+  f.dir.forEach(function (v, i) { if (v > domVal) { domVal = v; domBin = i; } });
+  if (domBin === 2 || domBin === 6) { add("sort"); readout.push({ label: "主な向き", value: DIR_NAME[domBin], meant: "並べ替え" }); }
+  else if (domBin === 0 || domBin === 4) { add("find"); readout.push({ label: "主な向き", value: DIR_NAME[domBin], meant: "検索" }); }
+  else { readout.push({ label: "主な向き", value: DIR_NAME[domBin], meant: "—" }); }
+  /* ストローク数 → 追加モジュール / グラフ */
+  if (f.strokes >= 3) { add("graph"); readout.push({ label: "ストローク数", value: String(f.strokes), meant: "グラフ・集計" }); }
+  /* 広がりの形 → 対象プラットフォーム */
+  var w = f.maxX - f.minX, h = f.maxY - f.minY;
+  if (w > h * 1.3) { add("windows"); add("linux"); readout.push({ label: "横長の思い", value: w.toFixed(2) + "×" + h.toFixed(2), meant: "Windows・Linux" }); }
+  else if (h > w * 1.3) { add("android"); readout.push({ label: "縦長の思い", value: w.toFixed(2) + "×" + h.toFixed(2), meant: "スマホ" }); }
+  /* トランスフォーマーへ渡す非言語の特徴トークン (latent を細かく変える) */
+  feat.push("g:spd" + Math.min(9, Math.round(f.speedMean / 200)));
+  feat.push("g:cur" + Math.min(9, Math.round(curv)));
+  feat.push("g:dir" + domBin);
+  feat.push("g:ext" + Math.min(9, Math.round(f.pathLen)));
+  feat.push("g:rhy" + Math.min(9, Math.round(Math.sqrt(f.rhythmVar) / 100)));
+  feat.push("g:pts" + Math.min(9, Math.round(f.points / 20)));
+  return { atoms: atoms, feat: feat, readout: readout };
+}
+
+/* イメージした思い (ジェスチャー) を 1 回で処理して全成果物を返す */
+function gestureProcess(strokes, opts) {
+  opts = opts || {};
+  var f = gestureFeatures(strokes);
+  var g = gestureToAtoms(f);
+  var seq = g.atoms.concat(g.feat);
+  var enc = silentEncode(seq);
+  var req = silentToRequest(g.atoms, enc);
+  return {
+    source: "gesture",
+    features: f, readout: g.readout, atoms: g.atoms, seq: seq, enc: enc,
+    request: req.text, tags: req.tags,
+    document: latentToDocument(seq, enc, opts),
+    imagery: latentToImagery(enc, opts.images || 3),
+    bada: latentToBada(g.atoms, enc, req)
+  };
+}
+
 /* 非言語アトム列を 1 回で処理して全成果物を返す (UI/テスト兼用) */
 function silentProcess(ids, opts) {
   opts = opts || {};

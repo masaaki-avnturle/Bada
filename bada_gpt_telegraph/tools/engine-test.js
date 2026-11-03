@@ -68,6 +68,29 @@ section("サイレント・トーク (非言語 → トランスフォーマー 
   const gp = call("generateApp", spec);
   const paperMd = call("writePaper", spec, gp, call("verifyApp", gp.html, spec), { silent: proc });
   ok(/### 2.0 サイレント・トーク/.test(paperMd) && paperMd.includes(proc.seq.join(" / ")), "論文にサイレント・トーク由来の節");
+
+  /* イメージした思い (ジェスチャー) 入力 */
+  const stroke = (pts, t0, dt) => pts.map((p, i) => ({ x: p[0], y: p[1], t: t0 + i * dt }));
+  const gestA = [stroke([[0.1, 0.2], [0.2, 0.2], [0.3, 0.21], [0.4, 0.2]], 0, 120)];
+  const gestB = [stroke([[0.5, 0.6], [0.9, 0.9], [0.6, 0.8], [0.95, 0.6], [0.5, 0.95]], 0, 30), stroke([[0.6, 0.7], [0.8, 0.5], [0.7, 0.9]], 400, 25), stroke([[0.55, 0.85], [0.9, 0.7], [0.6, 0.6]], 900, 25)];
+  const fA = call("gestureFeatures", gestA);
+  ok(fA.points === 4 && fA.strokes === 1 && fA.pathLen > 0 && fA.cx > 0 && fA.cx < 0.5, "ジェスチャー特徴量 (点・ストローク・経路長・重心)");
+  ok(JSON.stringify(call("gestureFeatures", gestA)) === JSON.stringify(fA), "ジェスチャー特徴量は決定的");
+  const ga = call("gestureToAtoms", fA);
+  ok(ga.atoms.length > 0 && ga.feat.length > 0 && ga.readout.length > 0, "ジェスチャー → アトム・特徴トークン・読み取り内容");
+  ok(ga.readout.every((r) => r.label && r.meant != null), "読み取り内容に動きの特徴と意味");
+  const pgA = call("gestureProcess", gestA, { targetChars: 1500 }), pgB = call("gestureProcess", gestB, { targetChars: 1500 });
+  ok(pgA.source === "gesture" && pgA.request && pgA.document && pgA.imagery.length && pgA.bada, "gestureProcess が全成果物を返す");
+  ok(JSON.stringify(call("gestureProcess", gestA, { targetChars: 1500 }).enc.pooled) === JSON.stringify(pgA.enc.pooled), "ジェスチャー処理は決定的");
+  ok(JSON.stringify(pgA.enc.pooled) !== JSON.stringify(pgB.enc.pooled) && pgA.request !== pgB.request, "異なる思い (動き) → 異なる latent と依頼文");
+  const sgA = call("comprehend", pgA.request);
+  ok(sgA.modules.length > 0 && sgA.coverage >= 0.5, "ジェスチャー由来の依頼文が全体把握に通る");
+  let gbok = true; try { new (E("BadaInterp"))(() => {}).run(pgA.bada); } catch (e) { gbok = false; }
+  ok(gbok, "ジェスチャー由来の Bada プログラムが実行できる");
+  ok(call("gestureFeatures", []).points === 0 && call("gestureToAtoms", call("gestureFeatures", [])).atoms.length === 0, "空ジェスチャーでも落ちない");
+  ok(pgA.document.target > pgA.document.target * 0 && call("gestureProcess", gestA, {}).document.chars > 100, "分量未指定でも広がりから文章量が決まる");
+  const paperG = call("writePaper", sgA, call("generateApp", sgA), call("verifyApp", call("generateApp", sgA).html, sgA), { silent: pgA });
+  ok(/動きから読み取った内容/.test(paperG) && /\| 動きの特徴 \| 値 \| 意味 \|/.test(paperG), "論文にジェスチャー読み取りの表");
 }
 
 /* 1. 電信エンジン */

@@ -83,7 +83,10 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
 .sglyph:active{transform:scale(.9)}.sglyph.on{background:rgba(143,208,255,.22);border-color:var(--acc)}
 .sstrip{min-height:40px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(0,0,0,.3);border:1px solid rgba(150,190,255,.18);border-radius:10px;padding:8px}
 .schip{font-size:15px;padding:4px 8px;border-radius:8px;background:rgba(143,208,255,.16);border:1px solid rgba(143,208,255,.35);cursor:pointer}
-.ssketch{width:100%;height:120px;display:block;border-radius:10px;background:#fff;touch-action:none;border:1px solid rgba(150,190,255,.2);margin:6px 0}
+.sfield{width:100%;height:240px;display:block;border-radius:12px;background:radial-gradient(ellipse at 50% 40%,#0c1430,#070a12);touch-action:none;border:1px solid rgba(143,208,255,.3);margin:6px 0;cursor:crosshair}
+.sreadout{display:flex;flex-direction:column;gap:4px;background:rgba(0,0,0,.28);border:1px solid rgba(150,190,255,.16);border-radius:10px;padding:9px 11px;font-size:12.5px}
+.sreadout .rrow{display:grid;grid-template-columns:140px 70px 1fr;gap:8px;align-items:baseline}
+.sreadout .rrow i{font-style:normal;color:var(--txt2)}.sreadout .rrow b{font-variant-numeric:tabular-nums;color:var(--acc);font-weight:500}
 .simgs{display:flex;gap:8px;flex-wrap:wrap}.simgs svg{border-radius:8px;border:1px solid rgba(150,190,255,.18)}
 </style>
 </head>
@@ -96,30 +99,36 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
 </header>
 
 <div class="card">
- <h2>⓪ サイレント・トーク — 言葉を介さない思考入力 (非言語 → トランスフォーマー → latent)</h2>
- <div class="muted" style="margin-bottom:8px">頭の中のアイデアを、言葉ではなく<b>無言のグリフ</b>・<b>手描き</b>・<b>リズム</b>で並べます。並べたアトムを<b>トランスフォーマー (自己注意)</b> が言語化されていない潜在表現 (latent) に変換し、そこから <b>本と同じ分量まで展開できる文章</b>・<b>イメージ</b>・<b>Bada 言語のプログラム</b>・BadaGPT への<b>依頼文</b>を復号します。</div>
- <label>無言のグリフを選ぶ (タップで思考列へ追加)</label>
- <div id="silent-palette"></div>
- <label style="margin-top:10px">思考列 (非言語入力の並び)</label>
- <div id="silent-strip" class="sstrip"><span class="muted">グリフをタップして並べてください。</span></div>
+ <h2>⓪ サイレント・トーク — イメージした思いを、言葉を介さず動きで入力する</h2>
+ <div class="muted" style="margin-bottom:8px">文字や絵文字を選ぶのではなく、頭に<b>思い描いたもの</b>を、言葉を介さずに<b>連続した動き</b>で下の面に描きます (目を閉じたままでも構いません)。その動きの<b>速さ・広がり・向き・曲がり・リズム・どこに留まったか</b>を<b>トランスフォーマー (自己注意)</b> が読み取って言語化されていない潜在表現 (latent) に変換し、そこから <b>文章</b>・<b>イメージ</b>・<b>Bada 言語のプログラム</b>・BadaGPT への<b>依頼文</b>を復号します。</div>
+ <label>🌫 思いを描く面 — 思い浮かべたものを連続した動きでなぞる</label>
+ <canvas id="silent-field" class="sfield"></canvas>
  <div class="row">
-  <button class="btn" id="silent-undo">⌫ 1つ戻す</button>
-  <button class="btn" id="silent-clear">クリア</button>
-  <span class="muted">手描き (感覚入力):</span>
-  <button class="btn" id="silent-sketchclr">スケッチ消去</button>
+  <button class="btn" id="silent-field-undo">⌫ ひと筆戻す</button>
+  <button class="btn" id="silent-field-clear">描き直す</button>
+  <button class="btn" id="silent-tap">● リズムをタップ</button>
+  <span class="muted" id="silent-field-stat">まだ何も描かれていません。</span>
  </div>
- <canvas id="silent-sketch" class="ssketch"></canvas>
  <div class="row">
-  <label style="margin:0">文章の分量</label>
+  <label style="margin:0">文章の分量 (広がりでも決まります)</label>
   <select id="silent-vol" style="width:auto">
+   <option value="0">思いの広がりにまかせる</option>
    <option value="1200">素描 (約 1,200 字)</option>
-   <option value="6000" selected>短編 (約 6,000 字)</option>
+   <option value="6000">短編 (約 6,000 字)</option>
    <option value="24000">中編 (約 24,000 字)</option>
    <option value="96000">本一冊 (約 96,000 字)</option>
   </select>
-  <button class="btn" id="silent-run">🧠 サイレント化 (トランスフォーマー実行)</button>
+  <button class="btn" id="silent-run">🧠 思いを言葉にする (トランスフォーマー実行)</button>
  </div>
+ <details style="margin-top:6px"><summary>✦ 細かく指定する — 無言のグリフで補う (任意)</summary>
+  <div class="muted" style="margin:8px 0">動きだけで足りないときに、無言のグリフを足せます。描いた思いがあればそちらが優先され、グリフは補いとして加わります。</div>
+  <div id="silent-palette"></div>
+  <div id="silent-strip" class="sstrip" style="margin-top:8px"><span class="muted">グリフをタップして並べてください。</span></div>
+  <div class="row"><button class="btn" id="silent-undo">⌫ 1つ戻す</button><button class="btn" id="silent-clear">クリア</button></div>
+ </details>
  <div id="silent-out" class="hidden">
+  <label style="margin-top:10px">読み取った思い (動きを固定の規則で言葉にした内訳)</label>
+  <div id="silent-readout" class="sreadout"></div>
   <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:10px">
    <div class="tile"><div class="k">latent ヒートマップ (最終層)</div><canvas id="silent-latent" style="width:100%;height:90px;display:block;margin-top:4px"></canvas></div>
    <div class="tile"><div class="k">自己注意 (行和=1 の注意行列・最終層)</div><canvas id="silent-att" style="width:100%;height:90px;display:block;margin-top:4px"></canvas></div>
@@ -143,7 +152,7 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
   </div>
   <div class="muted" id="silent-outstate"></div>
  </div>
- <div class="note" style="text-align:left;margin-top:10px">※ これは利用者が<b>自分で並べた非言語のアトムと手描き</b>を処理するもので、脳の信号は読み取りません。トランスフォーマーは固定の重みを持つ小さな自己注意ネットワーク (学習済み LLM ではない) で、同じ入力は必ず同じ出力になります。文章は latent に駆動された決定的なテンプレート展開です。</div>
+ <div class="note" style="text-align:left;margin-top:10px">※ これは利用者が<b>自分で描いた動き</b> (速さ・広がり・向き・曲がり・リズム・重心) を固定の規則で言葉にするもので、<b>脳の信号は読み取りません</b>。「読み取った思い」に、動きの何がどの意味になったかをそのまま表示します。トランスフォーマーは固定の重みを持つ小さな自己注意ネットワーク (学習済み LLM ではない) で、同じ動きは必ず同じ出力になります。文章は latent に駆動された決定的なテンプレート展開です。</div>
 </div>
 
 <div class="card">
@@ -1325,6 +1334,130 @@ function latentToBada(ids, enc, req) {
   return L.join("\n");
 }
 
+/* ───────────── イメージした思い (ジェスチャー) → 特徴 ─────────────
+ * 利用者が「頭に思い描いたものを、言葉を介さずに連続した動きで描く」。
+ * その動き (ストロークの集まり) の速さ・広がり・向き・曲がり・リズム・重心を
+ * 固定の規則で特徴量にする。思考を読むのではなく、描かれた動きを読む。
+ * strokes: [[{x,y,t}, ...], ...]  x,y は 0..1 に正規化、t はミリ秒。 */
+function gestureFeatures(strokes) {
+  strokes = (strokes || []).filter(function (s) { return s && s.length; });
+  var f = {
+    strokes: strokes.length, points: 0, pathLen: 0, durationMs: 0,
+    minX: 1, minY: 1, maxX: 0, maxY: 0, cx: 0, cy: 0,
+    speedMean: 0, speedVar: 0, curvature: 0, dir: new Array(8).fill(0), rhythmVar: 0
+  };
+  if (!strokes.length) return f;
+  var speeds = [], sumX = 0, sumY = 0, tStart = Infinity, tEnd = -Infinity, prevAng = null, strokeStarts = [];
+  strokes.forEach(function (st) {
+    strokeStarts.push(st[0].t);
+    for (var i = 0; i < st.length; i++) {
+      var p = st[i];
+      f.points++; sumX += p.x; sumY += p.y;
+      f.minX = Math.min(f.minX, p.x); f.minY = Math.min(f.minY, p.y);
+      f.maxX = Math.max(f.maxX, p.x); f.maxY = Math.max(f.maxY, p.y);
+      if (p.t < tStart) tStart = p.t; if (p.t > tEnd) tEnd = p.t;
+      if (i > 0) {
+        var q = st[i - 1], dx = p.x - q.x, dy = p.y - q.y, len = Math.hypot(dx, dy), dt = Math.max(1, p.t - q.t);
+        f.pathLen += len;
+        if (len > 1e-4) {
+          speeds.push(len / dt * 1000);
+          var ang = Math.atan2(dy, dx);
+          var bin = Math.floor(((ang + Math.PI) / (2 * Math.PI)) * 8) % 8;
+          f.dir[bin] += len;
+          if (prevAng != null) { var da = Math.abs(ang - prevAng); if (da > Math.PI) da = 2 * Math.PI - da; f.curvature += da; }
+          prevAng = ang;
+        }
+      }
+    }
+  });
+  f.cx = sumX / f.points; f.cy = sumY / f.points;
+  f.durationMs = (tEnd > tStart) ? tEnd - tStart : 0;
+  if (speeds.length) {
+    var m = speeds.reduce(function (a, b) { return a + b; }, 0) / speeds.length;
+    f.speedMean = m;
+    f.speedVar = speeds.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / speeds.length;
+  }
+  if (strokeStarts.length > 1) {
+    var gaps = [];
+    for (var k = 1; k < strokeStarts.length; k++) gaps.push(strokeStarts[k] - strokeStarts[k - 1]);
+    var gm = gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length;
+    f.rhythmVar = gaps.reduce(function (a, b) { return a + (b - gm) * (b - gm); }, 0) / gaps.length;
+  }
+  return f;
+}
+
+/* 重心の 3×3 領域 → 主モジュール (どこに思いを描いたかで何のアプリかが決まる) */
+var GESTURE_GRID = [
+  ["note", "records", "task"],
+  ["draw", "quantum", "money"],
+  ["random", "habit", "time"]
+];
+var DIR_NAME = ["右", "右下", "下", "左下", "左", "左上", "上", "右上"];
+
+/* ジェスチャー特徴 → 非言語アトム列 + 読み取り内容 (利用者に見せる) */
+function gestureToAtoms(f) {
+  var atoms = [], feat = [], readout = [];
+  if (!f.points) return { atoms: [], feat: [], readout: [] };
+  function add(id) { if (id && atoms.indexOf(id) < 0) atoms.push(id); }
+  /* 重心 → 主モジュール */
+  var col = Math.min(2, Math.floor(f.cx * 3)), row = Math.min(2, Math.floor(f.cy * 3));
+  var primary = GESTURE_GRID[row][col];
+  add(primary);
+  var pa = ATOM_BY_ID[primary] || {}, pmod = (pa.tags && pa.tags.mod) || "";
+  var pname = (MOD_PHRASE[pmod] || MOD_PHRASE[primary] || primary).replace(/^を/, "");
+  readout.push({ label: "思いの重心", value: (["上", "中", "下"][row]) + "・" + (["左", "中", "右"][col]), meant: pname + " のアプリ" });
+  /* 広がり (pathLen) → 文章の分量・大きさ */
+  var vol = f.pathLen < 1.5 ? "small" : f.pathLen < 4 ? "medium" : f.pathLen < 8 ? "large" : "book_vol";
+  add(vol);
+  readout.push({ label: "広がり (動きの長さ)", value: f.pathLen.toFixed(2), meant: "分量 " + ({ small: "素描", medium: "短編", large: "中編", book_vol: "本一冊" }[vol]) });
+  /* 曲がり (curvature) → 気分・配色 */
+  var curv = f.curvature;
+  if (curv > 12) { add("urgent"); add("vivid"); readout.push({ label: "曲がりの多さ", value: curv.toFixed(1), meant: "勢いのある思い → 音で知らせる・紫" }); }
+  else if (curv < 3 && f.speedVar < 1e5) { add("calm"); readout.push({ label: "曲がりの少なさ", value: curv.toFixed(1), meant: "静かな思い → 落ち着いた構成" }); }
+  else { add("joy"); readout.push({ label: "動きの質", value: curv.toFixed(1), meant: "軽やかな思い" }); }
+  /* 重心の高さ → 明暗・色 */
+  if (f.cy < 0.4) { add("cool"); readout.push({ label: "上側に描いた", value: f.cy.toFixed(2), meant: "暗い青のデザイン" }); }
+  else if (f.cy > 0.6) { add("warm"); readout.push({ label: "下側に描いた", value: f.cy.toFixed(2), meant: "明るいオレンジのデザイン" }); }
+  /* 主な向き → 機能 */
+  var domBin = 0, domVal = -1;
+  f.dir.forEach(function (v, i) { if (v > domVal) { domVal = v; domBin = i; } });
+  if (domBin === 2 || domBin === 6) { add("sort"); readout.push({ label: "主な向き", value: DIR_NAME[domBin], meant: "並べ替え" }); }
+  else if (domBin === 0 || domBin === 4) { add("find"); readout.push({ label: "主な向き", value: DIR_NAME[domBin], meant: "検索" }); }
+  else { readout.push({ label: "主な向き", value: DIR_NAME[domBin], meant: "—" }); }
+  /* ストローク数 → 追加モジュール / グラフ */
+  if (f.strokes >= 3) { add("graph"); readout.push({ label: "ストローク数", value: String(f.strokes), meant: "グラフ・集計" }); }
+  /* 広がりの形 → 対象プラットフォーム */
+  var w = f.maxX - f.minX, h = f.maxY - f.minY;
+  if (w > h * 1.3) { add("windows"); add("linux"); readout.push({ label: "横長の思い", value: w.toFixed(2) + "×" + h.toFixed(2), meant: "Windows・Linux" }); }
+  else if (h > w * 1.3) { add("android"); readout.push({ label: "縦長の思い", value: w.toFixed(2) + "×" + h.toFixed(2), meant: "スマホ" }); }
+  /* トランスフォーマーへ渡す非言語の特徴トークン (latent を細かく変える) */
+  feat.push("g:spd" + Math.min(9, Math.round(f.speedMean / 200)));
+  feat.push("g:cur" + Math.min(9, Math.round(curv)));
+  feat.push("g:dir" + domBin);
+  feat.push("g:ext" + Math.min(9, Math.round(f.pathLen)));
+  feat.push("g:rhy" + Math.min(9, Math.round(Math.sqrt(f.rhythmVar) / 100)));
+  feat.push("g:pts" + Math.min(9, Math.round(f.points / 20)));
+  return { atoms: atoms, feat: feat, readout: readout };
+}
+
+/* イメージした思い (ジェスチャー) を 1 回で処理して全成果物を返す */
+function gestureProcess(strokes, opts) {
+  opts = opts || {};
+  var f = gestureFeatures(strokes);
+  var g = gestureToAtoms(f);
+  var seq = g.atoms.concat(g.feat);
+  var enc = silentEncode(seq);
+  var req = silentToRequest(g.atoms, enc);
+  return {
+    source: "gesture",
+    features: f, readout: g.readout, atoms: g.atoms, seq: seq, enc: enc,
+    request: req.text, tags: req.tags,
+    document: latentToDocument(seq, enc, opts),
+    imagery: latentToImagery(enc, opts.images || 3),
+    bada: latentToBada(g.atoms, enc, req)
+  };
+}
+
 /* 非言語アトム列を 1 回で処理して全成果物を返す (UI/テスト兼用) */
 function silentProcess(ids, opts) {
   opts = opts || {};
@@ -2176,14 +2309,24 @@ function writePaper(spec, gen, ver, meta) {
   L.push("");
   if (meta.silent && meta.silent.seq && meta.silent.seq.length) {
     var sv = meta.silent;
+    var gestured = sv.readout && sv.readout.length;
     L.push("### 2.0 サイレント・トーク (非言語思考入力) 由来");
     L.push("");
-    L.push("この依頼は言葉ではなく、利用者が並べた非言語のアトム (" + sv.seq.join(" / ") + ") と手描きから作られた。" +
-      "アトム列は固定の重みを持つ小さなトランスフォーマー (自己注意 " + SILENT_CFG.L + " 層・多頭) で言語化されていない潜在表現 (latent) に変換され、" +
-      "latent から (a) 本と同じ分量まで展開できる文章 (" + (sv.document ? sv.document.chars.toLocaleString("ja-JP") : "?") + " 字)、(b) イメージ " +
+    L.push("この依頼は言葉ではなく、" + (gestured ? "利用者が頭に思い描いたものを連続した動き (ジェスチャー) で入力したもの" : "利用者が並べた非言語のアトム (" + sv.seq.join(" / ") + ")") +
+      "から作られた。" + (gestured ? "動きの速さ・広がり・向き・曲がり・リズム・重心を固定の規則で特徴量にし、そこから非言語のアトム列を導いた。" : "") +
+      "この列は固定の重みを持つ小さなトランスフォーマー (自己注意 " + SILENT_CFG.L + " 層・多頭) で言語化されていない潜在表現 (latent) に変換され、" +
+      "latent から (a) 文章 (" + (sv.document ? sv.document.chars.toLocaleString("ja-JP") : "?") + " 字)、(b) イメージ " +
       ((sv.imagery && sv.imagery.length) || 0) + " 枚、(c) Bada 言語のプログラム、(d) 次節以降に渡す依頼文「" + sv.request + "」を決定的に復号した。" +
-      "トランスフォーマーは利用者が並べたアトムを処理するもので、脳の信号は読み取らない。");
+      (gestured ? "これは利用者が描いた動きを読むもので" : "トランスフォーマーは利用者が並べたアトムを処理するもので") + "、脳の信号は読み取らない。");
     L.push("");
+    if (gestured) {
+      L.push("動きから読み取った内容 (固定の規則):");
+      L.push("");
+      L.push("| 動きの特徴 | 値 | 意味 |");
+      L.push("|---|---|---|");
+      sv.readout.forEach(function (r) { L.push("| " + mdCell(r.label) + " | " + mdCell(r.value) + " | " + mdCell(r.meant) + " |"); });
+      L.push("");
+    }
   }
   L.push("### 2.1 電信による入力");
   L.push("");
@@ -3000,21 +3143,39 @@ function extractHtml(text) {
   $("silent-undo").onclick = function () { silentSeq.pop(); saveSeq(); renderStrip(); };
   $("silent-clear").onclick = function () { silentSeq = []; saveSeq(); renderStrip(); };
 
-  /* 手描き (感覚入力): ストローク数を latent の種として非言語列に足す */
-  var scv = $("silent-sketch"), sctx2 = scv.getContext("2d"), sdrawing = false, slast = null, sStrokes = 0;
-  function sfit() { scv.width = scv.clientWidth; scv.height = 120; sctx2.fillStyle = "#fff"; sctx2.fillRect(0, 0, scv.width, scv.height); }
-  function spt(e) { var r = scv.getBoundingClientRect(); return { x: (e.clientX - r.left) * scv.width / r.width, y: (e.clientY - r.top) * scv.height / r.height }; }
-  scv.onpointerdown = function (e) { sdrawing = true; slast = spt(e); sStrokes++; scv.setPointerCapture(e.pointerId); };
-  scv.onpointermove = function (e) { if (!sdrawing) return; var p = spt(e); sctx2.strokeStyle = "#2a3550"; sctx2.lineWidth = 2.5; sctx2.lineCap = "round"; sctx2.beginPath(); sctx2.moveTo(slast.x, slast.y); sctx2.lineTo(p.x, p.y); sctx2.stroke(); slast = p; };
-  scv.onpointerup = scv.onpointercancel = function () { sdrawing = false; };
-  $("silent-sketchclr").onclick = function () { sStrokes = 0; sfit(); };
-  setTimeout(sfit, 0);
-
-  function fullSeq() {
-    var seq = silentSeq.slice();
-    if (sStrokes > 0) seq.push("sketch:" + Math.min(6, sStrokes)); /* 感覚入力をトランスフォーマーへ */
-    return seq;
+  /* 🌫 思いを描く面: イメージした思いを連続した動きで入力。正規化した {x,y,t} を記録する。 */
+  var gcv = $("silent-field"), gctx = gcv.getContext("2d"), gstrokes = [], gcur = null, gdrawing = false, gstart = 0;
+  function gfit() {
+    gcv.width = gcv.clientWidth; gcv.height = 240; redrawField();
   }
+  function redrawField() {
+    gctx.clearRect(0, 0, gcv.width, gcv.height);
+    gctx.lineWidth = 2.5; gctx.lineCap = "round"; gctx.lineJoin = "round";
+    gstrokes.forEach(function (st, si) {
+      gctx.strokeStyle = "hsla(" + (200 + si * 24) % 360 + ",90%,68%,.9)"; gctx.beginPath();
+      st.forEach(function (p, i) { var x = p.x * gcv.width, y = p.y * gcv.height; if (i) gctx.lineTo(x, y); else gctx.moveTo(x, y); });
+      gctx.stroke();
+    });
+  }
+  function gpt(e) { var r = gcv.getBoundingClientRect(); return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)), t: (performance.now() - gstart) }; }
+  function fieldStat() {
+    var n = gstrokes.reduce(function (a, s) { return a + s.length; }, 0);
+    $("silent-field-stat").textContent = gstrokes.length ? ("ひと筆 " + gstrokes.length + " 本・点 " + n + " 個を描きました。") : "まだ何も描かれていません。";
+  }
+  gcv.onpointerdown = function (e) { if (!gstart) gstart = performance.now(); gdrawing = true; gcur = [gpt(e)]; gstrokes.push(gcur); gcv.setPointerCapture(e.pointerId); };
+  gcv.onpointermove = function (e) { if (!gdrawing) return; gcur.push(gpt(e)); redrawField(); };
+  gcv.onpointerup = gcv.onpointercancel = function () { gdrawing = false; fieldStat(); };
+  $("silent-field-undo").onclick = function () { gstrokes.pop(); redrawField(); fieldStat(); };
+  $("silent-field-clear").onclick = function () { gstrokes = []; gstart = 0; redrawField(); fieldStat(); };
+  /* リズムをタップ: 点の連なりとして記録 (無言のリズム入力) */
+  $("silent-tap").onclick = function () {
+    if (!gstart) gstart = performance.now();
+    var t = performance.now() - gstart, x = 0.5 + (Math.sin(t / 130) * 0.18), y = 0.5 + (Math.cos(t / 90) * 0.18);
+    gstrokes.push([{ x: x, y: y, t: t }, { x: x + 0.01, y: y + 0.01, t: t + 10 }]);
+    redrawField(); fieldStat();
+  };
+  setTimeout(gfit, 0); addEventListener("resize", function () { setTimeout(gfit, 0); });
+  function hasGesture() { return gstrokes.reduce(function (a, s) { return a + s.length; }, 0) >= 3; }
   function drawHeat(cv, rows, absMax) {
     var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight || 90;
     cv.width = W * dpr; cv.height = H * dpr; var x = cv.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
@@ -3025,22 +3186,37 @@ function extractHtml(text) {
       x.fillStyle = "hsl(" + hue + ",80%," + light + "%)"; x.fillRect(j * cw, i * ch, cw + 0.5, ch + 0.5);
     }
   }
+  function volOpt() { var v = +$("silent-vol").value; return v > 0 ? { targetChars: v, images: 3 } : { images: 3 }; }
+  function renderReadout(readout) {
+    $("silent-readout").innerHTML = (readout && readout.length)
+      ? readout.map(function (r) { return '<div class="rrow"><i>' + escHtml(r.label) + '</i><b>' + escHtml(r.value) + '</b><span>' + escHtml(r.meant) + "</span></div>"; }).join("")
+      : '<div class="muted">グリフのみから構成しました (動きの読み取りはありません)。</div>';
+  }
+  function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function runSilent() {
-    var seq = fullSeq();
-    if (!seq.length) { $("silent-outstate").innerHTML = '<span class="err">グリフを並べてください (手描きだけでも可)。</span>'; return; }
-    var proc = silentProcess(seq, { targetChars: +$("silent-vol").value, images: 3 });
-    lastSilent = { seq: seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags };
+    var proc, readout, srcLabel;
+    if (hasGesture()) {
+      proc = gestureProcess(gstrokes, volOpt());
+      /* グリフも足されていれば補いとして末尾に加える */
+      if (silentSeq.length) { proc = silentProcess(proc.atoms.concat(silentSeq).concat(proc.seq.filter(function (s) { return s.indexOf("g:") === 0; })), volOpt()); }
+      readout = (proc.readout || []); srcLabel = "描いた思い" + (silentSeq.length ? " + グリフ " + silentSeq.length + " 個" : "");
+    } else if (silentSeq.length) {
+      proc = silentProcess(silentSeq.slice(), volOpt()); readout = null; srcLabel = "グリフ " + silentSeq.length + " 個";
+    } else {
+      $("silent-outstate").innerHTML = '<span class="err">上の面に思いを描いてください (グリフだけでも可)。</span>'; return;
+    }
+    lastSilent = { seq: proc.seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags, readout: readout, features: proc.features };
     $("silent-out").classList.remove("hidden");
+    renderReadout(readout);
     var amax = 0; proc.enc.seq.forEach(function (row) { row.forEach(function (v) { amax = Math.max(amax, Math.abs(v)); }); });
     drawHeat($("silent-latent"), proc.enc.seq, amax);
-    var att = proc.enc.attention.slice(0, seq.length); /* 最初のヘッドぶん */
-    drawHeat($("silent-att"), att.length ? att : [[0]], 1);
+    drawHeat($("silent-att"), proc.enc.attention.length ? proc.enc.attention.slice(0, proc.seq.length) : [[0]], 1);
     $("silent-imgs").innerHTML = proc.imagery.join("");
     $("silent-req").textContent = proc.request;
     $("silent-doc").innerHTML = mdToHtml(proc.document.markdown);
-    $("silent-doc-sum").textContent = "📖 本と同じ分量まで展開した文章 (" + proc.document.chars.toLocaleString("ja-JP") + " 字 / 目標 " + proc.document.target.toLocaleString("ja-JP") + " 字)";
+    $("silent-doc-sum").textContent = "📖 思いを展開した文章 (" + proc.document.chars.toLocaleString("ja-JP") + " 字 / 目標 " + proc.document.target.toLocaleString("ja-JP") + " 字)";
     $("silent-bada").textContent = proc.bada;
-    $("silent-outstate").textContent = "サイレント化しました。アトム " + seq.length + " 個 → latent " + proc.enc.pooled.length + " 次元。「錬成」で BadaGPT がアプリを作ります。";
+    $("silent-outstate").textContent = srcLabel + " → latent " + proc.enc.pooled.length + " 次元に変換しました。「錬成」で BadaGPT がアプリを作ります。";
   }
   $("silent-run").onclick = runSilent;
   $("silent-send").onclick = function () {
@@ -3050,7 +3226,7 @@ function extractHtml(text) {
     $("thought").scrollIntoView({ behavior: "smooth", block: "center" });
     go();
   };
-  function sfile() { return "silent-" + (lastSilent ? lastSilent.seq.filter(function (s) { return s.indexOf("sketch") < 0; }).slice(0, 4).join("-") : "thought"); }
+  function sfile() { return "silent-" + (lastSilent ? lastSilent.seq.filter(function (s) { return s.indexOf("g:") < 0 && s.indexOf("sketch") < 0 && ATOM_BY_ID[s]; }).slice(0, 4).join("-") || "thought" : "thought"); }
   $("silent-dl-doc").onclick = function () { if (lastSilent) report(saveBytes(sfile() + ".md", utf8(lastSilent.document.markdown), "text/markdown")); };
   $("silent-dl-docpdf").onclick = function () { if (lastSilent) report(saveBytes(sfile() + ".pdf", pdfFromJpegs(renderPages(lastSilent.document.markdown), sfile()), "application/pdf")); };
   $("silent-dl-bada").onclick = function () { if (lastSilent) report(saveBytes("silent.bada", utf8(lastSilent.bada), "text/plain")); };
