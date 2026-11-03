@@ -149,7 +149,7 @@
 | **ブラウザ** | `BadaGPTTelegraph-web.html` (または [`bada_gpt_telegraph/index.html`](bada_gpt_telegraph/index.html)) |
 | **論文** | [`BadaGPT_Telegraph_paper.pdf`](bada_gpt_telegraph/paper/BadaGPT_Telegraph_paper.pdf) |
 
-ビルドは [`badagpt-telegraph-app-build.yml`](.github/workflows/badagpt-telegraph-app-build.yml) が実行します。使い方・設計は [`bada_gpt_telegraph/`](bada_gpt_telegraph/) を参照。
+ビルドは [`badagpt-telegraph-app-build.yml`](.github/workflows/badagpt-telegraph-app-build.yml) が実行します。**Actions の実行ページ → Artifacts → `badagpt-telegraph-all-platforms`** から全ビルドを 1 つの ZIP でも取れます。使い方・設計は [`bada_gpt_telegraph/`](bada_gpt_telegraph/) を参照。
 
 ---
 

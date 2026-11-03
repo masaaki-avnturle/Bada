@@ -29,6 +29,18 @@
 ビルドは [`badagpt-telegraph-app-build.yml`](../.github/workflows/badagpt-telegraph-app-build.yml) が行います
 (`bada_gpt_telegraph/` への push で `badagpt-telegraph-latest` を更新、`badagpt-telegraph-v*` タグでそのタグの Release)。
 
+### ⚙️ Actions からダウンロードする
+
+Release を待たずに、どの実行からでも**全プラットフォームを 1 つの ZIP** で取れます:
+
+1. [Actions → BadaGPT Telegraph app build](https://github.com/masaaki-avnturle/Bada/actions/workflows/badagpt-telegraph-app-build.yml) を開く
+2. 一番上の緑の実行 (または **Run workflow** で自分で実行) をクリック
+3. ページ下の **Artifacts** から **`badagpt-telegraph-all-platforms`** をダウンロード
+   (APK・Windows EXE 2 種・Linux AppImage/deb・ブラウザ版 HTML・論文 PDF/MD・README.txt が入っています)
+
+プラットフォーム別に取りたいときは `badagpt-telegraph-android` / `-windows` / `-linux` を選んでください。
+Artifacts のダウンロードには GitHub へのログインが必要です (保存期間 90 日)。
+
 ## 🚀 使い方
 
 1. **① 思考入力** に作りたいアプリを書く。例:

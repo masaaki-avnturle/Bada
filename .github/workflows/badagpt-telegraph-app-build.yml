@@ -13,6 +13,7 @@ name: BadaGPT Telegraph app build (Android APK + Windows EXE + Linux)
 #   - bada_gpt_telegraph/ を変更して push → Release「badagpt-telegraph-latest」(プレリリース) を更新
 #   - badagpt-telegraph-v* タグを push    → そのタグの Release
 #   - workflow_dispatch                    → release_tag を指定したときだけ Release、空欄なら Actions アーティファクトのみ
+#   いずれの場合も、実行ページの Artifacts「badagpt-telegraph-all-platforms」から全ビルドを 1 つの ZIP で取得できる
 
 on:
   workflow_dispatch:
@@ -171,17 +172,39 @@ jobs:
           else
             echo "tag=badagpt-telegraph-latest" >> "$GITHUB_OUTPUT"
           fi
+      # 3 プラットフォームのビルドを 1 か所に集める (Release を作らない実行でも必ず行う)
       - uses: actions/download-artifact@v4
-        if: steps.tag.outputs.tag != ''
         with:
           path: dist
           merge-multiple: true
-      - name: Add the web version and the paper
-        if: steps.tag.outputs.tag != ''
+      - name: Add the web version, the paper and a README
         run: |
           cp bada_gpt_telegraph/index.html dist/BadaGPTTelegraph-web.html
           cp bada_gpt_telegraph/paper/BadaGPT_Telegraph_paper.pdf dist/
           cp bada_gpt_telegraph/paper/BadaGPT_Telegraph_paper.md dist/
+          cat > dist/README.txt <<'TXT'
+          BadaGPT電信 — 全プラットフォームのビルド一式 (GitHub Actions アーティファクト)
+
+            bada-gpt-telegraph-debug.apk            Android (「提供元不明のアプリ」を許可してインストール)
+            BadaGPTTelegraph-*-x64.exe              Windows 10/11 インストーラ
+            BadaGPTTelegraph-*-portable.exe         Windows 10/11 ポータブル (インストール不要)
+            BadaGPTTelegraph-*-x86_64.AppImage      Linux (chmod +x して起動)
+            BadaGPTTelegraph-*-amd64.deb            Linux (sudo apt install ./…deb)
+            BadaGPTTelegraph-web.html               ブラウザで開くだけで動く版
+            BadaGPT_Telegraph_paper.pdf / .md       システム論文
+
+          思考入力 (文章・音声・FSK 電信・描いた動き・本人の体のサイン) から依頼の全体を捉えて
+          アプリ・ソースコード・論文を錬成します。脳の信号は読み取りません。
+          TXT
+          ls -la dist
+      # Actions の実行ページ (Artifacts) から 1 つの ZIP で全部ダウンロードできるようにする
+      - name: Upload all-platform bundle (download from the Actions run page)
+        uses: actions/upload-artifact@v4
+        with:
+          name: badagpt-telegraph-all-platforms
+          path: dist/*
+          retention-days: 90
+          if-no-files-found: error
       - name: Attach builds to Release
         if: steps.tag.outputs.tag != ''
         uses: softprops/action-gh-release@v2
