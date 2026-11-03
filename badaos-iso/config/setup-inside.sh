@@ -40,7 +40,7 @@ apt_try_rec(){ for p in "$@"; do apt-get install -y "$p" \
 apt_try nano less curl wget ca-certificates \
   xserver-xorg xinit x11-xserver-utils \
   lightdm lightdm-gtk-greeter \
-  w9wm mlterm mlterm-common xterm x11-utils feh \
+  w9wm mlterm mlterm-common mlterm-im-fcitx xterm x11-utils feh \
   fonts-dejavu fonts-noto-cjk fonts-noto-color-emoji
 
 # ---- エディタ (vim / emacs / neovim) と定番 CLI/GUI アプリ ----
@@ -177,6 +177,15 @@ input_method = fcitx
 use_anti_alias = true
 type_engine = xft
 EOF
+# type_engine = xft では ~/.mlterm/aafont が使われる (font は X コアフォント用)。
+# これが無いと日本語が「□」(豆腐) になる
+cat > /etc/skel/.mlterm/aafont <<EOF
+DEFAULT = Noto Sans Mono CJK JP 14
+ISO10646_UCS4_1 = Noto Sans Mono CJK JP 14
+ISO10646_UCS4_1_BOLD = Noto Sans Mono CJK JP:weight=bold 14
+JISX0208_1983 = Noto Sans Mono CJK JP 14
+JISX0213_2000_1 = Noto Sans Mono CJK JP 14
+EOF
 cat > /etc/skel/.mlterm/font <<EOF
 ISO10646_UCS4_1 = Noto Sans Mono CJK JP
 ISO10646_UCS4_1_BOLD = Noto Sans Mono CJK JP:weight=bold
@@ -285,7 +294,9 @@ EOF
 chmod 755 /usr/local/bin/badaos-nat
 
 # ---- apt: Bada の apt リポジトリが未公開 (404) でも apt update がエラーにならないよう、
-#      起動時に到達確認して有効/無効を切り替え、そのあと apt update する ----
+#      起動時に到達確認して有効/無効を切り替える。apt update は起動時にはしない
+#      (ロックを握って利用者の apt を失敗させないため)。パッケージ索引は ISO に
+#      同梱済みなので、起動直後から `sudo apt install <pkg>` が使える ----
 cat > /usr/local/sbin/badaos-apt-check <<'EOF'
 #!/bin/sh
 L=/etc/apt/sources.list.d/bada.list; D=/etc/apt/sources.list.d/bada.list.disabled
@@ -296,18 +307,17 @@ if [ -n "$URL" ] && curl -fsIL --max-time 15 "${URL%/}/Packages" >/dev/null 2>&1
 else
   [ "$F" = "$L" ] && mv "$L" "$D"
 fi
-apt-get update -qq || true
 EOF
 chmod 755 /usr/local/sbin/badaos-apt-check
 cat > /etc/systemd/system/badaos-apt-check.service <<'EOF'
 [Unit]
-Description=Bada VM Pro OS: check Bada apt repository and run apt update
+Description=Bada VM Pro OS: enable/disable the Bada apt repository by reachability
 Wants=network-online.target
 After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/badaos-apt-check
-TimeoutStartSec=180
+TimeoutStartSec=60
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -448,7 +458,7 @@ fi
 REQUIRED="openssh-server xinetd network-manager iptables dnsmasq-base apt
   cups cups-filters cups-browsed avahi-daemon printer-driver-all system-config-printer
   fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
-  screen mlterm xterm w9wm lightdm xserver-xorg
+  screen mlterm mlterm-im-fcitx xterm w9wm lightdm xserver-xorg
   vim vim-gtk3 emacs neovim texlive-full texlive-lang-japanese
   falkon evince mpv pcmanfm mousepad"
 MISSING=""
@@ -464,5 +474,6 @@ echo "required commands OK"
 update-initramfs -u || true
 
 apt-get clean
-rm -rf /var/lib/apt/lists/*
+# /var/lib/apt/lists は消さない: 起動直後 (オフライン含む) から apt install / apt search が使える。
+# 古くなったら `sudo apt update`。
 echo "setup-inside.sh done (v$VERSION)"
