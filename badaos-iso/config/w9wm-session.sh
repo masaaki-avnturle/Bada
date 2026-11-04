@@ -46,7 +46,10 @@ if grep -qw "badaos.triboot=1" /proc/cmdline 2>/dev/null; then
 fi
 
 # Bada VM Pro を自動起動 (電子アプリがあればそれ、無ければブラウザで単一HTML)
-/usr/local/bin/bada-launcher bada_vm_pro &
+#   インストール用に起動した時は、インストーラの上に大きなアプリ画面を重ねない
+if ! grep -qw "badaos.triboot=1" /proc/cmdline 2>/dev/null; then
+  /usr/local/bin/bada-launcher bada_vm_pro &
+fi
 
 # w9wm を最後に exec する (これが終了するとセッション終了)
 exec w9wm

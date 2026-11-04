@@ -16,7 +16,8 @@ esac
 for B in $CANDS; do
   if command -v "$B" >/dev/null 2>&1 || [ -x "$B" ]; then
     # --no-sandbox: ライブ環境/古いカーネルでも chrome-sandbox で止まらないように
-    exec "$B" --no-sandbox
+    # --disable-gpu: GPU ドライバとの相性でウィンドウが真っ黒になるのを防ぐ (ソフト描画)
+    exec "$B" --no-sandbox --disable-gpu
   fi
 done
 

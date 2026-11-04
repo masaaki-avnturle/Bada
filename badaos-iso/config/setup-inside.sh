@@ -244,6 +244,33 @@ xsetroot -solid "#0b0e14" 2>/dev/null || true
 EOF
 
 echo "$VERSION" > /etc/badaos-version
+# GRUB「インストール (テキスト画面)」= badaos.textinstall=1 の時、tty1 でテキスト版インストーラを自動起動
+#   (X / GPU を使わないので、画面が真っ黒になる PC でもインストールできる)
+cat > /etc/systemd/system/badaos-text-install.service <<'EOF'
+[Unit]
+Description=Bada VM Pro OS text-mode triple-boot installer on tty1
+ConditionKernelCommandLine=badaos.textinstall=1
+After=systemd-user-sessions.service
+Conflicts=getty@tty1.service
+Before=getty@tty1.service
+
+[Service]
+Type=idle
+ExecStart=/usr/local/bin/badaos-triboot-text
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+Restart=no
+ExecStopPost=/bin/systemctl start getty@tty1.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable badaos-text-install.service 2>/dev/null || true
+
 # テキストモード (画面なし) でログインした時の案内
 cat > /etc/profile.d/badaos-text-hint.sh <<'EOF'
 if [ -z "${DISPLAY:-}" ] && [ -z "${SSH_TTY:-}" ] && tty 2>/dev/null | grep -q '^/dev/tty[0-9]'; then
