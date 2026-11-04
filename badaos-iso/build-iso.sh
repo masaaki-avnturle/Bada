@@ -197,12 +197,16 @@ menuentry "Bada VM Pro OS ${VERSION} (ライブ / インストール)" {
     linux /casper/vmlinuz $CMDLINE
     initrd /casper/initrd
 }
-menuentry "Bada VM Pro OS ${VERSION} (インストール: テキスト画面 / 画面が真っ黒になる PC はこちら)" {
-    linux /casper/vmlinuz boot=casper username=bada hostname=badaos nomodeset systemd.unit=multi-user.target badaos.textinstall=1 ---
+menuentry "Bada VM Pro OS ${VERSION} (インストール: GUI  Windows | BadaVMPro | Linux)" {
+    linux /casper/vmlinuz $CMDLINE badaos.triboot=1
     initrd /casper/initrd
 }
-menuentry "Bada VM Pro OS ${VERSION} (トリプルブート導入: Windows | BadaVMPro | Linux)" {
-    linux /casper/vmlinuz $CMDLINE badaos.triboot=1
+menuentry "Bada VM Pro OS ${VERSION} (インストール: GUI セーフグラフィック / 画面が真っ黒になる PC はこちら)" {
+    linux /casper/vmlinuz boot=casper username=bada hostname=badaos nomodeset badaos.triboot=1 ---
+    initrd /casper/initrd
+}
+menuentry "Bada VM Pro OS ${VERSION} (インストール: テキスト画面 / GUI がどうしても出ない時)" {
+    linux /casper/vmlinuz boot=casper username=bada hostname=badaos nomodeset systemd.unit=multi-user.target badaos.textinstall=1 ---
     initrd /casper/initrd
 }
 menuentry "Bada VM Pro OS ${VERSION} (セーフグラフィック: 画面が真っ黒になる PC 向け)" {

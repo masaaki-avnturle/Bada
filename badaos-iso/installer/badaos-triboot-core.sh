@@ -313,6 +313,10 @@ GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
 GRUB_CMDLINE_LINUX=""
 GRUB_DISABLE_OS_PROBER=false
 EOF
+# セーフグラフィック (nomodeset) で起動してインストールした PC は、インストール後も同じ設定で起動
+if grep -qw nomodeset /proc/cmdline 2>/dev/null; then
+  sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nomodeset"/' "$MNT/etc/default/grub"
+fi
 install -Dm755 /usr/local/lib/badaos/35_badavmpro_triboot "$MNT/etc/grub.d/35_badavmpro_triboot" 2>/dev/null \
   || log "注意: 35_badavmpro_triboot が無いため os-prober のみで Windows/Linux を検出します"
 

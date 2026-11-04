@@ -45,6 +45,7 @@ apt_try_rec(){ for p in "$@"; do apt-get install -y "$p" \
 # ---- デスクトップ (w9wm) + xterm + 日本語フォント ----
 apt_try nano less curl wget ca-certificates \
   xserver-xorg xinit x11-xserver-utils x11-utils \
+  xserver-xorg-video-all xserver-xorg-video-vesa xserver-xorg-video-fbdev xserver-xorg-input-all \
   lightdm lightdm-gtk-greeter \
   w9wm xterm \
   fonts-dejavu-core fonts-noto-cjk fonts-noto-color-emoji
@@ -499,7 +500,7 @@ fi
 REQUIRED="network-manager iptables dnsmasq-base apt
   cups cups-filters cups-browsed avahi-daemon printer-driver-all system-config-printer
   fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
-  xterm w9wm lightdm xserver-xorg
+  xterm w9wm lightdm xserver-xorg xserver-xorg-video-vesa xserver-xorg-video-fbdev
   vim vim-gtk3 emacs
   grub-pc-bin grub-efi-amd64-bin dosfstools ntfs-3g zenity calamares"
 MISSING=""
