@@ -58,6 +58,14 @@ else
   chroot "$MNT" grub-install --target=i386-pc --boot-directory=/boot/efi --recheck "$DISK" || fail "grub-install (i386-pc) failed"
 fi
 echo "== regenerating the boot menu (detects Windows / Linux)"
+# root=UUID=... にするため /dev/disk/by-uuid を用意 (udev が無い環境でも)。
+# これが無いと grub-mkconfig が root=/dev/sdb6 のようなデバイス名を書き、
+# USB を抜いて起動すると「/dev/sdb6 does not exist」で止まる
+for d in "$ROOT_DEV" "$BOOT_DEV"; do
+  u="$(blkid -s UUID -o value "$d" 2>/dev/null || true)"
+  [ -n "$u" ] && { mkdir -p /dev/disk/by-uuid; ln -sf "$d" "/dev/disk/by-uuid/$u"; }
+done
 chroot "$MNT" grub-mkconfig -o /boot/efi/grub/grub.cfg || fail "grub-mkconfig failed"
+grep -q 'root=UUID=' "$MNT/boot/efi/grub/grub.cfg" || fail "boot menu has no root=UUID="
 echo
 echo "Repair finished. Remove the USB stick and reboot."

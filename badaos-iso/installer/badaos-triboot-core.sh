@@ -517,7 +517,15 @@ else
 fi
 
 emit 93 "起動メニュー (Bada VM Pro / Windows / Linux) を生成中"
+# root=UUID=... にするため /dev/disk/by-uuid を用意 (udev が無い環境でも)。
+# これが無いと grub-mkconfig が root=/dev/sdb6 のようなデバイス名を書き、
+# USB を抜いて起動すると「/dev/sdb6 does not exist」で止まる
+for d in "$ROOT_DEV" "$BOOT_DEV"; do
+  u="$(blkid -s UUID -o value "$d" 2>/dev/null || true)"
+  [ -n "$u" ] && { mkdir -p /dev/disk/by-uuid; ln -sf "$d" "/dev/disk/by-uuid/$u"; }
+done
 chroot "$MNT" grub-mkconfig -o /boot/efi/grub/grub.cfg >&2
+grep -q 'root=UUID=' "$MNT/boot/efi/grub/grub.cfg" || fail "起動メニューに root=UUID= がありません"
 
 emit 97 "後始末"
 sync

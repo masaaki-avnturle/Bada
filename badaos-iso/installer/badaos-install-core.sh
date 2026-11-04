@@ -124,6 +124,11 @@ if [ "$FW" = "uefi" ]; then
 else
   chroot /mnt grub-install --target=i386-pc --recheck "$DISK"
 fi
+for d in "$ROOT" "${ESP:-}"; do
+  [ -n "$d" ] || continue
+  u="$(blkid -s UUID -o value "$d" 2>/dev/null || true)"
+  [ -n "$u" ] && { mkdir -p /dev/disk/by-uuid; ln -sf "$d" "/dev/disk/by-uuid/$u"; }
+done
 chroot /mnt update-grub 2>/dev/null || chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 
 emit 96 "後始末"
