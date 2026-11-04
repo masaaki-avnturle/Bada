@@ -14,13 +14,14 @@ Z(){ zenity --window-icon=info "$@"; }
 Z --info --width=600 --title="$TITLE" --ok-label="次へ" \
   --text="<span size='xx-large' foreground='#c8a44a'><b>Bada VM Pro トリプルブート</b></span>\n\n<tt>[ Windows ][ ★BADAVMBOOT (FAT)★ ][ ★BADAVMPRO (OS)★ ][ Linux ]</tt>\n\n• Windows の<b>下</b>に Bada VM Pro <b>専用ブートローダの FAT パーティション</b>を作り、\n  その下の空き領域に <b>Bada VM Pro OS</b> をインストールします (Linux との間)\n• Windows の起動パーティションは変更しません\n• <b>UEFI / Legacy BIOS</b> どちらでも、起動メニューで <b>Bada VM Pro / Windows / Linux</b> を選べます\n• 既存の Windows / Linux は消しません\n\n⚠ 事前に Windows の<b>高速スタートアップを無効</b>にし、BitLocker を一時停止し、\n  大切なデータはバックアップしてください。" || exit 0
 
-declare -a ROWS=()
+# 実ディスクのみ (起動に使っている USB は除く)。sda を既定で選択しておく
+declare -a ROWS=(); first=TRUE
 while read -r name size model; do
-  [ -n "$name" ] && ROWS+=( FALSE "/dev/$name" "$size" "${model:-(不明)}" )
-done < <(lsblk -dn -o NAME,SIZE,MODEL -e 2,7,11 2>/dev/null)
+  [ -n "$name" ] && ROWS+=( "$first" "/dev/$name" "$size" "${model:-(不明)}" ) && first=FALSE
+done < <(/usr/local/lib/badaos/badaos-disks)
 [ ${#ROWS[@]} -gt 0 ] || { Z --error --title="$TITLE" --text="ディスクが見つかりません。"; exit 1; }
 DISK="$(Z --list --radiolist --title="$TITLE — ディスク" --width=600 --height=340 \
-  --text="Windows と Linux が入っているディスクを選んでください:" \
+  --text="Windows と Linux が入っている実ディスク (通常は /dev/sda) を選んでください:" \
   --column="選択" --column="デバイス" --column="容量" --column="モデル" "${ROWS[@]}")" || exit 0
 [ -n "$DISK" ] || exit 1
 

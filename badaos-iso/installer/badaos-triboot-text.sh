@@ -59,10 +59,11 @@ echo "   Existing Windows and Linux are kept. The MBR is not rewritten."
 echo "=================================================================="
 echo
 echo "Disks:"
-mapfile -t DISKS < <(lsblk -dn -o NAME -e 2,7,11)
+mapfile -t DISKS < <(/usr/local/lib/badaos/badaos-disks | awk '{print $1}')   # real disks, sda first, boot USB hidden
 i=1; for d in "${DISKS[@]}"; do printf '  %d) /dev/%s  %s  %s\n' "$i" "$d" "$(lsblk -dn -o SIZE /dev/$d)" "$(lsblk -dn -o MODEL /dev/$d)"; i=$((i+1)); done
 echo
-read -r -p "Disk with Windows and Linux (number): " n
+read -r -p "Disk with Windows and Linux (number, Enter = 1 = ${DISKS[0]:-?}): " n
+n="${n:-1}"
 DISK="/dev/${DISKS[$((n-1))]}"
 [ -b "$DISK" ] || { echo "No disk selected."; read -r -p "Enter to exit" _; exit 1; }
 read -r -p "Size for Bada VM Pro in GiB (Enter = all free space between them): " SIZE

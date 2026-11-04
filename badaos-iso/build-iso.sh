@@ -111,6 +111,7 @@ install -Dm755 "$HERE/config/install-badaos-triboot.sh"          "$CHROOT/usr/lo
 install -Dm755 "$HERE/installer/badaos-triboot-installer.sh"     "$CHROOT/usr/local/bin/badaos-triboot-installer"
 install -Dm755 "$HERE/installer/badaos-triboot-core.sh"          "$CHROOT/usr/local/lib/badaos/badaos-triboot-core.sh"
 install -Dm755 "$HERE/installer/badaos-triboot-text.sh"          "$CHROOT/usr/local/bin/badaos-triboot-text"
+install -Dm755 "$HERE/installer/badaos-disks.sh"                 "$CHROOT/usr/local/lib/badaos/badaos-disks"
 install -Dm755 "$HERE/installer/35_badavmpro_triboot"            "$CHROOT/usr/local/lib/badaos/35_badavmpro_triboot"
 # Calamares の日本語インストール設定
 mkdir -p "$CHROOT/etc/calamares"
