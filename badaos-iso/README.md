@@ -74,6 +74,16 @@ Windows の**すぐ下**に **Bada VM Pro 専用ブートローダの FAT パー
 `sudo TARGET_DISK=/dev/sda PLAN_ONLY=1 /usr/local/lib/badaos/badaos-triboot-core.sh`
 (`BOOT_MODE=bios` / `uefi` で起動方式を指定可)
 
+## 🛠 起動途中で止まる時
+
+GRUB メニューは出るのにデスクトップまで行かない場合は、メニューで次を選んでください:
+
+| メニュー | 用途 |
+|:---|:---|
+| **セーフグラフィック** | 画面が真っ黒/固まる PC (グラフィックドライバの相性)。`nomodeset` で起動 |
+| **詳細表示** | 起動メッセージをすべて表示。止まった所の最後の数行が原因の手がかり |
+| **テキストモード** | 画面 (GUI) なしで起動。ユーザー `bada`(パスワードなし Enter)でログインし `sudo badaos-triboot-text` で同じトリプルブート導入ができる |
+
 ## ⬇️ ダウンロード
 
 [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `badaos-v*` から:

@@ -110,6 +110,7 @@ install -Dm755 "$HERE/installer/badaos-install-core.sh" "$CHROOT/usr/local/lib/b
 install -Dm755 "$HERE/config/install-badaos-triboot.sh"          "$CHROOT/usr/local/bin/install-badaos-triboot"
 install -Dm755 "$HERE/installer/badaos-triboot-installer.sh"     "$CHROOT/usr/local/bin/badaos-triboot-installer"
 install -Dm755 "$HERE/installer/badaos-triboot-core.sh"          "$CHROOT/usr/local/lib/badaos/badaos-triboot-core.sh"
+install -Dm755 "$HERE/installer/badaos-triboot-text.sh"          "$CHROOT/usr/local/bin/badaos-triboot-text"
 install -Dm755 "$HERE/installer/35_badavmpro_triboot"            "$CHROOT/usr/local/lib/badaos/35_badavmpro_triboot"
 # Calamares の日本語インストール設定
 mkdir -p "$CHROOT/etc/calamares"
@@ -200,8 +201,16 @@ menuentry "Bada VM Pro OS ${VERSION} (トリプルブート導入: Windows | Bad
     linux /casper/vmlinuz $CMDLINE badaos.triboot=1
     initrd /casper/initrd
 }
-menuentry "Bada VM Pro OS ${VERSION} (セーフグラフィック)" {
+menuentry "Bada VM Pro OS ${VERSION} (セーフグラフィック: 画面が真っ黒になる PC 向け)" {
     linux /casper/vmlinuz boot=casper username=bada hostname=badaos nomodeset ---
+    initrd /casper/initrd
+}
+menuentry "Bada VM Pro OS ${VERSION} (詳細表示: 起動メッセージを全部表示 / 問題調査用)" {
+    linux /casper/vmlinuz boot=casper username=bada hostname=badaos systemd.show_status=1 ---
+    initrd /casper/initrd
+}
+menuentry "Bada VM Pro OS ${VERSION} (テキストモード: 画面なしでインストール  sudo badaos-triboot-text)" {
+    linux /casper/vmlinuz boot=casper username=bada hostname=badaos nomodeset systemd.unit=multi-user.target ---
     initrd /casper/initrd
 }
 EOF

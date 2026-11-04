@@ -244,6 +244,15 @@ xsetroot -solid "#0b0e14" 2>/dev/null || true
 EOF
 
 echo "$VERSION" > /etc/badaos-version
+# テキストモード (画面なし) でログインした時の案内
+cat > /etc/profile.d/badaos-text-hint.sh <<'EOF'
+if [ -z "${DISPLAY:-}" ] && [ -z "${SSH_TTY:-}" ] && tty 2>/dev/null | grep -q '^/dev/tty[0-9]'; then
+  echo "=== Bada VM Pro OS (テキストモード) ==="
+  echo "  トリプルブート導入 (Windows | BadaVMPro | Linux):  sudo badaos-triboot-text"
+  echo "  ネットワーク: nmcli device / nmtui     追加ソフト: badaos-extras mlterm ssh ..."
+  echo "  画面 (GUI) を試す: sudo systemctl start lightdm"
+fi
+EOF
 
 # ---- 後から apt で入れるもの (mlterm/ssh/xinetd/screen/texlive-full) の既定設定 ----
 #   パッケージ自体は入れない。入れた時にすぐ日本語で使えるよう設定だけ用意する。
