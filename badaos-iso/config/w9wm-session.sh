@@ -12,6 +12,10 @@ export XMODIFIERS=@im=fcitx
 [ -f "$HOME/.xprofile" ]   && . "$HOME/.xprofile"
 [ -f "$HOME/.xsessionrc" ] && . "$HOME/.xsessionrc"
 xsetroot -solid "#0b0e14" 2>/dev/null || true
+# 日本語 106/109 キーボード配列 (念のためセッションでも設定)
+setxkbmap -model jp106 -layout jp 2>/dev/null || true
+# ネットワークのアイコン (有線/Wi-Fi の接続・NAT/DHCP 状態)
+command -v nm-applet >/dev/null 2>&1 && (nm-applet >/dev/null 2>&1 &)
 
 # 日本語入力 fcitx (mozc) を起動 — .xprofile 未起動時の保険
 if command -v fcitx-autostart >/dev/null 2>&1; then fcitx-autostart >/dev/null 2>&1 &
@@ -24,8 +28,9 @@ echo "パーティションマネージャ (GParted):          badaos-partition"
 echo "かんたんインストール (ウィザード):           install-badaos-simple"; \
 echo "トリプルブート (Win|BadaVMPro|Linux):         install-badaos-triboot"; \
 echo "Ubuntu アプリを簡単導入 (GUI):               badaos-apps"; \
-echo "追加ソフト (apt):                            badaos-extras mlterm ssh xinetd screen texlive"; \
-echo "  (または sudo apt update && sudo apt install mlterm mlterm-im-fcitx openssh-server xinetd screen texlive-full)"; \
+echo "追加ソフト (apt):                            badaos-extras ssh xinetd screen texlive"; \
+echo "  (または sudo apt update && sudo apt install openssh-server xinetd screen texlive-full)"; \
+echo "ネットワーク (有線/Wi-Fi):                   nmtui  /  nm-connection-editor  (NAT/DHCP は自動)"; \
 echo "NAT ルータ:                                  sudo badaos-nat on <外側IF> <内側IF> / share <内側IF>"; \
 echo "プリンター:                                  system-config-printer (または http://localhost:631)"; \
 echo "エディタ:                                    vim / gvim / emacs"; \

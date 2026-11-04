@@ -7,6 +7,20 @@
 #     Legacy … \bootmgr (System Reserved / C:) を ntldr で起動
 #   後ろの Linux は os-prober が検出してメニューに追加する。
 set -e
+# GPU ドライバで高速表示する起動項目 (既定の項目は nomodeset = どの PC でも起動する汎用表示)
+ROOT_UUID="$(grub-probe --target=fs_uuid / 2>/dev/null || true)"
+if [ -n "$ROOT_UUID" ] && [ -e /boot/vmlinuz ] && [ -e /boot/initrd.img ]; then
+  cat <<GRUB
+menuentry "Bada VM Pro (GPU accelerated graphics)" --class gnu-linux --class os {
+    insmod part_msdos
+    insmod part_gpt
+    insmod ext2
+    search --no-floppy --fs-uuid --set=root $ROOT_UUID
+    linux /boot/vmlinuz root=UUID=$ROOT_UUID ro quiet splash
+    initrd /boot/initrd.img
+}
+GRUB
+fi
 cat <<'GRUB'
 if [ "$grub_platform" = "efi" ]; then
   menuentry "Windows (Windows Boot Manager)" --class windows --class os {

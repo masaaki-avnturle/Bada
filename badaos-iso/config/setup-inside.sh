@@ -39,15 +39,42 @@ apt_try_rec(){ for p in "$@"; do apt-get install -y "$p" \
 # ==== 必要最小限 ====
 #   事前に入れるもの: 日本語 (fcitx-mozc)・w9wm・NAT (NetworkManager)・印刷 (CUPS)・
 #   vim・emacs・apt とインストーラ一式。端末は xterm (日本語入力対応の設定済み)。
-#   mlterm・ssh・xinetd・screen・texlive-full などは入れない → 後から apt で導入
+#   端末 mlterm (日本語入力付き)・Wi-Fi・日本語 106 キーボードも事前導入。
+#   ssh・xinetd・screen・texlive-full などは入れない → 後から apt で導入
 #   (`badaos-extras` / `badaos-apps` / `sudo apt install ...`)。
 
-# ---- デスクトップ (w9wm) + xterm + 日本語フォント ----
+# ---- キーボード: 日本語 106/109 配列 (X・テキストコンソール・ライブ環境すべて) ----
+cat <<'EOF' | debconf-set-selections
+keyboard-configuration keyboard-configuration/modelcode string jp106
+keyboard-configuration keyboard-configuration/layoutcode string jp
+keyboard-configuration keyboard-configuration/layout select Japanese
+keyboard-configuration keyboard-configuration/variant select Japanese
+keyboard-configuration keyboard-configuration/xkb-keymap select jp
+EOF
+cat > /etc/default/keyboard <<'EOF'
+XKBMODEL="jp106"
+XKBLAYOUT="jp"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+apt-get install -y --no-install-recommends keyboard-configuration console-setup kbd
+mkdir -p /etc/X11/xorg.conf.d
+cat > /etc/X11/xorg.conf.d/00-keyboard.conf <<'EOF'
+Section "InputClass"
+    Identifier "Japanese keyboard"
+    MatchIsKeyboard "on"
+    Option "XkbModel" "jp106"
+    Option "XkbLayout" "jp"
+EndSection
+EOF
+
+# ---- デスクトップ (w9wm) + 端末 mlterm (既定) / xterm + 日本語フォント ----
 apt_try nano less curl wget ca-certificates \
   xserver-xorg xinit x11-xserver-utils x11-utils \
   xserver-xorg-video-all xserver-xorg-video-vesa xserver-xorg-video-fbdev xserver-xorg-input-all \
   lightdm lightdm-gtk-greeter \
-  w9wm xterm \
+  w9wm xterm mlterm mlterm-common mlterm-im-fcitx \
   fonts-dejavu-core fonts-noto-cjk fonts-noto-color-emoji
 
 # ---- w9wm を「新しいウィンドウを自動配置」するよう修正してビルド ----
@@ -91,7 +118,7 @@ mkdir -p /etc/skel/.config/fcitx
 cat > /etc/skel/.config/fcitx/profile <<EOF
 [Profile]
 IMName=mozc
-EnabledIMList=fcitx-keyboard-us:True,mozc:True
+EnabledIMList=fcitx-keyboard-jp:True,mozc:True
 PreeditStringInApplication=False
 ShareStateAmongWindow=No
 DefaultQuickPhrase=
@@ -121,7 +148,11 @@ apt_try qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-contro
 apt_try ntfs-3g efibootmgr fdisk shim-signed grub-efi-amd64-signed python3-minimal
 
 # ---- NAT: NetworkManager (DHCP/NAT のクライアント) + NAT ルータ用 (badaos-nat) ----
-apt_try iptables dnsmasq-base network-manager-gnome iputils-ping
+apt_try iptables dnsmasq-base network-manager-gnome iputils-ping \
+  wpasupplicant iw wireless-tools rfkill wireless-regdb linux-firmware \
+  modemmanager usb-modeswitch ppp
+# NetworkManager に有線/無線をすべて管理させ、起動時に必ず有効に
+systemctl enable NetworkManager wpa_supplicant 2>/dev/null || true
 
 # ---- 印刷: CUPS + ドライバ一式 + GUI 設定 ----
 #   USB プリンタ (ipp-usb でドライバ不要機も) / ネットワークプリンタ (avahi で
@@ -487,6 +518,26 @@ Terminal=false
 Icon=system-run
 Categories=System;
 EOF
+cat > /etc/skel/Desktop/mlterm.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=端末 (mlterm)
+Comment=日本語対応ターミナル (日本語入力 Ctrl+Space)
+Exec=mlterm
+Terminal=false
+Icon=utilities-terminal
+Categories=System;
+EOF
+cat > /etc/skel/Desktop/network.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=ネットワーク設定 (有線 / Wi-Fi)
+Comment=NetworkManager の接続を設定 (NAT / DHCP は自動)
+Exec=nm-connection-editor
+Terminal=false
+Icon=network-wired
+Categories=Settings;
+EOF
 cat > /etc/skel/Desktop/xterm.desktop <<EOF
 [Desktop Entry]
 Type=Application
@@ -534,16 +585,30 @@ REQUIRED="network-manager iptables dnsmasq-base apt
   cups cups-filters cups-browsed avahi-daemon printer-driver-all system-config-printer
   fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
   xterm w9wm lightdm xserver-xorg xserver-xorg-video-vesa xserver-xorg-video-fbdev
+  mlterm mlterm-im-fcitx keyboard-configuration console-setup wpasupplicant network-manager-gnome linux-firmware
   vim vim-gtk3 emacs
   grub-pc-bin grub-efi-amd64-bin dosfstools ntfs-3g zenity calamares"
 MISSING=""
 for p in $REQUIRED; do dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"; done
 if [ -n "$MISSING" ]; then echo "FATAL: 必須パッケージが入っていません:$MISSING"; exit 1; fi
 echo "required packages OK"
-for c in nmcli cupsd lp lpstat system-config-printer fcitx xterm w9wm vim gvim emacs apt-get; do
+for c in mlterm nm-applet wpa_supplicant setxkbmap nmcli cupsd lp lpstat system-config-printer fcitx xterm w9wm vim gvim emacs apt-get; do
   command -v "$c" >/dev/null 2>&1 || { echo "FATAL: コマンド $c がありません"; exit 1; }
 done
 echo "required commands OK"
+
+# インストール後のシステムの起動設定 (Calamares / かんたんウィザードでも同じになるよう ISO 側で設定)
+#   既定は nomodeset (GPU ドライバ不使用の汎用表示): GPU との相性で通常起動が止まり
+#   「リカバリーモードでしか起動しない」PC でも、通常起動でデスクトップまで行く。
+mkdir -p /etc/default/grub.d
+cat > /etc/default/grub.d/90-badaos.cfg <<'EOF'
+GRUB_DISTRIBUTOR="Bada VM Pro"
+GRUB_TIMEOUT_STYLE=menu
+GRUB_TIMEOUT=10
+GRUB_CMDLINE_LINUX_DEFAULT="nomodeset"
+GRUB_DISABLE_OS_PROBER=false
+EOF
+install -Dm755 /tmp/35_badavmpro_triboot /etc/grub.d/35_badavmpro_triboot 2>/dev/null || true
 
 # initramfs を更新 (casper を取り込む)
 update-initramfs -u || true

@@ -444,14 +444,13 @@ GRUB_DEFAULT=0
 GRUB_TIMEOUT_STYLE=menu
 GRUB_TIMEOUT=10
 GRUB_DISTRIBUTOR="Bada VM Pro"
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX_DEFAULT="nomodeset"
 GRUB_CMDLINE_LINUX=""
 GRUB_DISABLE_OS_PROBER=false
+GRUB_DISABLE_RECOVERY=false
 EOF
-# セーフグラフィック (nomodeset) で起動してインストールした PC は、インストール後も同じ設定で起動
-if grep -qw nomodeset /proc/cmdline 2>/dev/null; then
-  sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nomodeset"/' "$MNT/etc/default/grub"
-fi
+# 既定は nomodeset (GPU ドライバを使わない汎用表示) で、どの PC でも通常起動できるようにする。
+# GPU ドライバで高速表示する起動項目は 35_badavmpro_triboot が別に追加する。
 install -Dm755 /usr/local/lib/badaos/35_badavmpro_triboot "$MNT/etc/grub.d/35_badavmpro_triboot" 2>/dev/null \
   || log "注意: 35_badavmpro_triboot が無いため os-prober のみで Windows/Linux を検出します"
 

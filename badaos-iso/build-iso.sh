@@ -115,6 +115,7 @@ install -Dm755 "$HERE/installer/badaos-disks.sh"                 "$CHROOT/usr/lo
 install -Dm755 "$HERE/installer/badaos-legacy-boot.sh"           "$CHROOT/usr/local/lib/badaos/badaos-legacy-boot"
 install -Dm755 "$HERE/installer/badaos-repair-boot.sh"           "$CHROOT/usr/local/bin/badaos-repair-boot"
 install -Dm755 "$HERE/installer/35_badavmpro_triboot"            "$CHROOT/usr/local/lib/badaos/35_badavmpro_triboot"
+install -Dm755 "$HERE/installer/35_badavmpro_triboot"            "$CHROOT/tmp/35_badavmpro_triboot"
 # Calamares の日本語インストール設定
 mkdir -p "$CHROOT/etc/calamares"
 cp -r "$HERE/config/calamares/." "$CHROOT/etc/calamares/"

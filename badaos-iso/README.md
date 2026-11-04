@@ -13,6 +13,10 @@ mlterm・ssh・xinetd・texlive-full・screen などは**後から apt コマン
 | 日本語 | ロケール ja_JP.UTF-8 / Noto CJK フォント / **fcitx-mozc**(Ctrl+Space / 半角全角 で ON/OFF)/ `fcitx-configtool` |
 | NAT | NetworkManager(**NAT / DHCP がそのまま通る**)。`badaos-nat` で**この PC を NAT ルータ**にも(`on <外側IF> <内側IF>` / `share <内側IF>`) |
 | プリンター | **CUPS** + `printer-driver-all`(Epson/Canon/HP/Brother…)。USB(ipp-usb)/ネットワーク(AirPrint・IPP Everywhere 自動検出)。デスクトップ「プリンターの設定」か `http://localhost:631`。ユーザーは `lpadmin` 所属 |
+| 端末 | **mlterm**(既定・日本語入力 mlterm-im-fcitx 付き)/ xterm |
+| キーボード | **日本語 106/109 配列**(X・テキストコンソール・fcitx すべて jp) |
+| ネットワーク | 有線 + **Wi-Fi**(wpasupplicant・ファームウェア)。画面右下のアイコン / `nmtui` / 「ネットワーク設定」で接続 |
+| 起動 (インストール後) | 既定は **nomodeset**(GPU ドライバを使わない汎用表示)で、どの PC でも通常起動。GRUB の「Bada VM Pro (GPU accelerated graphics)」で GPU 高速表示 |
 | エディタ (事前導入) | **vim** / gvim / **emacs**(emacs-mozc 付き) |
 | apt | パッケージ索引を同梱 → **起動直後から** `sudo apt install <pkg>` が使える |
 | インストーラ | トリプルブート導入 / Calamares / かんたんウィザード / GParted |
