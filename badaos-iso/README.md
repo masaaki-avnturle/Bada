@@ -36,6 +36,17 @@ sudo apt install texlive-full             # TeX 一式 (日本語 platex/uplatex
 
 ## 🪟🜁🐧 トリプルブート: Windows | Bada VM Pro | Linux (UEFI / Legacy 両対応)
 
+**Linux がまだ入っていないディスク**(Windows + データの無い空き領域)では、その空きを次のように割り当てます:
+
+```
+/dev/sda: [Windows][★BADAVMBOOT FAT32 512MiB: ブートローダー][★BADAVMPRO: Bada VM Pro OS][★UBUNTU: 残り (Ubuntu 用)]
+```
+
+- 大きさの既定は「BadaVM Pro = 空きの半分 / 残りを Ubuntu」。GUI のサイズ欄で BadaVM Pro の大きさを指定できます
+- UBUNTU は ext4 でフォーマットした空のパーティション。Ubuntu の ISO で「それ以外」→ UBUNTU を `/` に、**ブートローダの場所も同じ UBUNTU パーティション**にすると sda の MBR は書き換わりません。入れた後 Bada VM Pro で `sudo update-grub` すると起動メニューに Ubuntu が追加されます
+- MBR ディスクで基本区画が足りない時は拡張区画の中に論理区画として作ります
+
+
 Windows と後ろの Linux が入っている PC で、その**真ん中**に Bada VM Pro を入れます。
 Windows の**すぐ下**に **Bada VM Pro 専用ブートローダの FAT パーティション**を作り、
 その下の空き領域に **Bada VM Pro OS** をインストールします。**Windows の起動パーティションは触りません。**

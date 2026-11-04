@@ -12,7 +12,7 @@ command -v zenity >/dev/null 2>&1 || { xmessage -center "zenity が見つかり�
 Z(){ zenity --window-icon=info "$@"; }
 
 Z --info --width=600 --title="$TITLE" --ok-label="次へ" \
-  --text="<span size='xx-large' foreground='#c8a44a'><b>Bada VM Pro トリプルブート</b></span>\n\n<tt>[ Windows ][ ★BADAVMBOOT (FAT)★ ][ ★BADAVMPRO (OS)★ ][ Linux ]</tt>\n\n• Windows の<b>下</b>に Bada VM Pro <b>専用ブートローダの FAT パーティション</b>を作り、\n  その下の空き領域に <b>Bada VM Pro OS</b> をインストールします (Linux との間)\n• Windows の起動パーティションは変更しません\n• <b>UEFI / Legacy BIOS</b> どちらでも、起動メニューで <b>Bada VM Pro / Windows / Linux</b> を選べます\n• 既存の Windows / Linux は消しません\n\n⚠ 事前に Windows の<b>高速スタートアップを無効</b>にし、BitLocker を一時停止し、\n  大切なデータはバックアップしてください。" || exit 0
+  --text="<span size='xx-large' foreground='#c8a44a'><b>Bada VM Pro トリプルブート</b></span>\n\n<tt>[ Windows ][ ★BADAVMBOOT (FAT32)★ ][ ★BADAVMPRO (OS)★ ][ Linux / ★UBUNTU★ ]</tt>\n\n• Windows の<b>下</b>に Bada VM Pro <b>専用ブートローダの FAT パーティション</b>を作り、\n  その下の空き領域に <b>Bada VM Pro OS</b> をインストールします (Linux との間)\n• <b>Linux がまだ無い</b>ディスクでは、Windows の後ろの空きを\n  BADAVMBOOT → BADAVMPRO → <b>残りを Ubuntu 用 (UBUNTU)</b> に割り当てます\n• Windows の起動パーティションは変更しません\n• <b>UEFI / Legacy BIOS</b> どちらでも、起動メニューで <b>Bada VM Pro / Windows / Linux</b> を選べます\n• 既存の Windows / Linux は消しません\n\n⚠ 事前に Windows の<b>高速スタートアップを無効</b>にし、BitLocker を一時停止し、\n  大切なデータはバックアップしてください。" || exit 0
 
 # 実ディスクのみ (起動に使っている USB は除く)。sda を既定で選択しておく
 declare -a ROWS=(); first=TRUE
@@ -26,7 +26,7 @@ DISK="$(Z --list --radiolist --title="$TITLE — ディスク" --width=600 --hei
 [ -n "$DISK" ] || exit 1
 
 SIZE="$(Z --entry --title="$TITLE — サイズ" --width=520 \
-  --text="Bada VM Pro に使う大きさ (GiB, ブート FAT 512MiB 込み)。空欄 = Windows と Linux の間の空きを全部使う:" \
+  --text="Bada VM Pro に使う大きさ (GiB, ブート FAT32 512MiB 込み)。\n空欄 = Windows と Linux の間の空きを全部 (Linux が無い時は空きの半分、残りは Ubuntu 用):" \
   --entry-text="")" || exit 0
 SIZE="${SIZE//[^0-9]/}"; SIZE="${SIZE:-0}"
 
@@ -61,9 +61,13 @@ NEW_HOST="${HOST:-badaos}" NEW_USER="${USER_NAME:-bada}" NEW_PASS="$PASS" \
   bash "$CORE" 2>>"$LOG" \
 | Z --progress --title="$TITLE — インストール中" --width=560 --auto-close --no-cancel --percentage=0 --text="準備しています…"
 RC=${PIPESTATUS[0]}
+UBU_NOTE=""
+if echo "$PLAN" | grep -q "UBUNTU"; then
+  UBU_NOTE="\n\n<b>Ubuntu 用パーティション (ラベル UBUNTU, ext4)</b> を作りました。Ubuntu をここに入れるには:\n 1. Ubuntu の ISO で起動 →「それ以外」を選ぶ\n 2. UBUNTU のパーティションを「ext4 / マウントポイント /」に設定\n 3.「ブートローダをインストールするデバイス」に <b>同じ UBUNTU のパーティション</b>を選ぶ\n    (sda を選ぶと MBR が書き換わります)\n 4. 終わったら Bada VM Pro で <tt>sudo update-grub</tt> → 起動メニューに Ubuntu が出ます"
+fi
 if [ "$RC" = "0" ]; then
   Z --question --width=520 --title="$TITLE — 完了" --ok-label="今すぐ再起動" --cancel-label="あとで" \
-    --text="✅ 完了しました。\n\n再起動すると起動メニュー <b>Bada VM Pro</b> から\nBada VM Pro / Windows / Linux を選べます。" && reboot
+    --text="✅ 完了しました。\n\n再起動すると起動メニュー <b>Bada VM Pro</b> から\nBada VM Pro / Windows / Linux を選べます。${UBU_NOTE}" && reboot
 else
   Z --error --width=640 --height=360 --title="$TITLE — エラー" \
     --text="失敗しました。ログの末尾:\n\n<tt>$(tail -n 18 "$LOG" | sed 's/&/\&amp;/g; s/</\&lt;/g')</tt>\n\n全文: ${LOG}"

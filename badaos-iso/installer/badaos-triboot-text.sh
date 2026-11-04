@@ -28,7 +28,11 @@ tr_plan(){ sed -u \
   -e 's/(新規)/(new) /; s/拡張区画/extended/; s/BIOS起動/BIOS-boot/; s/GRUB 埋め込み/GRUB-core/' \
   -e 's/★ Bada VM Pro 専用ブートローダ/<= Bada VM Pro boot loader (FAT)/' \
   -e 's/★ Bada VM Pro OS/<= Bada VM Pro OS/' \
-  -e 's/★ 拡張区画 (中に論理区画 2 つ)/<= extended partition (2 logical inside)/' \
+  -e 's/★ 拡張区画 (中に論理区画)/<= extended partition (logical partitions inside)/' \
+  -e 's/★ Ubuntu 用 (空き)/<= for Ubuntu (empty, install Ubuntu here later)/' \
+  -e 's/^Linux    : (無し) → 残りを Ubuntu 用 (UBUNTU) に割り当て/Linux   : (none) -> the rest is allocated to Ubuntu (UBUNTU)/' \
+  -e 's/^ERROR: Ubuntu 用のパーティションが.*/ERROR: the Ubuntu partition would be smaller than 20 GiB/' \
+  -e 's/^ERROR: Ubuntu 用の空きが残りません.*/ERROR: no space left for Ubuntu; choose a smaller Bada VM Pro size/' \
   -e 's/★ GRUB 本体 (未割り当て)/<= GRUB core (unallocated gap)/; s/★ GRUB 埋め込み用/<= GRUB core/' \
   -e 's/^PLAN_ONLY=1: ディスクは変更していません/(plan only - nothing written yet)/' \
   -e 's/^ERROR: Windows (NTFS) パーティションが見つかりません.*/ERROR: no Windows (NTFS) partition found on this disk/' \
@@ -54,7 +58,8 @@ stage(){ case "$1" in
 clear
 echo "=================================================================="
 echo " Bada VM Pro OS - triple boot installer (text mode)"
-echo "   Windows | BADAVMBOOT (FAT, boot loader) | BADAVMPRO (OS) | Linux"
+echo "   Windows | BADAVMBOOT (FAT32, boot loader) | BADAVMPRO (OS) | Linux / Ubuntu"
+echo "   No Linux yet? The rest of the free space is allocated to Ubuntu (UBUNTU)."
 echo "   Existing Windows and Linux are kept. The MBR is not rewritten."
 echo "=================================================================="
 echo
@@ -66,7 +71,7 @@ read -r -p "Disk with Windows and Linux (number, Enter = 1 = ${DISKS[0]:-?}): " 
 n="${n:-1}"
 DISK="/dev/${DISKS[$((n-1))]}"
 [ -b "$DISK" ] || { echo "No disk selected."; read -r -p "Enter to exit" _; exit 1; }
-read -r -p "Size for Bada VM Pro in GiB (Enter = all free space between them): " SIZE
+read -r -p "Size for Bada VM Pro in GiB (Enter = all free space between Windows and Linux; with no Linux: half, the rest for Ubuntu): " SIZE
 SIZE="${SIZE//[^0-9]/}"; SIZE="${SIZE:-0}"
 
 SHRINK=0
@@ -108,6 +113,15 @@ rc=${PIPESTATUS[0]}
 echo
 if [ "$rc" = 0 ]; then
   echo "Installation finished. Remove the USB stick and reboot."
+  if grep -q "UBUNTU" /tmp/plan.txt 2>/dev/null; then
+    echo
+    echo "An empty Ubuntu partition (label UBUNTU, ext4) was created. To install Ubuntu there:"
+    echo "  1. boot the Ubuntu ISO and choose 'Something else'"
+    echo "  2. set the UBUNTU partition to ext4, mount point /"
+    echo "  3. 'Device for boot loader installation': choose that same UBUNTU partition"
+    echo "     (choosing /dev/sda would rewrite the MBR)"
+    echo "  4. then in Bada VM Pro run: sudo update-grub   (adds Ubuntu to the boot menu)"
+  fi
   read -r -p "Reboot now? [Y/n] " a; [ "$a" = n ] || reboot
 else
   echo "Installation FAILED (exit code $rc). Last lines of $LOG:"

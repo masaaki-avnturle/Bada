@@ -49,6 +49,8 @@ USER_NAME="${NEW_USER:-bada}"
 PASS="${NEW_PASS:-bada}"
 BADA_SIZE_GB="${BADA_SIZE_GB:-0}"
 SHRINK_WINDOWS="${SHRINK_WINDOWS:-0}"
+UBUNTU_SIZE_GB="${UBUNTU_SIZE_GB:-0}"   # Linux が無いディスク: Ubuntu 用に割り当てる大きさ (0 = 残り全部)
+UBU_MIN=20                               # Ubuntu 用パーティションの最小 GiB
 PLAN_ONLY="${PLAN_ONLY:-0}"
 MIN_GB=20                  # OS 本体 (ext4) の最小サイズ (最小構成 約 6GiB + 後から apt で texlive-full 等を入れる余裕)
 BOOT_MIB=512               # 専用ブートローダ FAT の大きさ
@@ -78,7 +80,11 @@ for p in t.get("partitions",[]):
 LABEL="$(echo "$TABLE" | head -1 | awk '{print $2}')"
 SECT="$(echo "$TABLE"  | head -1 | awk '{print $3}')"
 PARTS="$(echo "$TABLE" | tail -n +2)"
-[ -n "$PARTS" ] || fail "$DISK にパーティションがありません (Windows と Linux が入ったディスクを選んでください)"
+[ -n "$PARTS" ] || fail "$DISK にパーティションがありません (Windows が入ったディスクを選んでください)"
+# ディスクの最後の使えるセクタ (Linux が無い時は Windows の後ろ〜ディスク末尾の空きを使う)
+if [ -b "$DISK" ]; then TOT512=$(blockdev --getsz "$DISK"); else TOT512=$(( $(stat -c %s "$DISK") / 512 )); fi
+DISK_SECTS=$(( TOT512 * 512 / SECT ))
+LASTUSABLE=$(( DISK_SECTS - 1 )); [ "$LABEL" = gpt ] && LASTUSABLE=$(( DISK_SECTS - 34 ))
 
 fstype(){ blkid -p -o value -s TYPE  -O $(( $1 * SECT )) "$DISK" 2>/dev/null || true; }
 fslabel(){ blkid -p -o value -s LABEL -O $(( $1 * SECT )) "$DISK" 2>/dev/null || true; }
@@ -113,8 +119,12 @@ for ((k=0;k<N;k++)); do
   esac
 done
 [ $WIN -ge 0 ] || fail "Windows (NTFS) パーティションが見つかりません"
-[ $LIN -ge 0 ] || fail "Linux (ext4/btrfs/xfs) パーティションが見つかりません"
-[ ${P_START[WIN]} -lt ${P_START[LIN]} ] || \
+# Linux が無い → Windows の後ろの空きを [BADAVMBOOT FAT32][BADAVMPRO][UBUNTU] に割り当てる
+NEWLINUX=0
+if [ $LIN -lt 0 ]; then NEWLINUX=1
+elif [ ${P_START[LIN]} -lt ${P_START[WIN]} ]; then LIN=-1; NEWLINUX=1   # Windows より前の Linux は使わない
+fi
+[ $NEWLINUX = 1 ] || [ ${P_START[WIN]} -lt ${P_START[LIN]} ] || \
   fail "Linux が Windows より前にあります。Bada VM Pro は「Windows の下・Linux の上」に作るため、Windows → Linux の順のディスクが必要です"
 
 # 起動方式
@@ -136,7 +146,8 @@ if [ "$LABEL" = "dos" ]; then
   [ $EXT -lt 0 ] || fail "MBR の拡張区画が既にあるディスクは未対応です (GParted で基本区画に空きを作ってください)"
   FREE_PRIM=$(( 4 - NPRIM ))
   [ $FREE_PRIM -ge 1 ] || fail "MBR の基本区画が 4 つとも使用中です (1 つ以上の空きが必要)"
-  [ $FREE_PRIM -lt 2 ] && USE_EXT=1
+  NEEDP=$(( 2 + NEWLINUX ))            # BADAVMBOOT + BADAVMPRO (+ UBUNTU)
+  [ $FREE_PRIM -lt $NEEDP ] && USE_EXT=1
 fi
 
 # ---------------------------------------------------------------------------
@@ -144,7 +155,8 @@ fi
 # ---------------------------------------------------------------------------
 ALIGN=$(( 1048576 / SECT ))
 GIB=$(( 1073741824 / SECT ))
-LO=${P_END[WIN]}; HI=${P_START[LIN]}
+LO=${P_END[WIN]}
+if [ $NEWLINUX = 1 ]; then HI=$(( LASTUSABLE + 1 )); else HI=${P_START[LIN]}; fi
 
 # 間の区間から、既存パーティション (回復区画など) が占めていない最大の空きを探す
 best_s=0; best_e=-1
@@ -165,11 +177,16 @@ GAP_GB=0; [ $GAP_E -gt $GAP_S ] && GAP_GB=$(( (GAP_E - GAP_S + 1) / GIB ))
 
 WANT=0; [ "$BADA_SIZE_GB" -gt 0 ] 2>/dev/null && WANT=$(( BADA_SIZE_GB * GIB ))
 NEED_GB=$(( MIN_GB + 1 ))   # OS 最小 + ブート区画
+[ $NEWLINUX = 1 ] && NEED_GB=$(( NEED_GB + UBU_MIN ))
+BADA_WANT=$WANT
 
 SHRINK=0
 if [ $GAP_GB -lt $NEED_GB ]; then
   if [ "$SHRINK_WINDOWS" = "1" ]; then
     [ $WANT -gt 0 ] || WANT=$(( 40 * GIB ))      # 縮小時の既定 40GiB
+    if [ $NEWLINUX = 1 ]; then                   # Bada + Ubuntu の分をまとめて空ける
+      U=$(( UBUNTU_SIZE_GB > 0 ? UBUNTU_SIZE_GB : 40 )); WANT=$(( WANT + U * GIB ))
+    fi
     SHRINK=1
     # Windows 末尾を WANT 分だけ縮める → Windows の直下に空きができる
     NEW_WIN_END=$(( (P_END[WIN] + 1 - WANT) / ALIGN * ALIGN - 1 ))
@@ -179,7 +196,7 @@ if [ $GAP_GB -lt $NEED_GB ]; then
   else
     fail "Windows と Linux の間に ${NEED_GB}GiB 以上の空きがありません (現在 ${GAP_GB}GiB)。SHRINK_WINDOWS=1 で Windows を縮小するか、GParted (badaos-partition) で空きを作ってください"
   fi
-elif [ $WANT -gt 0 ] && [ $WANT -lt $(( GAP_E - GAP_S + 1 )) ]; then
+elif [ $NEWLINUX = 0 ] && [ $WANT -gt 0 ] && [ $WANT -lt $(( GAP_E - GAP_S + 1 )) ]; then
   GAP_E=$(( GAP_S + WANT / ALIGN * ALIGN - 1 ))
 fi
 
@@ -197,6 +214,17 @@ cur=$(( cur + LGAP ))
 if [ $NEED_BIOSGRUB = 1 ]; then BG_S=$cur; BG_E=$(( cur + ALIGN - 1 )); cur=$(( BG_E + 1 )); fi
 BOOT_S=$cur; BOOT_E=$(( cur + BOOT_MIB * ALIGN - 1 )); cur=$(( BOOT_E + 1 + LGAP ))
 ROOT_S=$cur; ROOT_E=$GAP_E
+UBU_S=0; UBU_E=-1
+if [ $NEWLINUX = 1 ]; then
+  # 指定があれば BadaVM Pro (ブート込み) をその大きさ、無ければ残りの半分。後ろは Ubuntu
+  if [ $BADA_WANT -gt 0 ]; then ROOT_E=$(( (GAP_S + BADA_WANT) / ALIGN * ALIGN - 1 ))
+  else ROOT_E=$(( ROOT_S + (GAP_E - ROOT_S + 1) / 2 / ALIGN * ALIGN - 1 )); fi
+  [ $ROOT_E -lt $GAP_E ] || fail "Ubuntu 用の空きが残りません。BADA_SIZE_GB を小さくしてください"
+  UBU_S=$(( ROOT_E + 1 + LGAP )); UBU_E=$GAP_E
+  if [ "$UBUNTU_SIZE_GB" -gt 0 ] 2>/dev/null && [ $(( UBU_S + UBUNTU_SIZE_GB * GIB - 1 )) -lt $UBU_E ]; then
+    UBU_E=$(( UBU_S + UBUNTU_SIZE_GB * GIB / ALIGN * ALIGN - 1 )); fi
+  [ $(( (UBU_E - UBU_S + 1) / GIB )) -ge $UBU_MIN ] || fail "Ubuntu 用のパーティションが ${UBU_MIN}GiB 未満になります"
+fi
 [ $(( (ROOT_E - ROOT_S + 1) / GIB )) -ge $MIN_GB ] || fail "OS 本体のパーティションが ${MIN_GB}GiB 未満になります"
 
 # ---------------------------------------------------------------------------
@@ -207,7 +235,8 @@ gib(){ awk -v s="$1" -v b="$SECT" 'BEGIN{ if (s*b < 1073741824) printf "%dMiB", 
   echo "=== Bada VM Pro トリプルブート計画 ==="
   echo "ディスク : $DISK  ($LABEL, ${SECT}B/セクタ)   起動方式: $( [ $FW = uefi ] && echo UEFI || echo Legacy BIOS )"
   echo "Windows  : ${P_NODE[WIN]}  $(gib $(( P_END[WIN]-P_START[WIN]+1 )))$( [ $SHRINK = 1 ] && echo " → 縮小後 $(gib $(( NEW_WIN_END-P_START[WIN]+1 ))) (ntfsresize)")"
-  echo "Linux    : ${P_NODE[LIN]}  $(gib $(( P_END[LIN]-P_START[LIN]+1 )))  (変更なし)"
+  if [ $NEWLINUX = 1 ]; then echo "Linux    : (無し) → 残りを Ubuntu 用 (UBUNTU) に割り当て"
+  else echo "Linux    : ${P_NODE[LIN]}  $(gib $(( P_END[LIN]-P_START[LIN]+1 )))  (変更なし)"; fi
   if [ $FW = uefi ]; then echo "Windows の起動パーティション (ESP) / MBR: 変更しない"
   elif [ $VBR_MODE = 1 ]; then
     echo "Windows の MBR 起動コード: 変更しない (Bada VM Pro の起動コードは$( [ $USE_EXT = 1 ] && echo '拡張区画の先頭 (EBR)' || echo '専用 FAT の先頭 (VBR)')、それをアクティブに)"
@@ -220,9 +249,10 @@ gib(){ awk -v s="$1" -v b="$SECT" 'BEGIN{ if (s*b < 1073741824) printf "%dMiB", 
     done
     [ $NEED_BIOSGRUB = 1 ] && printf '%012d  %-24s %-6s %9s  ★ GRUB 埋め込み用\n' "$BG_S" "(新規)BIOS起動" "-" "$(gib $(( BG_E-BG_S+1 )))"
     [ $VBR_MODE = 1 ] && [ $USE_EXT = 0 ] && printf '%012d  %-24s %-6s %9s  ★ GRUB 本体 (未割り当て)\n' "$EMB_S" "(新規)GRUB 埋め込み" "-" "1MiB"
-    [ $USE_EXT = 1 ] && printf '%012d  %-24s %-6s %9s  ★ 拡張区画 (中に論理区画 2 つ)\n' "$GAP_S" "(新規)拡張区画" "-" "$(gib $(( GAP_E-GAP_S+1 )))"
+    [ $USE_EXT = 1 ] && printf '%012d  %-24s %-6s %9s  ★ 拡張区画 (中に論理区画)\n' "$GAP_S" "(新規)拡張区画" "-" "$(gib $(( GAP_E-GAP_S+1 )))"
     printf '%012d  %-24s %-6s %9s  ★ Bada VM Pro 専用ブートローダ\n' "$BOOT_S" "(新規)BADAVMBOOT" "vfat" "$(gib $(( BOOT_E-BOOT_S+1 )))"
     printf '%012d  %-24s %-6s %9s  ★ Bada VM Pro OS\n' "$ROOT_S" "(新規)BADAVMPRO" "ext4" "$(gib $(( ROOT_E-ROOT_S+1 )))"
+    if [ $NEWLINUX = 1 ]; then printf '%012d  %-24s %-6s %9s  ★ Ubuntu 用 (空き)\n' "$UBU_S" "(新規)UBUNTU" "ext4" "$(gib $(( UBU_E-UBU_S+1 )))"; fi
   } | sort | cut -c15- | sed 's/^/  /'
 } >&2
 [ "$PLAN_ONLY" = "1" ] && { echo "PLAN_ONLY=1: ディスクは変更していません" >&2; exit 0; }
@@ -260,11 +290,13 @@ if [ "$LABEL" = "gpt" ]; then
   # 専用ブート FAT は EFI System 型 (Windows からは隠れる / UEFI から起動できる)
   sgdisk -n "0:${BOOT_S}:${BOOT_E}" -t 0:EF00 -c "0:BadaVMPro-Boot" "$DISK" >&2 || fail "ブート区画の作成に失敗"
   sgdisk -n "0:${ROOT_S}:${ROOT_E}" -t 0:8300 -c "0:BadaVMPro"      "$DISK" >&2 || fail "OS 区画の作成に失敗"
+  [ $NEWLINUX = 1 ] && { sgdisk -n "0:${UBU_S}:${UBU_E}" -t 0:8300 -c "0:Ubuntu" "$DISK" >&2 || fail "Ubuntu 区画の作成に失敗"; }
 else
   # MBR: ブート FAT は type ef (Windows に隠れる)、OS は 83。アクティブ区画は変えない
   {
     [ $USE_EXT = 1 ] && printf '%s,%s,5\n' "$GAP_S" $(( GAP_E-GAP_S+1 ))
     printf '%s,%s,ef\n%s,%s,83\n' "$BOOT_S" $(( BOOT_E-BOOT_S+1 )) "$ROOT_S" $(( ROOT_E-ROOT_S+1 ))
+    if [ $NEWLINUX = 1 ]; then printf '%s,%s,83\n' "$UBU_S" $(( UBU_E-UBU_S+1 )); fi
   } | sfdisk --no-reread --append "$DISK" >&2 || fail "MBR にパーティションを追加できません"
 fi
 partprobe "$DISK" 2>/dev/null || true; udevadm settle 2>/dev/null || true; sleep 2
@@ -280,6 +312,10 @@ BOOT_DEV="$(node_at "$BOOT_S")"; ROOT_DEV="$(node_at "$ROOT_S")"
 emit 18 "フォーマット中 (専用ブート FAT32: $BOOT_DEV / OS ext4: $ROOT_DEV)"
 mkfs.vfat -F32 -n BADAVMBOOT "$BOOT_DEV" >/dev/null
 mkfs.ext4 -F -L BADAVMPRO "$ROOT_DEV" >/dev/null
+if [ $NEWLINUX = 1 ]; then
+  UBU_DEV="$(node_at "$UBU_S")"; [ -b "$UBU_DEV" ] || fail "Ubuntu 区画のデバイスが見つかりません"
+  mkfs.ext4 -F -L UBUNTU "$UBU_DEV" >/dev/null
+fi
 mkdir -p "$MNT"; mount "$ROOT_DEV" "$MNT"
 
 emit 22 "システムをコピー中… (数分かかります)"
