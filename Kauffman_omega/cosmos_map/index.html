@@ -1,0 +1,501 @@
+<title>宇宙の地図</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two maps share one stage (a logarithmic map of the whole observable universe
+   centred on the Sun, and a linear map of the Milky Way). A star-chart notebook panel on the
+   left (below the stage on phones) holds the view tabs, the scale ladder, category filters and
+   the object index. Single dark look by choice: it is a sky chart. */
+:root{
+  --void:#03040a; --panel:#090b16; --line:#1c2140; --ink:#e7e9f6; --muted:#8a90b2; --chip:#11152e;
+  --sun:#ffc95a; --planet:#5fe3a1; --star:#e6ecff; --milky:#8fc2ff; --local:#b49cff; --nearby:#de9cff;
+  --cluster:#ff8fc4; --deep:#ff9f5a; --cmb:#ff6a5a; --focus:#7fd0ff;
+  --f-display:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--void);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.7}
+.app{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);height:100%}
+.panel{overflow-y:auto;background:var(--panel);border-right:1px solid var(--line);
+  padding-block:24px 44px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:20px;
+  display:flex;flex-direction:column;gap:24px;min-width:0}
+.stage{position:relative;min-width:0;overflow:hidden;background:var(--void)}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none}
+@media (max-width:760px){
+  html,body{height:auto}
+  .app{display:flex;flex-direction:column;height:auto}
+  .stage{height:72vh;min-height:440px;order:-1}
+  .panel{border-right:0;border-top:1px solid var(--line);overflow:visible;
+    padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:800;font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:.03em;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:600;font-size:16px;margin:0 0 10px;letter-spacing:.04em}
+p{margin:0}
+.lead{color:#c8cbe2;max-width:65ch}
+section{display:flex;flex-direction:column;min-width:0}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+button{font:inherit;font-size:12.5px;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:4px;padding:6px 10px;cursor:pointer;text-align:left}
+button:hover{border-color:var(--focus)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.tabs button{text-align:center;padding:8px 6px;font-size:13px}
+.tabs button[aria-selected=true]{border-color:var(--focus);color:var(--focus);background:#0f1a33}
+.ladder{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ladder li button{display:grid;grid-template-columns:1fr auto;gap:10px;width:100%;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:6px 2px}
+.ladder li button:hover{background:#0e1229}
+.ladder .d{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cats{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+label.chk{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;min-width:0}
+label.chk input{accent-color:var(--focus);width:15px;height:15px;margin:0;flex:none}
+.sw{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 6px currentColor}
+details{border-top:1px solid var(--line)}
+details:last-child{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;padding:7px 0;font-size:13px;display:flex;align-items:center;gap:8px;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"＋";margin-left:auto;color:var(--muted);font-size:12px}
+details[open] summary::after{content:"－"}
+summary .n{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.olist{display:flex;flex-direction:column;gap:2px;padding-bottom:8px}
+.olist button{display:grid;grid-template-columns:1fr auto;gap:8px;background:none;border:0;padding:4px 6px;border-radius:3px}
+.olist button:hover,.olist button[aria-pressed=true]{background:#121837}
+.olist .d{font-family:var(--f-mono);font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.note{font-size:12px;color:var(--muted);line-height:1.65}
+.note a{color:var(--focus)}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;font-size:11.5px;letter-spacing:.02em;padding:0 5px;border-radius:3px;
+  background:rgba(3,4,10,.55);color:var(--ink);will-change:transform}
+.lbl small{color:var(--muted);font-size:10.5px;margin-left:4px}
+.lbl.shell{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);background:none}
+.lbl.sel{outline:1px solid currentColor}
+.card{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:12px;width:min(340px,calc(100% - 24px));
+  background:rgba(9,11,22,.92);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(6px)}
+.card .kind{font-size:11px;letter-spacing:.08em;display:flex;align-items:center;gap:6px}
+.card h3{font-family:var(--f-display);font-size:18px;font-weight:600;margin:0;line-height:1.35}
+.card .dist{font-family:var(--f-mono);font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.card .meta{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.card p{font-size:13px;color:#cdd0e6}
+.card .x{position:absolute;right:8px;top:6px;background:none;border:0;color:var(--muted);font-size:16px;padding:2px 6px}
+.hint{position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:10px;font-size:11.5px;color:var(--muted);
+  background:rgba(3,4,10,.6);padding:3px 8px;border-radius:3px;pointer-events:none}
+.err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--muted)}
+</style>
+
+<div class="app">
+  <aside class="panel">
+    <header>
+      <div class="eyebrow">太陽系から宇宙の果てまで</div>
+      <h1>宇宙の地図</h1>
+      <p class="lead">地球型惑星の候補は、すべて太陽から約2,000光年の内側にあります。これは直径10万光年の天の川銀河のごく一部です。この地図では、その外側にある局部銀河群、銀河団や超銀河団、遠方の銀河、そして465億光年先の観測可能な宇宙の果て（宇宙マイクロ波背景放射）まで、実際の方向と距離で並べています。</p>
+    </header>
+
+    <section aria-labelledby="h-view">
+      <h2 id="h-view">地図</h2>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-log" aria-selected="true">宇宙全体<br><small>対数スケール</small></button>
+        <button type="button" role="tab" id="tab-gal" aria-selected="false">天の川銀河<br><small>実寸スケール</small></button>
+      </div>
+      <p class="note" id="view-note" style="margin-top:10px"></p>
+    </section>
+
+    <section aria-labelledby="h-ladder" id="sec-ladder">
+      <h2 id="h-ladder">スケールの梯子</h2>
+      <ul class="ladder" id="ladder"></ul>
+    </section>
+
+    <section aria-labelledby="h-cats">
+      <h2 id="h-cats">表示</h2>
+      <div class="cats" id="cats"></div>
+    </section>
+
+    <section aria-labelledby="h-index">
+      <h2 id="h-index">天体の一覧</h2>
+      <div id="index"></div>
+    </section>
+
+    <section>
+      <p class="note">方向は赤経・赤緯（J2000）、距離は公開されている値の概数です。遠方の天体は「現在の距離」（共動距離）で置き、光が出た時期を別に記しています。天の川銀河の渦状腕と宇宙マイクロ波背景放射の模様は模式図です。惑星の位置は今日の日付から平均軌道で計算しています。</p>
+      <p class="note" style="margin-top:8px">観測可能な宇宙のさらに外側については、レポートの理論をもとにした <a href="https://claude.ai/artifact/LzNJcdt3uNfPMV54MgE2Fa" target="_blank" rel="noopener">D-brane 宇宙図</a> を参照してください。</p>
+    </section>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="labels" id="labels"></div>
+    <div class="hint">ドラッグで回転 · ホイール／ピンチでズーム · 天体をタップ</div>
+    <div class="card" id="card" hidden>
+      <button type="button" class="x" id="card-x" aria-label="閉じる">×</button>
+      <div class="kind" id="c-kind"></div>
+      <h3 id="c-name"></h3>
+      <div class="dist" id="c-dist"></div>
+      <div class="meta" id="c-meta"></div>
+      <p id="c-desc"></p>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const stage = document.getElementById('stage');
+if (!window.THREE || !THREE.OrbitControls){ const e = document.createElement('div'); e.className = 'err';
+  e.textContent = '3D ライブラリを読み込めませんでした。ネットワーク接続を確認して再読み込みしてください。'; stage.appendChild(e); return; }
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const V = THREE.Vector3, TAU = Math.PI*2, D2R = Math.PI/180, AU_PER_LY = 63241.1;
+
+/* ---------- categories ---------- */
+const CATS = {
+  sun:{ja:'太陽系', c:'#ffc95a'}, planet:{ja:'地球型惑星候補', c:'#5fe3a1'}, star:{ja:'恒星・星雲', c:'#e6ecff'},
+  milky:{ja:'天の川銀河', c:'#8fc2ff'}, local:{ja:'局部銀河群', c:'#b49cff'}, nearby:{ja:'近傍の銀河', c:'#de9cff'},
+  cluster:{ja:'銀河団・大規模構造', c:'#ff8fc4'}, deep:{ja:'遠方の宇宙', c:'#ff9f5a'},
+};
+
+/* ---------- objects: [name, cat, RA(h), Dec(°), distance(ly), description, extra] ---------- */
+const OBJ = [
+  ['プロキシマ・ケンタウリ b','planet',14.4953,-62.68,4.24,'太陽に最も近い恒星プロキシマ・ケンタウリのハビタブルゾーンを回る、地球程度の質量の惑星。','M5.5V 赤色矮星'],
+  ['ロス128 b','planet',11.796,0.80,11.0,'活動の穏やかな赤色矮星ロス128を回る温暖な惑星。','M4V 赤色矮星'],
+  ['GJ 1061 d','planet',3.600,-44.51,12.0,'赤色矮星 GJ 1061 の温暖帯にある岩石惑星の候補。','M5.5V 赤色矮星'],
+  ['ルイテン b','planet',7.457,5.23,12.2,'ルイテン星（GJ 273）のハビタブルゾーンを回るスーパーアース。','M3.5V 赤色矮星'],
+  ['ティーガーデン星 b','planet',2.884,16.88,12.5,'地球に近い質量をもつ、ティーガーデン星の温暖な惑星。','M7V 赤色矮星'],
+  ['ウルフ1061 c','planet',16.505,-12.66,14.0,'ウルフ1061のハビタブルゾーン内側の縁にあるスーパーアース。','M3V 赤色矮星'],
+  ['グリーゼ1002 b','planet',0.112,-7.54,15.8,'近くの赤色矮星を回る、地球程度の質量の温暖な惑星。','M5.5V 赤色矮星'],
+  ['グリーゼ667 Cc','planet',17.316,-34.99,23.6,'三重連星グリーゼ667のC星を回るスーパーアース。','M1.5V 赤色矮星'],
+  ['グリーゼ12 b','planet',0.264,13.56,40,'2024年に発見。地球と金星の中間ほどの温度をもつ地球サイズの惑星。','M4V 赤色矮星'],
+  ['TRAPPIST-1 e・f・g','planet',23.108,-5.04,40.7,'7つの地球サイズ惑星のうち、e・f・g の3つがハビタブルゾーンにある。','M8V 超低温矮星'],
+  ['LHS 1140 b','planet',0.750,-15.27,48.8,'水に富む可能性があるスーパーアース。JWST が大気を観測している。','M4.5V 赤色矮星'],
+  ['TOI-700 d','planet',6.473,-65.58,101.4,'TESS 衛星が見つけた、地球サイズのハビタブルゾーン惑星。','M2V 赤色矮星'],
+  ['K2-18 b','planet',11.504,7.59,124,'大気に水蒸気やメタンが検出されたサブネプチューン。','M2.5V 赤色矮星'],
+  ['ケプラー1649 c','planet',19.500,41.82,301,'地球とほぼ同じ大きさで、受ける光は地球の約75%。','M5V 赤色矮星'],
+  ['ケプラー186 f','planet',19.910,43.95,579,'ハビタブルゾーンで初めて見つかった地球サイズの惑星（2014年）。','M1V 赤色矮星'],
+  ['ケプラー22 b','planet',19.281,47.88,640,'ケプラー宇宙望遠鏡がハビタブルゾーンで初めて確認した惑星。','G5V 太陽型星'],
+  ['ケプラー62 f','planet',18.881,45.35,990,'半径が地球の約1.4倍のハビタブルゾーン惑星。','K2V 橙色矮星'],
+  ['ケプラー442 b','planet',19.024,39.28,1206,'地球との類似度が高いとされる、橙色矮星のスーパーアース。','K 型 橙色矮星'],
+  ['ケプラー452 b','planet',19.734,44.28,1800,'太陽によく似た星を385日で回る「地球のいとこ」。','G2V 太陽型星'],
+
+  ['ケンタウルス座α星 A・B','star',14.660,-60.83,4.37,'太陽に最も近い恒星系。プロキシマを含む三重星。'],
+  ['バーナード星','star',17.963,4.69,5.96,'全天で最も速く位置を変えて見える赤色矮星。'],
+  ['シリウス','star',6.753,-16.72,8.6,'夜空で最も明るい恒星。'],
+  ['ベガ（織姫星）','star',18.616,38.78,25,'こと座の一等星。七夕の織姫星。'],
+  ['北極星','star',2.530,89.26,433,'こぐま座α星。天の北極のすぐ近くにある。'],
+  ['すばる（プレアデス）','star',3.790,24.12,444,'若い星が集まる散開星団。'],
+  ['ベテルギウス','star',5.919,7.41,550,'オリオン座の赤色超巨星。距離の推定には幅がある。'],
+  ['オリオン大星雲','star',5.588,-5.39,1344,'いまも星が生まれている、最も近い大きな星形成領域。'],
+  ['かに星雲','star',5.576,22.01,6500,'1054年に観測された超新星の残骸。中心にパルサーがある。'],
+  ['りゅうこつ座η星','star',10.751,-59.68,7500,'太陽の約100倍の質量をもつ、不安定な大質量星。'],
+  ['オメガ星団','star',13.446,-47.48,17100,'天の川銀河で最大の球状星団。約1000万個の星が集まる。'],
+
+  ['いて座A*（銀河中心）','milky',17.761,-29.01,26700,'天の川銀河の中心にある、太陽の約400万倍の質量のブラックホール。'],
+  ['いて座矮小楕円銀河','milky',18.920,-30.50,65000,'天の川銀河に引き裂かれ、飲み込まれつつある矮小銀河。'],
+  ['大マゼラン雲','milky',5.393,-69.76,160000,'天の川銀河の伴銀河。南半球の空に雲のように見える。'],
+  ['小マゼラン雲','milky',0.879,-72.83,200000,'天の川銀河の伴銀河。大マゼラン雲と対になって見える。'],
+
+  ['しし座 I','local',10.141,12.31,820000,'天の川銀河の遠い伴銀河の一つ。'],
+  ['NGC 6822（バーナード銀河）','local',19.749,-14.80,1.6e6,'局部銀河群の不規則矮小銀河。'],
+  ['IC 1613','local',1.080,2.12,2.4e6,'局部銀河群の不規則矮小銀河。'],
+  ['アンドロメダ銀河 M31','local',0.712,41.27,2.54e6,'天の川銀河と同じくらいの大きな渦巻銀河。約45億年後に天の川銀河と衝突すると予測されている。'],
+  ['さんかく座銀河 M33','local',1.564,30.66,2.73e6,'局部銀河群で3番目に大きい渦巻銀河。'],
+
+  ['ちょうこくしつ座銀河 NGC 253','nearby',0.793,-25.29,11.4e6,'激しく星を作っているスターバースト銀河。'],
+  ['M81（ボーデの銀河）','nearby',9.926,69.07,11.8e6,'おおぐま座の渦巻銀河。隣の M82 と重力で影響し合う。'],
+  ['ケンタウルス座A','nearby',13.424,-43.02,12e6,'強い電波を出す巨大楕円銀河。中心からジェットが噴き出す。'],
+  ['回転花火銀河 M101','nearby',14.054,54.35,21e6,'正面を向いた大きな渦巻銀河。'],
+  ['子持ち銀河 M51','nearby',13.498,47.20,23e6,'小さな伴銀河と相互作用している渦巻銀河。'],
+  ['ソンブレロ銀河 M104','nearby',12.667,-11.62,31e6,'帽子のような形の、暗黒帯をもつ銀河。'],
+
+  ['おとめ座銀河団（M87）','cluster',12.450,12.72,54e6,'最も近い大きな銀河団。中心の M87 のブラックホールは2019年に撮影された。'],
+  ['ろ座銀河団','cluster',3.633,-35.45,62e6,'南天にある近くの銀河団。'],
+  ['グレートアトラクター（じょうぎ座銀河団）','cluster',16.25,-60.9,220e6,'周りの銀河の流れが集まる重力の中心。ラニアケア超銀河団の中心付近。'],
+  ['ペルセウス座銀河団','cluster',3.300,41.51,240e6,'X線で明るく光る高温ガスに包まれた銀河団。'],
+  ['かみのけ座銀河団','cluster',12.997,27.98,321e6,'暗黒物質の存在が初めて指摘された銀河団（ツビッキー、1933年）。'],
+  ['ヘルクレス座銀河団','cluster',16.08,17.75,500e6,'渦巻銀河が多く、衝突中の銀河も多い銀河団。'],
+  ['シャプレー超銀河団','cluster',13.42,-31.0,650e6,'近くの宇宙で最も重い構造の一つ。'],
+  ['うしかい座ボイド','cluster',14.83,46.0,700e6,'直径約3億光年の、銀河がほとんどない巨大な空洞。'],
+  ['スローン・グレートウォール','cluster',13.0,4.0,1.0e9,'長さ約14億光年にわたって銀河が壁のように連なる構造。'],
+  ['クエーサー 3C 273','deep',12.485,2.05,2.1e9,'最初に正体が分かったクエーサー。超大質量ブラックホールが輝く。','赤方偏移 z≈0.16 · 光は約24億年前に出た'],
+  ['ヘルクレス座・かんむり座グレートウォール','deep',16.0,30.0,15.5e9,'差し渡し約100億光年とされる最大級の構造。存在には議論がある。','z≈1.6〜2.1 · 光は約100億年前に出た'],
+  ['GN-z11','deep',12.607,62.24,32e9,'ハッブル宇宙望遠鏡で見つかった初期宇宙の明るい銀河。','z≈10.6 · 光は約134億年前に出た'],
+  ['JADES-GS-z14-0','deep',3.539,-27.87,33.6e9,'2024年に JWST で確認された、最も遠い銀河の一つ。','z≈14.3 · 光は約135億年前に出た'],
+];
+
+/* ---------- formatting ---------- */
+function fmtLy(ly){
+  if (ly < 0.05){ const au = ly*AU_PER_LY; return (au < 10 ? au.toFixed(2) : Math.round(au).toLocaleString('ja-JP')) + ' AU'; }
+  if (ly < 1e4) return (ly < 100 ? (+ly.toFixed(2)).toString() : Math.round(ly).toLocaleString('ja-JP')) + ' 光年';
+  if (ly < 1e8) return (+(ly/1e4).toPrecision(3)).toString() + '万光年';
+  return (+(ly/1e8).toPrecision(3)).toString() + '億光年';
+}
+const raStr = h => { const H = Math.floor(h), m = Math.round((h - H)*60); return `${H}h${String(m).padStart(2,'0')}m`; };
+const decStr = d => `${d < 0 ? '−' : '+'}${Math.abs(d).toFixed(1)}°`;
+
+/* ---------- coordinate frames ---------- */
+// equatorial (X→vernal equinox, Z→celestial north) to three.js (y up)
+const eq3 = (X, Y, Z) => new V(X, Z, -Y);
+function eqDir(raH, decD){ const a = raH*15*D2R, d = decD*D2R; return [Math.cos(d)*Math.cos(a), Math.cos(d)*Math.sin(a), Math.sin(d)]; }
+const EPS = 23.4393*D2R;
+function eclTo3(x, y, z){ return eq3(x, y*Math.cos(EPS) - z*Math.sin(EPS), y*Math.sin(EPS) + z*Math.cos(EPS)); }
+const RG = [[-0.0548755604,-0.8734370902,-0.4838350155],[0.4941094279,-0.4448296300,0.7469822445],[-0.8676661490,-0.1980763734,0.4559837762]];
+const eqToGal = e => RG.map(r => r[0]*e[0] + r[1]*e[1] + r[2]*e[2]);
+const GAL_X = eq3(...RG[0]), GAL_Y = eq3(...RG[1]), GAL_Z = eq3(...RG[2]); // galactic axes in the log map
+
+/* ---------- renderer ---------- */
+const renderer = new THREE.WebGLRenderer({antialias:true, logarithmicDepthBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x03040a, 1);
+stage.insertBefore(renderer.domElement, stage.firstChild);
+const PR = renderer.getPixelRatio();
+
+const glowTex = (()=>{ const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const r = g.createRadialGradient(32,32,0,32,32,32); r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(.22,'rgba(255,255,255,.6)'); r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
+const ringTex = (()=>{ const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(32,32,26,0,TAU); g.stroke(); return new THREE.CanvasTexture(c); })();
+function dot(color, size, opacity){ const s = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color, transparent:true, opacity:opacity ?? 1, depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:false}));
+  s.scale.set(size, size, 1); return s; }
+function ring(r, basisU, basisV, n, color, opacity){ const p = []; for (let i = 0; i <= n; i++){ const a = i/n*TAU; p.push(basisU.clone().multiplyScalar(r*Math.cos(a)).addScaledVector(basisV, r*Math.sin(a))); }
+  return new THREE.Line(new THREE.BufferGeometry().setFromPoints(p), new THREE.LineBasicMaterial({color, transparent:true, opacity, depthWrite:false})); }
+
+function makeView(camPos, maxD, minD){
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(45, 1, 1e-4, 5000);
+  camera.position.copy(camPos);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = .08; controls.autoRotate = !reduce; controls.autoRotateSpeed = .25;
+  controls.minDistance = minD; controls.maxDistance = maxD; controls.zoomSpeed = 1.2; controls.enabled = false;
+  return {scene, camera, controls, pickables:[], labels:[], home:camPos.clone()};
+}
+
+/* =================== VIEW 1: logarithmic map of the universe =================== */
+const K = 3, R = au => K*(Math.log10(au) + 1);            // 0.1 AU → 0 ; 1 decade = 3 units
+const Rly = ly => R(ly*AU_PER_LY);
+const LOG = makeView(new V(62, 44, 92), 260, 0.5);
+const objects = [];
+{ const s = LOG.scene;
+  s.add(new THREE.AmbientLight(0xffffff, 1));
+  // Sun
+  const sun = dot('#ffd98a', .06); s.add(sun); s.add(dot('#ffb84a', .14, .35));
+  objects.push({name:'太陽', cat:'sun', ly:0, desc:'太陽系の中心。この地図の原点です。', meta:'G2V 恒星', logPos:new V(), noIndex:true});
+  // planets on today's mean orbits
+  const days = (Date.now() - Date.UTC(2000,0,1,12))/864e5;
+  const PL = [['水星',.387,252.25,4.09233],['金星',.723,181.98,1.60213],['地球',1,100.46,.985609],['火星',1.524,355.45,.524033],
+              ['木星',5.203,34.40,.083091],['土星',9.537,49.94,.033494],['天王星',19.19,313.23,.011733],['海王星',30.07,304.88,.005995]];
+  const ex = eclTo3(1,0,0), ey = eclTo3(0,1,0);
+  PL.forEach(([n, a, L0, rate]) => { s.add(ring(R(a), ex, ey, 160, '#ffc95a', n === '地球' ? .55 : .22));
+    const L = ((L0 + rate*days) % 360)*D2R, p = ex.clone().multiplyScalar(Math.cos(L)).addScaledVector(ey, Math.sin(L)).multiplyScalar(R(a));
+    objects.push({name:n, cat:'sun', ly:a/AU_PER_LY, desc: n === '地球' ? '私たちの惑星。生命が確認されている唯一の場所。' : `太陽からの平均距離 ${a} AU。位置は今日の日付から計算した平均軌道上の点です。`, meta:`公転半径 ${a} AU`, logPos:p, au:a}); });
+  objects.push({name:'ボイジャー1号', cat:'sun', ly:169/AU_PER_LY, desc:'1977年に打ち上げられた探査機。人類が作った最も遠い物体で、2012年に太陽圏を出た。', meta:'へびつかい座方向 · 約169 AU', logPos:eq3(...eqDir(17.22, 12.0)).multiplyScalar(R(169))});
+  // catalogue objects
+  OBJ.forEach(([name, cat, ra, dec, ly, desc, extra]) => { const e = eqDir(ra, dec);
+    objects.push({name, cat, ly, desc, meta:(extra ? extra + ' · ' : '') + `赤経 ${raStr(ra)} 赤緯 ${decStr(dec)}`, eq:e, logPos:eq3(...e).multiplyScalar(Rly(ly))}); });
+  // galactic plane disk (the Milky Way band) out to 100,000 ly
+  const dc = document.createElement('canvas'); dc.width = dc.height = 256; const g = dc.getContext('2d');
+  const gr = g.createRadialGradient(128,128,0,128,128,128); gr.addColorStop(0,'rgba(143,194,255,0)'); gr.addColorStop(.55,'rgba(143,194,255,.05)'); gr.addColorStop(.97,'rgba(143,194,255,.16)'); gr.addColorStop(1,'rgba(143,194,255,0)');
+  g.fillStyle = gr; g.fillRect(0,0,256,256);
+  const disk = new THREE.Mesh(new THREE.CircleGeometry(Rly(1e5), 96), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(dc), transparent:true, side:THREE.DoubleSide, depthWrite:false}));
+  disk.applyMatrix4(new THREE.Matrix4().makeBasis(GAL_X, GAL_Y, GAL_Z)); disk.userData.cat = 'milky'; s.add(disk);
+  const gl = ring(Rly(1e5), GAL_X, GAL_Y, 200, '#8fc2ff', .35); gl.userData.cat = 'milky'; s.add(gl);
+  // CMB: last-scattering surface (pattern is illustrative)
+  const cc = document.createElement('canvas'); cc.width = 1024; cc.height = 512; const cg = cc.getContext('2d');
+  cg.fillStyle = '#1a0e1a'; cg.fillRect(0,0,1024,512);
+  let sd = 11; const rr = () => (sd = (sd*16807) % 2147483647)/2147483647;
+  for (let i = 0; i < 5200; i++){ const x = rr()*1024, y = rr()*512, rad = 4 + rr()*22, t = rr();
+    const col = t < .5 ? `rgba(40,90,${180 + t*120|0},.16)` : `rgba(${200 + (t - .5)*110|0},${70 + (1 - t)*120|0},40,.16)`;
+    const rg = cg.createRadialGradient(x,y,0,x,y,rad); rg.addColorStop(0,col); rg.addColorStop(1,'rgba(0,0,0,0)'); cg.fillStyle = rg; cg.fillRect(x - rad, y - rad, rad*2, rad*2); }
+  const cmb = new THREE.Mesh(new THREE.SphereGeometry(Rly(45.7e9), 96, 48), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cc), side:THREE.BackSide, transparent:true, opacity:.75, depthWrite:false}));
+  s.add(cmb); LOG.cmb = cmb;
+}
+const SHELLS = [
+  ['地球の軌道', 1/AU_PER_LY], ['海王星の軌道', 30.07/AU_PER_LY], ['太陽圏の境界（ヘリオポーズ）', 120/AU_PER_LY], ['オールトの雲', 1.5],
+  ['近くの恒星', 10], ['地球型惑星候補の範囲', 2000], ['天の川銀河', 1e5], ['局部銀河群', 1e7], ['ラニアケア超銀河団', 5.2e8],
+  ['宇宙マイクロ波背景放射', 45.7e9], ['観測可能な宇宙', 46.5e9],
+];
+{ const s = LOG.scene, up = new V(0,1,0);
+  SHELLS.forEach(([n, ly], i) => { const r = Rly(ly);
+    if (i >= 3 && i < 9){ const g = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 24), new THREE.MeshBasicMaterial({color:'#7f88c0', wireframe:true, transparent:true, opacity:.035, depthWrite:false})); s.add(g); }
+    if (i >= 2){ s.add(ring(r, new V(1,0,0), new V(0,0,1), 180, '#8a90b2', i === 10 ? .5 : .22)); }
+    LOG.labels.push({html:`${n} <small>${fmtLy(ly)}</small>`, cls:'shell', pos:new V(0, r + .3, 0).applyAxisAngle(new V(0,0,1), -.35), pri:5, cat:'_shell'}); });
+}
+
+/* =================== VIEW 2: the Milky Way (1 unit = 1,000 ly) =================== */
+const R0 = 26.7;                               // Sun–centre distance (thousand ly)
+const gal3 = (x, y, z) => new V(x, z, -y);      // galactocentric (x→GC from Sun, z→NGP) to three.js
+const SUN_G = gal3(-R0, 0, 0);
+const GAL = makeView(new V(-30, 78, 44), 420, 0.002);
+GAL.controls.target.set(-6, 0, 0); GAL.homeTarget = new V(-6, 0, 0);
+const ARMS = [
+  {ja:'ペルセウス腕', rs:33.0, lab:38}, {ja:'たて・ケンタウルス腕', rs:16.9, lab:19},
+  {ja:'いて・りゅうこつ腕', rs:21.5, lab:24}, {ja:'じょうぎ腕 → 外縁腕', rs:11.0, lab:43},
+];
+const PITCH = Math.tan(13*D2R);
+const armXY = (rs, r) => { const th = Math.PI + Math.log(r/rs)/PITCH; return [r*Math.cos(th), r*Math.sin(th)]; };
+{ const s = GAL.scene; let sd = 5; const rnd = () => (sd = (sd*16807) % 2147483647)/2147483647;
+  const gauss = () => { let u = 0; for (let i = 0; i < 4; i++) u += rnd(); return (u - 2)*1.22; };
+  const P = [], C = [], push = (x, y, z, r, g, b) => { const v = gal3(x, y, z); P.push(v.x, v.y, v.z); C.push(r, g, b); };
+  for (let i = 0; i < 9000; i++){ const r = -11*Math.log(1 - rnd()*.985), a = rnd()*TAU, k = .1 + rnd()*.1; push(r*Math.cos(a), r*Math.sin(a), gauss()*.5, k*.8, k*.85, k); }
+  for (let i = 0; i < 7000; i++){ const k = .55 + rnd()*.4; push(gauss()*2.6, gauss()*2.6, gauss()*1.6, k, k*.78, k*.5); }
+  const bar = 27*D2R; for (let i = 0; i < 6000; i++){ const u = gauss()*7.5, w = gauss()*1.5, k = .5 + rnd()*.4; push(-u*Math.cos(bar) - w*Math.sin(bar), u*Math.sin(bar) - w*Math.cos(bar), gauss()*.7, k, k*.8, k*.55); }
+  ARMS.forEach((A, j) => { const big = j < 2;
+    for (let i = 0; i < (big ? 9000 : 6000); i++){ const r = 11 + Math.pow(rnd(), 1.15)*39, [x, y] = armXY(A.rs, r), sc = .55 + .028*r, hii = rnd() < .05;
+      const k = hii ? 1 : .45 + rnd()*.5; push(x + gauss()*sc, y + gauss()*sc, gauss()*.35, hii ? 1 : k*.75, hii ? .45 : k*.88, hii ? .7 : k); }
+    const [lx, ly] = armXY(A.rs, A.lab); GAL.labels.push({html:A.ja, pos:gal3(lx, ly, .8), pri:2, color:'#9fc6ff', cat:'milky'}); });
+  const sp = [.17, .98]; for (let i = 0; i < 2200; i++){ const t = gauss()*3.2, k = .5 + rnd()*.4; push(-R0 + sp[0]*t + gauss()*.45, sp[1]*t + gauss()*.45, gauss()*.25, k*.8, k*.9, k); }
+  GAL.labels.push({html:'オリオン腕（局所腕）', pos:gal3(-R0 + sp[0]*4.6, sp[1]*4.6, .6), pri:2, color:'#9fc6ff', cat:'milky'});
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({size:1.7*PR, sizeAttenuation:false, vertexColors:true, map:glowTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}));
+  pts.userData.cat = 'milky'; s.add(pts);
+  s.add(dot('#ffe0a0', .05));
+  GAL.labels.push({html:'銀河中心 いて座A*', pos:new V(0, 1.4, 0), pri:1, color:'#ffe0a0', cat:'milky'});
+  // the Sun and the 2,000-ly bubble that holds every known Earth-like candidate
+  const sun = dot('#ffd98a', .035); sun.position.copy(SUN_G); s.add(sun);
+  const bub = new THREE.Mesh(new THREE.SphereGeometry(2, 24, 12), new THREE.MeshBasicMaterial({color:'#5fe3a1', wireframe:true, transparent:true, opacity:.14, depthWrite:false}));
+  bub.position.copy(SUN_G); bub.userData.cat = 'planet'; s.add(bub);
+  GAL.labels.push({html:'太陽 <small>中心から約2.67万光年</small>', pos:SUN_G.clone().add(new V(0, -.9, 0)), pri:0, color:'#ffd98a', cat:'sun'});
+  GAL.labels.push({html:'地球型惑星候補はすべてこの球の中 <small>半径2,000光年</small>', pos:SUN_G.clone().add(new V(0, 2.5, 0)), pri:1, color:'#5fe3a1', cat:'planet'});
+  GAL.labels.push({html:'直径 約10万光年', pos:gal3(0, -50, 0), pri:6, color:'#8a90b2', cat:'milky'});
+  s.add(ring(50, new V(1,0,0), new V(0,0,1), 200, '#8fc2ff', .18));
+  // pointer toward Andromeda (off the map)
+  const m31 = OBJ.find(o => o[0].startsWith('アンドロメダ')), gd = eqToGal(eqDir(m31[2], m31[3])), dir = gal3(...gd).normalize();
+  const end = SUN_G.clone().addScaledVector(dir, 95);
+  const al = new THREE.Line(new THREE.BufferGeometry().setFromPoints([SUN_G, end]), new THREE.LineDashedMaterial({color:'#b49cff', dashSize:1.4, gapSize:1, transparent:true, opacity:.6}));
+  al.computeLineDistances(); al.userData.cat = 'local'; s.add(al);
+  GAL.labels.push({html:'→ アンドロメダ銀河 <small>254万光年先（この縮尺で約2.5 km）</small>', pos:end, pri:1, color:'#b49cff', cat:'local'});
+}
+
+/* ---------- sprites for objects, in both views ---------- */
+objects.forEach(o => {
+  const col = CATS[o.cat].c, big = o.cat === 'sun' ? .018 : .02;
+  o.logSprite = dot(col, o.name === '太陽' ? .001 : big); o.logSprite.position.copy(o.logPos); o.logSprite.userData.obj = o;
+  if (o.name !== '太陽'){ LOG.scene.add(o.logSprite); LOG.pickables.push(o.logSprite); }
+  LOG.labels.push({html:o.name, pos:o.logPos, pri: o.cat === 'deep' || o.cat === 'cluster' ? 3 : 4, color:col, cat:o.cat, obj:o});
+  if (o.eq && o.ly <= 3e5){ const g = eqToGal(o.eq), d = o.ly/1000;
+    o.galPos = SUN_G.clone().add(gal3(g[0]*d, g[1]*d, g[2]*d));
+    o.galSprite = dot(col, .016); o.galSprite.position.copy(o.galPos); o.galSprite.userData.obj = o; GAL.scene.add(o.galSprite); GAL.pickables.push(o.galSprite);
+    GAL.labels.push({html:o.name, pos:o.galPos, pri: o.cat === 'milky' ? 1 : 4, color:col, cat:o.cat, obj:o}); }
+});
+const selRing = new THREE.Sprite(new THREE.SpriteMaterial({map:ringTex, color:'#ffffff', transparent:true, depthWrite:false, sizeAttenuation:false}));
+selRing.scale.set(.05, .05, 1); selRing.visible = false;
+let selLine = null;
+
+/* ---------- labels (projected HTML, de-cluttered by priority) ---------- */
+const labelBox = document.getElementById('labels');
+[LOG, GAL].forEach(Vw => { Vw.labels.sort((a, b) => a.pri - b.pri); Vw.labels.forEach(L => { const d = document.createElement('div'); d.className = 'lbl' + (L.cls ? ' ' + L.cls : ''); d.innerHTML = L.html;
+  if (L.color) d.style.color = L.color; d.hidden = true; labelBox.appendChild(d); L.d = d; }); });
+const tmp = new V();
+function placeLabels(Vw, other){
+  other.labels.forEach(L => L.d.hidden = true);
+  const w = stage.clientWidth, h = stage.clientHeight, placed = [];
+  const order = selected ? [Vw.labels.find(L => L.obj === selected), ...Vw.labels.filter(L => L.obj !== selected)].filter(Boolean) : Vw.labels;
+  for (const L of order){
+    if (L.cat !== '_shell' && !catOn[L.cat]){ L.d.hidden = true; continue; }
+    tmp.copy(L.pos).project(Vw.camera);
+    if (tmp.z > 1 || Math.abs(tmp.x) > 1.05 || Math.abs(tmp.y) > 1.05){ L.d.hidden = true; continue; }
+    const x = (tmp.x*.5 + .5)*w + (L.cls ? 0 : 8), y = (-tmp.y*.5 + .5)*h - 9;
+    const lw = (L.tw ??= L.d.textContent.length*11.5 + 12), box = [x, y, x + lw, y + 18];
+    const isSel = L.obj && L.obj === selected;
+    if (!isSel && placed.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])){ L.d.hidden = true; continue; }
+    placed.push(box); L.d.hidden = false; L.d.classList.toggle('sel', !!isSel);
+    L.d.style.transform = `translate(${x}px, ${y}px)`;
+  }
+}
+
+/* ---------- state, panel ---------- */
+let view = LOG, selected = null, fly = null;
+const catOn = {}; Object.keys(CATS).forEach(k => catOn[k] = true);
+const catsEl = document.getElementById('cats');
+Object.entries(CATS).forEach(([k, c]) => { const l = document.createElement('label'); l.className = 'chk';
+  l.innerHTML = `<input type="checkbox" id="cat-${k}" checked><i class="sw" style="background:${c.c};color:${c.c}"></i>${c.ja}`;
+  l.querySelector('input').addEventListener('change', e => { catOn[k] = e.target.checked; applyCats(); }); catsEl.appendChild(l); });
+function applyCats(){
+  objects.forEach(o => { const on = catOn[o.cat]; if (o.logSprite) o.logSprite.visible = on && o.name !== '太陽'; if (o.galSprite) o.galSprite.visible = on; });
+  [LOG.scene, GAL.scene].forEach(s => s.children.forEach(c => { if (c.userData.cat) c.visible = catOn[c.userData.cat]; }));
+}
+const idx = document.getElementById('index');
+const idxButtons = [];
+Object.entries(CATS).forEach(([k, c]) => { const list = objects.filter(o => o.cat === k && !o.noIndex); if (!list.length) return;
+  const d = document.createElement('details'); if (k === 'planet') d.open = true;
+  d.innerHTML = `<summary><i class="sw" style="background:${c.c};color:${c.c}"></i>${c.ja}<span class="n">${list.length}</span></summary><div class="olist"></div>`;
+  list.forEach(o => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed','false');
+    b.innerHTML = `<span>${o.name}</span><span class="d">${fmtLy(o.ly)}</span>`; b.addEventListener('click', () => select(o, true)); o.btn = b; idxButtons.push(b);
+    d.querySelector('.olist').appendChild(b); });
+  idx.appendChild(d); });
+const ladder = document.getElementById('ladder');
+SHELLS.forEach(([n, ly]) => { const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+  b.innerHTML = `<span>${n}</span><span class="d">${fmtLy(ly)}</span>`;
+  b.addEventListener('click', () => { if (view !== LOG) setView(LOG); const r = Rly(ly), dir = LOG.camera.position.clone().sub(LOG.controls.target).normalize();
+    flyTo(LOG, dir.multiplyScalar(Math.max(r*2.3, 2.2)), new V()); });
+  li.appendChild(b); ladder.appendChild(li); });
+
+const card = document.getElementById('card');
+function select(o, move){
+  selected = o; idxButtons.forEach(b => b.setAttribute('aria-pressed', b === o?.btn ? 'true' : 'false'));
+  if (!o){ card.hidden = true; selRing.visible = false; if (selLine){ selLine.parent?.remove(selLine); selLine = null; } return; }
+  let pos = view === GAL ? o.galPos : o.logPos;
+  if (!pos){ setView(LOG); pos = o.logPos; }
+  const c = CATS[o.cat].c;
+  document.getElementById('c-kind').innerHTML = `<i class="sw" style="background:${c};color:${c}"></i><span style="color:${c}">${CATS[o.cat].ja}</span>`;
+  document.getElementById('c-name').textContent = o.name;
+  document.getElementById('c-dist').textContent = o.ly ? `太陽からの距離 ${fmtLy(o.ly)}` : '';
+  document.getElementById('c-meta').textContent = o.meta || '';
+  document.getElementById('c-desc').textContent = o.desc;
+  card.hidden = false;
+  selRing.material.color.set(c); selRing.position.copy(pos); selRing.visible = true; view.scene.add(selRing);
+  if (selLine) selLine.parent?.remove(selLine);
+  const origin = view === GAL ? SUN_G : new V();
+  selLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([origin, pos]), new THREE.LineBasicMaterial({color:c, transparent:true, opacity:.45, depthWrite:false}));
+  view.scene.add(selLine);
+  if (move){ const span = view === GAL ? Math.max(.03, Math.min(40, (o.ly/1000)*2.2 + .02)) : Math.max(2.5, pos.length()*.55);
+    const dir = view.camera.position.clone().sub(view.controls.target).normalize();
+    flyTo(view, pos.clone().addScaledVector(dir, span), pos.clone()); }
+}
+document.getElementById('card-x').addEventListener('click', () => select(null));
+
+const tabLog = document.getElementById('tab-log'), tabGal = document.getElementById('tab-gal'), note = document.getElementById('view-note');
+const NOTES = {
+  log:'中心が太陽で、外へ1目盛り進むごとに距離が10倍になります。内側から惑星の軌道、近くの恒星、地球型惑星候補、天の川銀河、局部銀河群、超銀河団と続き、いちばん外側の殻が宇宙マイクロ波背景放射です。青い円盤は天の川銀河の面です。',
+  gal:'天の川銀河を上（銀河北極側）から見た実寸の地図です。1目盛りは1,000光年。太陽の周りの緑の球（半径2,000光年）の中に、知られている地球型惑星候補がすべて入っています。太陽へズームすると個々の惑星が見えます。',
+};
+function setView(Vw){
+  if (view === Vw && Vw.controls.enabled) return;
+  view.controls.enabled = false; view = Vw; Vw.controls.enabled = true;
+  tabLog.setAttribute('aria-selected', Vw === LOG); tabGal.setAttribute('aria-selected', Vw === GAL);
+  note.textContent = Vw === LOG ? NOTES.log : NOTES.gal;
+  document.getElementById('sec-ladder').hidden = Vw !== LOG;
+  const s = selected; select(null); if (s && (Vw === LOG || s.galPos)) select(s, false);
+  resize();
+}
+tabLog.addEventListener('click', () => setView(LOG));
+tabGal.addEventListener('click', () => setView(GAL));
+
+function flyTo(Vw, pos, target){ fly = {Vw, p0:Vw.camera.position.clone(), t0:Vw.controls.target.clone(), p1:pos, t1:target, s:performance.now()}; }
+
+/* ---------- picking ---------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); let down = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
+  const r = renderer.domElement.getBoundingClientRect(); ndc.set((e.clientX - r.left)/r.width*2 - 1, -(e.clientY - r.top)/r.height*2 + 1);
+  ray.setFromCamera(ndc, view.camera);
+  const hits = ray.intersectObjects(view.pickables.filter(p => p.visible), false);
+  if (hits.length) select(hits[0].object.userData.obj, false);
+});
+
+/* ---------- loop ---------- */
+function resize(){ const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false);
+  [LOG, GAL].forEach(Vw => { Vw.camera.aspect = w/h; Vw.camera.fov = w/h < 1 ? Math.min(70, 45/Math.max(w/h, .5)*.8) : 45; Vw.camera.updateProjectionMatrix(); }); }
+new ResizeObserver(resize).observe(stage);
+setView(LOG); applyCats(); resize();
+const clock = new THREE.Clock();
+function frame(){
+  const t = clock.getElapsedTime();
+  if (fly){ const u = Math.min(1, (performance.now() - fly.s)/1400), e = u < .5 ? 4*u*u*u : 1 - Math.pow(-2*u + 2, 3)/2;
+    fly.Vw.camera.position.lerpVectors(fly.p0, fly.p1, e); fly.Vw.controls.target.lerpVectors(fly.t0, fly.t1, e); if (u >= 1) fly = null; }
+  if (selRing.visible) selRing.material.rotation = t*.6;
+  LOG.cmb.rotation.y = 0;
+  view.controls.update(); renderer.render(view.scene, view.camera); placeLabels(view, view === LOG ? GAL : LOG);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
