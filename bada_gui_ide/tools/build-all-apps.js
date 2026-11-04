@@ -32,7 +32,8 @@ const builds = [
   "build-anomaly-map.js",    // dist/anomaly-map.html
   "build-heat-sense.js",     // dist/heat-sense.html
   "build-bio-therm.js",      // dist/bio-therm.html
-  "build-aqua-vita.js"       // dist/aqua-vita.html
+  "build-aqua-vita.js",      // dist/aqua-vita.html
+  "build-quantum-contact.js" // dist/quantum-contact.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -168,6 +169,24 @@ it in any browser — no install, no dependencies, works offline.
                       accumulates live. .webm recording. Honest banner: no
                       mythical spring or tree found — these are the real
                       water and life-chemistry of the cosmos.
+  quantum-contact.html QuantumContact — 宇宙人コンタクト量子通信局: contact
+                      the way physics actually allows. A quantum computer's
+                      real job is the KEY: a live BB84 quantum-key-
+                      distribution demo (insert eavesdropper Eve and QBER
+                      jumps to ~25%, exposing her — the key is destroyed,
+                      exactly like real QKD). The sifted key becomes a
+                      trefoil Jones |V(e^{i theta})| quantum key that
+                      encrypts an Arecibo-format 23x73=1679-bit composed
+                      message (+UTF-8 text) into a downloadable .qmsg.
+                      Real targets with real METI history (Arecibo 1974 ->
+                      M13, Sonar Calling 2017 -> GJ 273b) and real link
+                      budgets (arrival year, earliest reply, beacon power);
+                      light-journey simulation with .webm recording. The
+                      Bada quantum engine exo/contact-bb84.bada (arrow
+                      syntax) runs in-browser to @@BB84-OK. Honest: zero
+                      contact as of 2026, entanglement cannot carry
+                      messages (no-communication theorem), and the app
+                      performs NO real transmission.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):

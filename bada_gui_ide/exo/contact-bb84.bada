@@ -1,0 +1,177 @@
+# ============================================================
+# contact-bb84.bada — 宇宙人コンタクトのための量子暗号エンジン
+#                     (BB84 量子鍵配送 + Jones 鍵 + 暗号化)
+#                     全面的に矢印オブジェクト構文で記述。
+#
+# 量子コンピューターでコンタクトを取る、の正直な物理:
+#   ・量子もつれ自体はメッセージを運べない (no-communication 定理)。
+#   ・量子計算機の実際の役割は「鍵」— BB84 量子鍵配送で盗聴不可能な
+#     共有鍵を作り、メッセージ本文は電磁波 (電波) で送る。
+#   ・盗聴者が割り込むと量子力学が QBER ≈ 25% の誤り率として
+#     それを暴露する — これが量子暗号の本体である。
+#   ・地球外文明との接触実績は 2026 年時点でゼロ。これは実在の
+#     METI 送信 (アレシボ 1974 → M13, Sónar Calling 2017 → GJ 273b)
+#     と同じ様式のメッセージを量子暗号で守る装置である。
+#
+# 矢印オブジェクト:  x <- v は束縛、[] で生まれた器への <- は流し込み。
+# 量子命令:          qubit / H / CNOT / Measure (測定台帳へコミット)。
+# ============================================================
+
+print("================================================================")
+print("CONTACT-BB84 BADA -- 量子鍵配送 x Jones鍵 x コンタクト暗号化")
+print("================================================================")
+
+PI <- 3.141592653589793
+
+# ---- 擬似乱数 (LCG): 量子統計 0.5/0.5 からのサンプリングに使う --------
+SEED <- 42.0
+def lcg(s) { return (s * 1103.0 + 12345.0) % 100003.0 }
+
+# ---- 量子統計の検証: H|0> の測定分布は厳密に 0.5 / 0.5 ----------------
+reg <- qubit(1)
+reg <- H(reg, 0)
+d <- Measure(reg)
+print("")
+print("[量子] H|0> の測定分布 |psi|^2 :", f5(d[0]), f5(d[1]), " (0.5/0.5 が正解)")
+
+# ---- BB84: アリス (地球) とボブ (受信者) の量子鍵配送 ------------------
+N <- 24
+abits <- []
+abase <- []
+bbase <- []
+bbits <- []
+s <- SEED
+i <- 0
+while (i < N) {
+    s <- lcg(s)
+    abits <- s % 2.0
+    s <- lcg(s)
+    abase <- s % 2.0
+    s <- lcg(s)
+    bbase <- s % 2.0
+    i <- i + 1
+}
+# ボブの測定: 基底が一致 -> 確率1で同じビット / 不一致 -> H分布 0.5 の硬貨
+i <- 0
+while (i < N) {
+    (abase[i] == bbase[i]) -> {
+        bbits <- abits[i]
+    } else {
+        s <- lcg(s)
+        bbits <- s % 2.0
+    }
+    i <- i + 1
+}
+# ふるい (sifting): 基底が一致した位置だけが鍵になる
+key <- []
+i <- 0
+while (i < N) {
+    (abase[i] == bbase[i]) -> { key <- abits[i] }
+    i <- i + 1
+}
+# QBER (盗聴なし): ふるい後の不一致率は厳密に 0
+err <- 0
+kept <- 0
+i <- 0
+while (i < N) {
+    (abase[i] == bbase[i]) -> {
+        kept <- kept + 1
+        (abits[i] != bbits[i]) -> { err <- err + 1 }
+    }
+    i <- i + 1
+}
+print("")
+print("[BB84] 量子ビット数:", N, " ふるい後の鍵長:", len(key), " QBER:", err, "/", kept, " (盗聴なし=0)")
+
+# ---- 盗聴者イヴ: 傍受再送攻撃は QBER ~ 25% として必ず露見する ----------
+eerr <- 0
+ekept <- 0
+i <- 0
+s2 <- SEED + 7.0
+while (i < N) {
+    s2 <- lcg(s2)
+    ebase <- s2 % 2.0
+    ebit <- abits[i]
+    (ebase != abase[i]) -> { s2 <- lcg(s2) ebit <- s2 % 2.0 }
+    bbit2 <- ebit
+    (abase[i] != ebase) -> { s2 <- lcg(s2) bbit2 <- s2 % 2.0 }
+    (abase[i] == bbase[i]) -> {
+        ekept <- ekept + 1
+        (bbit2 != abits[i]) -> { eerr <- eerr + 1 }
+    }
+    i <- i + 1
+}
+print("[BB84] 盗聴者イヴ挿入時の QBER:", eerr, "/", ekept, " (理論値 25% — 量子力学が盗聴を暴露)")
+print("       判定: QBER > 11% なら鍵を破棄して再配送 — これが量子暗号の防御")
+
+# ---- Bell 対の零保存: 配送路の完全性証明 (QKD 同型) --------------------
+bell <- qubit(2)
+bell <- H(bell, 0)
+bell <- CNOT(bell, 0, 1)
+bo <- Measure(bell)
+intact <- 0
+(bo[1] == 0) -> { (bo[2] == 0) -> { intact <- 1 } }
+print("[Bell] 零保存 |01>,|10> = 0 (盗聴なし=1):", intact, " 台帳 =", len(tuplespace), "facts")
+
+# ---- Jones 鍵: 鍵ビットを三葉結び目の |V(e^{i theta})| に通す ----------
+def sin_t(x) {
+    x <- x % (2.0 * PI)
+    (x > PI)       -> { x <- x - 2.0 * PI }
+    (x < 0.0 - PI) -> { x <- x + 2.0 * PI }
+    term <- x
+    sm <- x
+    k <- 1
+    while (k <= 11) {
+        term <- 0.0 - term * x * x / ((2.0 * k) * (2.0 * k + 1.0))
+        sm <- sm + term
+        k <- k + 1
+    }
+    return sm
+}
+def cos_t(x) { return sin_t(PI / 2.0 - x) }
+def jones_abs(theta) {
+    re <- 0.0 - cos_t(0.0 - 4.0 * theta) + cos_t(0.0 - 3.0 * theta) + cos_t(0.0 - theta)
+    im <- 0.0 - sin_t(0.0 - 4.0 * theta) + sin_t(0.0 - 3.0 * theta) + sin_t(0.0 - theta)
+    return sqrt(re * re + im * im)
+}
+kv <- 0.0
+i <- 0
+while (i < len(key)) {
+    kv <- kv * 2.0 + key[i]
+    (kv > 65536.0) -> { kv <- kv % 65521.0 }
+    i <- i + 1
+}
+jtheta <- (kv % 1400.0) / 1400.0 * PI
+jkey <- jones_abs(jtheta)
+print("")
+print("[Jones] 鍵値 =", kv, " -> theta =", f5(jtheta), " -> |V| =", f5(jkey), " (Jones量子鍵)")
+
+# ---- コンタクト文の暗号化 / 復号 (鍵ストリーム, 往復一致を証明) --------
+msg <- "WE COME IN PEACE"
+ks <- kv + jkey * 1000.0
+ct <- []
+i <- 0
+while (i < len(msg)) {
+    ks <- lcg(ks)
+    ct <- (ord(msg, i) + ks) % 65536.0
+    i <- i + 1
+}
+ks2 <- kv + jkey * 1000.0
+back <- ""
+i <- 0
+while (i < len(ct)) {
+    ks2 <- lcg(ks2)
+    back <- back + chr((ct[i] - ks2 + 65536.0) % 65536.0)
+    i <- i + 1
+}
+print("[暗号] 平文:", msg)
+print("[暗号] 暗号文 (先頭4符号):", ct[0], ct[1], ct[2], ct[3])
+print("[復号] 復元:", back)
+(back == msg) -> { print("[復号] 往復一致 = 1 (量子鍵で保護されたコンタクト文)") }
+
+print("")
+print("正直な注記: もつれ自体は通信に使えない (no-communication 定理)。")
+print("量子計算機の役割は鍵 (BB84) であり、搬送は電磁波である。実在の")
+print("METI 送信 (1974 アレシボ -> M13 / 2017 Sonar Calling -> GJ 273b)")
+print("への返信を含め、地球外からの接触は 2026 年時点でゼロである。")
+print("@@BB84-OK")

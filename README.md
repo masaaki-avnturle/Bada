@@ -64,6 +64,7 @@
 | [`aqua-vita.html`](bada_gui_ide/dist/aqua-vita.html) | **AquaVita 命の水・命の樹アトラス** — **Γ関数の大域的部分積分多様体の分析機能**と**Jones多項式の熱感知の機構**で、宇宙に実在する**「命の水」と「命の樹」の場所・周辺・映像**を調べる。**💧命の水(実検出・8地点)**: クエーサー APM 08279+5255 の**地球の海の140兆倍の水蒸気**(既知最大の水の貯蔵庫・120億光年)、オリオンKL/W49N の**水メーザー**、TW Hya 円盤の**水の雪線**、K2-18 b(ハッブル2019)/ WASP-96 b(JWST2022)の**大気の水**、**エンケラドス**(カッシーニが間欠泉に直接突入・Eリングはこの水)と**エウロパ**(地球の2倍の海)の**地下の液体の海**。**🌳命の樹(実観測・6地点)**: **創造の柱(M16)**と宇宙の断崖(NGC 3324)の樹状の星誕生柱、いて座B2の**糖(RNA前駆体)**、**リュウグウ試料のウラシル=RNA塩基**(はやぶさ2 2023)、**ベンヌ試料の全5種の核酸塩基**、TMC-1 の有機分子の森。**位置**=実RA/Decの全天アトラス(太陽系天体は別段・クリック選択)、**周辺に何があるのか**=各地点に実在3項目をリングでラベル表示、**映像**=DSS2実写の視野ズーム動画(太陽系天体は正直にプロシージャル映像: 土星+Eリング+間欠泉/木星+エウロパ地下海/小惑星+試料帰還軌道)+**⏺.webm録画**。**∮Γ×Jones分析**: 各地点の**実測温度**が三つ葉Jones曲線の θ を決め、**部分積分 ∫₀^θ\|V(e^{iθ'})\|dθ′ をライブ積算**(θ=πで大域積分5.024)、\|V\|・d\|V\|/dθ・ウィーン則 λ=2898/T を実計算。**正直な前提を冒頭に明記: 神話の泉や樹そのものが見つかったわけではない — これらは宇宙の実在の水と生命化学** |
 | [`exo-gamma.bada`](bada_gui_ide/dist/exo-gamma.bada) | **Bada量子エンジンのソースコード(.bada)** — Γ関数の大域的部分積分恒等式 Γ(z+1)=zΓ(z) の実行時自己検証(Lanczos近似)× Jones多項式 V(t)=−t⁻⁴+t⁻³+t⁻¹ の熱感知 × ESI(地球と同位の惑星)× SETIスコア × 量子レジスタ(qubit/H/CNOT/Measure・Bell零保存)。実行: `node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/exo/exo-gamma.bada`(原本は [`exo/exo-gamma.bada`](bada_gui_ide/exo/exo-gamma.bada)) |
 | [`exo-gamma.pdf`](bada_gui_ide/dist/exo-gamma.pdf) | **同ソースコードの印刷用PDF** — 実装の対応表・実行方法・全306行を行番号+シンタックスハイライトつきで6ページに整形(日本語コメント込み) |
+| [`quantum-contact.html`](bada_gui_ide/dist/quantum-contact.html) | **QuantumContact 宇宙人コンタクト量子通信局** — **量子コンピューターでコンタクトを取る、の正直な物理**: もつれ自体はメッセージを運べない(no-communication定理)ため、量子計算機の実務は**鍵**。**⚛ BB84量子鍵配送をライブ実演**(64qubit・基底照合→ふるい→鍵。**盗聴者イヴを挿入すると QBER≈25% で必ず露見→鍵を破棄** — 本物のQKDの防御動作)。ふるい鍵→**三つ葉Jones \|V(e^{iθ})\| の量子鍵**で、**アレシボ様式 23×73=1679ビット(半素数)の自作メッセージ**(2進数1〜10・H,C,N,O,P・DNA・ヒト・太陽系・望遠鏡、クリック編集+UTF-8テキスト追記)を暗号化し **.qmsg 保存**。**🎯 実在9天体**(★実送信史: 1974アレシボ→M13 / 2017 Sónar Calling→GJ 273b=Luyten b)への**実リンクバジェット**(到着年・最速返信年・必要ビーコン電力・実在送信機 Goldstone/EISCAT)と**光の旅シミュレーション**(対数タイムライン・**⏺.webm録画**)。**Bada量子エンジン同梱**([`exo/contact-bb84.bada`](bada_gui_ide/exo/contact-bb84.bada) 矢印構文をブラウザ内実行→@@BB84-OK)。**正直な前提を明記: 接触は2026年時点でゼロ・実際の電波送信は行わない** |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
 
 **一括ダウンロード(zip)**: [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-ultranetwork-apps.zip`。[`apps-dist.yml`](.github/workflows/apps-dist.yml) が `apps-v*` タグ / `workflow_dispatch` で生成・添付します。自分で生成する場合は `node bada_gui_ide/tools/build-all-apps.js`。
@@ -152,7 +153,7 @@
 
 Ubuntu ではキー送出に `xdotool`(X11 推奨)、`uno`/`sum(Calc)`/`ruby(Writer)` に `python3-uno` を利用します。ビルドは [`madokey-app-build.yml`](.github/workflows/madokey-app-build.yml)([`bada_gui_ide/madokey-app/`](bada_gui_ide/madokey-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
 
-**宇宙8アプリ — Orbita / GammaTwin / PlanetCinema / GeoSignal / AnomalyMap / HeatSense / BioThermNet / AquaVita** もネイティブ アプリを用意しています(1つのワークフローでまとめてビルド):
+**宇宙9アプリ — Orbita / GammaTwin / PlanetCinema / GeoSignal / AnomalyMap / HeatSense / BioThermNet / AquaVita / QuantumContact** もネイティブ アプリを用意しています(1つのワークフローでまとめてビルド):
 
 | アプリ | Android (APK) | Windows 10 / 11 | Ubuntu |
 |:---|:---|:---|:---|
@@ -164,8 +165,9 @@ Ubuntu ではキー送出に `xdotool`(X11 推奨)、`uno`/`sum(Calc)`/`ruby(Wri
 | **HeatSense**(未知の伝達チャネル模索) | `heatsense-debug.apk` | `HeatSense-*-x64.exe` | `HeatSense-*-x86_64.AppImage` / `*-amd64.deb` |
 | **BioThermNet**(知的生命体 熱感知ネットワーク) | `biotherm-debug.apk` | `BioThermNet-*-x64.exe` | `BioThermNet-*-x86_64.AppImage` / `*-amd64.deb` |
 | **AquaVita**(命の水・命の樹アトラス) | `aquavita-debug.apk` | `AquaVita-*-x64.exe` | `AquaVita-*-x86_64.AppImage` / `*-amd64.deb` |
+| **QuantumContact**(宇宙人コンタクト量子通信局) | `quantumcontact-debug.apk` | `QuantumContact-*-x64.exe` | `QuantumContact-*-x86_64.AppImage` / `*-amd64.deb` |
 
-ビルドは [`space-apps-build.yml`](.github/workflows/space-apps-build.yml)。Actions の Artifacts **`spaceapps-windows` / `spaceapps-linux` / `spaceapps-android`** から取得できます([`orbita-app/`](bada_gui_ide/orbita-app/)・[`gammatwin-app/`](bada_gui_ide/gammatwin-app/)・[`planetcinema-app/`](bada_gui_ide/planetcinema-app/)・[`geosignal-app/`](bada_gui_ide/geosignal-app/)・[`anomalymap-app/`](bada_gui_ide/anomalymap-app/)・[`heatsense-app/`](bada_gui_ide/heatsense-app/)・[`biotherm-app/`](bada_gui_ide/biotherm-app/)・[`aquavita-app/`](bada_gui_ide/aquavita-app/))。ライブ表示は要ネット(GammaTwin/PlanetCinema/BioThermNet はオフライン スナップショット内蔵)。Release への添付は `workflow_dispatch` の `release_tag`(例 `space-v1.7.0`)で。
+ビルドは [`space-apps-build.yml`](.github/workflows/space-apps-build.yml)。Actions の Artifacts **`spaceapps-windows` / `spaceapps-linux` / `spaceapps-android`** から取得できます([`orbita-app/`](bada_gui_ide/orbita-app/)・[`gammatwin-app/`](bada_gui_ide/gammatwin-app/)・[`planetcinema-app/`](bada_gui_ide/planetcinema-app/)・[`geosignal-app/`](bada_gui_ide/geosignal-app/)・[`anomalymap-app/`](bada_gui_ide/anomalymap-app/)・[`heatsense-app/`](bada_gui_ide/heatsense-app/)・[`biotherm-app/`](bada_gui_ide/biotherm-app/)・[`aquavita-app/`](bada_gui_ide/aquavita-app/)・[`quantumcontact-app/`](bada_gui_ide/quantumcontact-app/))。ライブ表示は要ネット(GammaTwin/PlanetCinema/BioThermNet はオフライン スナップショット内蔵)。Release への添付は `workflow_dispatch` の `release_tag`(例 `space-v1.7.0`)で。
 
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`

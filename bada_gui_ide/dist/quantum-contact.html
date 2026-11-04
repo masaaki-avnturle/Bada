@@ -1,0 +1,2333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>QuantumContact — 宇宙人コンタクト量子通信局 (BB84×Jones×Bada)</title>
+<style>
+  :root{color-scheme:dark;--bg:#03050c;--line:#1b2740;--ink:#e9f0fb;--dim:#8aa0c0;
+        --cy:#39c2ff;--gold:#c8a44a;--green:#2fbf71;--red:#e0555a;--vio:#b58cff;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:#03050c;color:var(--ink);
+       font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;}
+  header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 16px;
+         border-bottom:1px solid var(--line);background:#060a14cc;position:sticky;top:0;z-index:20;backdrop-filter:blur(6px);}
+  .logo{font-size:19px;font-weight:800;letter-spacing:.4px;
+        background:linear-gradient(90deg,#b58cff,#39c2ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--dim);font-size:12px;}
+  select,input,button,textarea{background:#0b1424;border:1px solid var(--line);color:var(--ink);border-radius:8px;
+        padding:7px 10px;font-size:13px;font-family:inherit;}
+  button{cursor:pointer;} button:hover{background:#152238;}
+  button.r{background:#3a1520;border-color:#6b2e3a;}
+  button.g{background:#11301f;border-color:#2e6b46;}
+  main{max-width:1150px;margin:0 auto;padding:14px 12px 70px;}
+  .banner{background:#241636;border:1px solid #4a3a7a;border-radius:10px;padding:10px 13px;
+          font-size:12.5px;color:#d8c8ff;margin-bottom:12px;line-height:1.7;}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0;}
+  .grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;} @media(max-width:920px){.grid{grid-template-columns:1fr;}}
+  .stagewrap{position:relative;background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  #stage{width:100%;display:block;background:#000;}
+  .hud{position:absolute;left:10px;top:10px;background:#000b;border:1px solid var(--line);border-radius:8px;
+       padding:7px 11px;font-size:12px;color:#cfe0f5;line-height:1.6;pointer-events:none;max-width:76%;}
+  .hud b{color:var(--gold);}
+  .rec{position:absolute;right:12px;top:12px;display:none;align-items:center;gap:6px;background:#000a;
+       border:1px solid #6b2e3a;border-radius:8px;padding:5px 10px;font-size:12px;color:#ff9aa5;}
+  .rec.on{display:inline-flex;} .rec .d{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite;}
+  @keyframes pulse{50%{opacity:.35;}}
+  .card{background:#070c16;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px;}
+  h2{font-size:15px;margin:0 0 10px;color:var(--cy);}
+  .muted{color:var(--dim);font-size:12px;}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin-top:10px;}
+  .kv b{color:var(--gold);font-weight:600;}
+  table{border-collapse:collapse;font-size:12px;width:100%;}
+  th,td{border:1px solid var(--line);padding:3px 7px;text-align:center;}
+  th{background:#0d1626;color:var(--cy);}
+  #msg{display:block;background:#04070f;border:1px solid var(--line);border-radius:10px;cursor:crosshair;max-width:100%;}
+  .mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;word-break:break-all;}
+  .gline{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#7fd8a8;margin-top:8px;word-break:break-all;}
+  .warn{background:#3a1520;border:1px solid #6b2e3a;border-radius:8px;padding:8px 11px;color:#ff9aa5;font-size:12.5px;margin-top:8px;display:none;}
+  .ok{background:#11301f;border:1px solid #2e6b46;border-radius:8px;padding:8px 11px;color:#7fe0a8;font-size:12.5px;margin-top:8px;display:none;}
+  pre{background:#04070f;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:11px;
+      max-height:300px;overflow:auto;white-space:pre-wrap;color:#bfe6c8;}
+  .badge{font-size:11px;border-radius:6px;padding:1px 7px;margin-left:6px;font-weight:600;
+         background:#173a29;color:#7fe0a8;border:1px solid #2e6b46;}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="logo">📡 QuantumContact — 宇宙人コンタクト量子通信局</div>
+    <div class="sub">量子コンピューター (BB84量子鍵配送) × Jones量子鍵 × アレシボ様式メッセージ — 宇宙人達への接触を量子暗号で守る通信局</div></div>
+</header>
+<main>
+
+  <div class="banner">
+    <b>正直な前提</b>: 地球外文明との接触は <b>2026年時点でゼロ</b>です (実在のMETI送信 —
+    <b>1974 アレシボ・メッセージ→M13</b>、Cosmic Call、<b>2017 Sónar Calling→GJ 273b (=カタログのLuyten b)</b> —
+    への返信もまだありません)。物理も正直に: <b>量子もつれ自体はメッセージを運べません</b>
+    (no-communication 定理)。量子コンピューターの実際の役割は<b>鍵</b> — BB84 量子鍵配送が
+    盗聴を QBER≈25% として暴露する共有鍵を作り、本文の搬送は電磁波 (電波望遠鏡) です。
+    この通信局はメッセージの作成・量子暗号化・送信シミュレーションまでを行い、<b>実際の送信はしません</b>。
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card" style="margin-top:0">
+        <h2>🎯 送信先 (実在の天体) と実リンクバジェット</h2>
+        <div class="controls">
+          <label class="muted">宛先:
+            <select id="pick" style="min-width:300px"></select></label>
+        </div>
+        <div class="kv" id="budget"></div>
+      </div>
+
+      <div class="card">
+        <h2>✉ アレシボ様式メッセージ (23×73 = 1679ビット・半素数) <span class="muted">クリックで編集</span></h2>
+        <canvas id="msg" width="414" height="657"></canvas>
+        <div class="controls">
+          <button id="presetBtn">🧬 自作アレシボ様式に戻す</button>
+          <button id="clearBtn">⬛ 全消去</button>
+          <span class="muted" id="bitInfo"></span>
+        </div>
+        <div class="controls">
+          <label class="muted" style="flex:1;min-width:280px">追記テキスト (UTF-8でビット列に追加):
+            <input id="txt" style="width:100%" value="WE COME IN PEACE 私たちは平和のうちに来た"/></label>
+        </div>
+        <div class="muted">本物のアレシボ・メッセージ (1974) と同じ 23×73 形式に倣った<b>自作</b>ビットマップ:
+          2進数の1〜10 / 生命の原子番号 H,C,N,O,P / DNA二重らせん / ヒト / 太陽系 (地球を持ち上げ) / 電波望遠鏡。</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="margin-top:0">
+        <h2>🔑 量子鍵配送 (BB84) — 量子コンピューターの実務</h2>
+        <div class="controls">
+          <button class="g" id="qkdBtn">⚛ 量子鍵を配送 (BB84×64qubit)</button>
+          <label class="muted"><input type="checkbox" id="eve"/> 盗聴者イヴを挿入</label>
+        </div>
+        <div style="max-height:190px;overflow:auto"><table id="qtab"></table></div>
+        <div class="kv" id="qinfo"></div>
+        <div class="warn" id="qwarn"></div>
+        <div class="ok" id="qok"></div>
+      </div>
+
+      <div class="card">
+        <h2>🔐 量子暗号化 → 送信パッケージ</h2>
+        <div class="controls">
+          <button class="g" id="encBtn">🔐 Jones量子鍵で暗号化</button>
+          <button id="dlBtn">⬇ .qmsg を保存</button>
+        </div>
+        <div class="kv" id="encInfo"></div>
+        <div class="mono muted" id="cipherPrev" style="margin-top:6px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🛰 送信シミュレーション (実スケールの光の旅)</h2>
+    <div class="stagewrap">
+      <canvas id="stage" width="920" height="420"></canvas>
+      <div class="hud" id="hud"></div>
+      <div class="rec" id="recBadge"><span class="d"></span>REC</div>
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <button class="g" id="txBtn">📡 送信シミュレーション開始</button>
+      <button class="r" id="recBtn">⏺ 録画 (.webm)</button>
+      <span class="muted" id="recNote"></span>
+      <span class="muted">※ 実際の電波送信は行いません (シミュレーションのみ)</span>
+    </div>
+    <div class="gline" id="gammaDemo"></div>
+  </div>
+
+  <div class="card">
+    <h2>⚛ Bada量子エンジン — exo/contact-bb84.bada (矢印構文) をブラウザ内で実行</h2>
+    <div class="controls">
+      <button class="g" id="badaBtn">▶ BB84エンジンを実行</button>
+      <span id="badaStat" class="muted"></span>
+    </div>
+    <pre id="badaOut">(実行すると BB84 ふるい・イヴのQBER・Bell零保存・Jones鍵・暗号往復が表示されます)</pre>
+  </div>
+
+</main>
+<script>/* ============================================================================
+ * bada.js — The Bada language (Unknown-Prior Engine language), JavaScript port.
+ *
+ * A faithful port of the C reference (lexer.c / parser.c / interp.c /
+ * transpile.c) so the same Bada programs run in the browser (APK / EXE /
+ * Ubuntu app) with the documented numerics:
+ *   (i)  zero preservation  — confident zeros survive the phase step
+ *   (ii) |psi|^2 == a       — the unit-modulus phase only reweights
+ *
+ * Additions over the C reference, per the paper "Reviser-Extensible Grammars:
+ * a Q#-targeted quantum front end for the Unknown-Prior Engine":
+ *   - @reviser : grammar { rule ... } — grammar-extension transactions whose
+ *     production rules are committed to a rule ledger consulted by the parser
+ *     (extension points: stmt / expr / postfix; latest-highest priority;
+ *     program-order scope).
+ *   - A Q#-style quantum sublanguage on the phase core: qubit, H, X, S, T,
+ *     Rz, CNOT, Measure — gates are phase/permutation steps, measurement is
+ *     an append-only ledger commit.
+ *   - Omega::Quantum inference library: prepare_unknown, observe, estimate,
+ *     forbidden (append-only measurement record, max-entropy start).
+ *   - Generic string primitives (split / substr / str_find / ord / chr) so
+ *     the zone:// URL scheme of the ultra-network WWW (examples/zone.bada)
+ *     can be written entirely in Bada itself: the runtime supplies only
+ *     character-level access, the parser, DHT and quantum guard are Bada.
+ *
+ * Exports (UMD): BadaLang.run / tokens / ast / emitC / VERSION
+ * ==========================================================================*/
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.BadaLang = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  var VERSION = "1.1.0";
+
+  /* ------------------------------------------------------------------ *
+   * Tokens
+   * ------------------------------------------------------------------ */
+  var KEYWORDS = {
+    Omega: "OMEGA", DATABASE: "DATABASE", tuplespace: "TUPLESPACE",
+    TupleSpace: "TUPLESPACE", asperal: "ASPERAL", struct: "STRUCT",
+    def: "DEF", typedef: "TYPEDEF", "return": "RETURN", "if": "IF",
+    "else": "ELSE", "while": "WHILE", "for": "FOR", "in": "IN",
+    "static": "STATIC", dynamic: "DYNAMIC", refine: "REFINE", star: "STAR",
+    "true": "TRUE", "false": "FALSE", nil: "NIL", let: "LET",
+    print: "PRINT", each: "EACH"
+  };
+
+  function isDigit(c) { return c >= "0" && c <= "9"; }
+  function isAlpha(c) { return /[A-Za-z_]/.test(c); }
+  function isAlnum(c) { return /[A-Za-z0-9_]/.test(c); }
+
+  function tokenize(src) {
+    var toks = [], pos = 0, line = 1, n = src.length;
+    function peek() { return pos < n ? src[pos] : "\0"; }
+    function peek2() { return pos + 1 < n ? src[pos + 1] : "\0"; }
+    function adv() { var c = src[pos++]; if (c === "\n") line++; return c; }
+    function mk(type, lexeme, num) {
+      return { type: type, lexeme: lexeme, num: num || 0, line: line };
+    }
+    for (;;) {
+      /* skip whitespace + comments (#, //) */
+      for (;;) {
+        var c0 = peek();
+        if (c0 === " " || c0 === "\t" || c0 === "\r" || c0 === "\n") { adv(); }
+        else if (c0 === "#") { while (pos < n && peek() !== "\n") adv(); }
+        else if (c0 === "/" && peek2() === "/") { while (pos < n && peek() !== "\n") adv(); }
+        else break;
+      }
+      var startLine = line;
+      var c = peek();
+      if (pos >= n) { toks.push({ type: "EOF", lexeme: "<eof>", num: 0, line: line }); break; }
+
+      /* numbers */
+      if (isDigit(c)) {
+        var s = pos;
+        while (isDigit(peek())) adv();
+        var isf = false;
+        if (peek() === "." && isDigit(peek2())) { isf = true; adv(); while (isDigit(peek())) adv(); }
+        if (peek() === "e" || peek() === "E") { isf = true; adv(); if (peek() === "+" || peek() === "-") adv(); while (isDigit(peek())) adv(); }
+        var text = src.slice(s, pos);
+        toks.push({ type: isf ? "FLOAT" : "INT", lexeme: text, num: parseFloat(text), line: startLine });
+        continue;
+      }
+      /* identifiers / keywords: allow @ prefix and trailing ? / ! */
+      if (isAlpha(c) || c === "@") {
+        var s2 = pos;
+        if (c === "@") adv();
+        while (isAlnum(peek())) adv();
+        if (peek() === "?" || peek() === "!") adv();
+        var buf = src.slice(s2, pos);
+        if (buf[0] === "@") {
+          if (buf === "@reviser") { toks.push({ type: "REVISER", lexeme: buf, num: 0, line: startLine }); continue; }
+          toks.push({ type: "IDENT", lexeme: buf, num: 0, line: startLine });
+          continue;
+        }
+        if (buf === "do") { toks.push({ type: "IDENT", lexeme: "do", num: 0, line: startLine }); continue; }
+        if (Object.prototype.hasOwnProperty.call(KEYWORDS, buf)) {
+          toks.push({ type: KEYWORDS[buf], lexeme: buf, num: 0, line: startLine });
+          continue;
+        }
+        toks.push({ type: "IDENT", lexeme: buf, num: 0, line: startLine });
+        continue;
+      }
+      /* strings — double quoted, and single quoted (used by rule patterns) */
+      if (c === '"' || c === "'") {
+        var quote = c;
+        adv();
+        var out = "";
+        while (pos < n && peek() !== quote) {
+          var ch = adv();
+          if (ch === "\\") {
+            var e = adv();
+            out += e === "n" ? "\n" : e === "t" ? "\t" : e === '"' ? '"' : e === "'" ? "'" : e === "\\" ? "\\" : e;
+          } else out += ch;
+        }
+        if (peek() === quote) adv();
+        toks.push({ type: "STRING", lexeme: out, num: 0, line: startLine });
+        continue;
+      }
+
+      adv(); /* consume c */
+      switch (c) {
+        case "(": toks.push(mk("LPAREN", "(")); continue;
+        case ")": toks.push(mk("RPAREN", ")")); continue;
+        case "{": toks.push(mk("LBRACE", "{")); continue;
+        case "}": toks.push(mk("RBRACE", "}")); continue;
+        case "[": toks.push(mk("LBRACK", "[")); continue;
+        case "]": toks.push(mk("RBRACK", "]")); continue;
+        case ",": toks.push(mk("COMMA", ",")); continue;
+        case ".": toks.push(mk("DOT", ".")); continue;
+        case "|": toks.push(mk("PIPE", "|")); continue;
+        case "~": toks.push(mk("CONSIST", "~")); continue;
+        case "+": toks.push(mk("PLUS", "+")); continue;
+        case "*": toks.push(mk("STAR_OP", "*")); continue;
+        case "/": toks.push(mk("SLASH", "/")); continue;
+        case "%": toks.push(mk("PERCENT", "%")); continue;
+        case ";": toks.push(mk("SEMI", ";")); continue;
+        case "-":
+          if (peek() === ">") { adv(); toks.push(mk("QUERY", "->")); continue; }
+          toks.push(mk("MINUS", "-")); continue;
+        case "<":
+          if (peek() === "-") { adv(); toks.push(mk("LARROW", "<-")); continue; }
+          if (peek() === "=") { adv(); toks.push(mk("LE", "<=")); continue; }
+          toks.push(mk("LT", "<")); continue;
+        case ">":
+          if (peek() === ">") { adv(); toks.push(mk("COMMIT", ">>")); continue; }
+          if (peek() === "=") { adv(); toks.push(mk("GE", ">=")); continue; }
+          toks.push(mk("GT", ">")); continue;
+        case "=":
+          if (peek() === "=") { adv(); toks.push(mk("EQ", "==")); continue; }
+          if (peek() === ">") { adv(); toks.push(mk("ARROW", "=>")); continue; }
+          toks.push(mk("ASSIGN", "=")); continue;
+        case "!":
+          if (peek() === "=") { adv(); toks.push(mk("NE", "!=")); continue; }
+          toks.push(mk("NOT", "!")); continue;
+        case "&":
+          if (peek() === "&") { adv(); toks.push(mk("AND", "&&")); continue; }
+          toks.push(mk("AND", "&")); continue;
+        case ":":
+          if (peek() === "=") {
+            adv();
+            if (peek() === ">") { adv(); toks.push(mk("DEFARROW", ":=>")); continue; }
+            toks.push(mk("WALRUS", ":=")); continue;
+          }
+          if (peek() === ":") { adv(); toks.push(mk("SCOPE", "::")); continue; }
+          toks.push(mk("COLON", ":")); continue;
+      }
+      toks.push(mk("ERROR", c));
+    }
+    return toks;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * AST
+   * ------------------------------------------------------------------ */
+  function node(type, line) {
+    return { type: type, line: line, num: 0, str: null, boolean: false, kids: [], params: [], body: null };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Parser (recursive descent, + rule-ledger extension points)
+   * ------------------------------------------------------------------ */
+  function Parser(toks) {
+    this.toks = toks;
+    this.i = 0;
+    this.errors = [];
+    /* the parse-time rule ledger (grammar facts committed by @reviser :
+       grammar transactions; consulted latest-first; program-order scope) */
+    this.ruleLedger = [];
+  }
+  Parser.prototype.cur = function () { return this.toks[this.i]; };
+  Parser.prototype.peekn = function (k) { var j = this.i + k; if (j >= this.toks.length) j = this.toks.length - 1; return this.toks[j]; };
+  Parser.prototype.check = function (t) { return this.cur().type === t; };
+  Parser.prototype.advance = function () { var t = this.cur(); if (this.i < this.toks.length - 1) this.i++; return t; };
+  Parser.prototype.match = function (t) { if (this.check(t)) { this.advance(); return true; } return false; };
+  Parser.prototype.perr = function (msg) {
+    this.errors.push("[parse error] line " + this.cur().line + " near '" + (this.cur().lexeme || "?") + "': " + msg);
+  };
+  Parser.prototype.expect = function (t, what) { if (!this.match(t)) this.perr(what); };
+
+  Parser.prototype.parsePipeParams = function (holder) {
+    this.expect("PIPE", "expected '|'");
+    while (!this.check("PIPE") && !this.check("EOF")) {
+      if (this.check("IDENT")) { holder.params.push(this.cur().lexeme); this.advance(); }
+      else this.advance();
+      if (this.check("PIPE")) break;
+      if (this.check("COMMA")) this.advance();
+    }
+    this.expect("PIPE", "expected closing '|'");
+  };
+
+  /* ---- rule-ledger matching -------------------------------------- */
+  /* pattern atom: {kind:'tok', text} literal, {kind:'hole'} expression hole */
+  Parser.prototype.tryRules = function (heads) {
+    /* latest commit wins (highest priority), then ledger order */
+    for (var r = this.ruleLedger.length - 1; r >= 0; r--) {
+      var rule = this.ruleLedger[r];
+      if (heads.indexOf(rule.head) < 0) continue;
+      if (!rule.pattern.length || rule.pattern[0].kind !== "tok") continue; /* avoid left recursion */
+      if (this.cur().lexeme !== rule.pattern[0].text) continue;
+      var save = this.i;
+      var holes = [];
+      var ok = true;
+      for (var k = 0; k < rule.pattern.length; k++) {
+        var atom = rule.pattern[k];
+        if (atom.kind === "tok") {
+          if (this.cur().lexeme === atom.text && !this.check("EOF")) this.advance();
+          else { ok = false; break; }
+        } else { /* hole: capture a full expression */
+          holes.push(this.parseExpr());
+        }
+      }
+      if (!ok) { this.i = save; continue; }
+      var ext = node("EXTENDED", this.toks[save].line);
+      ext.str = rule.name;
+      ext.rule = rule;
+      ext.kids = holes;
+      return ext;
+    }
+    return null;
+  };
+
+  Parser.prototype.parsePrimary = function () {
+    /* extension point: rules with head 'expr' / 'postfix' before built-ins */
+    var ext = this.tryRules(["expr", "postfix"]);
+    if (ext) return ext;
+
+    var t = this.cur();
+    switch (t.type) {
+      case "INT": case "FLOAT": { var n1 = node(t.type === "INT" ? "INT" : "FLOAT", t.line); n1.num = t.num; this.advance(); return n1; }
+      case "STRING": { var n2 = node("STRING", t.line); n2.str = t.lexeme; this.advance(); return n2; }
+      case "TRUE": { var n3 = node("BOOL", t.line); n3.boolean = true; this.advance(); return n3; }
+      case "FALSE": { var n4 = node("BOOL", t.line); n4.boolean = false; this.advance(); return n4; }
+      case "NIL": { var n5 = node("NIL", t.line); this.advance(); return n5; }
+      case "STAR": { var n6 = node("IDENT", t.line); n6.str = "STAR"; this.advance(); return n6; }
+      case "LPAREN": { this.advance(); var e = this.parseExpr(); this.expect("RPAREN", "expected ')'"); return e; }
+      case "LBRACK": {
+        this.advance();
+        var a = node("ARRAY", t.line);
+        while (!this.check("RBRACK") && !this.check("EOF")) {
+          a.kids.push(this.parseExpr());
+          if (!this.match("COMMA")) break;
+        }
+        this.expect("RBRACK", "expected ']'");
+        return a;
+      }
+      case "PIPE": { /* lambda */
+        var lam = node("LAMBDA", t.line);
+        this.parsePipeParams(lam);
+        if (this.check("IDENT") && this.cur().lexeme === "do") {
+          this.advance();
+          var body = node("BLOCK", t.line);
+          while (!(this.check("IDENT") && this.cur().lexeme === "end") && !this.check("EOF"))
+            body.kids.push(this.parseStmt());
+          if (this.check("IDENT") && this.cur().lexeme === "end") this.advance();
+          lam.body = body;
+        } else {
+          lam.body = this.parseExpr();
+        }
+        return lam;
+      }
+      case "OMEGA": { var n7 = node("IDENT", t.line); n7.str = "Omega"; this.advance(); return n7; }
+      case "TUPLESPACE": { var n8 = node("IDENT", t.line); n8.str = "TupleSpace"; this.advance(); return n8; }
+      case "IDENT": { var n9 = node("IDENT", t.line); n9.str = t.lexeme; this.advance(); return n9; }
+      case "DATABASE": { var nA = node("IDENT", t.line); nA.str = "DATABASE"; this.advance(); return nA; }
+      default:
+        this.perr("expected expression");
+        this.advance();
+        return node("NIL", t.line);
+    }
+  };
+
+  Parser.prototype.parsePostfix = function () {
+    var e = this.parsePrimary();
+    for (;;) {
+      /* call の '(' は直前トークンと同じ行にある場合のみ — 行頭の '(' は
+         矢印条件文 (条件) -> { … } の開始であり、呼び出しに貪らせない */
+      if (this.check("LPAREN") && this.i > 0 && this.cur().line === this.toks[this.i - 1].line) {
+        this.advance();
+        var call = node("CALL", e.line);
+        call.kids.push(e);
+        while (!this.check("RPAREN") && !this.check("EOF")) {
+          call.kids.push(this.parseExpr());
+          if (!this.match("COMMA")) break;
+        }
+        this.expect("RPAREN", "expected ')'");
+        e = call;
+      } else if (this.match("LBRACK")) {
+        var idx = node("INDEX", e.line);
+        idx.kids.push(e);
+        if (!this.check("RBRACK")) idx.kids.push(this.parseExpr());
+        this.expect("RBRACK", "expected ']'");
+        e = idx;
+      } else if (this.match("DOT")) {
+        var m = this.cur();
+        if (this.check("EACH")) {
+          this.advance();
+          var each = node("EACH", m.line);
+          each.kids.push(e);
+          var lam = node("LAMBDA", m.line);
+          if (this.check("PIPE")) this.parsePipeParams(lam);
+          if (this.check("IDENT") && this.cur().lexeme === "do") {
+            this.advance();
+            var body = node("BLOCK", m.line);
+            while (!(this.check("IDENT") && this.cur().lexeme === "end") && !this.check("EOF"))
+              body.kids.push(this.parseStmt());
+            if (this.check("IDENT") && this.cur().lexeme === "end") this.advance();
+            lam.body = body;
+          } else {
+            lam.body = this.parseExpr();
+          }
+          each.kids.push(lam);
+          e = each;
+        } else {
+          var name = m.lexeme;
+          this.advance();
+          if (this.match("LPAREN")) {
+            var call2 = node("CALL", m.line);
+            var meth = node("GET", m.line);
+            meth.str = name;
+            meth.kids.push(e);
+            call2.kids.push(meth);
+            while (!this.check("RPAREN") && !this.check("EOF")) {
+              call2.kids.push(this.parseExpr());
+              if (!this.match("COMMA")) break;
+            }
+            this.expect("RPAREN", "expected ')'");
+            e = call2;
+          } else {
+            var get = node("GET", m.line);
+            get.str = name;
+            get.kids.push(e);
+            e = get;
+          }
+        }
+      } else if (this.match("SCOPE")) {
+        var m2 = this.cur();
+        var name2 = m2.lexeme || "?";
+        this.advance();
+        var get2 = node("GET", m2.line);
+        get2.str = name2;
+        get2.kids.push(e);
+        e = get2;
+      } else break;
+    }
+    return e;
+  };
+
+  Parser.prototype.parseUnary = function () {
+    if (this.check("MINUS") || this.check("NOT")) {
+      var op = this.advance();
+      var n = node("UNARY", op.line);
+      n.str = op.lexeme;
+      n.kids.push(this.parseUnary());
+      return n;
+    }
+    return this.parsePostfix();
+  };
+
+  Parser.prototype.bin = function (sub, ops) {
+    var left = sub.call(this);
+    for (;;) {
+      var matched = false;
+      for (var i = 0; i < ops.length; i++) {
+        if (this.check(ops[i][0])) {
+          var op = this.advance();
+          var n = node("BINARY", op.line);
+          n.str = ops[i][1];
+          n.kids.push(left);
+          n.kids.push(sub.call(this));
+          left = n;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) break;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseFactor = function () { return this.bin(this.parseUnary, [["STAR_OP", "*"], ["SLASH", "/"], ["PERCENT", "%"]]); };
+  Parser.prototype.parseTerm = function () { return this.bin(this.parseFactor, [["PLUS", "+"], ["MINUS", "-"]]); };
+  Parser.prototype.parseCompare = function () { return this.bin(this.parseTerm, [["LT", "<"], ["LE", "<="], ["GT", ">"], ["GE", ">="]]); };
+  Parser.prototype.parseEquality = function () { return this.bin(this.parseCompare, [["EQ", "=="], ["NE", "!="], ["CONSIST", "~"]]); };
+  Parser.prototype.parseAnd = function () { return this.bin(this.parseEquality, [["AND", "&&"]]); };
+  Parser.prototype.parseOr = function () { return this.bin(this.parseAnd, [["OR", "||"]]); };
+
+  Parser.prototype.parseQuery = function () {
+    var left = this.parseOr();
+    while (this.check("ARROW") || this.check("QUERY")) {
+      var op = this.advance();
+      var n = node("QUERY", op.line);
+      n.kids.push(left);
+      n.kids.push(this.parseOr());
+      left = n;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseCommit = function () {
+    var left = this.parseQuery();
+    for (;;) {
+      if (this.check("COMMIT")) {
+        this.advance();
+        var n = node("COMMIT", left.line);
+        n.kids.push(left);
+        n.kids.push(this.parseQuery());
+        left = n;
+      } else if (this.check("LARROW")) {
+        this.advance();
+        var n2 = node("LARROW", left.line);
+        n2.kids.push(left);
+        n2.kids.push(this.parseQuery());
+        left = n2;
+      } else break;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseExpr = function () { return this.parseCommit(); };
+
+  /* ---- statements ---- */
+  Parser.prototype.parseBlock = function () {
+    var line = this.cur().line;
+    this.expect("LBRACE", "expected '{'");
+    var b = node("BLOCK", line);
+    while (!this.check("RBRACE") && !this.check("EOF"))
+      b.kids.push(this.parseDecl());
+    this.expect("RBRACE", "expected '}'");
+    return b;
+  };
+
+  Parser.prototype.parseFunc = function () {
+    var line = this.cur().line;
+    this.expect("DEF", "expected 'def'");
+    var fn = node("FUNC", line);
+    if (this.check("IDENT")) { fn.str = this.cur().lexeme; this.advance(); }
+    else fn.str = "anon";
+    if (this.check("PIPE")) this.parsePipeParams(fn);
+    else if (this.match("LPAREN")) {
+      while (!this.check("RPAREN") && !this.check("EOF")) {
+        if (this.check("IDENT")) { fn.params.push(this.cur().lexeme); this.advance(); }
+        else this.advance();
+        if (!this.match("COMMA")) break;
+      }
+      this.expect("RPAREN", "expected ')'");
+    }
+    if (this.check("LBRACE")) {
+      fn.body = this.parseBlock();
+    } else if (this.match("COMMIT") || this.match("ARROW") || this.match("DEFARROW") || this.match("ASSIGN")) {
+      var body = node("BLOCK", line);
+      var ret = node("RETURN", line);
+      ret.kids.push(this.parseExpr());
+      body.kids.push(ret);
+      this.match("SEMI");
+      fn.body = body;
+    } else {
+      var body2 = node("BLOCK", line);
+      var ret2 = node("RETURN", line);
+      ret2.kids.push(this.parseExpr());
+      body2.kids.push(ret2);
+      fn.body = body2;
+    }
+    return fn;
+  };
+
+  Parser.prototype.parseAsperal = function () {
+    var line = this.cur().line;
+    this.expect("ASPERAL", "expected 'asperal'");
+    if (this.check("PIPE")) {
+      var n = node("ASPERAL", line);
+      n.str = "union";
+      this.parsePipeParams(n);
+      this.match("DEFARROW");
+      if (this.check("LBRACE")) n.body = this.parseBlock();
+      return n;
+    }
+    var st = node("STRUCT", line);
+    if (this.check("IDENT")) { st.str = this.cur().lexeme; this.advance(); }
+    else if (this.check("TUPLESPACE")) { st.str = "TupleSpace"; this.advance(); }
+    else st.str = "anon";
+    if (this.match("COLON")) this.match("STRUCT");
+    else this.match("STRUCT");
+    st.body = this.parseBlock();
+    return st;
+  };
+
+  Parser.prototype.parseOmega = function () {
+    var line = this.cur().line;
+    this.expect("OMEGA", "expected 'Omega'");
+    var n = node("OMEGA_DB", line);
+    if (this.match("SCOPE")) {
+      if (this.check("DATABASE")) { this.advance(); n.str = "DATABASE"; }
+      else if (this.check("TUPLESPACE")) { this.advance(); n.str = "Tuplespace"; }
+      else if (this.check("IDENT")) { n.str = this.cur().lexeme; this.advance(); }
+      else n.str = "DATABASE";
+    } else n.str = "DATABASE";
+    if (this.match("LBRACK")) {
+      if (this.check("TUPLESPACE") || this.check("IDENT")) this.advance();
+      this.expect("RBRACK", "expected ']'");
+    }
+    if (this.match("LT")) { if (this.check("DATABASE") || this.check("IDENT")) this.advance(); }
+    n.body = this.parseBlock();
+    return n;
+  };
+
+  /* @reviser — either the value-level learning loop (executes its block),
+     or, when the header names 'grammar', a grammar-extension transaction:
+        @reviser : grammar {
+            rule "name" head [ 'tok' expr ... ] => denotation
+        }
+     Rules are committed to the parse-time rule ledger (program-order scope,
+     latest-highest priority) and, at run time, appended to the tuplespace
+     ledger as ["rule", name, head, ...] facts (auditability). */
+  Parser.prototype.parseReviser = function () {
+    var line = this.cur().line;
+    this.expect("REVISER", "expected '@reviser'");
+    var isGrammar = false;
+    var j = this.i;
+    while (j < this.toks.length && this.toks[j].type !== "LBRACE" && this.toks[j].type !== "EOF") {
+      if (this.toks[j].lexeme === "grammar") isGrammar = true;
+      j++;
+    }
+    /* skip header noise up to '{' */
+    while (!this.check("LBRACE") && !this.check("EOF")) this.advance();
+    if (isGrammar) return this.parseGrammarBlock(line);
+    var n = node("REVISER", line);
+    n.body = this.parseBlock();
+    return n;
+  };
+
+  Parser.prototype.parseGrammarBlock = function (line) {
+    var g = node("GRAMMAR", line);
+    g.rules = [];
+    this.expect("LBRACE", "expected '{'");
+    while (!this.check("RBRACE") && !this.check("EOF")) {
+      if (this.check("IDENT") && this.cur().lexeme === "rule") {
+        this.advance();
+        var rule = { name: "?", head: "expr", pattern: [], denotation: null, prio: this.ruleLedger.length };
+        if (this.check("STRING") || this.check("IDENT")) { rule.name = this.cur().lexeme; this.advance(); }
+        if (this.check("IDENT") || this.check("STRUCT")) { rule.head = this.cur().lexeme; this.advance(); }
+        this.expect("LBRACK", "expected '[' pattern");
+        while (!this.check("RBRACK") && !this.check("EOF")) {
+          var t = this.cur();
+          if (t.type === "STRING") { rule.pattern.push({ kind: "tok", text: t.lexeme }); this.advance(); }
+          else if (t.type === "IDENT" && t.lexeme === "expr") { rule.pattern.push({ kind: "hole" }); this.advance(); }
+          else { rule.pattern.push({ kind: "tok", text: t.lexeme }); this.advance(); }
+          this.match("COMMA");
+        }
+        this.expect("RBRACK", "expected ']'");
+        this.expect("ARROW", "expected '=>' denotation");
+        rule.denotation = this.parseExpr();
+        /* monotone append: the rule ledger only grows */
+        this.ruleLedger.push(rule);
+        g.rules.push(rule);
+        this.match("SEMI");
+      } else {
+        this.perr("expected 'rule' in grammar reviser");
+        this.advance();
+      }
+    }
+    this.expect("RBRACE", "expected '}'");
+    return g;
+  };
+
+  Parser.prototype.parseIf = function () {
+    var line = this.cur().line;
+    this.expect("IF", "if");
+    var n = node("IF", line);
+    var par = this.match("LPAREN");
+    n.kids.push(this.parseExpr());
+    if (par) this.expect("RPAREN", ")");
+    n.kids.push(this.parseBlock());
+    if (this.match("ELSE")) {
+      if (this.check("IF")) n.kids.push(this.parseIf());
+      else n.kids.push(this.parseBlock());
+    }
+    return n;
+  };
+
+  Parser.prototype.parseWhile = function () {
+    var line = this.cur().line;
+    this.expect("WHILE", "while");
+    var n = node("WHILE", line);
+    var par = this.match("LPAREN");
+    n.kids.push(this.parseExpr());
+    if (par) this.expect("RPAREN", ")");
+    n.kids.push(this.parseBlock());
+    return n;
+  };
+
+  Parser.prototype.parseFor = function () {
+    var line = this.cur().line;
+    this.expect("FOR", "for");
+    var n = node("FOR", line);
+    n.str = this.cur().lexeme;
+    if (this.check("IDENT")) this.advance();
+    this.expect("IN", "in");
+    n.kids.push(this.parseExpr());
+    n.kids.push(this.parseBlock());
+    return n;
+  };
+
+  Parser.prototype.parseStmt = function () {
+    var line = this.cur().line;
+    /* extension point: rules with head 'stmt' before built-ins */
+    var ext = this.tryRules(["stmt"]);
+    if (ext) { this.match("SEMI"); return ext; }
+
+    if (this.check("DEF")) return this.parseFunc();
+    if (this.check("ASPERAL")) return this.parseAsperal();
+    if (this.check("OMEGA")) return this.parseOmega();
+    if (this.check("REVISER")) return this.parseReviser();
+    if (this.check("IF")) return this.parseIf();
+    if (this.check("WHILE")) return this.parseWhile();
+    if (this.check("FOR")) return this.parseFor();
+    if (this.check("TYPEDEF")) {
+      this.advance();
+      var n = node("STRUCT", line);
+      n.str = "typedef";
+      while (!this.check("LBRACE") && !this.check("EOF")) this.advance();
+      n.body = this.parseBlock();
+      return n;
+    }
+    if (this.match("RETURN")) {
+      var r = node("RETURN", line);
+      if (!this.check("RBRACE") && !this.check("SEMI")) r.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return r;
+    }
+    if (this.match("PRINT")) {
+      var pn = node("PRINT", line);
+      var par = this.match("LPAREN");
+      pn.kids.push(this.parseExpr());
+      while (this.match("COMMA")) pn.kids.push(this.parseExpr());
+      if (par) this.expect("RPAREN", ")");
+      this.match("SEMI");
+      return pn;
+    }
+    if (this.check("IDENT") && this.peekn(1).type === "WALRUS") {
+      var b = node("BIND", line);
+      b.str = this.cur().lexeme;
+      this.advance(); this.advance();
+      b.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return b;
+    }
+    /* 矢印オブジェクト (代入): name <- expr — := の矢印形。器 (配列) が
+       相手なら従来どおり流し込み (追記)、それ以外の名前へは束縛する。 */
+    if (this.check("IDENT") && this.peekn(1).type === "LARROW") {
+      var ab = node("ARROWBIND", line);
+      ab.str = this.cur().lexeme;
+      this.advance(); this.advance();
+      ab.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return ab;
+    }
+    /* 矢印オブジェクト (条件文): (条件) -> { ... } [else { ... } / else (…) -> { … }]
+       — if の矢印形。条件文でなければ巻き戻して通常の式として解析する。 */
+    if (this.check("LPAREN")) {
+      var save = this.i, errLen = this.errors.length;
+      this.advance();
+      var cond = this.parseExpr();
+      if (this.match("RPAREN") && this.check("QUERY") && this.peekn(1).type === "LBRACE") {
+        this.advance();
+        var fi = node("IF", line);
+        fi.kids.push(cond);
+        fi.kids.push(this.parseBlock());
+        if (this.match("ELSE")) {
+          if (this.check("LBRACE")) fi.kids.push(this.parseBlock());
+          else fi.kids.push(this.parseStmt());
+        }
+        return fi;
+      }
+      this.i = save;
+      this.errors.length = errLen;
+    }
+    var e = this.parseExpr();
+    if (this.check("ASSIGN")) {
+      this.advance();
+      var a = node("ASSIGN", line);
+      a.kids.push(e);
+      a.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return a;
+    }
+    this.match("SEMI");
+    return e;
+  };
+
+  Parser.prototype.parseDecl = function () { return this.parseStmt(); };
+
+  function parseProgram(src) {
+    var toks = tokenize(src);
+    var p = new Parser(toks);
+    var prog = node("PROGRAM", 1);
+    while (!p.check("EOF")) {
+      var d = p.parseDecl();
+      if (d) prog.kids.push(d);
+      if (p.errors.length > 50) { p.errors.push("too many parse errors, aborting"); break; }
+    }
+    return { program: prog, errors: p.errors, ruleLedger: p.ruleLedger };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Values
+   * ------------------------------------------------------------------ */
+  function Vnil() { return { t: "nil" }; }
+  function Vnum(x) { return { t: "num", num: x }; }
+  function Vbool(b) { return { t: "bool", b: b }; }
+  function Vstr(s) { return { t: "str", str: s == null ? "" : String(s) }; }
+  function Vstar() { return { t: "star" }; }
+  function Varr(items) { return { t: "arr", items: items || [] }; }
+  function Vdist(p) { return { t: "dist", p: p }; }
+  function Vts(ts) { return { t: "ts", ts: ts }; }
+  function Vreg(reg) { return { t: "reg", reg: reg }; }
+
+  function distNormalize(p) {
+    var s = 0;
+    for (var i = 0; i < p.length; i++) s += p[i];
+    if (s > 0) for (var j = 0; j < p.length; j++) p[j] /= s;
+  }
+  function arrToP(items) {
+    var p = new Array(items.length);
+    for (var i = 0; i < items.length; i++) p[i] = items[i].t === "num" ? items[i].num : 0;
+    return p;
+  }
+  function asNum(v) { return v && v.t === "num" ? v.num : 0; }
+  function truthy(v) {
+    switch (v.t) {
+      case "nil": case "star": return false;
+      case "bool": return v.b;
+      case "num": return v.num !== 0;
+      case "str": return v.str.length > 0;
+      default: return true;
+    }
+  }
+
+  /* C %g-alike for string concat */
+  function fmtG(x) {
+    if (!isFinite(x)) return String(x);
+    if (x === Math.trunc(x) && Math.abs(x) < 1e15) return String(x);
+    return String(parseFloat(x.toPrecision(6)));
+  }
+  function fmtNum(x) {
+    if (x === Math.trunc(x) && isFinite(x) && Math.abs(x) < 9.2e18) return String(Math.trunc(x));
+    return x.toFixed(5);
+  }
+  /* C "%.2e" with >=2 exponent digits */
+  function fmtSci(x) {
+    var s = x.toExponential(2); /* e.g. 5.55e-17 or 1.23e-7 */
+    return s.replace(/e([+-])(\d)$/, "e$10$2");
+  }
+
+  function printValue(v) {
+    switch (v.t) {
+      case "nil": return "nil";
+      case "star": return "star";
+      case "bool": return v.b ? "true" : "false";
+      case "num": return fmtNum(v.num);
+      case "str": return v.str;
+      case "arr": return "[" + v.items.map(printValue).join(", ") + "]";
+      case "dist": return "dist[" + Array.prototype.map.call(v.p, function (x) { return x.toFixed(5); }).join(", ") + "]";
+      case "phase": return "phase[V=" + v.v + ", |.|=1]";
+      case "ts": return "tuplespace<" + (v.ts ? v.ts.facts.length : 0) + " facts>";
+      case "func": return "<fn " + (v.decl && v.decl.str ? v.decl.str : "lambda") + ">";
+      case "native": return "<native fn>";
+      case "struct": return "<struct " + v.name + ">";
+      case "inst": return "<" + v.name + " instance>";
+      case "reg": {
+        var probs = regProbs(v.reg);
+        return "qreg[n=" + v.reg.n + "] |psi|^2=[" +
+          Array.prototype.map.call(probs, function (x) { return x.toFixed(5); }).join(", ") + "]";
+      }
+      default: return "?";
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Quantum register on the phase core
+   * psi_i = sqrt(a_i) * exp(i * theta_i)  — stored as re/im amplitude
+   * vectors; gates are index permutations and/or phase contributions.
+   * ------------------------------------------------------------------ */
+  function regNew(n) {
+    var V = 1 << n;
+    var re = new Float64Array(V), im = new Float64Array(V);
+    re[0] = 1;
+    return { n: n, re: re, im: im };
+  }
+  function regProbs(reg) {
+    var V = reg.re.length, p = new Array(V), s = 0;
+    for (var i = 0; i < V; i++) { p[i] = reg.re[i] * reg.re[i] + reg.im[i] * reg.im[i]; s += p[i]; }
+    if (s > 0) for (var j = 0; j < V; j++) p[j] /= s;
+    return p;
+  }
+  function gateH(reg, q) {
+    var V = reg.re.length, bit = 1 << q, r = Math.SQRT1_2;
+    for (var i = 0; i < V; i++) {
+      if (i & bit) continue;
+      var j = i | bit;
+      var ar = reg.re[i], ai = reg.im[i], br = reg.re[j], bi = reg.im[j];
+      reg.re[i] = r * (ar + br); reg.im[i] = r * (ai + bi);
+      reg.re[j] = r * (ar - br); reg.im[j] = r * (ai - bi);
+    }
+  }
+  function gateX(reg, q) {
+    var V = reg.re.length, bit = 1 << q;
+    for (var i = 0; i < V; i++) {
+      if (i & bit) continue;
+      var j = i | bit;
+      var tr = reg.re[i], ti = reg.im[i];
+      reg.re[i] = reg.re[j]; reg.im[i] = reg.im[j];
+      reg.re[j] = tr; reg.im[j] = ti;
+    }
+  }
+  /* pure phase gate on |1> of qubit q: amp *= e^{i lam}. By |psi|^2 == a this
+     changes no probability (Theorem 2 => unitarity of the phase layer). */
+  function gatePhase(reg, q, lam) {
+    var V = reg.re.length, bit = 1 << q;
+    var c = Math.cos(lam), s = Math.sin(lam);
+    for (var i = 0; i < V; i++) {
+      if (!(i & bit)) continue;
+      var ar = reg.re[i], ai = reg.im[i];
+      reg.re[i] = ar * c - ai * s;
+      reg.im[i] = ar * s + ai * c;
+    }
+  }
+  function gateCNOT(reg, c, t) {
+    var V = reg.re.length, cb = 1 << c, tb = 1 << t;
+    for (var i = 0; i < V; i++) {
+      if ((i & cb) && !(i & tb)) {
+        var j = i | tb;
+        var tr = reg.re[i], ti = reg.im[i];
+        reg.re[i] = reg.re[j]; reg.im[i] = reg.im[j];
+        reg.re[j] = tr; reg.im[j] = ti;
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Interpreter
+   * ------------------------------------------------------------------ */
+  function Env(parent) { this.map = Object.create(null); this.parent = parent || null; }
+  Env.prototype.set = function (k, v) {
+    for (var e = this; e; e = e.parent) if (Object.prototype.hasOwnProperty.call(e.map, k)) { /* C ref sets in own env only */ break; }
+    this.map[k] = v;
+  };
+  Env.prototype.get = function (k) {
+    for (var e = this; e; e = e.parent)
+      if (Object.prototype.hasOwnProperty.call(e.map, k)) return e.map[k];
+    return undefined;
+  };
+  Env.prototype.root = function () { var e = this; while (e.parent) e = e.parent; return e; };
+
+  function Interp(opts) {
+    opts = opts || {};
+    this.out = opts.out || function () {};
+    this.ledger = { facts: [] };          /* the append-only tuplespace */
+    this.qstate = { prior: null };        /* Omega::Quantum estimator */
+    this.global = new Env(null);
+    this.steps = 0;
+    this.maxSteps = opts.maxSteps || 20000000;
+    this.installNatives();
+    this.global.set("Omega", Vts(this.ledger));
+    this.global.set("tuplespace", Vts(this.ledger));
+  }
+
+  Interp.prototype.commit = function (v) {
+    if (v.t !== "nil") this.ledger.facts.push(v);
+    return this.ledger.facts.length - 1;
+  };
+
+  Interp.prototype.installNatives = function () {
+    var self = this;
+    var g = this.global;
+    function nat(name, fn) { g.set(name, { t: "native", name: name, fn: fn }); }
+
+    nat("softmax", function (a) {
+      if (!a[0]) return Vnil();
+      var src;
+      if (a[0].t === "dist") src = Array.prototype.slice.call(a[0].p);
+      else if (a[0].t === "arr") src = arrToP(a[0].items);
+      else return Vnil();
+      var v = src.length, out = new Array(v);
+      var mx = -Infinity;
+      for (var i = 0; i < v; i++) if (src[i] > mx) mx = src[i];
+      var s = 0;
+      for (var j = 0; j < v; j++) { out[j] = Math.exp(src[j] - mx); s += out[j]; }
+      for (var k = 0; k < v; k++) out[k] /= s;
+      /* confident-zero semantics: a logit far below the max is ruled out */
+      for (var l = 0; l < v; l++) if (src[l] - mx < -30.0) out[l] = 0.0;
+      distNormalize(out);
+      return Vdist(out);
+    });
+    nat("entropy", function (a) {
+      var p;
+      if (a[0].t === "dist") p = a[0].p;
+      else if (a[0].t === "arr") p = arrToP(a[0].items);
+      else return Vnum(0);
+      var H = 0;
+      for (var i = 0; i < p.length; i++) { var q = p[i]; if (q < 1e-12) q = 1e-12; H += -q * Math.log(q); }
+      return Vnum(H);
+    });
+    nat("unknown_prior", function (a) {
+      var v = Math.trunc(asNum(a[0])); if (v < 1) v = 1;
+      var p = new Array(v);
+      for (var i = 0; i < v; i++) p[i] = 1.0 / v;
+      return Vdist(p);
+    });
+    nat("update", function (a) {
+      if (a.length < 2 || a[0].t !== "dist") return a.length > 0 ? a[0] : Vnil();
+      var prior = a[0].p;
+      var evid = a[1].t === "dist" ? a[1].p : (a[1].t === "arr" ? arrToP(a[1].items) : null);
+      if (!evid) return a[0];
+      var lr = a.length >= 3 ? asNum(a[2]) : 0.5;
+      var v = prior.length, out = new Array(v), s = 0;
+      for (var i = 0; i < v; i++) { var e = i < evid.length ? evid[i] : 0; out[i] = (1 - lr) * prior[i] + lr * e; s += out[i]; }
+      if (s > 0) for (var j = 0; j < v; j++) out[j] /= s;
+      return Vdist(out);
+    });
+    nat("manifold_embed", function (a) {
+      if (a.length < 1 || a[0].t !== "arr") return Vnil();
+      var x = a[0].items;
+      var W = (a.length >= 2 && a[1].t === "arr") ? a[1].items : null;
+      var outdim = W ? W.length : x.length;
+      var d = new Array(outdim);
+      for (var i = 0; i < outdim; i++) {
+        var acc = 0;
+        if (W && W[i].t === "arr") {
+          var row = W[i].items;
+          for (var j = 0; j < x.length && j < row.length; j++) acc += asNum(row[j]) * asNum(x[j]);
+        } else acc = asNum(x[i]);
+        d[i] = acc;
+      }
+      var nrm = 0;
+      for (var k = 0; k < outdim; k++) nrm += d[k] * d[k];
+      nrm = Math.sqrt(nrm) + 1e-12;
+      for (var l = 0; l < outdim; l++) d[l] /= nrm;
+      return Vdist(d);
+    });
+    nat("cognitive_system", function (a, env) {
+      if (a.length < 1) return Vnil();
+      var adist;
+      if (a[0].t === "dist") adist = Array.prototype.slice.call(a[0].p);
+      else {
+        var sm = g.get("softmax").fn([a[0]], env);
+        if (sm.t !== "dist") return Vnil();
+        adist = Array.prototype.slice.call(sm.p);
+      }
+      var v = adist.length;
+      var theta = new Array(v);
+      for (var z = 0; z < v; z++) theta[z] = 0;
+      var mods = (a.length >= 2 && a[1].t === "arr") ? a[1].items : null;
+      var betas = (a.length >= 3 && a[2].t === "arr") ? a[2].items : null;
+      if (mods) {
+        for (var m = 0; m < mods.length; m++) {
+          if (mods[m].t !== "arr") continue;
+          var pair = mods[m].items;
+          if (pair.length < 2) continue;
+          var q;
+          if (pair[0].t === "dist") q = pair[0].p;
+          else if (pair[0].t === "arr") q = arrToP(pair[0].items);
+          else continue;
+          var H = 0;
+          for (var i = 0; i < q.length; i++) { var qq = q[i]; if (qq < 1e-12) qq = 1e-12; H += -qq * Math.log(qq); }
+          var phi = pair[1].t === "arr" ? pair[1].items : null;
+          var beta = (betas && m < betas.length) ? asNum(betas[m]) : 1.0;
+          for (var j = 0; j < v; j++) {
+            var phival = (phi && j < phi.length) ? asNum(phi[j]) : 0;
+            theta[j] += beta * H * phival;
+          }
+        }
+      }
+      /* psi = sqrt(a) * exp(i theta); |psi|^2 == a exactly */
+      var qhat = new Array(v), s = 0;
+      for (var k = 0; k < v; k++) {
+        var r = Math.sqrt(adist[k]);
+        var re = r * Math.cos(theta[k]), im = r * Math.sin(theta[k]);
+        var mag2 = re * re + im * im;
+        qhat[k] = mag2; s += mag2;
+      }
+      if (s > 0) for (var l = 0; l < v; l++) qhat[l] /= s;
+      /* commit q_hat to the append-only ledger */
+      self.commit(Vdist(Array.prototype.slice.call(qhat)));
+      /* stash base a for property (ii) verification */
+      env.root().set("__last_a", Vdist(adist));
+      return Vdist(qhat);
+    });
+    nat("len", function (a) {
+      switch (a[0].t) {
+        case "arr": return Vnum(a[0].items.length);
+        case "dist": return Vnum(a[0].p.length);
+        case "str": return Vnum(a[0].str.length);
+        case "ts": return Vnum(a[0].ts ? a[0].ts.facts.length : 0);
+        case "reg": return Vnum(a[0].reg.re.length);
+        default: return Vnum(0);
+      }
+    });
+    nat("sqrt", function (a) { return Vnum(Math.sqrt(asNum(a[0]))); });
+    nat("log", function (a) { return Vnum(Math.log(asNum(a[0]))); });
+    nat("exp", function (a) { return Vnum(Math.exp(asNum(a[0]))); });
+    nat("abs", function (a) { return Vnum(Math.abs(asNum(a[0]))); });
+    nat("dist", function (a) {
+      if (a[0].t === "arr") { var p = arrToP(a[0].items); distNormalize(p); return Vdist(p); }
+      if (a[0].t === "dist") return a[0];
+      return Vnil();
+    });
+    nat("zeros_of", function (a) {
+      var p = null;
+      if (a[0] && a[0].t === "dist") p = a[0].p;
+      else if (a[0] && a[0].t === "reg") p = regProbs(a[0].reg);
+      if (!p) return Varr([]);
+      var out = [];
+      for (var i = 0; i < p.length; i++) if (p[i] === 0.0) out.push(Vnum(i));
+      return Varr(out);
+    });
+    nat("maxdiff", function (a) {
+      if (a[0].t !== "dist" || a[1].t !== "dist") return Vnum(0);
+      var v = Math.min(a[0].p.length, a[1].p.length), m = 0;
+      for (var i = 0; i < v; i++) { var d = Math.abs(a[0].p[i] - a[1].p[i]); if (d > m) m = d; }
+      return Vnum(m);
+    });
+    nat("sci", function (a) { return Vstr(fmtSci(asNum(a[0]))); });
+    nat("f5", function (a) { return Vstr(asNum(a[0]).toFixed(5)); });
+    nat("ledger", function () { return Vts(self.ledger); });
+    nat("last_a", function (a, env) {
+      var v = env.root().get("__last_a");
+      return v === undefined ? Vnil() : v;
+    });
+
+    /* ============== string primitives (zone:// ultra-network) =========
+       Character-level access only: the zone:// URL parser, the P2P DHT
+       and the quantum guard themselves are written in Bada on top of
+       these (see examples/zone.bada). */
+    function wantStrv(v) { return v && v.t === "str" ? v.str : null; }
+    nat("split", function (a) {
+      var s = wantStrv(a[0]); if (s == null) return Varr([]);
+      var sep = a.length >= 2 ? wantStrv(a[1]) : null;
+      var parts = (sep == null || sep === "") ? s.split("") : s.split(sep);
+      return Varr(parts.map(Vstr));
+    });
+    nat("substr", function (a) {
+      var s = wantStrv(a[0]); if (s == null) return Vstr("");
+      var from = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      if (from < 0) from = 0;
+      var cnt = a.length >= 3 ? Math.trunc(asNum(a[2])) : s.length - from;
+      if (cnt < 0) cnt = 0;
+      return Vstr(s.substr(from, cnt));
+    });
+    nat("str_find", function (a) {
+      var s = wantStrv(a[0]);
+      var needle = a.length >= 2 ? wantStrv(a[1]) : null;
+      if (s == null || needle == null) return Vnum(-1);
+      return Vnum(s.indexOf(needle));
+    });
+    nat("ord", function (a) {
+      var s = wantStrv(a[0]); if (s == null || !s.length) return Vnum(0);
+      var i = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      if (i < 0 || i >= s.length) return Vnum(0);
+      return Vnum(s.charCodeAt(i));
+    });
+    nat("chr", function (a) {
+      return Vstr(String.fromCharCode(Math.trunc(asNum(a[0]))));
+    });
+
+    /* ============== the Q#-style quantum sublanguage ==================
+       Registered natively AND reachable through @reviser : grammar rules
+       (whose denotations call phase_uniform / commit_measurement below). */
+    function wantReg(v) { return v && v.t === "reg" ? v.reg : null; }
+
+    nat("qubit", function (a) {
+      var nq = Math.max(1, Math.trunc(asNum(a[0]) || 1));
+      return Vreg(regNew(nq));
+    });
+    nat("H", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gateH(r, q);
+      return a[0];
+    });
+    nat("X", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gateX(r, q);
+      return a[0];
+    });
+    nat("S", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gatePhase(r, q, Math.PI / 2);
+      return a[0];
+    });
+    nat("T", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gatePhase(r, q, Math.PI / 4);
+      return a[0];
+    });
+    nat("Rz", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var lam = a.length >= 2 ? asNum(a[1]) : 0;
+      var q = a.length >= 3 ? Math.trunc(asNum(a[2])) : 0;
+      gatePhase(r, q, lam);
+      return a[0];
+    });
+    nat("CNOT", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var c = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      var t = a.length >= 3 ? Math.trunc(asNum(a[2])) : 1;
+      gateCNOT(r, c, t);
+      return a[0];
+    });
+    function doMeasure(v) {
+      var r = wantReg(v);
+      if (!r) {
+        if (v && v.t === "dist") { self.commit(v); return v; }
+        return Vnil();
+      }
+      var p = regProbs(r);
+      var d = Vdist(p);
+      /* measurement is an append-only ledger commit */
+      self.commit(Vdist(Array.prototype.slice.call(p)));
+      return d;
+    }
+    nat("Measure", function (a) { return doMeasure(a[0]); });
+    /* denotation names used by the paper's reviser rules */
+    nat("phase_uniform", function (a) {
+      var r = wantReg(a[0]);
+      if (!r) return Vnil();
+      for (var q = 0; q < r.n; q++) gateH(r, q);
+      return a[0];
+    });
+    nat("commit_measurement", function (a) { return doMeasure(a[0]); });
+
+    /* ---------- Omega::Quantum: append-only measurement inference ----- */
+    nat("prepare_unknown", function (a) {
+      var nq = Math.max(1, Math.trunc(asNum(a[0]) || 1));
+      var V = 1 << nq;
+      var p = new Array(V);
+      for (var i = 0; i < V; i++) p[i] = 1.0 / V;
+      self.qstate.prior = p;                 /* max-entropy start (Jaynes) */
+      return Vdist(Array.prototype.slice.call(p));
+    });
+    nat("observe", function (a) {
+      var d = doMeasure(a[0]);
+      if (d.t === "dist" && self.qstate.prior) {
+        var prior = self.qstate.prior, lr = 0.5;
+        var v = prior.length, out = new Array(v), s = 0;
+        for (var i = 0; i < v; i++) { var e = i < d.p.length ? d.p[i] : 0; out[i] = (1 - lr) * prior[i] + lr * e; s += out[i]; }
+        if (s > 0) for (var j = 0; j < v; j++) out[j] /= s;
+        self.qstate.prior = out;
+      }
+      return d;
+    });
+    nat("estimate", function () {
+      if (!self.qstate.prior) return Vnil();
+      return Vdist(Array.prototype.slice.call(self.qstate.prior));
+    });
+    nat("forbidden", function () {
+      if (!self.qstate.prior) return Varr([]);
+      var out = [];
+      for (var i = 0; i < self.qstate.prior.length; i++)
+        if (self.qstate.prior[i] === 0.0) out.push(Vnum(i));
+      return Varr(out);
+    });
+  }
+
+  Interp.prototype.tick = function (line) {
+    if (++this.steps > this.maxSteps)
+      throw new Error("[runtime] execution budget exceeded near line " + line);
+  };
+
+  function evalBinary(op, l, r) {
+    if (op === "~") {
+      if (l.t === "star" || r.t === "star") return Vbool(true);
+      if (l.t === "num" && r.t === "num") return Vbool(l.num === r.num);
+      if (l.t === "str" && r.t === "str") return Vbool(l.str === r.str);
+      return Vbool(l.t === r.t);
+    }
+    if (op === "&&") return Vbool(truthy(l) && truthy(r));
+    if (op === "||") return Vbool(truthy(l) || truthy(r));
+    if (op === "==") {
+      if (l.t === "num" && r.t === "num") return Vbool(l.num === r.num);
+      if (l.t === "str" && r.t === "str") return Vbool(l.str === r.str);
+      return Vbool(l.t === r.t);
+    }
+    if (op === "!=") { var e = evalBinary("==", l, r); return Vbool(!e.b); }
+    if (op === "+" && (l.t === "str" || r.t === "str")) {
+      var a = l.t === "str" ? l.str : fmtG(asNum(l));
+      var b = r.t === "str" ? r.str : fmtG(asNum(r));
+      return Vstr(a + b);
+    }
+    var x = asNum(l), y = asNum(r);
+    switch (op) {
+      case "+": return Vnum(x + y);
+      case "-": return Vnum(x - y);
+      case "*": return Vnum(x * y);
+      case "/": return Vnum(y !== 0 ? x / y : 0);
+      case "%": return Vnum(y !== 0 ? x % y : 0);
+      case "<": return Vbool(x < y);
+      case "<=": return Vbool(x <= y);
+      case ">": return Vbool(x > y);
+      case ">=": return Vbool(x >= y);
+    }
+    return Vnil();
+  }
+
+  Interp.prototype.callValue = function (callee, args, env) {
+    if (callee.t === "native") return callee.fn(args, env) || Vnil();
+    if (callee.t === "func") {
+      var decl = callee.decl;
+      var local = new Env(callee.closure);
+      for (var i = 0; i < decl.params.length; i++)
+        local.map[decl.params[i]] = i < args.length ? args[i] : Vnil();
+      var f = this.exec(decl.body, local);
+      return f.ret ? f.val : Vnil();
+    }
+    if (callee.t === "struct") {
+      var fields = new Env(callee.closure);
+      if (callee.decl && callee.decl.body) this.exec(callee.decl.body, fields);
+      return { t: "inst", name: callee.name, fields: fields };
+    }
+    return Vnil();
+  };
+
+  Interp.prototype.eval = function (n, env) {
+    if (!n) return Vnil();
+    this.tick(n.line);
+    switch (n.type) {
+      case "INT": case "FLOAT": return Vnum(n.num);
+      case "STRING": return Vstr(n.str);
+      case "BOOL": return Vbool(n.boolean);
+      case "NIL": return Vnil();
+      case "IDENT": {
+        if (n.str === "STAR") return Vstar();
+        var v = env.get(n.str);
+        if (v !== undefined) return v;
+        if (n.str === "TupleSpace" || n.str === "tuplespace" || n.str === "Omega")
+          return Vts(this.ledger);
+        /* unknown identifier resolves to its name as a symbol/string */
+        return Vstr(n.str);
+      }
+      case "ARRAY": {
+        var items = [];
+        for (var i = 0; i < n.kids.length; i++) items.push(this.eval(n.kids[i], env));
+        var av0 = Varr(items);
+        /* 空リテラル [] で生まれた配列は「器 (flow vessel)」— 矢印代入
+           name <- 式 の相手がこの器のときだけ流し込み (追記) になる */
+        if (items.length === 0) av0.flow = true;
+        return av0;
+      }
+      case "UNARY": {
+        var u = this.eval(n.kids[0], env);
+        if (n.str === "-") return Vnum(-asNum(u));
+        if (n.str === "!") return Vbool(!truthy(u));
+        return u;
+      }
+      case "BINARY": {
+        var l = this.eval(n.kids[0], env), r = this.eval(n.kids[1], env);
+        return evalBinary(n.str, l, r);
+      }
+      case "INDEX": {
+        var base = this.eval(n.kids[0], env);
+        if (n.kids.length < 2) return Vnil();
+        var idx = Math.trunc(asNum(this.eval(n.kids[1], env)));
+        if (base.t === "arr" && idx >= 0 && idx < base.items.length) return base.items[idx];
+        if (base.t === "dist" && idx >= 0 && idx < base.p.length) return Vnum(base.p[idx]);
+        return Vnil();
+      }
+      case "GET": {
+        var b = this.eval(n.kids[0], env);
+        if (b.t === "inst") {
+          var fv = b.fields.get(n.str);
+          if (fv !== undefined) return fv;
+        }
+        if (b.t === "ts") {
+          if (n.str === "len" || n.str === "facts") return Vnum(b.ts ? b.ts.facts.length : 0);
+        }
+        if (b.t === "dist") {
+          if (n.str === "entropy") return this.global.get("entropy").fn([b], env);
+          if (n.str === "v" || n.str === "len") return Vnum(b.p.length);
+        }
+        if (b.t === "str") {
+          if (b.str === "Omega" || n.str === "tuplespace" || n.str === "DATABASE")
+            return Vts(this.ledger);
+          /* Omega::Quantum — expose the quantum-inference library namespace */
+          if (n.str === "Quantum") return Vstr("Quantum");
+        }
+        return Vstr(n.str);
+      }
+      case "CALL": {
+        var calleeNode = n.kids[0];
+        /* special: append/read/scan on a tuplespace value */
+        if (calleeNode.type === "GET") {
+          var gbase = this.eval(calleeNode.kids[0], env);
+          if (gbase.t === "ts" && calleeNode.str === "append") {
+            var av = n.kids.length > 1 ? this.eval(n.kids[1], env) : Vnil();
+            (gbase.ts || this.ledger).facts.push(av);
+            return Vnum((gbase.ts || this.ledger).facts.length - 1);
+          }
+          if (gbase.t === "ts" && (calleeNode.str === "read" || calleeNode.str === "scan")) {
+            var facts = (gbase.ts || this.ledger).facts;
+            return Varr(facts.slice());
+          }
+          /* Omega::Quantum.method(...) */
+          if (gbase.t === "str" && gbase.str === "Quantum") {
+            var qf = this.global.get(calleeNode.str);
+            if (qf && qf.t === "native") {
+              var qargs = [];
+              for (var qi = 1; qi < n.kids.length; qi++) qargs.push(this.eval(n.kids[qi], env));
+              return qf.fn(qargs, env) || Vnil();
+            }
+          }
+        }
+        var callee = this.eval(calleeNode, env);
+        var args = [];
+        for (var ai = 1; ai < n.kids.length; ai++) args.push(this.eval(n.kids[ai], env));
+        return this.callValue(callee, args, env);
+      }
+      case "LAMBDA": return { t: "func", decl: n, closure: env };
+      case "EACH": {
+        var coll = this.eval(n.kids[0], env);
+        var fn = this.eval(n.kids[1], env);
+        if (coll.t === "arr" && fn.t === "func") {
+          for (var ei = 0; ei < coll.items.length; ei++)
+            this.callValue(fn, [coll.items[ei]], env);
+        }
+        return Vnil();
+      }
+      case "COMMIT": {
+        /* l >> r : commit l to the append-only ledger, then yield r (or l) */
+        var cl = this.eval(n.kids[0], env);
+        if (cl.t !== "nil") this.ledger.facts.push(cl);
+        var cr = this.eval(n.kids[1], env);
+        return cr.t !== "nil" ? cr : cl;
+      }
+      case "QUERY": {
+        this.eval(n.kids[0], env);
+        return this.eval(n.kids[1], env);
+      }
+      case "LARROW": {
+        var tgt = this.eval(n.kids[0], env);
+        var val = this.eval(n.kids[1], env);
+        if (tgt.t === "arr") { tgt.items.push(val); return tgt; }
+        return val;
+      }
+      case "EXTENDED": {
+        /* reviser-extended form: bind captured holes _1.. and evaluate the
+           rule's stored denotation (an ordinary Bada expression) */
+        var scope = new Env(env);
+        for (var hi = 0; hi < n.kids.length; hi++)
+          scope.map["_" + (hi + 1)] = this.eval(n.kids[hi], env);
+        return this.eval(n.rule.denotation, scope);
+      }
+      default: break;
+    }
+    var f = this.exec(n, env);
+    return f.val;
+  };
+
+  Interp.prototype.exec = function (n, env) {
+    if (!n) return { ret: false, val: Vnil() };
+    this.tick(n.line);
+    switch (n.type) {
+      case "PROGRAM": case "BLOCK": {
+        var f = { ret: false, val: Vnil() };
+        for (var i = 0; i < n.kids.length; i++) {
+          f = this.exec(n.kids[i], env);
+          if (f.ret) return f;
+        }
+        return f;
+      }
+      case "BIND": {
+        var v = this.eval(n.kids[0], env);
+        env.set(n.str, v);
+        return { ret: false, val: v };
+      }
+      case "ARROWBIND": {
+        /* 矢印オブジェクト: [] で生まれた器へは流し込み (追記・従来の <- と
+           同じ)、それ以外の名前へは束縛 (:= の矢印形)。 */
+        var curv = env.get(n.str);
+        var av2 = this.eval(n.kids[0], env);
+        if (curv && curv.t === "arr" && curv.flow) { curv.items.push(av2); return { ret: false, val: curv }; }
+        env.set(n.str, av2);
+        return { ret: false, val: av2 };
+      }
+      case "ASSIGN": {
+        var lhs = n.kids[0];
+        var av = this.eval(n.kids[1], env);
+        if (lhs.type === "IDENT") env.set(lhs.str, av);
+        else if (lhs.type === "INDEX") {
+          var base = this.eval(lhs.kids[0], env);
+          var idx = Math.trunc(asNum(this.eval(lhs.kids[1], env)));
+          if (base.t === "arr" && idx >= 0 && idx < base.items.length) base.items[idx] = av;
+          else if (base.t === "dist" && idx >= 0 && idx < base.p.length) base.p[idx] = asNum(av);
+        }
+        return { ret: false, val: av };
+      }
+      case "FUNC": {
+        var fv = { t: "func", decl: n, closure: env };
+        env.set(n.str || "anon", fv);
+        return { ret: false, val: fv };
+      }
+      case "STRUCT": {
+        var sv = { t: "struct", name: n.str || "struct", decl: n, closure: env };
+        env.set(n.str || "struct", sv);
+        return { ret: false, val: sv };
+      }
+      case "ASPERAL": return { ret: false, val: Vnil() };
+      case "OMEGA_DB": {
+        env.set("tuplespace", Vts(this.ledger));
+        env.set("Omega", Vts(this.ledger));
+        if (n.body) return this.exec(n.body, env);
+        return { ret: false, val: Vnil() };
+      }
+      case "REVISER": {
+        if (n.body) return this.exec(n.body, env);
+        return { ret: false, val: Vnil() };
+      }
+      case "GRAMMAR": {
+        /* grammar transaction: commit each production rule as a ledger fact —
+           the grammar's history is auditable, append-only, monotone. */
+        for (var g = 0; g < n.rules.length; g++) {
+          var rule = n.rules[g];
+          this.ledger.facts.push(Varr([
+            Vstr("rule"), Vstr(rule.name), Vstr(rule.head),
+            Vstr(rule.pattern.map(function (a2) { return a2.kind === "hole" ? "expr" : a2.text; }).join(" "))
+          ]));
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "IF": {
+        var c = this.eval(n.kids[0], env);
+        if (truthy(c)) return this.exec(n.kids[1], env);
+        else if (n.kids.length > 2) return this.exec(n.kids[2], env);
+        return { ret: false, val: Vnil() };
+      }
+      case "WHILE": {
+        while (truthy(this.eval(n.kids[0], env))) {
+          var wf = this.exec(n.kids[1], env);
+          if (wf.ret) return wf;
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "FOR": {
+        var it = this.eval(n.kids[0], env);
+        var loop = new Env(env);
+        if (it.t === "arr") {
+          for (var fi = 0; fi < it.items.length; fi++) {
+            loop.map[n.str] = it.items[fi];
+            var ff = this.exec(n.kids[1], loop);
+            if (ff.ret) return ff;
+          }
+        } else if (it.t === "dist") {
+          for (var di = 0; di < it.p.length; di++) {
+            loop.map[n.str] = Vnum(it.p[di]);
+            var df = this.exec(n.kids[1], loop);
+            if (df.ret) return df;
+          }
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "RETURN": {
+        return { ret: true, val: n.kids.length ? this.eval(n.kids[0], env) : Vnil() };
+      }
+      case "PRINT": {
+        var parts = [];
+        for (var pi = 0; pi < n.kids.length; pi++)
+          parts.push(printValue(this.eval(n.kids[pi], env)));
+        this.out(parts.join(" "));
+        return { ret: false, val: Vnil() };
+      }
+      default: {
+        return { ret: false, val: this.eval(n, env) };
+      }
+    }
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Transpiler: Bada -> C  (self-contained C program, embedded runtime)
+   * ------------------------------------------------------------------ */
+  var C_RUNTIME = [
+    "/* ==== Bada C runtime (emitted by the Bada GUI IDE) ==== */",
+    "#include <stdio.h>",
+    "#include <stdlib.h>",
+    "#include <string.h>",
+    "#include <math.h>",
+    "#include <complex.h>",
+    "typedef enum{BV_NIL,BV_NUM,BV_STR,BV_ARR,BV_DIST,BV_REG}BVT;",
+    "typedef struct BV BV;",
+    "typedef struct{BV*it;int n,cap;}BArr;",
+    "typedef struct{double*p;int v;}BDist;",
+    "typedef struct{double*re;double*im;int n;int v;}BReg;",
+    "struct BV{BVT t;double num;char*str;BArr*arr;BDist*dist;BReg*reg;};",
+    "static BV bnil(void){BV v;memset(&v,0,sizeof v);v.t=BV_NIL;return v;}",
+    "static BV bnum(double x){BV v;memset(&v,0,sizeof v);v.t=BV_NUM;v.num=x;return v;}",
+    "static BV bstr(const char*s){BV v;memset(&v,0,sizeof v);v.t=BV_STR;v.str=strdup(s);return v;}",
+    "static BArr*barr(void){BArr*a=calloc(1,sizeof(BArr));return a;}",
+    "static void bpush(BArr*a,BV v){if(a->n>=a->cap){a->cap=a->cap?a->cap*2:8;a->it=realloc(a->it,a->cap*sizeof(BV));}a->it[a->n++]=v;}",
+    "static BV barrv(BArr*a){BV v;memset(&v,0,sizeof v);v.t=BV_ARR;v.arr=a;return v;}",
+    "static BDist*bdist(int v){if(v<1)v=1;BDist*d=malloc(sizeof(BDist));d->p=calloc((size_t)v,sizeof(double));d->v=v;return d;}",
+    "static BV bdistv(BDist*d){BV v;memset(&v,0,sizeof v);v.t=BV_DIST;v.dist=d;return v;}",
+    "static double bnumof(BV v){return v.t==BV_NUM?v.num:0;}",
+    "/* append-only ledger */",
+    "static BV*G_FACTS=0;static int G_N=0,G_CAP=0;",
+    "static int bcommit(BV v){if(G_N>=G_CAP){G_CAP=G_CAP?G_CAP*2:8;G_FACTS=realloc(G_FACTS,G_CAP*sizeof(BV));}G_FACTS[G_N]=v;return G_N++;}",
+    "static int bledger_len(void){return G_N;}",
+    "static BDist*G_LAST_A=0;",
+    "/* engine builtins */",
+    "static BV b_softmax(BV a){int v;double*src;int own=0;",
+    "  if(a.t==BV_DIST){v=a.dist->v;src=a.dist->p;}else if(a.t==BV_ARR){v=a.arr->n;src=malloc(v*sizeof(double));for(int i=0;i<v;i++)src[i]=bnumof(a.arr->it[i]);own=1;}else return bnil();",
+    "  BDist*o=bdist(v);double mx=-INFINITY;for(int i=0;i<v;i++)if(src[i]>mx)mx=src[i];double s=0;for(int i=0;i<v;i++){o->p[i]=exp(src[i]-mx);s+=o->p[i];}for(int i=0;i<v;i++)o->p[i]/=s;for(int i=0;i<v;i++)if(src[i]-mx<-30.0)o->p[i]=0.0;{double ss=0;for(int i=0;i<v;i++)ss+=o->p[i];if(ss>0)for(int i=0;i<v;i++)o->p[i]/=ss;}if(own)free(src);return bdistv(o);}",
+    "static BV b_entropy(BV a){double*p;int v;int own=0;if(a.t==BV_DIST){p=a.dist->p;v=a.dist->v;}else if(a.t==BV_ARR){v=a.arr->n;p=malloc(v*sizeof(double));for(int i=0;i<v;i++)p[i]=bnumof(a.arr->it[i]);own=1;}else return bnum(0);",
+    "  double H=0;for(int i=0;i<v;i++){double q=p[i];if(q<1e-12)q=1e-12;H+=-q*log(q);}if(own)free(p);return bnum(H);}",
+    "static BV b_unknown_prior(BV a){int v=(int)bnumof(a);if(v<1)v=1;BDist*d=bdist(v);for(int i=0;i<v;i++)d->p[i]=1.0/v;return bdistv(d);}",
+    "static BV b_update(BV pr,BV ev,double lr){if(pr.t!=BV_DIST)return pr;BDist*P=pr.dist;double*E;int ev_v;int own=0;",
+    "  if(ev.t==BV_DIST){E=ev.dist->p;ev_v=ev.dist->v;}else if(ev.t==BV_ARR){ev_v=ev.arr->n;E=malloc(ev_v*sizeof(double));for(int i=0;i<ev_v;i++)E[i]=bnumof(ev.arr->it[i]);own=1;}else return pr;",
+    "  int v=P->v;BDist*o=bdist(v);double s=0;for(int i=0;i<v;i++){double e=i<ev_v?E[i]:0;o->p[i]=(1-lr)*P->p[i]+lr*e;s+=o->p[i];}if(s>0)for(int i=0;i<v;i++)o->p[i]/=s;if(own)free(E);return bdistv(o);}",
+    "static BV b_cognitive(BV base,BArr*mods,BArr*betas){BDist*a;",
+    "  if(base.t!=BV_DIST&&base.t!=BV_ARR)return bnil();",
+    "  if(base.t==BV_DIST){a=bdist(base.dist->v);for(int i=0;i<a->v;i++)a->p[i]=base.dist->p[i];}else{BV s=b_softmax(base);if(s.t!=BV_DIST)return bnil();a=bdist(s.dist->v);for(int i=0;i<a->v;i++)a->p[i]=s.dist->p[i];}",
+    "  int v=a->v;if(v<1)v=1;double*th=calloc((size_t)v,sizeof(double));",
+    "  if(mods)for(int m=0;m<mods->n;m++){if(mods->it[m].t!=BV_ARR)continue;BArr*pr=mods->it[m].arr;if(pr->n<2)continue;",
+    "    double*q;int qv;int own=0;if(pr->it[0].t==BV_DIST){q=pr->it[0].dist->p;qv=pr->it[0].dist->v;}else if(pr->it[0].t==BV_ARR){qv=pr->it[0].arr->n;q=malloc(qv*sizeof(double));for(int i=0;i<qv;i++)q[i]=bnumof(pr->it[0].arr->it[i]);own=1;}else continue;",
+    "    double H=0;for(int i=0;i<qv;i++){double qq=q[i];if(qq<1e-12)qq=1e-12;H+=-qq*log(qq);}",
+    "    BArr*phi=pr->it[1].t==BV_ARR?pr->it[1].arr:0;double beta=(betas&&m<betas->n)?bnumof(betas->it[m]):1.0;",
+    "    for(int i=0;i<v;i++){double pv=(phi&&i<phi->n)?bnumof(phi->it[i]):0;th[i]+=beta*H*pv;}if(own)free(q);}",
+    "  BDist*qh=bdist(v);double s=0;for(int i=0;i<v;i++){double complex psi=sqrt(a->p[i])*cexp(I*th[i]);double mag2=creal(psi)*creal(psi)+cimag(psi)*cimag(psi);qh->p[i]=mag2;s+=mag2;}if(s>0)for(int i=0;i<v;i++)qh->p[i]/=s;free(th);",
+    "  if(G_LAST_A){free(G_LAST_A->p);free(G_LAST_A);}G_LAST_A=a;",
+    "  BDist*snap=bdist(v);for(int i=0;i<v;i++)snap->p[i]=qh->p[i];bcommit(bdistv(snap));return bdistv(qh);}",
+    "static BV b_last_a(void){if(!G_LAST_A)return bnil();BDist*c=bdist(G_LAST_A->v);for(int i=0;i<c->v;i++)c->p[i]=G_LAST_A->p[i];return bdistv(c);}",
+    "static BV b_zeros_of(BV a){BArr*o=barr();if(a.t==BV_DIST){for(int i=0;i<a.dist->v;i++)if(a.dist->p[i]==0.0)bpush(o,bnum(i));}return barrv(o);}",
+    "static BV b_maxdiff(BV a,BV b){if(a.t!=BV_DIST||b.t!=BV_DIST)return bnum(0);int v=a.dist->v<b.dist->v?a.dist->v:b.dist->v;double m=0;for(int i=0;i<v;i++){double d=fabs(a.dist->p[i]-b.dist->p[i]);if(d>m)m=d;}return bnum(m);}",
+    "static BV b_sci(BV a){char buf[64];snprintf(buf,64,\"%.2e\",bnumof(a));return bstr(buf);}",
+    "static BV b_f5(BV a){char buf[64];snprintf(buf,64,\"%.5f\",bnumof(a));return bstr(buf);}",
+    "/* ==== quantum sublanguage on the phase core ==== */",
+    "static BReg*bqreg(int n){BReg*r=malloc(sizeof(BReg));r->n=n;r->v=1<<n;r->re=calloc(r->v,sizeof(double));r->im=calloc(r->v,sizeof(double));r->re[0]=1;return r;}",
+    "static BV bregv(BReg*r){BV v;memset(&v,0,sizeof v);v.t=BV_REG;v.reg=r;return v;}",
+    "static BV b_qubit(BV a){int n=(int)bnumof(a);if(n<1)n=1;return bregv(bqreg(n));}",
+    "static void b_gate_h(BReg*r,int q){int bit=1<<q;double c=M_SQRT1_2;for(int i=0;i<r->v;i++){if(i&bit)continue;int j=i|bit;double ar=r->re[i],ai=r->im[i],br=r->re[j],bi=r->im[j];r->re[i]=c*(ar+br);r->im[i]=c*(ai+bi);r->re[j]=c*(ar-br);r->im[j]=c*(ai-bi);}}",
+    "static void b_gate_x(BReg*r,int q){int bit=1<<q;for(int i=0;i<r->v;i++){if(i&bit)continue;int j=i|bit;double tr=r->re[i],ti=r->im[i];r->re[i]=r->re[j];r->im[i]=r->im[j];r->re[j]=tr;r->im[j]=ti;}}",
+    "static void b_gate_ph(BReg*r,int q,double lam){int bit=1<<q;double c=cos(lam),s=sin(lam);for(int i=0;i<r->v;i++){if(!(i&bit))continue;double ar=r->re[i],ai=r->im[i];r->re[i]=ar*c-ai*s;r->im[i]=ar*s+ai*c;}}",
+    "static void b_gate_cnot(BReg*r,int cq,int tq){int cb=1<<cq,tb=1<<tq;for(int i=0;i<r->v;i++){if((i&cb)&&!(i&tb)){int j=i|tb;double tr=r->re[i],ti=r->im[i];r->re[i]=r->re[j];r->im[i]=r->im[j];r->re[j]=tr;r->im[j]=ti;}}}",
+    "static BV b_H(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_h(a.reg,q);return a;}",
+    "static BV b_X(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_x(a.reg,q);return a;}",
+    "static BV b_S(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,M_PI/2);return a;}",
+    "static BV b_T(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,M_PI/4);return a;}",
+    "static BV b_Rz(BV a,double lam,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,lam);return a;}",
+    "static BV b_CNOT(BV a,int c,int t){if(a.t!=BV_REG)return bnil();b_gate_cnot(a.reg,c,t);return a;}",
+    "static BV b_phase_uniform(BV a){if(a.t!=BV_REG)return bnil();for(int q=0;q<a.reg->n;q++)b_gate_h(a.reg,q);return a;}",
+    "static BV b_measure(BV a){if(a.t==BV_DIST){bcommit(a);return a;}if(a.t!=BV_REG)return bnil();BReg*r=a.reg;BDist*d=bdist(r->v);double s=0;for(int i=0;i<r->v;i++){d->p[i]=r->re[i]*r->re[i]+r->im[i]*r->im[i];s+=d->p[i];}if(s>0)for(int i=0;i<r->v;i++)d->p[i]/=s;BDist*snap=bdist(r->v);for(int i=0;i<r->v;i++)snap->p[i]=d->p[i];bcommit(bdistv(snap));return bdistv(d);}",
+    "/* Omega::Quantum estimator: max-entropy start + append-only sharpening */",
+    "static BDist*G_QPRIOR=0;",
+    "static BV b_prepare_unknown(BV a){int n=(int)bnumof(a);if(n<1)n=1;int V=1<<n;BDist*p=bdist(V);for(int i=0;i<V;i++)p->p[i]=1.0/V;G_QPRIOR=p;BDist*c=bdist(V);for(int i=0;i<V;i++)c->p[i]=p->p[i];return bdistv(c);}",
+    "static BV b_observe(BV a){BV d=b_measure(a);if(d.t==BV_DIST&&G_QPRIOR){int v=G_QPRIOR->v;BDist*o=bdist(v);double s=0;for(int i=0;i<v;i++){double e=i<d.dist->v?d.dist->p[i]:0;o->p[i]=0.5*G_QPRIOR->p[i]+0.5*e;s+=o->p[i];}if(s>0)for(int i=0;i<v;i++)o->p[i]/=s;free(G_QPRIOR->p);free(G_QPRIOR);G_QPRIOR=o;}return d;}",
+    "static BV b_estimate(void){if(!G_QPRIOR)return bnil();BDist*c=bdist(G_QPRIOR->v);for(int i=0;i<c->v;i++)c->p[i]=G_QPRIOR->p[i];return bdistv(c);}",
+    "static BV b_forbidden(void){BArr*o=barr();if(G_QPRIOR)for(int i=0;i<G_QPRIOR->v;i++)if(G_QPRIOR->p[i]==0.0)bpush(o,bnum(i));return barrv(o);}",
+    "static BV bindex(BV b,BV i){int k=(int)bnumof(i);if(b.t==BV_DIST&&k>=0&&k<b.dist->v)return bnum(b.dist->p[k]);if(b.t==BV_ARR&&k>=0&&k<b.arr->n)return b.arr->it[k];return bnil();}",
+    "static void bprint(BV v){switch(v.t){case BV_NIL:printf(\"nil\");break;case BV_NUM:if(v.num==(long long)v.num)printf(\"%lld\",(long long)v.num);else printf(\"%.5f\",v.num);break;case BV_STR:printf(\"%s\",v.str);break;case BV_ARR:{printf(\"[\");for(int i=0;i<v.arr->n;i++){if(i)printf(\", \");bprint(v.arr->it[i]);}printf(\"]\");break;}case BV_DIST:{printf(\"dist[\");for(int i=0;i<v.dist->v;i++){if(i)printf(\", \");printf(\"%.5f\",v.dist->p[i]);}printf(\"]\");break;}case BV_REG:{BV d=b_measure(v);G_N--;printf(\"qreg[n=%d] |psi|^2=[\",v.reg->n);for(int i=0;i<d.dist->v;i++){if(i)printf(\", \");printf(\"%.5f\",d.dist->p[i]);}printf(\"]\");break;}}}",
+    "static BV badd(BV a,BV b){if(a.t==BV_STR||b.t==BV_STR){char x[256],y[256],z[520];if(a.t==BV_STR)snprintf(x,256,\"%s\",a.str);else snprintf(x,256,\"%g\",bnumof(a));if(b.t==BV_STR)snprintf(y,256,\"%s\",b.str);else snprintf(y,256,\"%g\",bnumof(b));snprintf(z,520,\"%s%s\",x,y);return bstr(z);}return bnum(bnumof(a)+bnumof(b));}",
+    "static BV bsub(BV a,BV b){return bnum(bnumof(a)-bnumof(b));}",
+    "static BV bmul(BV a,BV b){return bnum(bnumof(a)*bnumof(b));}",
+    "static BV bdiv(BV a,BV b){double d=bnumof(b);return bnum(d!=0?bnumof(a)/d:0);}",
+    ""
+  ].join("\n");
+
+  function Emitter() {
+    this.lines = [];
+    this.tmp = 0;
+    this.declared = Object.create(null);
+  }
+  Emitter.prototype.push = function (s) { this.lines.push(s); };
+
+  function lowerCall(E, n, holes) {
+    var callee = n.kids[0];
+    var argc = n.kids.length - 1;
+    function arg(i, dflt) {
+      return i < argc ? lowerExpr(E, n.kids[i + 1], holes) : (dflt || "bnil()");
+    }
+    if (callee.type === "IDENT") {
+      var name = callee.str;
+      switch (name) {
+        case "softmax": return "b_softmax(" + arg(0) + ")";
+        case "entropy": return "b_entropy(" + arg(0) + ")";
+        case "unknown_prior": return "b_unknown_prior(" + arg(0) + ")";
+        case "dist": return "(" + arg(0) + ")";
+        case "len": {
+          if (argc > 0 && n.kids[1].type === "IDENT" &&
+              (n.kids[1].str === "tuplespace" || n.kids[1].str === "Omega" || n.kids[1].str === "TupleSpace"))
+            return "bnum(bledger_len())";
+          var a0 = arg(0);
+          return "bnum((" + a0 + ").t==BV_ARR?(" + a0 + ").arr->n:((" + a0 + ").t==BV_DIST?(" + a0 + ").dist->v:((" + a0 + ").t==BV_REG?(" + a0 + ").reg->v:0)))";
+        }
+        case "sqrt": return "bnum(sqrt(bnumof(" + arg(0) + ")))";
+        case "log": return "bnum(log(bnumof(" + arg(0) + ")))";
+        case "exp": return "bnum(exp(bnumof(" + arg(0) + ")))";
+        case "abs": return "bnum(fabs(bnumof(" + arg(0) + ")))";
+        case "ledger": return "bnum(bledger_len())";
+        case "zeros_of": return "b_zeros_of(" + arg(0) + ")";
+        case "maxdiff": return "b_maxdiff(" + arg(0) + "," + arg(1) + ")";
+        case "sci": return "b_sci(" + arg(0) + ")";
+        case "f5": return "b_f5(" + arg(0) + ")";
+        case "last_a": return "b_last_a()";
+        case "update": {
+          if (argc > 2) return "b_update(" + arg(0) + "," + arg(1) + ",bnumof(" + arg(2) + "))";
+          return "b_update(" + arg(0) + "," + arg(1) + ",0.5)";
+        }
+        case "cognitive_system": {
+          var b0 = arg(0), b1 = arg(1, "bnil()"), b2 = arg(2, "bnil()");
+          var t1 = "t" + (E.tmp++), t2 = "t" + (E.tmp++);
+          E.push("  BV " + t1 + "=" + b1 + "; BV " + t2 + "=" + b2 + ";");
+          return "b_cognitive(" + b0 + ",(" + t1 + ").t==BV_ARR?(" + t1 + ").arr:0,(" + t2 + ").t==BV_ARR?(" + t2 + ").arr:0)";
+        }
+        /* quantum sublanguage */
+        case "qubit": return "b_qubit(" + arg(0) + ")";
+        case "H": return "b_H(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "X": return "b_X(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "S": return "b_S(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "T": return "b_T(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "Rz": return "b_Rz(" + arg(0) + "," + (argc > 1 ? "bnumof(" + arg(1) + ")" : "0") + "," + (argc > 2 ? "(int)bnumof(" + arg(2) + ")" : "0") + ")";
+        case "CNOT": return "b_CNOT(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + "," + (argc > 2 ? "(int)bnumof(" + arg(2) + ")" : "1") + ")";
+        case "Measure": case "commit_measurement": return "b_measure(" + arg(0) + ")";
+        case "observe": return "b_observe(" + arg(0) + ")";
+        case "phase_uniform": return "b_phase_uniform(" + arg(0) + ")";
+        case "prepare_unknown": return "b_prepare_unknown(" + arg(0) + ")";
+        case "estimate": return "b_estimate()";
+        case "forbidden": return "b_forbidden()";
+      }
+    }
+    /* method call: x.append(v) -> bcommit(v) */
+    if (callee.type === "GET" && callee.str === "append") {
+      return "bnum(bcommit(" + arg(0) + "))";
+    }
+    return "bnil()";
+  }
+
+  function cQuote(s) {
+    return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\t/g, "\\t");
+  }
+
+  function lowerExpr(E, n, holes) {
+    if (!n) return "bnil()";
+    switch (n.type) {
+      case "INT": case "FLOAT": {
+        var s = String(n.num);
+        if (!/[.eE]/.test(s)) s += ".0";
+        return "bnum(" + s + ")";
+      }
+      case "STRING": return 'bstr("' + cQuote(n.str || "") + '")';
+      case "BOOL": return "bnum(" + (n.boolean ? 1 : 0) + ")";
+      case "NIL": return "bnil()";
+      case "IDENT": {
+        if (holes && Object.prototype.hasOwnProperty.call(holes, n.str)) return holes[n.str];
+        if (n.str === "tuplespace" || n.str === "Omega" || n.str === "TupleSpace")
+          return "bnum(bledger_len())";
+        return "v_" + n.str;
+      }
+      case "ARRAY": {
+        var id = E.tmp++;
+        E.push("  BArr*t" + id + "=barr();");
+        for (var i = 0; i < n.kids.length; i++) {
+          var e = lowerExpr(E, n.kids[i], holes);
+          E.push("  bpush(t" + id + "," + e + ");");
+        }
+        return "barrv(t" + id + ")";
+      }
+      case "BINARY": {
+        var l = lowerExpr(E, n.kids[0], holes);
+        var r = lowerExpr(E, n.kids[1], holes);
+        switch (n.str) {
+          case "+": return "badd(" + l + "," + r + ")";
+          case "-": return "bsub(" + l + "," + r + ")";
+          case "*": return "bmul(" + l + "," + r + ")";
+          case "/": return "bdiv(" + l + "," + r + ")";
+          case "<": return "bnum(bnumof(" + l + ")<bnumof(" + r + ")?1:0)";
+          case "<=": return "bnum(bnumof(" + l + ")<=bnumof(" + r + ")?1:0)";
+          case ">": return "bnum(bnumof(" + l + ")>bnumof(" + r + ")?1:0)";
+          case ">=": return "bnum(bnumof(" + l + ")>=bnumof(" + r + ")?1:0)";
+          case "==": return "bnum(bnumof(" + l + ")==bnumof(" + r + ")?1:0)";
+          case "!=": return "bnum(bnumof(" + l + ")!=bnumof(" + r + ")?1:0)";
+          case "%": return "bnum(fmod(bnumof(" + l + "),bnumof(" + r + ")))";
+          case "&&": return "bnum((bnumof(" + l + ")!=0&&bnumof(" + r + ")!=0)?1:0)";
+          case "||": return "bnum((bnumof(" + l + ")!=0||bnumof(" + r + ")!=0)?1:0)";
+          default: return "bnum(bnumof(" + l + ")+bnumof(" + r + "))";
+        }
+      }
+      case "CALL": return lowerCall(E, n, holes);
+      case "UNARY": {
+        var u = lowerExpr(E, n.kids[0], holes);
+        if (n.str === "-") return "bnum(-bnumof(" + u + "))";
+        if (n.str === "!") return "bnum(bnumof(" + u + ")==0?1:0)";
+        return "(" + u + ")";
+      }
+      case "INDEX": {
+        var b = lowerExpr(E, n.kids[0], holes);
+        var ix = n.kids.length > 1 ? lowerExpr(E, n.kids[1], holes) : "bnum(0)";
+        return "bindex(" + b + "," + ix + ")";
+      }
+      case "COMMIT": {
+        var cl = lowerExpr(E, n.kids[0], holes);
+        var id2 = E.tmp++;
+        E.push("  BV c" + id2 + "=" + cl + "; bcommit(c" + id2 + ");");
+        return lowerExpr(E, n.kids[1], holes);
+      }
+      case "QUERY": {
+        var q0 = lowerExpr(E, n.kids[0], holes);
+        var id3 = E.tmp++;
+        E.push("  BV q" + id3 + "=" + q0 + "; (void)q" + id3 + ";");
+        return lowerExpr(E, n.kids[1], holes);
+      }
+      case "EXTENDED": {
+        /* lower an extended form by lowering the rule denotation with the
+           captured holes substituted (rule lookup happens before lowering,
+           so the native back end sees only ordinary engine calls) */
+        var hmap = {};
+        for (var h = 0; h < n.kids.length; h++) {
+          var he = lowerExpr(E, n.kids[h], holes);
+          var ht = "h" + (E.tmp++);
+          E.push("  BV " + ht + "=" + he + ";");
+          hmap["_" + (h + 1)] = ht;
+        }
+        return lowerExpr(E, n.rule.denotation, hmap);
+      }
+      case "GET": return "bnil()";
+      default: return "bnil()";
+    }
+  }
+
+  function lowerStmt(E, n) {
+    switch (n.type) {
+      case "BIND": case "ARROWBIND": {
+        var e = lowerExpr(E, n.kids[0], null);
+        if (E.declared[n.str]) E.push("  v_" + n.str + "=" + e + ";");
+        else { E.declared[n.str] = true; E.push("  BV v_" + n.str + "=" + e + "; (void)v_" + n.str + ";"); }
+        break;
+      }
+      case "ASSIGN": {
+        if (n.kids[0].type === "IDENT") {
+          var e2 = lowerExpr(E, n.kids[1], null);
+          if (!E.declared[n.kids[0].str]) { E.declared[n.kids[0].str] = true; E.push("  BV v_" + n.kids[0].str + "=" + e2 + ";"); }
+          else E.push("  v_" + n.kids[0].str + "=" + e2 + ";");
+        }
+        break;
+      }
+      case "PRINT": {
+        var parts = [];
+        for (var i = 0; i < n.kids.length; i++) parts.push(lowerExpr(E, n.kids[i], null));
+        var stmt = "  ";
+        for (var j = 0; j < parts.length; j++) {
+          stmt += "bprint(" + parts[j] + ");";
+          if (j < parts.length - 1) stmt += 'printf(" ");';
+        }
+        stmt += 'printf("\\n");';
+        E.push(stmt);
+        break;
+      }
+      case "OMEGA_DB": case "REVISER":
+        if (n.body) for (var k = 0; k < n.body.kids.length; k++) lowerStmt(E, n.body.kids[k]);
+        break;
+      case "GRAMMAR":
+        E.push("  /* grammar transaction: " + n.rules.map(function (r) { return r.name; }).join(", ") + " (resolved before lowering) */");
+        break;
+      case "BLOCK":
+        for (var l = 0; l < n.kids.length; l++) lowerStmt(E, n.kids[l]);
+        break;
+      case "FUNC": case "STRUCT": case "ASPERAL":
+        E.push("  /* decl '" + (n.str || "?") + "' specialised at compile time (interp register) */");
+        break;
+      case "IF": {
+        var c = lowerExpr(E, n.kids[0], null);
+        E.push("  if(bnumof(" + c + ")!=0){");
+        lowerStmt(E, n.kids[1]);
+        E.push("  }");
+        if (n.kids.length > 2) { E.push("  else {"); lowerStmt(E, n.kids[2]); E.push("  }"); }
+        break;
+      }
+      case "WHILE": {
+        var wc = lowerExpr(E, n.kids[0], null);
+        E.push("  while(bnumof(" + wc + ")!=0){");
+        lowerStmt(E, n.kids[1]);
+        E.push("  }");
+        break;
+      }
+      case "FOR":
+        E.push("  /* 'for' outside the transpiled subset (runs in the interpreter) */");
+        break;
+      default: {
+        var ex = lowerExpr(E, n, null);
+        E.push("  (void)(" + ex + ");");
+      }
+    }
+  }
+
+  function transpileToC(program) {
+    var E = new Emitter();
+    var body = [];
+    E.lines = body;
+    for (var i = 0; i < program.kids.length; i++) lowerStmt(E, program.kids[i]);
+    return C_RUNTIME + "\nint main(void){\n" + body.join("\n") + "\n  return 0;\n}\n";
+  }
+
+  /* ------------------------------------------------------------------ *
+   * AST / token dumps (for the IDE's inspector panes)
+   * ------------------------------------------------------------------ */
+  function dumpAst(n, d, out) {
+    var pad = new Array(d + 1).join("  ");
+    var s = pad + n.type.toLowerCase();
+    if (n.str) s += " '" + n.str + "'";
+    if (n.type === "INT" || n.type === "FLOAT") s += " " + n.num;
+    if (n.params && n.params.length) s += " |" + n.params.join(",") + "|";
+    out.push(s);
+    for (var i = 0; i < n.kids.length; i++) dumpAst(n.kids[i], d + 1, out);
+    if (n.body) dumpAst(n.body, d + 1, out);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Public API
+   * ------------------------------------------------------------------ */
+  return {
+    VERSION: VERSION,
+    tokenize: tokenize,
+    parse: parseProgram,
+    tokens: function (src) {
+      return tokenize(src).map(function (t) {
+        return String(t.line).padStart(4) + "  " + t.type.padEnd(10) + "  " + (t.lexeme || "");
+      }).join("\n");
+    },
+    ast: function (src) {
+      var p = parseProgram(src);
+      var out = [];
+      dumpAst(p.program, 0, out);
+      return { text: out.join("\n"), errors: p.errors };
+    },
+    run: function (src, opts) {
+      opts = opts || {};
+      var lines = [];
+      var p = parseProgram(src);
+      var interp = new Interp({
+        out: function (s) { lines.push(s); if (opts.out) opts.out(s); },
+        maxSteps: opts.maxSteps
+      });
+      var ok = true, error = null;
+      try {
+        interp.exec(p.program, interp.global);
+      } catch (e) {
+        ok = false;
+        error = String(e && e.message ? e.message : e);
+        lines.push("[runtime error] " + error);
+      }
+      return {
+        ok: ok && p.errors.length === 0,
+        output: lines.join("\n"),
+        parseErrors: p.errors,
+        error: error,
+        ledgerLen: interp.ledger.facts.length,
+        rules: p.ruleLedger.map(function (r) { return r.name + " (" + r.head + ")"; })
+      };
+    },
+    emitC: function (src) {
+      var p = parseProgram(src);
+      var c = transpileToC(p.program);
+      return { ok: p.errors.length === 0, c: c, errors: p.errors };
+    }
+  };
+});
+</script>
+<script>
+window.CONTACT_SRC="# ============================================================\n# contact-bb84.bada — 宇宙人コンタクトのための量子暗号エンジン\n#                     (BB84 量子鍵配送 + Jones 鍵 + 暗号化)\n#                     全面的に矢印オブジェクト構文で記述。\n#\n# 量子コンピューターでコンタクトを取る、の正直な物理:\n#   ・量子もつれ自体はメッセージを運べない (no-communication 定理)。\n#   ・量子計算機の実際の役割は「鍵」— BB84 量子鍵配送で盗聴不可能な\n#     共有鍵を作り、メッセージ本文は電磁波 (電波) で送る。\n#   ・盗聴者が割り込むと量子力学が QBER ≈ 25% の誤り率として\n#     それを暴露する — これが量子暗号の本体である。\n#   ・地球外文明との接触実績は 2026 年時点でゼロ。これは実在の\n#     METI 送信 (アレシボ 1974 → M13, Sónar Calling 2017 → GJ 273b)\n#     と同じ様式のメッセージを量子暗号で守る装置である。\n#\n# 矢印オブジェクト:  x <- v は束縛、[] で生まれた器への <- は流し込み。\n# 量子命令:          qubit / H / CNOT / Measure (測定台帳へコミット)。\n# ============================================================\n\nprint(\"================================================================\")\nprint(\"CONTACT-BB84 BADA -- 量子鍵配送 x Jones鍵 x コンタクト暗号化\")\nprint(\"================================================================\")\n\nPI <- 3.141592653589793\n\n# ---- 擬似乱数 (LCG): 量子統計 0.5/0.5 からのサンプリングに使う --------\nSEED <- 42.0\ndef lcg(s) { return (s * 1103.0 + 12345.0) % 100003.0 }\n\n# ---- 量子統計の検証: H|0> の測定分布は厳密に 0.5 / 0.5 ----------------\nreg <- qubit(1)\nreg <- H(reg, 0)\nd <- Measure(reg)\nprint(\"\")\nprint(\"[量子] H|0> の測定分布 |psi|^2 :\", f5(d[0]), f5(d[1]), \" (0.5/0.5 が正解)\")\n\n# ---- BB84: アリス (地球) とボブ (受信者) の量子鍵配送 ------------------\nN <- 24\nabits <- []\nabase <- []\nbbase <- []\nbbits <- []\ns <- SEED\ni <- 0\nwhile (i < N) {\n    s <- lcg(s)\n    abits <- s % 2.0\n    s <- lcg(s)\n    abase <- s % 2.0\n    s <- lcg(s)\n    bbase <- s % 2.0\n    i <- i + 1\n}\n# ボブの測定: 基底が一致 -> 確率1で同じビット / 不一致 -> H分布 0.5 の硬貨\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> {\n        bbits <- abits[i]\n    } else {\n        s <- lcg(s)\n        bbits <- s % 2.0\n    }\n    i <- i + 1\n}\n# ふるい (sifting): 基底が一致した位置だけが鍵になる\nkey <- []\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> { key <- abits[i] }\n    i <- i + 1\n}\n# QBER (盗聴なし): ふるい後の不一致率は厳密に 0\nerr <- 0\nkept <- 0\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> {\n        kept <- kept + 1\n        (abits[i] != bbits[i]) -> { err <- err + 1 }\n    }\n    i <- i + 1\n}\nprint(\"\")\nprint(\"[BB84] 量子ビット数:\", N, \" ふるい後の鍵長:\", len(key), \" QBER:\", err, \"/\", kept, \" (盗聴なし=0)\")\n\n# ---- 盗聴者イヴ: 傍受再送攻撃は QBER ~ 25% として必ず露見する ----------\neerr <- 0\nekept <- 0\ni <- 0\ns2 <- SEED + 7.0\nwhile (i < N) {\n    s2 <- lcg(s2)\n    ebase <- s2 % 2.0\n    ebit <- abits[i]\n    (ebase != abase[i]) -> { s2 <- lcg(s2) ebit <- s2 % 2.0 }\n    bbit2 <- ebit\n    (abase[i] != ebase) -> { s2 <- lcg(s2) bbit2 <- s2 % 2.0 }\n    (abase[i] == bbase[i]) -> {\n        ekept <- ekept + 1\n        (bbit2 != abits[i]) -> { eerr <- eerr + 1 }\n    }\n    i <- i + 1\n}\nprint(\"[BB84] 盗聴者イヴ挿入時の QBER:\", eerr, \"/\", ekept, \" (理論値 25% — 量子力学が盗聴を暴露)\")\nprint(\"       判定: QBER > 11% なら鍵を破棄して再配送 — これが量子暗号の防御\")\n\n# ---- Bell 対の零保存: 配送路の完全性証明 (QKD 同型) --------------------\nbell <- qubit(2)\nbell <- H(bell, 0)\nbell <- CNOT(bell, 0, 1)\nbo <- Measure(bell)\nintact <- 0\n(bo[1] == 0) -> { (bo[2] == 0) -> { intact <- 1 } }\nprint(\"[Bell] 零保存 |01>,|10> = 0 (盗聴なし=1):\", intact, \" 台帳 =\", len(tuplespace), \"facts\")\n\n# ---- Jones 鍵: 鍵ビットを三葉結び目の |V(e^{i theta})| に通す ----------\ndef sin_t(x) {\n    x <- x % (2.0 * PI)\n    (x > PI)       -> { x <- x - 2.0 * PI }\n    (x < 0.0 - PI) -> { x <- x + 2.0 * PI }\n    term <- x\n    sm <- x\n    k <- 1\n    while (k <= 11) {\n        term <- 0.0 - term * x * x / ((2.0 * k) * (2.0 * k + 1.0))\n        sm <- sm + term\n        k <- k + 1\n    }\n    return sm\n}\ndef cos_t(x) { return sin_t(PI / 2.0 - x) }\ndef jones_abs(theta) {\n    re <- 0.0 - cos_t(0.0 - 4.0 * theta) + cos_t(0.0 - 3.0 * theta) + cos_t(0.0 - theta)\n    im <- 0.0 - sin_t(0.0 - 4.0 * theta) + sin_t(0.0 - 3.0 * theta) + sin_t(0.0 - theta)\n    return sqrt(re * re + im * im)\n}\nkv <- 0.0\ni <- 0\nwhile (i < len(key)) {\n    kv <- kv * 2.0 + key[i]\n    (kv > 65536.0) -> { kv <- kv % 65521.0 }\n    i <- i + 1\n}\njtheta <- (kv % 1400.0) / 1400.0 * PI\njkey <- jones_abs(jtheta)\nprint(\"\")\nprint(\"[Jones] 鍵値 =\", kv, \" -> theta =\", f5(jtheta), \" -> |V| =\", f5(jkey), \" (Jones量子鍵)\")\n\n# ---- コンタクト文の暗号化 / 復号 (鍵ストリーム, 往復一致を証明) --------\nmsg <- \"WE COME IN PEACE\"\nks <- kv + jkey * 1000.0\nct <- []\ni <- 0\nwhile (i < len(msg)) {\n    ks <- lcg(ks)\n    ct <- (ord(msg, i) + ks) % 65536.0\n    i <- i + 1\n}\nks2 <- kv + jkey * 1000.0\nback <- \"\"\ni <- 0\nwhile (i < len(ct)) {\n    ks2 <- lcg(ks2)\n    back <- back + chr((ct[i] - ks2 + 65536.0) % 65536.0)\n    i <- i + 1\n}\nprint(\"[暗号] 平文:\", msg)\nprint(\"[暗号] 暗号文 (先頭4符号):\", ct[0], ct[1], ct[2], ct[3])\nprint(\"[復号] 復元:\", back)\n(back == msg) -> { print(\"[復号] 往復一致 = 1 (量子鍵で保護されたコンタクト文)\") }\n\nprint(\"\")\nprint(\"正直な注記: もつれ自体は通信に使えない (no-communication 定理)。\")\nprint(\"量子計算機の役割は鍵 (BB84) であり、搬送は電磁波である。実在の\")\nprint(\"METI 送信 (1974 アレシボ -> M13 / 2017 Sonar Calling -> GJ 273b)\")\nprint(\"への返信を含め、地球外からの接触は 2026 年時点でゼロである。\")\nprint(\"@@BB84-OK\")\n";
+(function(){
+  "use strict";
+  function $(id){ return document.getElementById(id); }
+
+  /* ================= Γ check + Jones heat ================================ */
+  var LG=[676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,
+          12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  function gamma(z){ if(z<0.5) return Math.PI/(Math.sin(Math.PI*z)*gamma(1-z));
+    z-=1; var x=0.99999999999980993;
+    for(var i=0;i<LG.length;i++) x+=LG[i]/(z+i+1);
+    var t=z+LG.length-0.5;
+    return Math.sqrt(2*Math.PI)*Math.pow(t,z+0.5)*Math.exp(-t)*x; }
+  function jonesV(th){ function e(n){ return {re:Math.cos(n*th), im:Math.sin(n*th)}; }
+    var a=e(-4), b=e(-3), c=e(-1);
+    var re=-a.re+b.re+c.re, im=-a.im+b.im+c.im;
+    return Math.sqrt(re*re+im*im); }
+  function heatColor(T){ if(T==null) return "#5a748f";
+    var t=Math.max(100,Math.min(1500,T)), mag=jonesV((t-100)/1400*Math.PI)/3;
+    var hue=t<255?230-(t-100)/155*110:Math.max(0,120-(t-255)/500*120);
+    return "hsl("+hue.toFixed(0)+","+(45+mag*50).toFixed(0)+"%,"+(42+mag*14).toFixed(0)+"%)"; }
+  $("gammaDemo").textContent="Γ(z+1)=zΓ(z) 検証: "+
+    [0.57,0.70,5.58].map(function(w){return "w="+w+": "+(gamma(1+w)/(w*gamma(w))).toFixed(6);}).join("  ")+
+    " | Γ(0.5)²="+(gamma(0.5)*gamma(0.5)).toFixed(6)+" (π="+Math.PI.toFixed(6)+")";
+
+  /* ================= real targets ======================================== */
+  // [name, 距離ly, Teq(色), 実送信史]
+  var TARGETS=[
+    ["Proxima Centauri b (最も近い地球型)",4.25,234,null],
+    ["Luyten b (GJ 273 b) ★実送信済み",12.4,259,"2017 Sónar Calling (EISCAT, ノルウェー) が実際に音楽+科学メッセージを送信 — 最速返信 2042年ごろ"],
+    ["Teegarden's Star b",12.5,264,null],
+    ["Ross 128 b",11.0,280,null],
+    ["GJ 1002 b",15.8,231,null],
+    ["TRAPPIST-1 e",40.66,250,null],
+    ["TOI-700 d",101.4,269,null],
+    ["Kepler-442 b",1206,233,null],
+    ["球状星団 M13 ★実送信済み",25000,null,"1974 アレシボ・メッセージ (1679ビット) が実際に送信済み — 到着は約2.5万年後"]
+  ];
+  var TI=1;
+  function budget(){
+    var t=TARGETS[TI], d=t[1];
+    var power=2e13*Math.pow(d/25000,2);
+    $("budget").innerHTML=
+      "<b>距離</b><span>"+d+" 光年"+(t[3]?' <span class="badge">実送信史あり</span>':"")+"</span>"+
+      "<b>片道の旅</b><span>"+d+" 年 (光速) → 到着 "+Math.ceil(2026+d)+" 年</span>"+
+      "<b>最速返信</b><span>"+Math.ceil(2026+2*d)+" 年 (往復 "+(2*d)+" 年)</span>"+
+      "<b>必要ビーコン電力</b><span>≈ "+power.toExponential(2)+" W (アレシボ級受信を仮定)</span>"+
+      "<b>実在の送信機例</b><span>Goldstone 70m (DSN) / EISCAT UHF (Sónar Calling 実機)</span>"+
+      (t[3]?"<b>実史</b><span>"+t[3]+"</span>":"");
+  }
+  var p=$("pick");
+  TARGETS.forEach(function(t,i){ var o=document.createElement("option"); o.value=i; o.textContent="📡 "+t[0]+" — "+t[1]+"光年"; if(i===TI)o.selected=true; p.appendChild(o); });
+  p.addEventListener("change",function(){ TI=parseInt(this.value,10); budget(); });
+
+  /* ================= Arecibo-style 23x73 composer ======================== */
+  var CW=23, CH=73, CELL=18;
+  var grid=[];
+  function blank(){ grid=[]; for(var y=0;y<CH;y++){ var r=[]; for(var x=0;x<CW;x++) r.push(0); grid.push(r); } }
+  function px(x,y){ if(x>=0&&x<CW&&y>=0&&y<CH) grid[y][x]=1; }
+  function bin(n,col,row){ // 下位ビットを下に置く縦2進数
+    var b=n.toString(2);
+    for(var i=0;i<b.length;i++) if(b[b.length-1-i]==="1") px(col,row-i);
+  }
+  function preset(){
+    blank();
+    for(var n=1;n<=10;n++) bin(n,n*2,5);                 // 1〜10 の2進数
+    var atoms=[1,6,7,8,15], ac=0;                        // H C N O P
+    atoms.forEach(function(a){ bin(a,3+ac*4,13); ac++; });
+    for(var y=16;y<34;y++){                              // DNA 二重らせん
+      var ph=(y-16)/18*Math.PI*2;
+      px(Math.round(11+7*Math.sin(ph)),y);
+      px(Math.round(11-7*Math.sin(ph)),y);
+      if(y%3===0) for(var x=Math.min(Math.round(11+7*Math.sin(ph)),Math.round(11-7*Math.sin(ph)))+1;x<Math.max(Math.round(11+7*Math.sin(ph)),Math.round(11-7*Math.sin(ph)));x++) px(x,y);
+    }
+    var man=[ "..#..", ".###.", "#.#.#", "..#..", ".#.#.", "#...#" ];  // ヒト
+    for(var my=0;my<man.length;my++) for(var mx=0;mx<5;mx++) if(man[my][mx]==="#") px(9+mx,37+my);
+    bin(173,16,42);                                      // 身長 ~173cm の2進数
+    for(var s=0;s<9;s++) px(2+s*2,50+(s===2?-1:0));      // 太陽系 (3番目=地球を持ち上げ)
+    px(0,50); px(1,50); px(0,49); px(1,49);              // 太陽
+    for(var dx=-8;dx<=8;dx++){                           // 電波望遠鏡 (放物面)
+      var dy=Math.round(dx*dx/10);
+      px(11+dx,62+dy);
+    }
+    px(11,66); px(11,67); px(10,68); px(12,68);          // 支柱
+    drawMsg();
+  }
+  var mc=$("msg"), mctx=mc.getContext("2d");
+  function drawMsg(){
+    mctx.fillStyle="#04070f"; mctx.fillRect(0,0,mc.width,mc.height);
+    var on=0;
+    for(var y=0;y<CH;y++) for(var x=0;x<CW;x++){
+      if(grid[y][x]){ on++; mctx.fillStyle=heatColor(150+((x*7+y*11)%900)); mctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2); }
+      else { mctx.fillStyle="#0a1120"; mctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2); }
+    }
+    $("bitInfo").textContent="ビットマップ 1679ビット (点灯 "+on+") + テキスト "+(new TextEncoder().encode($("txt").value).length*8)+"ビット";
+  }
+  mc.addEventListener("click",function(ev){
+    var r=mc.getBoundingClientRect();
+    var x=Math.floor((ev.clientX-r.left)*mc.width/r.width/CELL), y=Math.floor((ev.clientY-r.top)*mc.height/r.height/CELL);
+    if(x>=0&&x<CW&&y>=0&&y<CH){ grid[y][x]=grid[y][x]?0:1; drawMsg(); }
+  });
+  $("presetBtn").addEventListener("click",preset);
+  $("clearBtn").addEventListener("click",function(){ blank(); drawMsg(); });
+  $("txt").addEventListener("input",drawMsg);
+
+  function messageBytes(){
+    var bits=[];
+    for(var y=0;y<CH;y++) for(var x=0;x<CW;x++) bits.push(grid[y][x]);
+    var bytes=[];
+    for(var i=0;i<bits.length;i+=8){ var v=0; for(var j=0;j<8;j++) v=(v<<1)|(bits[i+j]||0); bytes.push(v); }
+    var tb=new TextEncoder().encode($("txt").value);
+    for(var k=0;k<tb.length;k++) bytes.push(tb[k]);
+    return bytes;
+  }
+
+  /* ================= BB84 quantum key distribution ======================= */
+  function rb(){ return crypto.getRandomValues(new Uint8Array(1))[0]&1; }
+  var KEY=null, QBER=null, EVE=false;
+  function runBB84(){
+    EVE=$("eve").checked;
+    var N=64, rows=[], key=[], err=0, kept=0;
+    for(var i=0;i<N;i++){
+      var abit=rb(), abase=rb(), bbase=rb(), bbit;
+      if(EVE){
+        // 傍受再送: イヴは自分の基底で測って送り直す。彼女の基底が
+        // アリスと不一致なら状態が壊れ、ボブの結果は完全ランダム → QBER 25%
+        var ebase=rb();
+        if(ebase===abase){ bbit=(abase===bbase)?abit:rb(); }
+        else { bbit=rb(); }
+      } else {
+        bbit=(abase===bbase)?abit:rb();
+      }
+      if(abase===bbase){
+        kept++;
+        key.push(abit);
+        if(bbit!==abit) err++;
+      }
+      if(rows.length<12) rows.push([i,abit,abase?"×":"+",bbase?"×":"+",abase===bbase?"✓":"—",abase===bbase?abit:"·"]);
+    }
+    QBER=kept?err/kept:0;
+    var h="<tr><th>#</th><th>ビット</th><th>基底A</th><th>基底B</th><th>一致</th><th>鍵</th></tr>";
+    rows.forEach(function(r){ h+="<tr><td>"+r.join("</td><td>")+"</td></tr>"; });
+    $("qtab").innerHTML=h;
+    var kv=0; key.forEach(function(b){ kv=(kv*2+b)%65521; });
+    var th=(kv%1400)/1400*Math.PI, jk=jonesV(th);
+    KEY={bits:key,kv:kv,theta:th,jones:jk,qber:QBER};
+    $("qinfo").innerHTML=
+      "<b>量子ビット</b><span>"+N+" (基底一致 "+kept+" → 鍵長 "+key.length+" bit)</span>"+
+      "<b>QBER</b><span>"+(QBER*100).toFixed(1)+"% (しきい値 11%)</span>"+
+      "<b>鍵値</b><span class='mono'>"+kv+" → θ="+th.toFixed(3)+" → Jones|V|="+jk.toFixed(4)+"</span>";
+    if(QBER>0.11){
+      KEY=null;
+      $("qwarn").style.display="block";
+      $("qwarn").innerHTML="<b>🚨 盗聴を検出</b> — QBER "+(QBER*100).toFixed(1)+"% &gt; 11%。量子力学がイヴの傍受再送を暴露しました。<b>鍵を破棄</b>して再配送してください (これが量子暗号の防御です)。";
+      $("qok").style.display="none";
+    } else {
+      $("qwarn").style.display="none";
+      $("qok").style.display="block";
+      $("qok").innerHTML="✅ QBER "+(QBER*100).toFixed(1)+"% — 盗聴なし。Jones量子鍵 |V|="+jk.toFixed(4)+" を確立しました。";
+    }
+  }
+  $("qkdBtn").addEventListener("click",runBB84);
+
+  /* ================= encrypt + package =================================== */
+  var CIPHER=null;
+  function lcg(s){ return (s*1103+12345)%100003; }
+  function encrypt(){
+    if(!KEY){ $("encInfo").innerHTML="<b>状態</b><span style='color:#ff9aa5'>先に BB84 で鍵を確立してください (盗聴検出時は鍵なし)</span>"; return; }
+    var bytes=messageBytes();
+    var ks=KEY.kv+KEY.jones*1000, ct=[];
+    for(var i=0;i<bytes.length;i++){ ks=lcg(ks); ct.push((bytes[i]+Math.floor(ks))%256); }
+    CIPHER=ct;
+    var hex=ct.slice(0,24).map(function(b){ return ("0"+b.toString(16)).slice(-2); }).join(" ");
+    $("encInfo").innerHTML=
+      "<b>平文</b><span>"+bytes.length+" バイト (1679ビット図 + テキスト)</span>"+
+      "<b>暗号方式</b><span>BB84鍵 → Jones|V|ストリーム (往復復号可)</span>"+
+      "<b>宛先</b><span>"+TARGETS[TI][0]+"</span>";
+    $("cipherPrev").textContent="暗号文 (先頭24バイト): "+hex+" …";
+  }
+  $("encBtn").addEventListener("click",encrypt);
+  $("dlBtn").addEventListener("click",function(){
+    if(!CIPHER){ $("cipherPrev").textContent="先に暗号化してください。"; return; }
+    var head="QMSG/1 QuantumContact\n宛先: "+TARGETS[TI][0]+"\n距離: "+TARGETS[TI][1]+" 光年\n鍵指紋: kv="+KEY.kv+" |V|="+KEY.jones.toFixed(6)+" QBER="+(KEY.qber*100).toFixed(1)+"%\n注記: 実送信はしていません (2026年時点で接触実績ゼロ)\n---\n";
+    var body=CIPHER.map(function(b){ return ("0"+b.toString(16)).slice(-2); }).join("");
+    var blob=new Blob([head+body+"\n"],{type:"text/plain"});
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="contact-"+TARGETS[TI][1]+"ly.qmsg";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },200);
+  });
+
+  /* ================= transmission simulation ============================= */
+  var st=$("stage"), sx=st.getContext("2d"), W=st.width, H=st.height;
+  var playing=true, t0=performance.now(), TX={on:false,t0:0};
+  var STARS=[]; (function(){ var s=7; function r(){ s=(Math.imul(s,1664525)+1013904223)>>>0; return s/4294967296; }
+    for(var i=0;i<140;i++) STARS.push([r()*W,r()*H,r()*1.3+0.3]); })();
+  $("txBtn").addEventListener("click",function(){ TX.on=true; TX.t0=performance.now(); });
+  function draw(now){
+    var t=(now-t0)/1000;
+    sx.fillStyle="#000308"; sx.fillRect(0,0,W,H);
+    sx.fillStyle="#9fb6d8";
+    for(var i=0;i<STARS.length;i++){ sx.globalAlpha=0.25+0.35*Math.abs(Math.sin(t*0.7+i)); sx.fillRect(STARS[i][0],STARS[i][1],STARS[i][2],STARS[i][2]); }
+    sx.globalAlpha=1;
+    var tg=TARGETS[TI], dx=110, dy=H*0.52, txx=W-90, txy=H*0.38;
+    // 電波望遠鏡 (放物面)
+    sx.strokeStyle="#8aa0c0"; sx.lineWidth=3;
+    sx.beginPath(); sx.arc(dx-24,dy,46,-Math.PI*0.42,Math.PI*0.42); sx.stroke();
+    sx.beginPath(); sx.moveTo(dx-24,dy+44); sx.lineTo(dx-24,dy+70); sx.moveTo(dx-40,dy+70); sx.lineTo(dx-8,dy+70); sx.stroke();
+    sx.fillStyle="#cfe0f5"; sx.font="11px sans-serif"; sx.fillText("Goldstone / EISCAT 級",dx-70,dy+88);
+    // 目標星
+    var col=heatColor(tg[2]);
+    var g=sx.createRadialGradient(txx,txy,0,txx,txy,34);
+    g.addColorStop(0,col); g.addColorStop(1,"rgba(0,0,0,0)");
+    sx.fillStyle=g; sx.beginPath(); sx.arc(txx,txy,34,0,Math.PI*2); sx.fill();
+    sx.fillStyle=col; sx.beginPath(); sx.arc(txx,txy,9,0,Math.PI*2); sx.fill();
+    sx.fillStyle="#fff"; sx.font="11px sans-serif"; sx.fillText(tg[0].split(" ★")[0],txx-120,txy-28);
+    // ビーム + 暗号ビット
+    if(TX.on){
+      var pr=Math.min(1,(now-TX.t0)/9000);
+      sx.strokeStyle="rgba(181,140,255,0.5)"; sx.lineWidth=2;
+      sx.beginPath(); sx.moveTo(dx,dy-8); sx.lineTo(dx+(txx-dx)*pr,dy-8+(txy-dy+8)*pr); sx.stroke();
+      sx.font="10px ui-monospace,monospace";
+      for(var b2=0;b2<26;b2++){
+        var ph=(t*0.35+b2*0.045)%1;
+        if(ph<pr){
+          var bx2=dx+(txx-dx)*ph, by2=dy-8+(txy-dy+8)*ph;
+          sx.fillStyle=b2%3?"#b58cff":"#39c2ff";
+          sx.fillText(((b2*7+Math.floor(t*4))%2).toString(),bx2,by2-4);
+        }
+      }
+      // タイムライン (対数)
+      var y=H-34, x0=80, x1=W-40;
+      sx.strokeStyle="#2a3c5c"; sx.lineWidth=2; sx.beginPath(); sx.moveTo(x0,y); sx.lineTo(x1,y); sx.stroke();
+      function lx(yr){ return x0+(x1-x0)*Math.log10(1+yr)/Math.log10(1+2*tg[1]); }
+      sx.fillStyle="#8aa0c0"; sx.font="10.5px sans-serif";
+      sx.fillText("2026 送信",x0-20,y+16);
+      sx.strokeStyle="#c8a44a"; sx.beginPath(); sx.moveTo(lx(tg[1]),y-6); sx.lineTo(lx(tg[1]),y+6); sx.stroke();
+      sx.fillText("到着 "+Math.ceil(2026+tg[1]),lx(tg[1])-22,y+16);
+      sx.strokeStyle="#2fbf71"; sx.beginPath(); sx.moveTo(lx(2*tg[1]),y-6); sx.lineTo(lx(2*tg[1]),y+6); sx.stroke();
+      sx.fillText("最速返信 "+Math.ceil(2026+2*tg[1]),lx(2*tg[1])-34,y+16);
+      sx.fillStyle="#b58cff";
+      sx.beginPath(); sx.arc(lx(tg[1]*pr),y,4,0,Math.PI*2); sx.fill();
+    }
+    $("hud").innerHTML="<b>📡 "+tg[0]+"</b> — "+tg[1]+" 光年<br>"+
+      (KEY?("Jones量子鍵 |V|="+KEY.jones.toFixed(4)+" (QBER "+(KEY.qber*100).toFixed(1)+"%)"):"鍵: 未配送 (BB84を実行)")+
+      "<br>"+(TX.on?("光の旅: "+(Math.min(1,(now-TX.t0)/9000)*tg[1]).toFixed(2)+" 光年 経過 (加速表示)"):"送信シミュレーション待機 — 実送信はしません");
+  }
+  function loop(now){ draw(now); if(playing) requestAnimationFrame(loop); }
+
+  /* ================= recorder ============================================ */
+  var recorder=null, chunks=[], recording=false;
+  $("recBtn").addEventListener("click",function(){
+    if(!recording){
+      try{
+        var stream=st.captureStream(30);
+        var mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+        recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:6e6});
+        chunks=[];
+        recorder.ondataavailable=function(e){ if(e.data.size) chunks.push(e.data); };
+        recorder.onstop=function(){
+          var blob=new Blob(chunks,{type:"video/webm"});
+          var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+          a.download="quantumcontact.webm";
+          document.body.appendChild(a); a.click();
+          setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },200);
+          $("recNote").textContent="保存しました ("+(blob.size/1024/1024).toFixed(1)+" MB)";
+        };
+        recorder.start(200); recording=true;
+        $("recBtn").textContent="⏹ 停止 / 保存"; $("recBadge").classList.add("on");
+      }catch(e){ $("recNote").textContent="録画失敗: "+e.message; }
+    } else {
+      recording=false; try{ recorder.stop(); }catch(e){}
+      $("recBtn").textContent="⏺ 録画 (.webm)"; $("recBadge").classList.remove("on");
+    }
+  });
+
+  /* ================= Bada engine card ==================================== */
+  $("badaBtn").addEventListener("click",function(){
+    $("badaStat").textContent="実行中…";
+    setTimeout(function(){
+      try{
+        var r=window.BadaLang.run(window.CONTACT_SRC,{maxSteps:4000000});
+        $("badaOut").textContent=r.output+((r.parseErrors&&r.parseErrors.length)?"\n"+r.parseErrors.join("\n"):"");
+        $("badaStat").textContent=/@@BB84-OK/.test(r.output)?"✅ @@BB84-OK (Bada量子エンジン完走)":"⚠ 異常終了";
+      }catch(e){ $("badaStat").textContent="エラー: "+e.message; }
+    },30);
+  });
+
+  /* ================= init ================================================= */
+  preset(); budget();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
