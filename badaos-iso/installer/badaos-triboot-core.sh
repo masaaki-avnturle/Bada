@@ -324,7 +324,7 @@ mount --bind /run "$MNT/run" 2>/dev/null || true
 cp -f /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null || true
 
 emit 80 "ユーザー ${USER_NAME} を作成中"
-chroot "$MNT" /bin/bash -e <<CHROOT
+chroot "$MNT" /bin/bash -e >&2 <<CHROOT
 # 存在するグループだけに入れる (lpadmin=プリンタ管理, scanner=スキャナ)
 GRPS=\$(for g in sudo adm cdrom dip plugdev netdev audio video lpadmin scanner; do getent group \$g >/dev/null && printf '%s,' \$g; done; true)
 id "${USER_NAME}" >/dev/null 2>&1 || useradd -m -s /bin/bash -G "\${GRPS%,}" "${USER_NAME}"

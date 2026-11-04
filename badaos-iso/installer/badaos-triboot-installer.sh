@@ -17,7 +17,7 @@ Z --info --width=600 --title="$TITLE" --ok-label="次へ" \
 declare -a ROWS=()
 while read -r name size model; do
   [ -n "$name" ] && ROWS+=( FALSE "/dev/$name" "$size" "${model:-(不明)}" )
-done < <(lsblk -dn -o NAME,SIZE,MODEL -e 7,11 2>/dev/null)
+done < <(lsblk -dn -o NAME,SIZE,MODEL -e 2,7,11 2>/dev/null)
 [ ${#ROWS[@]} -gt 0 ] || { Z --error --title="$TITLE" --text="ディスクが見つかりません。"; exit 1; }
 DISK="$(Z --list --radiolist --title="$TITLE — ディスク" --width=600 --height=340 \
   --text="Windows と Linux が入っているディスクを選んでください:" \

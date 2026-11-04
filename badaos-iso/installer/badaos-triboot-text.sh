@@ -59,7 +59,7 @@ echo "   Existing Windows and Linux are kept. The MBR is not rewritten."
 echo "=================================================================="
 echo
 echo "Disks:"
-mapfile -t DISKS < <(lsblk -dn -o NAME -e 7,11)
+mapfile -t DISKS < <(lsblk -dn -o NAME -e 2,7,11)
 i=1; for d in "${DISKS[@]}"; do printf '  %d) /dev/%s  %s  %s\n' "$i" "$d" "$(lsblk -dn -o SIZE /dev/$d)" "$(lsblk -dn -o MODEL /dev/$d)"; i=$((i+1)); done
 echo
 read -r -p "Disk with Windows and Linux (number): " n

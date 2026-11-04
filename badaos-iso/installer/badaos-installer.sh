@@ -25,7 +25,7 @@ declare -a ROWS=()
 while read -r name size model; do
   [ -n "$name" ] || continue
   ROWS+=( FALSE "/dev/$name" "$size" "${model:-(不明)}" )
-done < <(lsblk -dn -o NAME,SIZE,MODEL -e 7,11 2>/dev/null)
+done < <(lsblk -dn -o NAME,SIZE,MODEL -e 2,7,11 2>/dev/null)
 
 [ ${#ROWS[@]} -gt 0 ] || { Z --error --title="$TITLE" --width=460 \
   --text="インストール可能なディスクが見つかりません。"; exit 1; }
