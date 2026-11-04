@@ -47,7 +47,30 @@ apt_try nano less curl wget ca-certificates \
   xserver-xorg xinit x11-xserver-utils x11-utils \
   lightdm lightdm-gtk-greeter \
   w9wm xterm \
-  fonts-dejavu-core fonts-noto-cjk
+  fonts-dejavu-core fonts-noto-cjk fonts-noto-color-emoji
+
+# ---- w9wm を「新しいウィンドウを自動配置」するよう修正してビルド ----
+#   素の w9wm は位置指定の無いウィンドウ (Electron の Bada VM Pro など) を開く時、
+#   マウスで枠を引くまでサーバをつかんで止まってしまう (セッションが固まって見える)。
+#   Ubuntu のソースに Debian のパッチ + 自動配置パッチ (30_badaos_autoplace.diff) を当てて
+#   ビルドし、/usr/bin/w9wm を差し替える (dpkg-divert で apt の更新にも上書きされない)。
+W9V="$(dpkg-query -W -f '${Version}' w9wm)"
+W9D=/tmp/w9wm-build; rm -rf "$W9D"; mkdir -p "$W9D"
+apt-get install -y --no-install-recommends gcc libc6-dev libx11-dev libxext-dev patch xz-utils
+( cd "$W9D"
+  POOL=http://archive.ubuntu.com/ubuntu/pool/universe/w/w9wm
+  curl -fsSLO "$POOL/w9wm_${W9V%%-*}.orig.tar.gz"
+  curl -fsSLO "$POOL/w9wm_${W9V}.debian.tar.xz"
+  tar -xzf "w9wm_${W9V%%-*}.orig.tar.gz"; cd w9wm-*/
+  tar -xJf "../w9wm_${W9V}.debian.tar.xz"
+  for p in $(cat debian/patches/series); do patch -p1 < "debian/patches/$p"; done
+  patch -p1 < /tmp/w9wm-patches/30_badaos_autoplace.diff
+  gcc -O2 -w -DSHAPE -o w9wm 9wm.c manage.c menu.c client.c grab.c cursor.c error.c -lXext -lX11
+  dpkg-divert --local --rename --add /usr/bin/w9wm
+  install -m755 w9wm /usr/bin/w9wm )
+apt-get purge -y --auto-remove gcc libc6-dev libx11-dev libxext-dev
+rm -rf "$W9D" /tmp/w9wm-patches
+/usr/bin/w9wm -version 2>&1 | head -1 || true
 
 # ---- エディタ: vim と emacs (事前導入) ----
 #   vim-gtk3: GUI (gvim) + X クリップボード。emacs: GTK 版 + emacs-mozc (Emacs 内の日本語入力)
@@ -157,7 +180,7 @@ EOF
 cat > /etc/skel/.Xresources <<'EOF'
 XTerm*locale: true
 XTerm*utf8: 1
-XTerm*faceName: Noto Sans Mono CJK JP
+XTerm*faceName: DejaVu Sans Mono
 XTerm*faceNameDoublesize: Noto Sans Mono CJK JP
 XTerm*faceSize: 12
 XTerm*geometry: 100x30
@@ -209,7 +232,7 @@ cat > /etc/lightdm/lightdm.conf.d/50-badaos.conf <<EOF
 [Seat:*]
 autologin-user=bada
 autologin-user-timeout=0
-user-session=w9wm
+user-session=badaos-w9wm
 greeter-session=lightdm-gtk-greeter
 EOF
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 # w9wm-session — Bada VM Pro OS の X セッション本体
-# lightdm がこのスクリプトを (w9wm.desktop 経由で) 起動する。
+# lightdm がこのスクリプトを (badaos-w9wm.desktop 経由で) 起動する。
 
 # 日本語環境 + 入力メソッド (fcitx-mozc) を読み込む
 export LANG=ja_JP.UTF-8
@@ -28,7 +28,7 @@ echo "追加ソフト (apt):                            badaos-extras mlterm ssh
 echo "  (または sudo apt update && sudo apt install mlterm mlterm-im-fcitx openssh-server xinetd screen texlive-full)"; \
 echo "NAT ルータ:                                  sudo badaos-nat on <外側IF> <内側IF> / share <内側IF>"; \
 echo "プリンター:                                  system-config-printer (または http://localhost:631)"; \
-echo "エディタ:                                    vim / gvim / emacs / neovim"; \
+echo "エディタ:                                    vim / gvim / emacs"; \
 echo "日本語入力の設定 (fcitx):                    fcitx-configtool"; \
 echo "アプリ再起動:                                bada-launcher bada_vm_pro"; \
 echo "Ubuntu アプリ導入例:                         sudo apt update && sudo apt install <pkg>"; \
@@ -36,7 +36,7 @@ echo "日本語入力の ON/OFF: Ctrl+Space"; echo; exec bash'
 if command -v mlterm >/dev/null 2>&1; then
   (mlterm -g 104x30+20+20 -T "Bada VM Pro OS — mlterm" -e sh -c "$HINT" &) 2>/dev/null || true
 else
-  (xterm -fa "Noto Sans Mono CJK JP" -fs 12 -geometry 104x30+20+20 \
+  (xterm -fa "DejaVu Sans Mono" -fd "Noto Sans Mono CJK JP" -fs 12 -geometry 100x30+20+20 \
      -T "Bada VM Pro OS — terminal" -e sh -c "$HINT" &) 2>/dev/null || true
 fi
 

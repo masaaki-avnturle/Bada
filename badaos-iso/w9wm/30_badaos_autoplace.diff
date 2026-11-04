@@ -1,0 +1,56 @@
+--- a/manage.c	2026-11-04 01:08:49.622678595 +0000
++++ b/manage.c	2026-11-04 01:08:57.408342217 +0000
+@@ -15,7 +15,7 @@
+ Client *c;
+ int mapped;
+ {
+-    int fixsize, dohide, doreshape, state;
++    int fixsize, dohide, doreshape, state, autoplaced;
+     long msize;
+     XClassHint class;
+     XWMHints *hints;
+@@ -53,6 +53,7 @@
+     if (!getstate(c->window, &state))
+         state = hints ? hints->initial_state : NormalState;
+     dohide = (state == IconicState);
++    autoplaced = 0;
+ 
+     fixsize = 0;
+     if ((c->size.flags & (USSize|PSize)))
+@@ -90,6 +91,27 @@
+ 
+     /* Now do it!!! */
+ 
++    /*
++     * Bada VM Pro OS: place new windows automatically (centered, clamped
++     * to the screen) instead of making the user drag/sweep them out with
++     * the mouse. Applications without a user-specified position (e.g. the
++     * Electron Bada VM Pro app) would otherwise block the session until
++     * the user sweeps, because the sweep grabs the server.
++     */
++    if (doreshape && !c->is9term) {
++        int sw = DisplayWidth(dpy, screen), sh = DisplayHeight(dpy, screen);
++        if (c->dx < 100) c->dx = 640;
++        if (c->dy < 60)  c->dy = 400;
++        if (c->dx > sw - 2*BORDER) c->dx = sw - 2*BORDER;
++        if (c->dy > sh - 2*BORDER) c->dy = sh - 2*BORDER;
++        c->x = (sw - c->dx) / 2;
++        c->y = (sh - c->dy) / 2;
++        if (c->x < BORDER) c->x = BORDER;
++        if (c->y < BORDER) c->y = BORDER;
++        doreshape = 0;
++        autoplaced = 1;
++    }
++
+     if (doreshape) {
+         cmapfocus(0);
+         if (!(fixsize ? drag(c) : sweep(c)) && c->is9term) {
+@@ -99,7 +121,7 @@
+             return 0;
+         }
+     }
+-    else
++    else if (!autoplaced)
+         gravitate(c, 0);
+ 
+     c->parent = XCreateSimpleWindow(dpy, root,

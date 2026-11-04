@@ -106,7 +106,7 @@ id "${USER_NAME}" >/dev/null 2>&1 || useradd -m -s /bin/bash -G "\${GRPS%,}" "${
 echo "${USER_NAME}:${PASS}" | chpasswd
 # lightdm 自動ログインを新ユーザー + w9wm セッションに
 mkdir -p /etc/lightdm/lightdm.conf.d
-printf '[Seat:*]\nautologin-user=%s\nautologin-user-timeout=0\nuser-session=w9wm\ngreeter-session=lightdm-gtk-greeter\n' "${USER_NAME}" > /etc/lightdm/lightdm.conf.d/50-badaos.conf
+printf '[Seat:*]\nautologin-user=%s\nautologin-user-timeout=0\nuser-session=badaos-w9wm\ngreeter-session=lightdm-gtk-greeter\n' "${USER_NAME}" > /etc/lightdm/lightdm.conf.d/50-badaos.conf
 # インストール後は不要なライブ専用パッケージを除去
 apt-get -y purge casper 2>/dev/null || true
 apt-get -y autoremove --purge 2>/dev/null || true
