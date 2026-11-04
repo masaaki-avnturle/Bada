@@ -508,6 +508,144 @@
   $("clearKey").onclick = function () { LS.set("apiKey", ""); keyState(); };
   keyState();
 
+  /* ═════════════ 💬 BadaGPT チャット (ChatGPT 版) ═════════════ */
+  function qsa2(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function chatAdd(who, text, src) {
+    var d = document.createElement("div"); d.className = "cmsg " + who;
+    d.innerHTML = (src ? '<span class="src">' + escHtml(src) + "</span>" : "") + escHtml(text);
+    $("chat-log").appendChild(d); $("chat-log").scrollTop = $("chat-log").scrollHeight; return d;
+  }
+  var chatBusy = false;
+  async function chatHandle(text, src) {
+    if (chatBusy) return;
+    chatAdd("me", text, src || "文字");
+    var route = chatRoute(text);
+    if (route.intent === "forge") {
+      chatBusy = true; var thinking = chatAdd("bot", "承知しました。全体を把握して錬成します…");
+      $("thought").value = route.request; LS.set("draft", route.request);
+      try { await go(); thinking.textContent = chatReplyLocal({ intent: "forged" }, { spec: cur && cur.spec, ver: cur && cur.ver }); }
+      catch (e) { thinking.textContent = "錬成でエラー: " + (e.message || e); }
+      chatBusy = false; return;
+    }
+    if (route.intent === "reset") { tpClear(); $("thought").value = ""; }
+    if (route.intent === "chat" && LS.get("apiKey", "")) {
+      var thinking2 = chatAdd("bot", "…");
+      try {
+        var req = claudeRequest({ apiKey: LS.get("apiKey", ""), model: LS.get("model", "claude-opus-5-5"), spec: comprehend(text), effort: "low" });
+        req.body.system = "You are BadaGPT, a friendly assistant inside the BadaGPT Telegraph app. Reply briefly in Japanese. If the user wants an app, tell them to say 作って.";
+        req.body.messages = [{ role: "user", content: text }]; req.body.max_tokens = 1024;
+        var res = await fetch(req.url, { method: "POST", headers: req.headers, body: JSON.stringify(req.body) });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        var reader = res.body.getReader(), dec = new TextDecoder(), st = sseNew();
+        for (;;) { var r = await reader.read(); if (r.done) break; sseFeed(st, dec.decode(r.value, { stream: true })); thinking2.textContent = st.text || "…"; }
+        if (!st.text) thinking2.textContent = chatReplyLocal(route);
+      } catch (e) { thinking2.textContent = chatReplyLocal(route) + " (Claude: " + (e.message || e) + ")"; }
+      return;
+    }
+    chatAdd("bot", chatReplyLocal(route));
+  }
+  $("chat-send").onclick = function () { var t = $("chat-in").value.trim(); if (!t) return; $("chat-in").value = ""; chatHandle(t, "文字"); };
+  $("chat-in").onkeydown = function (e) { if (e.key === "Enter") $("chat-send").click(); };
+
+  /* ═════════════ ⓪-β Ω-Telephacy (無音の口形 → 語) ═════════════ */
+  var tp = { stream: null, timer: null, cal: { base: null, max: null }, lastFeat: null, seq: [], feats: [], restRun: 0, words: [], prevGray: null, lastTokens: [] };
+  var tpRoi = $("tp-roi"), tpRx = tpRoi.getContext("2d", { willReadFrequently: true }), tpTh = $("tp-thermal"), tpTx = tpTh.getContext("2d");
+  function tpStat(m) { $("tp-stat").textContent = m; }
+  function tpAtoms() { return tp.words.filter(function (w) { return w.atom; }).map(function (w) { return w.atom; }); }
+  function tpRenderWords() {
+    $("tp-words").innerHTML = tp.words.length ? tp.words.map(function (w, i) { return '<span class="schip" data-i="' + i + '" title="' + escHtml(w.visemes) + " · " + escHtml(w.bandName) + '">' + escHtml(w.label || w.visemes) + "</span>"; }).join("") : '<span class="muted">まだ認識していません。</span>';
+    $("tp-send").disabled = !tpAtoms().length;
+  }
+  function tpClear() { tp.words = []; tp.seq = []; tp.feats = []; tpRenderWords(); $("tp-seq").textContent = "—"; }
+  /* 語トークンを受け取る (カメラ・辞書 dwell・テスト用フィードの共通の出口) */
+  function tpAccept(tok) {
+    if (tok.cmd === "forge") { tpSendToChat(); return; }
+    if (tok.cmd === "reset") { tpClear(); chatHandle("やり直し", "口形"); return; }
+    if (tok.cmd === "undo") { tp.words.pop(); tpRenderWords(); return; }
+    if (tok.atom) { tp.words.push(tok); tpRenderWords(); }
+    else if (tok.visemes) tpStat("辞書にない口形の列: " + tok.visemes + " (辞書を見て発音してください)");
+  }
+  function tpSendToChat() {
+    var atoms = tpAtoms(); if (!atoms.length) { tpStat("語がまだありません"); return; }
+    var proc = silentProcess(atoms, volOpt());
+    lastSilent = { seq: proc.seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags,
+      readout: tp.words.map(function (w) { var th = thermalPath(w.feat ? Math.min(1, w.feat.aperture + w.feat.spread) : 0.5); return { label: "口形 " + w.visemes, value: w.bandName + " / T(2," + th.n + ")", meant: (w.label || "") + " (熱経路 " + th.score.toFixed(2) + ")" }; }), features: null };
+    $("silent-out").classList.remove("hidden"); renderReadout(lastSilent.readout);
+    $("silent-req").textContent = proc.request; $("silent-doc").innerHTML = mdToHtml(proc.document.markdown); $("silent-bada").textContent = proc.bada; $("silent-imgs").innerHTML = proc.imagery.join("");
+    chatHandle(proc.request, "Ω-Telephacy (口形 " + tp.words.length + " 語)");
+  }
+  /* 1 フレーム (gray w×h) を処理: 口形に分類し、閉じで区切って語にする */
+  function tpFrame(gray, w, h, thresh) {
+    var raw = lipFeatures(gray, w, h, thresh != null ? thresh : adaptiveThresh(gray));
+    tp.lastFeat = raw;
+    var f = normalizeFeat(raw, tp.cal), v = classifyViseme(f);
+    $("tp-vis").textContent = v; $("tp-feat").textContent = "開き " + f.aperture.toFixed(2) + " · 幅 " + f.spread.toFixed(2) + " · 力 " + f.energy.toFixed(2);
+    var th = thermalPath(Math.min(1, f.aperture + f.spread));
+    $("tp-band").textContent = BAND_NAMES[dominantBand(f)] + " · T(2," + th.n + ") |V|=" + th.abs.toFixed(2);
+    if (v === "C") { tp.restRun++; if (tp.restRun >= 3 && tp.seq.length) { /* 閉じが 3 フレーム (約 0.2 秒) 続いたら語を区切る */ var toks = decodeVisemes(tp.seq.concat(["C"]), tp.feats.concat([f])); tp.seq = []; tp.feats = []; toks.forEach(tpAccept); $("tp-seq").textContent = "—"; } }
+    else { tp.restRun = 0; if (!tp.seq.length || tp.seq[tp.seq.length - 1] !== v) { tp.seq.push(v); tp.feats.push(f); } else { tp.feats[tp.feats.length - 1] = f; } $("tp-seq").textContent = tp.seq.join(" → "); }
+  }
+  function tpDrawThermal(gray, w, h) {
+    var img = tpTx.createImageData(w, h);
+    for (var i = 0; i < w * h; i++) {
+      var motion = tp.prevGray ? Math.abs(gray[i] - tp.prevGray[i]) / 255 : 0, t = Math.min(1, 0.25 * (gray[i] / 255) + 3 * motion), c = cmapThermal(t);
+      img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
+    }
+    tpTx.putImageData(img, 0, 0); tp.prevGray = gray;
+  }
+  $("tp-start").onclick = function () {
+    androidPerm("CAMERA").then(function () { return navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } }); }).then(function (stream) {
+      tp.stream = stream; var vid = $("tp-video"); vid.srcObject = stream; vid.style.display = ""; vid.play().catch(function () { /* autoplay */ });
+      $("tp-start").classList.add("hidden"); $("tp-stop").classList.remove("hidden");
+      tpStat("口を枠の中に。較正 (閉じた/開けた) をしてから、口形の列で発音してください。");
+      tp.timer = setInterval(function () {
+        if (vid.readyState < 2) return;
+        /* 口付近 ROI: 映像の中央下寄り (幅 40%・高さ 30%) */
+        var vw = vid.videoWidth || 640, vh = vid.videoHeight || 480;
+        tpRx.drawImage(vid, vw * 0.3, vh * 0.52, vw * 0.4, vh * 0.3, 0, 0, 64, 48);
+        var d = tpRx.getImageData(0, 0, 64, 48).data, gray = new Uint8Array(64 * 48);
+        for (var i = 0; i < 64 * 48; i++) gray[i] = (0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) | 0;
+        tpDrawThermal(gray, 64, 48); tpFrame(gray, 64, 48, null);
+      }, 66);
+    }).catch(function (e) { tpStat("カメラを開始できません: " + (e.message || e)); });
+  };
+  $("tp-stop").onclick = function () {
+    clearInterval(tp.timer); try { tp.stream && tp.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { /* 既に停止 */ }
+    tp.stream = null; $("tp-video").style.display = "none"; $("tp-start").classList.remove("hidden"); $("tp-stop").classList.add("hidden"); tpStat("止めました");
+  };
+  $("tp-cal-closed").onclick = function () { if (tp.lastFeat) { tp.cal.base = tp.lastFeat; tpStat("較正: 閉じた口を記録 (開き " + tp.lastFeat.aperture.toFixed(2) + ")"); } };
+  $("tp-cal-open").onclick = function () { if (tp.lastFeat) { tp.cal.max = tp.lastFeat; tpStat("較正: 開けた口を記録 (開き " + tp.lastFeat.aperture.toFixed(2) + ")"); } };
+  /* 辞書 (ホバー滞留 = Ω-Telepathy の dwell でも選べる) */
+  (function buildLex() {
+    var keys = Object.keys(TELEPHACY_LEXICON);
+    $("tp-lex").innerHTML = keys.map(function (k) { var e = TELEPHACY_LEXICON[k]; return '<div class="bciopt" data-k="' + k + '"><b>' + k + "</b> " + escHtml(e.label) + '<span class="hz">' + k.split("").map(function (v) { return VISEME_HINT[v]; }).join(" → ") + '</span><span class="dw"></span></div>'; }).join("");
+    var hover = null, hoverT = 0;
+    qsa2(".bciopt", $("tp-lex")).forEach(function (el) {
+      el.onmouseenter = function () { hover = el; hoverT = performance.now(); };
+      el.onmouseleave = function () { if (hover === el) { hover = null; el.querySelector(".dw").style.width = "0"; } };
+      el.onclick = function () { var k = el.getAttribute("data-k"), e = TELEPHACY_LEXICON[k]; tpAccept({ visemes: k, atom: e.atom || null, cmd: e.cmd || null, label: e.label, bandName: "—", feat: null }); };
+    });
+    setInterval(function () {
+      if (!hover) return; var p = Math.min(1, (performance.now() - hoverT) / 800); hover.querySelector(".dw").style.width = (p * 100) + "%";
+      if (p >= 1) { var el = hover; hover = null; el.querySelector(".dw").style.width = "0"; el.click(); }
+    }, 50);
+  })();
+  $("tp-img").onchange = function () {
+    var f = this.files[0]; if (!f) return; var img = new Image();
+    img.onload = function () {
+      var c = document.createElement("canvas"); c.width = 48; c.height = 48; var x = c.getContext("2d"); x.drawImage(img, 0, 0, 48, 48);
+      var r = imageFeatures(x.getImageData(0, 0, 48, 48).data, 48, 48); URL.revokeObjectURL(img.src);
+      r.atoms.forEach(function (a) { var e = ATOM_BY_ID[a]; tp.words.push({ visemes: "img", atom: a, label: "画像→" + (e ? e.g : a), bandName: "—", feat: null }); });
+      tpRenderWords(); $("tp-imgstat").textContent = "画像: 明るさ " + r.brightness.toFixed(2) + " · 彩度 " + r.saturation.toFixed(2) + " → " + r.atoms.join(", ") + " (内容は読みません)";
+    };
+    img.src = URL.createObjectURL(f);
+  };
+  $("tp-send").onclick = tpSendToChat;
+  $("tp-clear").onclick = tpClear;
+  /* テスト・外部連携用: 合成した口形フレーム列 ({gray,w,h,thresh}) を流し込む */
+  window.__telephacyFeed = function (frames) { frames.forEach(function (fr) { tpFrame(fr.gray, fr.w, fr.h, fr.thresh); }); };
+  tpRenderWords();
+
   /* ═════════════ ⓪-α 思考だけで (脳波 BCI) ═════════════ */
   var bci = { src: null, fs: 256, buf: [], mode: "att", stageIdx: 0, sel: {}, scanner: null, timer: null, flickerRaf: null, flickerOn: false, att: NaN, ssvep: NaN, device: null, demoT: 0, demoPlan: null };
   function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }

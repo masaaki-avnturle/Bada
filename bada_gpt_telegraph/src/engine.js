@@ -336,9 +336,16 @@ var Jones = (function () {
       return (c < 0 ? "−" : "+") + (ac === 1 ? "" : ac) + "A" + (e < 0 ? "⁻" + sup(-e) : sup(e));
     }).join("").replace(/^\+/, "") || "0";
   }
+  /* t = e^{iθ} での |V(t)|。A = t^{-1/4} = e^{-iθ/4} として Σ c_e A^e を複素数で評価する。 */
+  function evalAbs(map, thetaT) {
+    var re = 0, im = 0, a = -thetaT / 4;
+    map.forEach(function (c, e) { re += c * Math.cos(e * a); im += c * Math.sin(e * a); });
+    return Math.hypot(re, im);
+  }
   return {
     bracketStr: function (n) { return polyStr(get(n).norm, 3); },
-    Vreal: function (n, t) { return evalReal(get(n).VA, Math.pow(t, -0.25)); }
+    Vreal: function (n, t) { return evalReal(get(n).VA, Math.pow(t, -0.25)); },
+    Vabs: function (n, thetaT) { return evalAbs(get(n).VA, thetaT); }
   };
 })();
 

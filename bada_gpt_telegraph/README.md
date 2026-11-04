@@ -50,6 +50,26 @@ Artifacts のダウンロードには GitHub へのログインが必要です (
 3. ④ でアプリをプレビュー・操作し、**⬇ アプリ (HTML)**・**📦 ビルド一式 (ZIP)**・**📄 論文 PDF**・**📝 論文 Markdown** を保存。
 4. ZIP を GitHub リポジトリに置いて Actions を実行すると、**生成したアプリそのもの**の APK / EXE / AppImage・deb ができます。
 
+## 💬 BadaGPT チャット (ChatGPT 版) と ⓪-β Ω-Telephacy — 声を出さないサイレント・トーク音声認識
+
+**Ω-Telephacy** は、本リポジトリの `bada_silent_vim/silenttalk` (Python) を移植した**無音の口形 (viseme) 認識**です。
+声を出さずに、口の形 **あ・い・う・お・え・閉じ** の列として語を「発音」すると、カメラが口付近の暗い領域から
+**縦の開き・横の開き・力**を測って口形に分類し、閉じで区切った口形の列を辞書で BadaGPT の語に引きます
+(例: 「あ→い」= 記録・管理、「い→お→い」= 作って)。語は 7 段階の共鳴スケール (do〜si) と
+**Γ多様体 × Jones の熱エネルギー経路** |V_{T(2,n)}(e^{2πi/5})| で重み付けされ、**トランスフォーマー**が latent に組み立てます。
+
+併せて取り入れたもの: **Ω-Telepathy** のホバー滞留 (dwell) 選択 (辞書の語をクリック不要で選べる)、
+**Ω-Thermal Trace** の疑似サーモ表示 (動きエネルギーの疑似カラー・**実温度ではない**)、**イメージ入力**
+(画像の明るさ・彩度・色相 → 調子と色。内容は読みません)。
+
+**BadaGPT チャット**は ChatGPT 風の対話面です。口形・脳波・描いた動き・画像・文字のどれで話しかけても、
+「作って」の意図を受けると全体把握 → アプリ → ソースコード → 論文 → 自動コンパイルの錬成を走らせ、結果を返答します
+(API キーがあれば雑談は Claude が答えます)。
+
+> ※ 認識するのは、本人が**声を出さずに口形の列として発音した辞書の語**で、自由な読唇・思考の読み取りではありません。
+> 熱 (温度) は測らず、疑似サーモは普通のカメラの動きエネルギーの疑似カラーです。Γ多様体・Jones は重み付けの可視化です。
+> 本人の顔を本人の同意の上で映します。Python 版と同じ検証 (各 viseme の自己分類、辞書全語の合成フレーム往復) を単体テストで行っています。
+
 ## ⓪-α 思考だけで — 脳波 (BCI) で選ぶ: 声も、絵も、文字もなしに
 
 声を出さず、絵も描かず、文字も打たずに入力する、**ブレイン・コンピュータ・インタフェース (BCI)** です。
@@ -163,7 +183,7 @@ Actions の監視は、偽の GitHub API を注入した単体テストと、API
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html (CI は --check で一致を検査)
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 184 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 209 件
 node bada_gpt_telegraph/tools/evaluate.js           # 論文 7.2 の評価 (--heldout で 7.3)
 cd bada_gpt_telegraph/app/electron && npm install && npm start   # デスクトップ版 (要 ../www/index.html)
 ```
@@ -175,6 +195,7 @@ bada_gpt_telegraph/
 │   ├── engine.js           ← ZIP / PDF / Markdown・Bada インタプリタ・Ξ・Jones・モールス・FSK
 │   ├── comprehend.js       ← 全体把握
 │   ├── silent.js           ← サイレント・トーク (非言語 → トランスフォーマー → latent → 文章・画像・Bada)
+│   ├── telephacy.js        ← Ω-Telephacy (無音の口形 viseme 認識・辞書・共鳴 7 帯・Jones 熱経路・イメージ入力・チャット)
 │   ├── bio.js              ← 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ)
 │   ├── bci.js              ← 思考だけで (脳波 BCI: 集中度 / SSVEP・Muse / OpenBCI 復号・スキャン選択)
 │   ├── codegen.js          ← ソースコード化 (仕様 → Python / Node / Bada の動くソース)

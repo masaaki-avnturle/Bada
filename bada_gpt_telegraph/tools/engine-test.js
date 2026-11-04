@@ -21,7 +21,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const ctx = { console, TextEncoder, TextDecoder, atob, btoa, Uint8Array, Float32Array, Map };
 vm.createContext(ctx);
-for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
+for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/telephacy.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), ctx, { filename: f });
 }
 const E = (expr) => vm.runInContext(expr, ctx);
@@ -115,6 +115,40 @@ section("体のサイン (本人の心拍・呼吸 → 気分のヒント)");
   const r0 = call("silentToRequest", base, call("silentEncode", base)), r1 = call("silentToRequest", withBio, call("silentEncode", withBio));
   ok(JSON.stringify(call("silentEncode", base).pooled) !== JSON.stringify(call("silentEncode", withBio).pooled), "気分アトムは latent に効く");
   ok(r0.tags.mods.join() === r1.tags.mods.join() && r0.tags.entity === r1.tags.entity, "気分アトムは依頼文のモジュール・対象を変えない");
+}
+
+/* 0.55 Ω-Telephacy: 無音の口形 (viseme) 認識 — silenttalk (Python) の移植 */
+section("Ω-Telephacy (無音の口形 → 語)");
+{
+  for (const v of E("VISEMES")) { const fr = call("drawViseme", v, 32, 32); const got = call("classifyViseme", call("lipFeatures", fr.gray, fr.w, fr.h, fr.thresh)); ok(got === v, "各 viseme が自分自身に分類される: " + v + " → " + got); }
+  const lex = E("TELEPHACY_LEXICON"), words = Object.keys(lex);
+  const toks = call("decodeFrames", call("synthStream", words, 3), null);
+  ok(toks.map((t) => t.visemes).join() === words.join(), "辞書 " + words.length + " 語の全往復 (合成フレーム → 復号)");
+  ok(toks.every((t) => t.atom || t.cmd) && toks.every((t) => t.band >= 0 && t.band <= 6 && t.bandName), "全語が意味 (アトム / 命令) と 7 段階の共鳴帯を持つ");
+  const t2 = call("decodeFrames", call("synthStream", ["AI", "IOI"], 2), null);
+  ok(t2[0].atom === "records" && t2[1].cmd === "forge", "AI → 記録・管理、IOI → 作って");
+  ok(call("decodeVisemes", ["C", "C"]).length === 0 && call("decodeVisemes", []).length === 0, "休止だけ・空は語なし");
+  ok(call("decodeVisemes", ["A", "A", "I", "I", "C", "O", "A"]).map((t) => t.visemes).join() === "AI,OA", "連続重複の縮約と C での区切り");
+  const unk = call("decodeVisemes", ["E", "E", "E"]); ok(unk.length === 1 && unk[0].visemes === "E" && !unk[0].atom && !unk[0].cmd, "辞書にない列は語なしトークン");
+  const th = call("adaptiveThresh", new Uint8Array([200, 200, 210, 190, 205, 30, 40])); ok(th >= 100 && th <= 120, "適応しきい値 = 中央値の 55% (" + th + ")");
+  ok(call("adaptiveThresh", new Uint8Array([10, 12, 11])) === 40 && call("adaptiveThresh", new Uint8Array([250, 250])) === 138 && call("adaptiveThresh", new Uint8Array([255, 255, 255])) === 140, "しきい値の下限・上限 (40..140)");
+  const nf = call("normalizeFeat", { aperture: 0.5, spread: 0.5, energy: 0.1 }, { base: { aperture: 0.1, spread: 0.1 }, max: { aperture: 0.9, spread: 0.9 } });
+  ok(Math.abs(nf.aperture - 0.25) < 1e-9 && Math.abs(nf.spread - 0.325) < 1e-9, "較正による正規化");
+  ok(E("BAND_NAMES").length === 7 && call("resonanceBands", { aperture: 0.4, spread: 0.6, energy: 0.3 }).reduce((a, b) => a + b, 0) > 0.999, "共鳴 7 帯の正規化");
+  /* Jones の複素評価: 三葉結び目 V = t + t^3 - t^4 を t = e^{2πi/5} で直接計算した絶対値と一致 */
+  const th5 = 2 * Math.PI / 5, re = Math.cos(th5) + Math.cos(3 * th5) - Math.cos(4 * th5), im = Math.sin(th5) + Math.sin(3 * th5) - Math.sin(4 * th5);
+  const direct = Math.hypot(re, im), viaJones = E("Jones").Vabs(3, th5);
+  ok(Math.abs(direct - viaJones) < 1e-9 || Math.abs(direct - E("Jones").Vabs(3, -th5)) < 1e-9, "Jones |V_{T(2,3)}(e^{2πi/5})| が閉形式と一致 (" + viaJones.toFixed(4) + " vs " + direct.toFixed(4) + ")");
+  const tpath = call("thermalPath", 0.5); ok(tpath.n === 3 + 2 * 4 && tpath.score >= 0 && tpath.score <= 1 && isFinite(tpath.abs), "熱経路: n = 3 + 2·round(7·feat)、score ∈ [0,1]");
+  ok(call("thermalPath", 0).n === 3 && call("thermalPath", 1).n === 17, "熱経路の n の範囲 3..17");
+  const px = (r, g, b, n) => { const a = new Uint8ClampedArray(n * 4); for (let i = 0; i < n; i++) { a[i * 4] = r; a[i * 4 + 1] = g; a[i * 4 + 2] = b; a[i * 4 + 3] = 255; } return a; };
+  ok(call("imageFeatures", px(20, 30, 80, 16), 4, 4).atoms[0] === "cool" && call("imageFeatures", px(240, 230, 200, 16), 4, 4).atoms[0] === "warm", "イメージ入力: 暗い → 暗い青、明るい → 明るい橙");
+  ok(call("imageFeatures", px(128, 128, 128, 16), 4, 4).atoms.includes("calm") && call("imageFeatures", px(160, 40, 200, 16), 4, 4).atoms.includes("vivid"), "イメージ入力: 無彩色 → 静か、紫 → 紫");
+  const cr = call("chatRoute", "本を管理するアプリを作って"); ok(cr.intent === "forge" && /本/.test(cr.request), "チャット: 作成依頼の振り分け");
+  ok(call("chatRoute", "こんにちは").intent === "greeting" && call("chatRoute", "何ができる？").intent === "capabilities" && call("chatRoute", "やり直し").intent === "reset" && call("chatRoute", "").intent === "empty", "チャット: 挨拶・できること・やり直し・空");
+  const spec = call("comprehend", cr.request), rep = call("chatReplyLocal", { intent: "forged" }, { spec: spec, ver: { ok: true } });
+  ok(/錬成しました/.test(rep) && rep.includes(spec.title), "チャット: 錬成後の返答に題名と結果");
+  ok(/口形|脳波/.test(call("chatReplyLocal", { intent: "capabilities" })), "チャット: できることの説明");
 }
 
 /* 0.6 思考だけで (脳波 BCI): DSP・機器パケット・スキャン選択 */

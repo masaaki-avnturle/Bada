@@ -88,6 +88,12 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
 .sreadout .rrow{display:grid;grid-template-columns:140px 70px 1fr;gap:8px;align-items:baseline}
 .sreadout .rrow i{font-style:normal;color:var(--txt2)}.sreadout .rrow b{font-variant-numeric:tabular-nums;color:var(--acc);font-weight:500}
 .simgs{display:flex;gap:8px;flex-wrap:wrap}.simgs svg{border-radius:8px;border:1px solid rgba(150,190,255,.18)}
+.chatlog{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;padding:8px;background:rgba(0,0,0,.25);border:1px solid rgba(150,190,255,.14);border-radius:12px;margin-bottom:8px}
+.cmsg{max-width:85%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.6;white-space:pre-wrap}
+.cmsg.bot{align-self:flex-start;background:rgba(30,42,70,.7);border:1px solid rgba(150,190,255,.18)}
+.cmsg.me{align-self:flex-end;background:rgba(143,208,255,.2);border:1px solid rgba(143,208,255,.4)}
+.cmsg .src{display:block;font-size:9px;color:var(--txt2);margin-bottom:2px}
+.bciopt .dw{display:block;height:3px;background:var(--acc);width:0;margin-top:6px;border-radius:3px}
 .bciopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .bciopt{padding:14px 10px;border-radius:12px;border:1px solid rgba(150,190,255,.2);background:rgba(30,42,70,.6);text-align:center;font-size:14px;transition:background .1s}
 .bciopt.cur{border-color:var(--acc);background:rgba(143,208,255,.22);box-shadow:0 0 18px rgba(143,208,255,.35)}
@@ -102,6 +108,52 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
  <div class="sub">BadaGPT TELEGRAPH · 思考入力 → 電信 → 全体把握 → 設計 → 生成 → 検証 → 論文<br>
  依頼の全体を捉えてアプリケーションを錬成し、Android (APK) / Windows 10・11 / Linux へ · Bada 言語駆動</div>
 </header>
+
+<div class="card">
+ <h2>💬 BadaGPT チャット — ChatGPT 版: 口形・脳波・動き・画像・文字で話しかける</h2>
+ <div id="chat-log" class="chatlog"><div class="cmsg bot">こんにちは。BadaGPT です。声を出さず、口形 (Ω-Telephacy)・脳波・描いた動き・画像で、欲しいアプリを伝えてください。文章にして、アプリ・ソースコード・論文を錬成し、exe / apk に自動コンパイルします。</div></div>
+ <div class="row">
+  <input id="chat-in" placeholder="(文字でも話しかけられます — 口形や脳波で入力したときは自動で入ります)" style="flex:1;min-width:200px">
+  <button class="main" id="chat-send" style="margin:0;width:auto;padding:10px 16px">送る</button>
+ </div>
+ <div class="muted" id="chat-stat"></div>
+</div>
+
+<div class="card">
+ <h2>⓪-β Ω-Telephacy — 声を出さないサイレント・トーク音声認識 (口形 viseme)</h2>
+ <div class="muted" style="margin-bottom:8px">声を出さずに、<b>口の形 (viseme: あ・い・う・お・え・閉じ)</b> の列として語を「発音」します。カメラが口付近の暗い領域から <b>縦の開き・横の開き・力</b> を測って口形に分類し、閉じで区切った口形の列を辞書で語に引きます (本リポジトリの silenttalk 復号器の移植)。語は <b>Γ多様体 × Jones の熱エネルギー経路</b>で重み付けされ、<b>トランスフォーマー</b>が latent に組み立て、BadaGPT チャットへ渡ります。</div>
+ <div class="row">
+  <button class="btn" id="tp-start">📷 カメラで口形を読む</button>
+  <button class="btn hidden" id="tp-stop">⏹ 止める</button>
+  <button class="btn" id="tp-cal-closed">較正: 口を閉じた状態</button>
+  <button class="btn" id="tp-cal-open">較正: 大きく開けた状態</button>
+  <span class="muted" id="tp-stat">未接続</span>
+ </div>
+ <div class="row">
+  <video id="tp-video" playsinline muted style="width:160px;height:120px;border-radius:8px;background:#000;display:none"></video>
+  <canvas id="tp-roi" width="64" height="48" style="width:128px;height:96px;border-radius:8px;background:#000;border:1px solid rgba(130,170,240,.2)"></canvas>
+  <canvas id="tp-thermal" width="64" height="48" style="width:128px;height:96px;border-radius:8px;background:#000;border:1px solid rgba(130,170,240,.2)" title="疑似サーモ (動きエネルギーの疑似カラー・実温度ではない)"></canvas>
+  <div class="tile" style="flex:1;min-width:150px"><div class="k">口形 / 特徴</div><div class="v" id="tp-vis" style="font-size:22px">—</div><div class="muted" id="tp-feat"></div></div>
+  <div class="tile" style="flex:1;min-width:150px"><div class="k">共鳴 (7 段階) / 熱経路 Jones</div><div class="v" id="tp-band" style="font-size:13px">—</div></div>
+ </div>
+ <label>口形の列 (いま発音中)</label>
+ <div id="tp-seq" class="mono" style="background:rgba(0,0,0,.3);border-radius:9px;padding:8px 10px;font-size:13px;letter-spacing:3px;min-height:34px">—</div>
+ <label>認識した語 (無音の発話)</label>
+ <div id="tp-words" class="sstrip"><span class="muted">まだ認識していません。</span></div>
+ <details style="margin-top:8px"><summary>📖 口形の辞書 — ホバーで滞留しても選べます (Ω-Telepathy の dwell)</summary>
+  <div class="muted" style="margin:6px 0">例: 「あ→い」(AI) = 記録・管理、「い→お→い」(IOI) = 作って。口を閉じると語が区切られます。マウスやタッチの<b>ホバー滞留 0.8 秒</b>でも選べます (クリック不要)。</div>
+  <div id="tp-lex" class="bciopts"></div>
+ </details>
+ <div class="row" style="margin-top:8px">
+  <label style="margin:0">🖼 イメージ入力</label><input type="file" id="tp-img" accept="image/*" style="width:auto">
+  <span class="muted" id="tp-imgstat">画像の明るさ・彩度・色相を調子と色に (内容は読みません)</span>
+ </div>
+ <div class="row">
+  <button class="main" id="tp-send" disabled style="margin-top:4px">⚡ 認識した語で錬成する (チャットへ送る)</button>
+  <button class="btn" id="tp-clear">語を消す</button>
+ </div>
+ <div class="note" style="text-align:left;margin-top:8px">※ 認識するのは、本人が<b>声を出さずに口形の列として発音した辞書の語</b>で、自由な読唇や思考の読み取りではありません。熱 (温度) は測らず、疑似サーモは普通のカメラの動きエネルギーの疑似カラーです。Γ多様体・Jones は重み付けの可視化です。本人の顔を本人の同意の上で映します。</div>
+</div>
 
 <div class="card">
  <h2>⓪-α 思考だけで — 脳波 (BCI) で選ぶ: 声も、絵も、文字もなしに</h2>
