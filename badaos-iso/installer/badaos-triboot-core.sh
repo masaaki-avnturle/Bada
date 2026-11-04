@@ -504,69 +504,11 @@ if [ "$FW" = "uefi" ]; then
       || log "注意: UEFI 起動エントリを登録できませんでした (起動メニューで BADAVMBOOT を選んでください)"
   fi
 elif [ $VBR_MODE = 1 ]; then
-  # (b) Legacy + MBR: ディスク先頭 (MBR) は書き換えない。
-  #     ・モジュールと grub.cfg と core.img を専用 FAT の /grub に (grub-install --no-bootsector)
-  #     ・core.img を FAT 直前の未使用領域 (EMB_S) に書き、
-  #     ・起動コード boot.img を専用 FAT の VBR (拡張区画方式なら EBR) に書き (BPB/区画表は保持)、
-  #     ・その区画をアクティブにする → Windows の MBR 起動コードが Bada VM Pro を起動
+  # (b) Legacy + MBR: ディスク先頭 (MBR) は書き換えない。GRUB は専用 FAT 側に設置し、
+  #     起動時に BADAVMBOOT を UUID で探す core.img を使う (ディスク番号に依存しない)
   emit 88 "Legacy BIOS 用 GRUB を専用 FAT パーティション側に設置中 (MBR は変更しない)"
-  BACK="$MNT/boot/efi/grub"
-  dd if="$DISK" of="$BACK/mbr-before-badavmpro.bin" bs=512 count=1 2>/dev/null || true
-  chroot "$MNT" grub-install --target=i386-pc --boot-directory=/boot/efi --no-bootsector --recheck "$DISK" >&2 \
-    || fail "grub-install (i386-pc, --no-bootsector) に失敗"
-  if [ $USE_EXT = 1 ]; then VBR_LBA=$X_S; ACT_DEV="$(node_at "$X_S")"; else VBR_LBA=$BOOT_S; ACT_DEV="$BOOT_DEV"; fi
-  cp -f /tmp/badaos-ptable-before.sfdisk "$BACK/ptable-before-badavmpro.sfdisk" 2>/dev/null || true
-  [ -n "$ACT_DEV" ] || fail "アクティブにする区画が見つかりません"
-  TMPG="$(mktemp -d)"; cp "$BACK/i386-pc/core.img" "$TMPG/core.img"
-  sync; umount "$MNT/boot/efi"   # VBR を書く前に FAT を外す
-  python3 - "$DISK" "$MNT/usr/lib/grub/i386-pc/boot.img" "$TMPG/core.img" \
-            "$EMB_S" "$VBR_LBA" "$SECT" "$(( ALIGN - 2 ))" "$(( BOOT_S - LGAP ))" "$(( BOOT_S - 1 ))" "$X_S" <<'PY' >&2 || fail "GRUB 起動コードの書き込みに失敗"
-import struct, sys
-disk, bootimg, coreimg = sys.argv[1], sys.argv[2], sys.argv[3]
-emb, vbr, sect, maxsec, reg_s, reg_e, xs = map(int, sys.argv[4:11])
-if emb < 0:
-    # 論理区画方式: FAT 直前の隙間 [reg_s, reg_e] のうち EBR が無い最長の範囲に core.img を置く
-    ebrs = set()
-    with open(disk, 'rb') as f:
-        e = xs
-        for _ in range(128):
-            ebrs.add(e); f.seek(e * sect); b = f.read(512)
-            nxt_type = b[0x1be + 16 + 4]
-            nxt = struct.unpack_from('<I', b, 0x1be + 16 + 8)[0]
-            if nxt_type not in (0x05, 0x0f, 0x85) or nxt == 0: break
-            e = xs + nxt
-    best = (0, -1); run_s = None
-    for x in range(reg_s, reg_e + 2):
-        free = x <= reg_e and x not in ebrs
-        if free and run_s is None: run_s = x
-        if not free and run_s is not None:
-            if x - run_s > best[1] - best[0] + 1: best = (run_s, x - 1)
-            run_s = None
-    emb = best[0]; maxsec = best[1] - best[0] + 1
-    print(f"EBR: {sorted(ebrs)}  core area: {best}")
-boot = open(bootimg, 'rb').read()
-core = bytearray(open(coreimg, 'rb').read())
-n = (len(core) + 511) // 512
-assert n <= maxsec, f"core.img が大きすぎます ({n} セクタ)"
-core += b'\0' * (n * 512 - len(core))
-# diskboot.img の blocklist: 残り n-1 セクタを emb+1 から読む (絶対 LBA)
-start, length, seg = struct.unpack_from('<QHH', core, 0x200 - 12)
-struct.pack_into('<QHH', core, 0x200 - 12, emb + 1, n - 1, seg)
-with open(disk, 'r+b') as f:
-    f.seek(vbr * sect); old = bytearray(f.read(512))
-    open(sys.argv[3] + '.vbr-before', 'wb').write(old)
-    new = bytearray(old)
-    new[0:3] = boot[0:3]                 # jmp (BPB 0x03-0x59 は FAT のものを保持)
-    new[0x5a:0x1b8] = boot[0x5a:0x1b8]   # 起動コード (区画表 0x1be- と署名 0x1fe は保持)
-    struct.pack_into('<Q', new, 0x5c, emb)   # kernel_sector = core.img の先頭
-    new[0x1fe:0x200] = b'\x55\xaa'
-    f.seek(emb * sect); f.write(core)
-    f.seek(vbr * sect); f.write(new)
-print(f"GRUB: boot.img -> LBA {vbr}, core.img ({n} sectors) -> LBA {emb}")
-PY
-  mount "$BOOT_DEV" "$MNT/boot/efi"
-  cp -f "$TMPG/core.img.vbr-before" "$BACK/vbr-before-badavmpro.bin" 2>/dev/null || true; rm -rf "$TMPG"
-  sfdisk --activate "$DISK" "$(pnum "$ACT_DEV")" >&2 || fail "アクティブ区画の設定に失敗"
+  cp -f /tmp/badaos-ptable-before.sfdisk "$MNT/boot/efi/grub/ptable-before-badavmpro.sfdisk" 2>/dev/null || true
+  bash /usr/local/lib/badaos/badaos-legacy-boot "$DISK" "$MNT" >&2 || fail "Legacy 起動の設定に失敗"
 else
   # (c) Legacy + GPT: GRUB の core を BIOS 起動区画に、モジュールと grub.cfg は専用 FAT の /grub に
   emit 88 "Legacy BIOS 用 GRUB をディスク先頭に設置中 (モジュール/設定は専用 FAT)"

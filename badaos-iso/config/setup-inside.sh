@@ -271,6 +271,29 @@ ExecStopPost=/bin/systemctl start getty@tty1.service
 WantedBy=multi-user.target
 EOF
 systemctl enable badaos-text-install.service 2>/dev/null || true
+# GRUB「起動の修復」= badaos.repair=1 の時、tty1 で起動修復を自動実行
+cat > /etc/systemd/system/badaos-repair-boot.service <<'EOF'
+[Unit]
+Description=Bada VM Pro OS boot repair on tty1
+ConditionKernelCommandLine=badaos.repair=1
+After=systemd-user-sessions.service
+Conflicts=getty@tty1.service
+Before=getty@tty1.service
+
+[Service]
+Type=idle
+ExecStart=/bin/bash -c '/usr/local/bin/badaos-repair-boot; echo; read -r -p "Enter = reboot (remove the USB stick first) " _; systemctl reboot'
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable badaos-repair-boot.service 2>/dev/null || true
 
 # テキストモード (画面なし) でログインした時の案内
 cat > /etc/profile.d/badaos-text-hint.sh <<'EOF'
@@ -453,6 +476,16 @@ Exec=emacs
 Terminal=false
 Icon=emacs
 Categories=Development;
+EOF
+cat > /etc/skel/Desktop/badaos-repair-boot.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=起動の修復 (Bada VM Pro が起動しない時)
+Comment=BADAVMBOOT (FAT32) のブートローダを入れ直す。MBR は書き換えない
+Exec=/usr/local/bin/badaos-repair-boot
+Terminal=false
+Icon=system-run
+Categories=System;
 EOF
 cat > /etc/skel/Desktop/xterm.desktop <<EOF
 [Desktop Entry]
