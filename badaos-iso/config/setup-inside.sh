@@ -59,6 +59,14 @@ XKBOPTIONS=""
 BACKSPACE="guess"
 EOF
 apt-get install -y --no-install-recommends keyboard-configuration console-setup kbd
+# パッケージの設定処理が書き換えるので、導入後にもう一度書く
+cat > /etc/default/keyboard <<'EOF'
+XKBMODEL="jp106"
+XKBLAYOUT="jp"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
 mkdir -p /etc/X11/xorg.conf.d
 cat > /etc/X11/xorg.conf.d/00-keyboard.conf <<'EOF'
 Section "InputClass"
@@ -579,6 +587,11 @@ if [ -n "$APT_BASE_URL" ]; then
   sed "s#@APT_BASE_URL@#${APT_BASE_URL}#g" /tmp/bada.list.tmpl > /etc/apt/sources.list.d/bada.list
   echo "registered bada apt repo: $APT_BASE_URL (fetched at first boot, not now)"
 fi
+
+# キーボード設定が最後まで jp106 / jp のままか確認 (後から入ったパッケージに書き換えられていないか)
+grep -q '^XKBMODEL="jp106"' /etc/default/keyboard && grep -q '^XKBLAYOUT="jp"' /etc/default/keyboard \
+  || { sed -i 's/^XKBMODEL=.*/XKBMODEL="jp106"/; s/^XKBLAYOUT=.*/XKBLAYOUT="jp"/' /etc/default/keyboard; }
+grep -q '^XKBMODEL="jp106"' /etc/default/keyboard || { echo "FATAL: /etc/default/keyboard が jp106 になりません"; exit 1; }
 
 # ---- 要求パッケージの最終確認 (1 つでも欠けたらビルド失敗) ----
 REQUIRED="network-manager iptables dnsmasq-base apt
