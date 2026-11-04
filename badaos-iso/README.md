@@ -3,22 +3,36 @@
 **USB ブートして実ディスクにインストールできる、Bada VM Pro OS の本物の Linux ディストロ**です。
 これまでの単一 HTML アプリを「ライブ CD の中で動く OS」として仕立てました。
 
-- **ベース**: Ubuntu 22.04 (jammy) を `debootstrap` で最小構築
-- **ウィンドウマネージャ**: **w9wm**(lightdm 自動ログイン)+ **日本語端末 mlterm**
-- **日本語環境**: ロケール ja_JP.UTF-8 / Noto CJK フォント / 入力メソッド **fcitx-mozc**(Ctrl+Space / 半角全角 で ON/OFF)+ 設定ツール **fcitx-configtool**(fcitx-config-gtk)
-- **プリインストール**: Bada VM Pro / Laevateinn + 単一 HTML アプリ(`/opt/bada`)。**エディタ vim(gvim)/emacs/neovim**、git/tmux/htop、ファイルマネージャ等の定番も同梱
-- **Ubuntu アプリを簡単導入**: `badaos-apps`（GUI チェックリスト）で LibreOffice/GIMP/VLC/Firefox 系/ブラウザ等を apt でワンクリック導入
-- **実ディスクへインストール**: **Calamares(日本語 GUI)** + **パーティションマネージャ GParted**(使いたい HDD を初期化・作成)。うまく動かない時の代替として自作 zenity ウィザードも同梱
-- **ネットワーク**: NetworkManager(**NAT / DHCP がそのまま通る**)→ `apt` が使える。`badaos-nat` で**この PC を NAT ルータ**にもできる(`on <外側IF> <内側IF>` = iptables マスカレード / `share <内側IF>` = NetworkManager の DHCP+NAT 共有)
-- **ssh**: `openssh-server` を有効化。ホスト鍵は ISO に焼き込まず、**初回起動時にその PC 固有の鍵を生成**(ライブ環境では先に `passwd` でパスワードを設定)
-- **xinetd**: 有効化済み。サンプルサービス `/etc/xinetd.d/bada-info`(TCP 7777, 既定は無効)
-- **apt**: パッケージ索引を ISO に同梱しているので**起動直後から** `sudo apt install <pkg>` が使える(古くなったら `sudo apt update`)。起動時に `badaos-apt-check` が Bada の apt リポジトリの到達確認(未公開なら自動で無効化し apt のエラーを出さない)。`sudo apt install <pkg>` / `badaos-apps`(GUI)でアプリを追加
-- **印刷 (プリンター)**: **CUPS** + ドライバ一式 `printer-driver-all`(Epson/Canon=gutenprint、HP=hplip、Brother=brlaser など)。**USB プリンタ**(ipp-usb でドライバ不要機も)と **ネットワークプリンタ**(avahi で AirPrint / IPP Everywhere を自動検出、cups-browsed で共有プリンタを自動追加)。デスクトップの「プリンターの設定」(`system-config-printer`)か、ブラウザで `http://localhost:631` から追加。ユーザーは `lpadmin` グループ所属なので管理者パスワードなしで追加可。スキャナ用に simple-scan も同梱
-- **TeX**: **texlive-full**(日本語 platex / uplatex / lualatex-ja 含む全パッケージ。PDF マニュアル texlive-doc のみ容量のため未展開 → `/etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc` を消して再インストールで追加可)
-- **エディタ**: **vim** / **gvim** / **emacs**(AUCTeX・emacs-mozc 付き)/ neovim / vim-latexsuite
-- **端末/アプリ**: **mlterm**(日本語 UTF-8)・**screen**(UTF-8 設定済み)・xterm、ブラウザ **Falkon**、PDF **Evince**、動画 **mpv**、画像 Ristretto/GPicView、ファイル PCManFM、エディタ Mousepad/vim/emacs/neovim、電卓、アーカイバ、タスクマネージャ、ネットワーク設定 (nm-applet / nm-connection-editor)
-- **あなたのリポジトリの apt リポジトリ**: `deb [trusted=yes] <release>/ ./` を登録済み。`apt install` で Bada アプリを取得
-- **起動方式**: GRUB (grub-mkrescue) による BIOS + UEFI ハイブリッド ISO。`search` でカーネルのある ISO を確実に検出 → **Rufus でそのまま USB に書ける**
+**必要最小限の構成**です。事前に入っているのは「日本語・w9wm・NAT・プリンター・vim・emacs・apt」だけで、
+mlterm・ssh・xinetd・texlive-full・screen などは**後から apt コマンドで入れる**方式にしました。
+
+| 区分 | 内容 |
+|:---|:---|
+| ベース | Ubuntu 22.04 (jammy) を `debootstrap` で最小構築 |
+| デスクトップ | **w9wm**(lightdm 自動ログイン)+ 端末 **xterm**(日本語フォント・日本語入力を設定済み) |
+| 日本語 | ロケール ja_JP.UTF-8 / Noto CJK フォント / **fcitx-mozc**(Ctrl+Space / 半角全角 で ON/OFF)/ `fcitx-configtool` |
+| NAT | NetworkManager(**NAT / DHCP がそのまま通る**)。`badaos-nat` で**この PC を NAT ルータ**にも(`on <外側IF> <内側IF>` / `share <内側IF>`) |
+| プリンター | **CUPS** + `printer-driver-all`(Epson/Canon/HP/Brother…)。USB(ipp-usb)/ネットワーク(AirPrint・IPP Everywhere 自動検出)。デスクトップ「プリンターの設定」か `http://localhost:631`。ユーザーは `lpadmin` 所属 |
+| エディタ (事前導入) | **vim** / gvim / **emacs**(emacs-mozc 付き) |
+| apt | パッケージ索引を同梱 → **起動直後から** `sudo apt install <pkg>` が使える |
+| インストーラ | トリプルブート導入 / Calamares / かんたんウィザード / GParted |
+
+### 後から apt で入れるもの
+
+```
+badaos-extras mlterm ssh xinetd screen texlive      # まとめて (GUI: デスクトップ「追加ソフトを導入」)
+
+# または apt コマンドで個別に
+sudo apt update
+sudo apt install mlterm mlterm-im-fcitx   # 日本語端末 (+ mozc 入力プラグイン。~/.mlterm は設定済み)
+sudo apt install openssh-server           # ssh
+sudo apt install xinetd                   # xinetd
+sudo apt install screen                   # screen (~/.screenrc は UTF-8 設定済み)
+sudo apt install texlive-full             # TeX 一式 (日本語 platex/uplatex 含む。数 GB)
+```
+
+その他のアプリは `badaos-apps`(GUI チェックリスト)か `sudo apt install <pkg>` で。
+起動方式: GRUB による BIOS + UEFI ハイブリッド ISO(各ファイル 4GB 未満なので **Rufus の ISO イメージモード**で書けます)。
 
 ## 🪟🜁🐧 トリプルブート: Windows | Bada VM Pro | Linux (UEFI / Legacy 両対応)
 
@@ -40,8 +54,8 @@ Windows の**すぐ下**に **Bada VM Pro 専用ブートローダの FAT パー
 | 起動方式 | Bada VM Pro のブートローダ |
 |:---|:---|
 | **UEFI** (GPT) | 専用 FAT の `\EFI\BadaVMPro\` を UEFI 起動メニュー **「Bada VM Pro」** に登録 (起動順の先頭)。Windows の ESP・`\EFI\Microsoft\` は無変更 |
-| **Legacy BIOS** (MBR) | GRUB の起動コードをディスク先頭に、モジュールと `grub.cfg` は専用 FAT の `/grub` に。基本区画が足りない (System Reserved + C: + Linux) 場合は**拡張区画 + 論理区画**で作成。元の MBR は `grub/mbr-before-badavmpro.bin` に退避 |
-| **Legacy BIOS** (GPT) | 上と同じ + GRUB 埋め込み用の 1MiB BIOS 起動区画を専用 FAT の前に作成 |
+| **Legacy BIOS** (MBR) | **ディスク先頭 (MBR) = Windows の先頭ヘッダは書き換えません。** GRUB の起動コードを**専用 FAT パーティションの先頭セクタ (VBR)** に、GRUB 本体を FAT 直前の未使用 1MiB に置き、専用 FAT を**アクティブ**にします → Windows の MBR 起動コードがそのまま Bada VM Pro のブートローダを起動。基本区画の空きが 1 つだけ (System Reserved + C: + Linux) の場合は**拡張区画 + 論理区画**で作り、起動コードは拡張区画の先頭 (EBR) に置いてそれをアクティブに。元に戻す: `sudo sfdisk --activate /dev/sdX 1`(元のアクティブ区画番号)。書き換え前のセクタは `grub/*-before-badavmpro.bin` に退避 |
+| **Legacy BIOS** (GPT) | (Windows では稀な構成) 保護 MBR の起動コード + GRUB 埋め込み用の 1MiB BIOS 起動区画を専用 FAT の前に作成 |
 
 どちらの方式でも GRUB メニューで **Bada VM Pro / Windows / Linux** を選べます。
 (Windows は UEFI なら `bootmgfw.efi`、Legacy なら `bootmgr` を起動時に探して起動。後ろの Linux は os-prober が検出)

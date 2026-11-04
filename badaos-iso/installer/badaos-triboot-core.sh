@@ -10,15 +10,20 @@
 #   │     │              │ Bada VM Pro 専用  │ Windows の下の    │              │
 #   │     │              │ ブートローダ      │ 空き領域に作成    │              │
 #   └─────┴──────────────┴───────────────────┴───────────────────┴──────────────┘
-#     ↑ Windows の起動パーティション (ESP) と MBR の Windows 起動コードは
-#       UEFI ではいっさい変更しない。Bada VM Pro のブートローダ (GRUB の EFI
-#       ローダ・モジュール・grub.cfg) はすべて専用 FAT パーティションに入る。
+#     ↑ Windows の起動パーティション (ESP) と、ディスク先頭 (MBR) の Windows の
+#       起動コードは変更しない (Windows の「先頭ヘッダ」には書かない)。
+#       Bada VM Pro のブートローダはすべて真ん中の専用 FAT パーティション側に入る。
 #
 #   起動方式:
 #     UEFI   … 専用 FAT の \EFI\BadaVMPro\ と \EFI\BOOT\BOOTX64.EFI に GRUB(+shim)。
 #              UEFI 起動メニュー「Bada VM Pro」を登録 (専用 FAT を指す)。
-#     Legacy … 専用 FAT の /grub に GRUB (i386-pc) を置き、ディスク先頭 (MBR) に
-#              GRUB の起動コードを書く。GPT ディスクでは 1MiB の BIOS 起動区画も作る。
+#     Legacy (MBR ディスク) … GRUB の起動コードを「専用 FAT パーティションの先頭セクタ
+#              (VBR)」に、GRUB 本体 (core.img) を FAT 直前の未使用 1MiB に置き、
+#              専用 FAT をアクティブにする。Windows の MBR 起動コードがアクティブ区画
+#              = Bada VM Pro のブートローダを起動する (MBR 先頭 440B は書き換えない)。
+#              基本区画の空きが 1 つしか無い時は拡張区画の先頭セクタ (EBR) に起動コード
+#              を置き、拡張区画をアクティブにする。元に戻す: sfdisk --activate <disk> <元の番号>
+#     Legacy (GPT ディスク、Windows では稀) … 1MiB の BIOS 起動区画 + 保護 MBR の起動コード。
 #     どちらでも GRUB メニューから Bada VM Pro / Windows / Linux を選べる。
 #
 #   ・Windows → Linux の順に並んだディスクで、その間の未割り当て領域を使う
@@ -45,7 +50,7 @@ PASS="${NEW_PASS:-bada}"
 BADA_SIZE_GB="${BADA_SIZE_GB:-0}"
 SHRINK_WINDOWS="${SHRINK_WINDOWS:-0}"
 PLAN_ONLY="${PLAN_ONLY:-0}"
-MIN_GB=30                  # OS 本体 (ext4) の最小サイズ (texlive-full 込みで約 15GiB + 余裕)
+MIN_GB=20                  # OS 本体 (ext4) の最小サイズ (最小構成 約 6GiB + 後から apt で texlive-full 等を入れる余裕)
 BOOT_MIB=512               # 専用ブートローダ FAT の大きさ
 BOOT_ID="BadaVMPro"        # \EFI\BadaVMPro\ と UEFI 起動メニュー名
 BOOT_LABEL="Bada VM Pro"
@@ -122,6 +127,8 @@ case "$FW" in uefi|bios) ;; *) fail "BOOT_MODE は uefi か bios" ;; esac
 
 # GPT + Legacy は GRUB の埋め込み先として 1MiB の BIOS 起動区画 (EF02) が要る
 NEED_BIOSGRUB=0; [ "$FW" = "bios" ] && [ "$LABEL" = "gpt" ] && NEED_BIOSGRUB=1
+# MBR + Legacy は MBR を書き換えず、専用 FAT (または拡張区画) の先頭セクタに起動コードを置く
+VBR_MODE=0; [ "$FW" = "bios" ] && [ "$LABEL" = "dos" ] && VBR_MODE=1
 # MBR は基本区画が 4 つまで。空きが 2 つ以上 → 基本区画 2 つ、
 # 1 つだけ (System Reserved + C: + Linux の典型例) → 拡張区画 1 つ + 論理区画 2 つ
 USE_EXT=0
@@ -178,7 +185,14 @@ fi
 
 # 空きを分割: [BIOS 起動 1MiB (GPT+Legacy のみ)] [専用ブート FAT] [OS 本体 ext4]
 # 論理区画は前に 1MiB (EBR 用) 空ける
+#   VBR_MODE: GRUB 本体 (core.img) を FAT 直前の未使用 1MiB (EMB_S から) に埋め込む
+#     拡張区画あり … EBR (GAP_S) の直後 = 最初の論理区画までの隙間
+#     基本区画     … 専用 FAT の前に 1MiB の未割り当てを残す
 cur=$GAP_S; LGAP=0; [ $USE_EXT = 1 ] && LGAP=$ALIGN
+EMB_S=0
+if [ $VBR_MODE = 1 ]; then
+  if [ $USE_EXT = 1 ]; then EMB_S=$(( GAP_S + 1 )); else EMB_S=$cur; cur=$(( cur + ALIGN )); fi
+fi
 cur=$(( cur + LGAP ))
 if [ $NEED_BIOSGRUB = 1 ]; then BG_S=$cur; BG_E=$(( cur + ALIGN - 1 )); cur=$(( BG_E + 1 )); fi
 BOOT_S=$cur; BOOT_E=$(( cur + BOOT_MIB * ALIGN - 1 )); cur=$(( BOOT_E + 1 + LGAP ))
@@ -194,7 +208,10 @@ gib(){ awk -v s="$1" -v b="$SECT" 'BEGIN{ if (s*b < 1073741824) printf "%dMiB", 
   echo "ディスク : $DISK  ($LABEL, ${SECT}B/セクタ)   起動方式: $( [ $FW = uefi ] && echo UEFI || echo Legacy BIOS )"
   echo "Windows  : ${P_NODE[WIN]}  $(gib $(( P_END[WIN]-P_START[WIN]+1 )))$( [ $SHRINK = 1 ] && echo " → 縮小後 $(gib $(( NEW_WIN_END-P_START[WIN]+1 ))) (ntfsresize)")"
   echo "Linux    : ${P_NODE[LIN]}  $(gib $(( P_END[LIN]-P_START[LIN]+1 )))  (変更なし)"
-  echo "Windows の起動パーティション/起動コード: $( [ $FW = uefi ] && echo '変更しない' || echo 'MBR 先頭 440B を GRUB に (Windows は GRUB メニューから起動)')"
+  if [ $FW = uefi ]; then echo "Windows の起動パーティション (ESP) / MBR: 変更しない"
+  elif [ $VBR_MODE = 1 ]; then
+    echo "Windows の MBR 起動コード: 変更しない (Bada VM Pro の起動コードは$( [ $USE_EXT = 1 ] && echo '拡張区画の先頭 (EBR)' || echo '専用 FAT の先頭 (VBR)')、それをアクティブに)"
+  else echo "GPT + Legacy: 保護 MBR の起動コードと BIOS 起動区画を使用"; fi
   echo "--- 予定のレイアウト (ディスク先頭から) ---"
   {
     for ((k=0;k<N;k++)); do
@@ -202,6 +219,7 @@ gib(){ awk -v s="$1" -v b="$SECT" 'BEGIN{ if (s*b < 1073741824) printf "%dMiB", 
       printf '%012d  %-24s %-6s %9s\n' "${P_START[k]}" "${P_NODE[k]}" "${P_FS[k]:-?}" "$(gib $(( e-P_START[k]+1 )))"
     done
     [ $NEED_BIOSGRUB = 1 ] && printf '%012d  %-24s %-6s %9s  ★ GRUB 埋め込み用\n' "$BG_S" "(新規)BIOS起動" "-" "$(gib $(( BG_E-BG_S+1 )))"
+    [ $VBR_MODE = 1 ] && [ $USE_EXT = 0 ] && printf '%012d  %-24s %-6s %9s  ★ GRUB 本体 (未割り当て)\n' "$EMB_S" "(新規)GRUB 埋め込み" "-" "1MiB"
     [ $USE_EXT = 1 ] && printf '%012d  %-24s %-6s %9s  ★ 拡張区画 (中に論理区画 2 つ)\n' "$GAP_S" "(新規)拡張区画" "-" "$(gib $(( GAP_E-GAP_S+1 )))"
     printf '%012d  %-24s %-6s %9s  ★ Bada VM Pro 専用ブートローダ\n' "$BOOT_S" "(新規)BADAVMBOOT" "vfat" "$(gib $(( BOOT_E-BOOT_S+1 )))"
     printf '%012d  %-24s %-6s %9s  ★ Bada VM Pro OS\n' "$ROOT_S" "(新規)BADAVMPRO" "ext4" "$(gib $(( ROOT_E-ROOT_S+1 )))"
@@ -346,9 +364,50 @@ if [ "$FW" = "uefi" ]; then
     efibootmgr -q -c -d "$DISK" -p "$(pnum "$BOOT_DEV")" -L "$BOOT_LABEL" -l "$LOADER" >&2 \
       || log "注意: UEFI 起動エントリを登録できませんでした (起動メニューで BADAVMBOOT を選んでください)"
   fi
+elif [ $VBR_MODE = 1 ]; then
+  # (b) Legacy + MBR: ディスク先頭 (MBR) は書き換えない。
+  #     ・モジュールと grub.cfg と core.img を専用 FAT の /grub に (grub-install --no-bootsector)
+  #     ・core.img を FAT 直前の未使用領域 (EMB_S) に書き、
+  #     ・起動コード boot.img を専用 FAT の VBR (拡張区画方式なら EBR) に書き (BPB/区画表は保持)、
+  #     ・その区画をアクティブにする → Windows の MBR 起動コードが Bada VM Pro を起動
+  emit 88 "Legacy BIOS 用 GRUB を専用 FAT パーティション側に設置中 (MBR は変更しない)"
+  BACK="$MNT/boot/efi/grub"
+  dd if="$DISK" of="$BACK/mbr-before-badavmpro.bin" bs=512 count=1 2>/dev/null || true
+  chroot "$MNT" grub-install --target=i386-pc --boot-directory=/boot/efi --no-bootsector --recheck "$DISK" >&2 \
+    || fail "grub-install (i386-pc, --no-bootsector) に失敗"
+  if [ $USE_EXT = 1 ]; then VBR_LBA=$GAP_S; ACT_DEV="$(node_at "$GAP_S")"; else VBR_LBA=$BOOT_S; ACT_DEV="$BOOT_DEV"; fi
+  [ -n "$ACT_DEV" ] || fail "アクティブにする区画が見つかりません"
+  TMPG="$(mktemp -d)"; cp "$BACK/i386-pc/core.img" "$TMPG/core.img"
+  sync; umount "$MNT/boot/efi"   # VBR を書く前に FAT を外す
+  python3 - "$DISK" "$MNT/usr/lib/grub/i386-pc/boot.img" "$TMPG/core.img" \
+            "$EMB_S" "$VBR_LBA" "$SECT" "$(( ALIGN - 2 ))" <<'PY' >&2 || fail "GRUB 起動コードの書き込みに失敗"
+import struct, sys
+disk, bootimg, coreimg, emb, vbr, sect, maxsec = sys.argv[1], sys.argv[2], sys.argv[3], *map(int, sys.argv[4:])
+boot = open(bootimg, 'rb').read()
+core = bytearray(open(coreimg, 'rb').read())
+n = (len(core) + 511) // 512
+assert n <= maxsec, f"core.img が大きすぎます ({n} セクタ)"
+core += b'\0' * (n * 512 - len(core))
+# diskboot.img の blocklist: 残り n-1 セクタを emb+1 から読む (絶対 LBA)
+start, length, seg = struct.unpack_from('<QHH', core, 0x200 - 12)
+struct.pack_into('<QHH', core, 0x200 - 12, emb + 1, n - 1, seg)
+with open(disk, 'r+b') as f:
+    f.seek(vbr * sect); old = bytearray(f.read(512))
+    open(sys.argv[3] + '.vbr-before', 'wb').write(old)
+    new = bytearray(old)
+    new[0:3] = boot[0:3]                 # jmp (BPB 0x03-0x59 は FAT のものを保持)
+    new[0x5a:0x1b8] = boot[0x5a:0x1b8]   # 起動コード (区画表 0x1be- と署名 0x1fe は保持)
+    struct.pack_into('<Q', new, 0x5c, emb)   # kernel_sector = core.img の先頭
+    new[0x1fe:0x200] = b'\x55\xaa'
+    f.seek(emb * sect); f.write(core)
+    f.seek(vbr * sect); f.write(new)
+print(f"GRUB: boot.img -> LBA {vbr}, core.img ({n} sectors) -> LBA {emb}")
+PY
+  mount "$BOOT_DEV" "$MNT/boot/efi"
+  cp -f "$TMPG/core.img.vbr-before" "$BACK/vbr-before-badavmpro.bin" 2>/dev/null || true; rm -rf "$TMPG"
+  sfdisk --activate "$DISK" "$(pnum "$ACT_DEV")" >&2 || fail "アクティブ区画の設定に失敗"
 else
-  # (b) Legacy BIOS 用: GRUB の core をディスク先頭 (MBR 後の隙間 / GPT は BIOS 起動区画) に、
-  #     モジュールと grub.cfg は専用 FAT の /grub に置く
+  # (c) Legacy + GPT: GRUB の core を BIOS 起動区画に、モジュールと grub.cfg は専用 FAT の /grub に
   emit 88 "Legacy BIOS 用 GRUB をディスク先頭に設置中 (モジュール/設定は専用 FAT)"
   dd if="$DISK" of="$MNT/boot/efi/grub/mbr-before-badavmpro.bin" bs=512 count=1 2>/dev/null || true
   chroot "$MNT" grub-install --target=i386-pc --boot-directory=/boot/efi --recheck "$DISK" >&2 \

@@ -12,8 +12,11 @@ SEL="$(zenity --list --checklist --width=640 --height=560 \
   --title="Bada VM Pro OS — Ubuntu アプリを導入" \
   --text="導入したいアプリにチェックを入れて「導入」を押してください（NAT/apt で取得）。" \
   --column="選択" --column="パッケージ" --column="内容" \
-  FALSE vim-gtk3       "Vim (GUI/クリップボード対応)" \
-  FALSE emacs          "Emacs エディタ" \
+  FALSE "mlterm mlterm-im-fcitx" "mlterm 日本語端末 (+ mozc 入力プラグイン)" \
+  FALSE openssh-server "ssh サーバ" \
+  FALSE xinetd         "xinetd スーパーサーバ" \
+  FALSE screen         "screen 端末多重化" \
+  FALSE texlive-full   "TeX 一式 (日本語 platex/uplatex 含む。数 GB)" \
   FALSE neovim         "Neovim エディタ" \
   FALSE geany          "軽量 IDE (Geany)" \
   FALSE firefox-esr    "Firefox 系ブラウザ (無ければ falkon 推奨)" \

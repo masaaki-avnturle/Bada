@@ -24,9 +24,9 @@ echo "パーティションマネージャ (GParted):          badaos-partition"
 echo "かんたんインストール (ウィザード):           install-badaos-simple"; \
 echo "トリプルブート (Win|BadaVMPro|Linux):         install-badaos-triboot"; \
 echo "Ubuntu アプリを簡単導入 (GUI):               badaos-apps"; \
-echo "ssh / xinetd:                                sudo systemctl status ssh xinetd (ssh 前に passwd でパスワード設定)"; \
+echo "追加ソフト (apt):                            badaos-extras mlterm ssh xinetd screen texlive"; \
+echo "  (または sudo apt update && sudo apt install mlterm mlterm-im-fcitx openssh-server xinetd screen texlive-full)"; \
 echo "NAT ルータ:                                  sudo badaos-nat on <外側IF> <内側IF> / share <内側IF>"; \
-echo "端末多重化:                                  screen"; \
 echo "プリンター:                                  system-config-printer (または http://localhost:631)"; \
 echo "エディタ:                                    vim / gvim / emacs / neovim"; \
 echo "日本語入力の設定 (fcitx):                    fcitx-configtool"; \

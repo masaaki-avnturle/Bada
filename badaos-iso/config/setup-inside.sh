@@ -36,18 +36,22 @@ apt_try(){ for p in "$@"; do apt-get install -y --no-install-recommends "$p" \
 apt_try_rec(){ for p in "$@"; do apt-get install -y "$p" \
   && echo "  [ok] $p" || echo "  [WARN] $p の導入に失敗 (スキップ)"; done; }
 
-# ---- デスクトップ (w9wm) + mlterm 端末 + 日本語フォント ----
-apt_try nano less curl wget ca-certificates \
-  xserver-xorg xinit x11-xserver-utils \
-  lightdm lightdm-gtk-greeter \
-  w9wm mlterm mlterm-common mlterm-im-fcitx xterm x11-utils feh \
-  fonts-dejavu fonts-noto-cjk fonts-noto-color-emoji
+# ==== 必要最小限 ====
+#   事前に入れるもの: 日本語 (fcitx-mozc)・w9wm・NAT (NetworkManager)・印刷 (CUPS)・
+#   vim・emacs・apt とインストーラ一式。端末は xterm (日本語入力対応の設定済み)。
+#   mlterm・ssh・xinetd・screen・texlive-full などは入れない → 後から apt で導入
+#   (`badaos-extras` / `badaos-apps` / `sudo apt install ...`)。
 
-# ---- エディタ (vim / emacs / neovim) と定番 CLI/GUI アプリ ----
-#   vim-gtk3: X クリップボード + 日本語対応。emacs: GTK 版。
-apt_try vim vim-gtk3 emacs neovim \
-  git tmux htop tree file unzip zip p7zip-full xz-utils \
-  pcmanfm mousepad gpicview xarchiver galculator
+# ---- デスクトップ (w9wm) + xterm + 日本語フォント ----
+apt_try nano less curl wget ca-certificates \
+  xserver-xorg xinit x11-xserver-utils x11-utils \
+  lightdm lightdm-gtk-greeter \
+  w9wm xterm \
+  fonts-dejavu-core fonts-noto-cjk
+
+# ---- エディタ: vim と emacs (事前導入) ----
+#   vim-gtk3: GUI (gvim) + X クリップボード。emacs: GTK 版 + emacs-mozc (Emacs 内の日本語入力)
+apt_try vim vim-gtk3 emacs emacs-mozc
 
 # ---- 日本語入力 (fcitx-mozc + fcitx-configtool) ----
 #   fcitx-mozc の依存で fcitx 本体・モジュールが入る。recommends 込みで
@@ -92,13 +96,8 @@ apt_try qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-contro
 # トリプルブート用: NTFS 検出/縮小、UEFI 起動メニュー登録、Secure Boot 用署名済み GRUB
 apt_try ntfs-3g efibootmgr fdisk shim-signed grub-efi-amd64-signed python3-minimal
 
-# ---- サーバ/ネットワーク: ssh・xinetd・NAT ルータ用ツール・screen ----
-apt_try openssh-server xinetd screen \
-  iptables dnsmasq-base network-manager-gnome \
-  iputils-ping dnsutils traceroute netcat-openbsd telnet rsync
-# ---- 一通りのアプリケーション (apt の deb。ブラウザ/PDF/動画/画像/端末) ----
-apt_try falkon evince mpv ristretto mousepad pcmanfm lxtask \
-  software-properties-common apt-transport-https gnupg
+# ---- NAT: NetworkManager (DHCP/NAT のクライアント) + NAT ルータ用 (badaos-nat) ----
+apt_try iptables dnsmasq-base network-manager-gnome iputils-ping
 
 # ---- 印刷: CUPS + ドライバ一式 + GUI 設定 ----
 #   USB プリンタ (ipp-usb でドライバ不要機も) / ネットワークプリンタ (avahi で
@@ -107,24 +106,12 @@ apt_try falkon evince mpv ristretto mousepad pcmanfm lxtask \
 #   foo2zjs, splix, ...)。GUI は system-config-printer、ブラウザなら http://localhost:631
 apt_try cups cups-client cups-bsd cups-filters cups-browsed ipp-usb \
   avahi-daemon libnss-mdns printer-driver-all hplip openprinting-ppds \
-  system-config-printer system-config-printer-udev sane-utils simple-scan
+  system-config-printer system-config-printer-udev
 systemctl enable cups cups-browsed avahi-daemon ipp-usb 2>/dev/null || true
 # ライブ環境の自動ログインユーザ (casper → user-setup が作る bada) を
 # プリンタ管理 (lpadmin)・スキャナ・音声/映像グループに入れる
-echo 'user-setup passwd/user-default-groups string adm cdrom dip lpadmin plugdev sudo netdev audio video scanner' \
+echo 'user-setup passwd/user-default-groups string adm cdrom dip lpadmin plugdev sudo netdev audio video' \
   | debconf-set-selections
-
-# ---- TeX: texlive-full (日本語 platex/uplatex/lualatex-ja 含む全パッケージ) ----
-#   PDF マニュアル (texlive-doc, 約 2GB) だけは ISO を軽くするため展開しない。
-#   必要なら /etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc を消して
-#   `sudo apt install --reinstall $(dpkg -l 'texlive-*-doc' | awk '/^ii/{print $2}')`。
-cat > /etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc <<'EOF'
-path-exclude=/usr/share/doc/texlive-doc/*
-EOF
-# 要求機能なので失敗したらビルドを止める (|| true を付けない)
-apt-get install -y --no-install-recommends texlive-full
-# エディタ連携: Emacs の AUCTeX と mozc (Emacs 内の日本語入力)、vim-latexsuite
-apt_try auctex emacs-mozc vim-latexsuite
 
 # 独自 /etc/calamares 設定を使用 (build-iso.sh が config/calamares を配置済み)
 # ブラウザは同梱しない: Bada アプリは Electron 版 (.deb) を優先起動するため不要。
@@ -165,7 +152,26 @@ export XMODIFIERS=@im=fcitx
 (command -v fcitx-autostart >/dev/null 2>&1 && fcitx-autostart || fcitx -d) 2>/dev/null &
 EOF
 
-# ---- mlterm を日本語 UTF-8 + CJK フォントで既定設定 ----
+# ---- xterm: 日本語フォント (Noto Sans Mono CJK) + UTF-8 + XIM 経由で fcitx-mozc ----
+#   ~/.Xresources は lightdm の Xsession が自動で xrdb に読み込む
+cat > /etc/skel/.Xresources <<'EOF'
+XTerm*locale: true
+XTerm*utf8: 1
+XTerm*faceName: Noto Sans Mono CJK JP
+XTerm*faceNameDoublesize: Noto Sans Mono CJK JP
+XTerm*faceSize: 12
+XTerm*geometry: 100x30
+XTerm*background: #fdfdf6
+XTerm*foreground: #1b1b1b
+XTerm*saveLines: 5000
+XTerm*scrollBar: true
+XTerm*rightScrollBar: true
+XTerm*openIm: true
+XTerm*inputMethod: fcitx
+XTerm*preeditType: OverTheSpot,Root
+EOF
+
+# ---- mlterm (後から apt で入れた時用) を日本語 UTF-8 + CJK フォントで既定設定 ----
 mkdir -p /etc/skel/.mlterm
 cat > /etc/skel/.mlterm/main <<EOF
 ENCODING = UTF8
@@ -214,44 +220,10 @@ cat > /etc/skel/.xsessionrc <<'EOF'
 xsetroot -solid "#0b0e14" 2>/dev/null || true
 EOF
 
-# ---- ssh: 起動時に「その PC 固有の」ホスト鍵を作る (ISO に鍵を焼き込まない) ----
-rm -f /etc/ssh/ssh_host_*
-cat > /etc/systemd/system/badaos-ssh-hostkeys.service <<'EOF'
-[Unit]
-Description=Bada VM Pro OS: generate SSH host keys on first boot
-Before=ssh.service
-ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/ssh-keygen -A
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl enable badaos-ssh-hostkeys.service ssh 2>/dev/null || true
-
-# ---- xinetd: 有効化。サンプルサービス bada-info (TCP 7777, 既定は無効) ----
-systemctl enable xinetd 2>/dev/null || true
-cat > /usr/local/bin/bada-info <<'EOF'
-#!/bin/sh
-echo "Bada VM Pro OS $(cat /etc/badaos-version 2>/dev/null) on $(hostname) — $(date)"
-EOF
-chmod 755 /usr/local/bin/bada-info
-cat > /etc/xinetd.d/bada-info <<'EOF'
-# Bada VM Pro OS のサンプル xinetd サービス (TCP 7777)。
-# 使うには disable = no にして `sudo systemctl restart xinetd`
-service bada-info
-{
-    disable     = yes
-    type        = UNLISTED
-    port        = 7777
-    socket_type = stream
-    protocol    = tcp
-    wait        = no
-    user        = nobody
-    server      = /usr/local/bin/bada-info
-}
-EOF
 echo "$VERSION" > /etc/badaos-version
+
+# ---- 後から apt で入れるもの (mlterm/ssh/xinetd/screen/texlive-full) の既定設定 ----
+#   パッケージ自体は入れない。入れた時にすぐ日本語で使えるよう設定だけ用意する。
 
 # ---- screen: UTF-8 / 日本語で使いやすい既定 ----
 cat > /etc/skel/.screenrc <<'EOF'
@@ -422,14 +394,24 @@ Terminal=false
 Icon=emacs
 Categories=Development;
 EOF
-cat > /etc/skel/Desktop/mlterm.desktop <<EOF
+cat > /etc/skel/Desktop/xterm.desktop <<EOF
 [Desktop Entry]
 Type=Application
-Name=端末 (mlterm)
-Comment=日本語対応ターミナル
-Exec=mlterm
+Name=端末 (xterm)
+Comment=日本語表示・日本語入力 (Ctrl+Space) 対応ターミナル
+Exec=xterm
 Terminal=false
 Icon=utilities-terminal
+Categories=System;
+EOF
+cat > /etc/skel/Desktop/badaos-extras.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=追加ソフトを導入 (mlterm / ssh / xinetd / screen / TeX)
+Comment=apt で mlterm・ssh・xinetd・screen・texlive-full などを後から導入
+Exec=/usr/local/bin/badaos-extras
+Terminal=false
+Icon=system-software-install
 Categories=System;
 EOF
 cat > /etc/skel/Desktop/bada-vm-pro.desktop <<EOF
@@ -455,17 +437,17 @@ if [ -n "$APT_BASE_URL" ]; then
 fi
 
 # ---- 要求パッケージの最終確認 (1 つでも欠けたらビルド失敗) ----
-REQUIRED="openssh-server xinetd network-manager iptables dnsmasq-base apt
+REQUIRED="network-manager iptables dnsmasq-base apt
   cups cups-filters cups-browsed avahi-daemon printer-driver-all system-config-printer
   fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
-  screen mlterm mlterm-im-fcitx xterm w9wm lightdm xserver-xorg
-  vim vim-gtk3 emacs neovim texlive-full texlive-lang-japanese
-  falkon evince mpv pcmanfm mousepad"
+  xterm w9wm lightdm xserver-xorg
+  vim vim-gtk3 emacs
+  grub-pc-bin grub-efi-amd64-bin dosfstools ntfs-3g zenity calamares"
 MISSING=""
 for p in $REQUIRED; do dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"; done
 if [ -n "$MISSING" ]; then echo "FATAL: 必須パッケージが入っていません:$MISSING"; exit 1; fi
 echo "required packages OK"
-for c in sshd xinetd cupsd lp lpstat system-config-printer screen mlterm vim gvim emacs nvim platex uplatex lualatex pdflatex; do
+for c in nmcli cupsd lp lpstat system-config-printer fcitx xterm w9wm vim gvim emacs apt-get; do
   command -v "$c" >/dev/null 2>&1 || { echo "FATAL: コマンド $c がありません"; exit 1; }
 done
 echo "required commands OK"

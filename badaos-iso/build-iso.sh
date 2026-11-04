@@ -99,6 +99,7 @@ install -Dm755 "$HERE/config/install-badaos.sh"        "$CHROOT/usr/local/bin/in
 install -Dm755 "$HERE/config/install-badaos-simple.sh" "$CHROOT/usr/local/bin/install-badaos-simple"
 install -Dm755 "$HERE/config/badaos-partition.sh"      "$CHROOT/usr/local/bin/badaos-partition"
 install -Dm755 "$HERE/config/badaos-apps.sh"           "$CHROOT/usr/local/bin/badaos-apps"
+install -Dm755 "$HERE/config/badaos-extras.sh"         "$CHROOT/usr/local/bin/badaos-extras"
 # 自作 GUI インストーラ (zenity ウィザード + 実インストール本体, Calamares 代替)
 install -Dm755 "$HERE/installer/badaos-installer.sh"    "$CHROOT/usr/local/bin/badaos-installer"
 install -Dm755 "$HERE/installer/badaos-install-core.sh" "$CHROOT/usr/local/lib/badaos/badaos-install-core.sh"
