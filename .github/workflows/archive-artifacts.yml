@@ -34,11 +34,11 @@ jobs:
             | sort -t$'\t' -k2,2 -k3,3r | awk -F'\t' '!s[$2]++' > MANIFEST.tsv
           echo "targets: $(wc -l < MANIFEST.tsv)"
           gh release view "$TAG" -R "$R" --json assets -q '.assets[].name' > have.txt || true
-          up() { for i in 1 2 3 4 5; do gh release upload "$TAG" "$@" -R "$R" --clobber && return 0; sleep $((i*20)); done; return 1; }
+          up() { for i in 1 2 3; do gh release upload "$TAG" "$@" -R "$R" --clobber && return 0; sleep $((i*20)); done; return 1; }
           fail=0
           while IFS=$'\t' read -r id name created size sha; do
             n="${name}.zip"
-            if grep -qx -e "$n" -e "$n.part00" have.txt; then echo "skip $n"; continue; fi
+            if grep -qx -e "$n" -e "$n.part00" -e "${name}-r2.zip" have.txt; then echo "skip $n"; continue; fi
             echo "::group::$n ($size bytes)"
             ok=0
             for i in 1 2 3; do gh api "repos/$R/actions/artifacts/$id/zip" > "$n" && ok=1 && break; sleep 15; done
@@ -47,7 +47,11 @@ jobs:
               split -b 1900M -d -a 2 "$n" "$n.part"; rm -f "$n"
               for p in "$n".part*; do up "$p" || { echo "::error::upload failed $p"; fail=1; }; rm -f "$p"; done
             else
-              up "$n" || { echo "::error::upload failed $n"; fail=1; }; rm -f "$n"
+              if ! up "$n"; then
+                mv "$n" "${name}-r2.zip"; n="${name}-r2.zip"
+                up "$n" || { echo "::error::upload failed $n"; fail=1; }
+              fi
+              rm -f "$n"
             fi
             echo "::endgroup::"
           done < MANIFEST.tsv
