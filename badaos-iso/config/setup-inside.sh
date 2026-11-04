@@ -620,6 +620,11 @@ GRUB_TIMEOUT_STYLE=menu
 GRUB_TIMEOUT=10
 GRUB_CMDLINE_LINUX_DEFAULT="nomodeset"
 GRUB_DISABLE_OS_PROBER=false
+# nomodeset の時は GRUB が設定した画面 (VBE/GOP) をそのまま Linux に渡す。
+# これが無いと Legacy で文字モードのまま起動し、X (fbdev) が画面を作れず
+# lightdm が再起動を繰り返す (デスクトップが出ない)。
+GRUB_GFXMODE=1024x768x32,1024x768,auto
+GRUB_GFXPAYLOAD_LINUX=keep
 EOF
 install -Dm755 /tmp/35_badavmpro_triboot /etc/grub.d/35_badavmpro_triboot 2>/dev/null || true
 
