@@ -44,7 +44,11 @@ sudo apt install texlive-full             # TeX 一式 (日本語 platex/uplatex
 
 - 大きさの既定は「BadaVM Pro = 空きの半分 / 残りを Ubuntu」。GUI のサイズ欄で BadaVM Pro の大きさを指定できます
 - UBUNTU は ext4 でフォーマットした空のパーティション。Ubuntu の ISO で「それ以外」→ UBUNTU を `/` に、**ブートローダの場所も同じ UBUNTU パーティション**にすると sda の MBR は書き換わりません。入れた後 Bada VM Pro で `sudo update-grub` すると起動メニューに Ubuntu が追加されます
-- MBR ディスクで基本区画が足りない時は拡張区画の中に論理区画として作ります
+- **MBR で基本区画がいくつ使われていても**インストールできます(BadaVM Pro は論理区画に):
+  - 空き領域が既存の拡張区画の中 → その中に追加 / 拡張区画が空き領域の隣 → 拡張区画を広げて追加
+  - 基本区画が 4 つとも使用中 → 空き領域の隣の Linux/データ区画を論理区画に変え(位置・大きさ・中身はそのまま)、その番号を拡張区画にする
+  - Windows の区画とディスク署名は変えず、MBR 先頭も書き換えません。変更前の区画表は `grub/ptable-before-badavmpro.sfdisk` に保存(戻す: `sudo sfdisk /dev/sda < ptable-before-badavmpro.sfdisk`)。既存の論理区画の番号は変わることがあります(UUID で参照している通常の Linux はそのまま起動します)
+- GPT は区画が 128 個まで作れるので、そのまま追加します
 
 
 Windows と後ろの Linux が入っている PC で、その**真ん中**に Bada VM Pro を入れます。

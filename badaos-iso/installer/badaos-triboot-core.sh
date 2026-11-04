@@ -139,16 +139,7 @@ case "$FW" in uefi|bios) ;; *) fail "BOOT_MODE は uefi か bios" ;; esac
 NEED_BIOSGRUB=0; [ "$FW" = "bios" ] && [ "$LABEL" = "gpt" ] && NEED_BIOSGRUB=1
 # MBR + Legacy は MBR を書き換えず、専用 FAT (または拡張区画) の先頭セクタに起動コードを置く
 VBR_MODE=0; [ "$FW" = "bios" ] && [ "$LABEL" = "dos" ] && VBR_MODE=1
-# MBR は基本区画が 4 つまで。空きが 2 つ以上 → 基本区画 2 つ、
-# 1 つだけ (System Reserved + C: + Linux の典型例) → 拡張区画 1 つ + 論理区画 2 つ
-USE_EXT=0
-if [ "$LABEL" = "dos" ]; then
-  [ $EXT -lt 0 ] || fail "MBR の拡張区画が既にあるディスクは未対応です (GParted で基本区画に空きを作ってください)"
-  FREE_PRIM=$(( 4 - NPRIM ))
-  [ $FREE_PRIM -ge 1 ] || fail "MBR の基本区画が 4 つとも使用中です (1 つ以上の空きが必要)"
-  NEEDP=$(( 2 + NEWLINUX ))            # BADAVMBOOT + BADAVMPRO (+ UBUNTU)
-  [ $FREE_PRIM -lt $NEEDP ] && USE_EXT=1
-fi
+USE_EXT=0   # MBR で論理区画を使うか (下の「MBR の作り方」で決める)
 
 # ---------------------------------------------------------------------------
 # 3. Windows と Linux の「間」の空き領域を計算 (1MiB 境界)
@@ -173,6 +164,12 @@ if [ $HI -gt $cur ] && [ $(( HI - cur )) -gt $(( best_e - best_s + 1 )) ]; then 
 
 GAP_S=$(( (best_s + ALIGN - 1) / ALIGN * ALIGN ))
 GAP_E=$(( (best_e + 1) / ALIGN * ALIGN - 1 ))
+# MBR: 空き領域が既存の拡張区画の境界 (先頭の EBR 部分など) にまたがる時は、境界の外側に切り詰める
+if [ "$LABEL" = "dos" ] && [ $EXT -ge 0 ]; then
+  XS0=${P_START[EXT]}; XE0=${P_END[EXT]}
+  if [ $GAP_S -lt $XS0 ] && [ $XS0 -le $GAP_E ]; then GAP_E=$(( XS0 / ALIGN * ALIGN - 1 )); fi
+  if [ $GAP_S -le $XE0 ] && [ $XE0 -lt $GAP_E ] && [ $GAP_S -ge $XS0 ]; then GAP_S=$(( (XE0 + ALIGN) / ALIGN * ALIGN )); fi
+fi
 GAP_GB=0; [ $GAP_E -gt $GAP_S ] && GAP_GB=$(( (GAP_E - GAP_S + 1) / GIB ))
 
 WANT=0; [ "$BADA_SIZE_GB" -gt 0 ] 2>/dev/null && WANT=$(( BADA_SIZE_GB * GIB ))
@@ -200,6 +197,57 @@ elif [ $NEWLINUX = 0 ] && [ $WANT -gt 0 ] && [ $WANT -lt $(( GAP_E - GAP_S + 1 )
   GAP_E=$(( GAP_S + WANT / ALIGN * ALIGN - 1 ))
 fi
 
+# ---------------------------------------------------------------------------
+# MBR の作り方 (基本区画が何個使われていても入れられるように)
+#   primary … 基本区画の空きが足りる → 基本区画で作る
+#   newext  … 空きが 1 つ以上 → 新しい拡張区画を作り、中に論理区画
+#   inext   … 空き領域が既存の拡張区画の中 → 論理区画を追加
+#   growext … 既存の拡張区画が空き領域の隣 → 拡張区画を広げて論理区画を追加
+#   convert … 基本区画が 4 つとも使用中 → 空き領域の隣の Linux/データ区画 (Windows 以外) を
+#             論理区画に変え、その番号を拡張区画にする (位置・大きさ・中身はそのまま)
+#   Windows の区画・ディスク署名 (label-id) はそのまま。MBR 先頭 440B は書き換えない。
+# ---------------------------------------------------------------------------
+MBRMODE=""; X_S=0; X_E=0; CONV=-1
+prim_between(){ # $1..$2 の間に (拡張区画以外の) 基本区画があるか
+  local k; for ((k=0;k<N;k++)); do
+    [ $k -eq $EXT ] && continue; [ "$(pnum "${P_NODE[k]}")" -le 4 ] || continue
+    [ ${P_START[k]} -gt $1 ] && [ ${P_START[k]} -lt $2 ] && return 0
+  done; return 1; }
+if [ "$LABEL" = "dos" ]; then
+  FREE_PRIM=$(( 4 - NPRIM ))
+  NEEDP=$(( 2 + NEWLINUX ))            # BADAVMBOOT + BADAVMPRO (+ UBUNTU)
+  if [ $EXT -ge 0 ]; then
+    XS=${P_START[EXT]}; XE=${P_END[EXT]}
+    if [ $GAP_S -ge $XS ] && [ $GAP_E -le $XE ]; then MBRMODE=inext; X_S=$XS; X_E=$XE
+      GAP_E=$(( GAP_E - ALIGN ))                       # 後ろの論理区画の EBR 用に 1MiB 残す
+    elif [ $FREE_PRIM -ge $NEEDP ]; then MBRMODE=primary
+    elif [ $XS -gt $GAP_E ] && ! prim_between $GAP_E $XS; then MBRMODE=growext; X_S=$GAP_S; X_E=$XE
+    elif [ $XE -lt $GAP_S ] && ! prim_between $XE $GAP_S; then MBRMODE=growext; X_S=$XS; X_E=$GAP_E
+    else fail "MBR: 拡張区画が空き領域から離れていて、基本区画の空きも足りません (GParted で空き領域を拡張区画の隣に作ってください)"; fi
+  elif [ $FREE_PRIM -ge $NEEDP ]; then MBRMODE=primary
+  elif [ $FREE_PRIM -ge 1 ]; then MBRMODE=newext; X_S=$GAP_S; X_E=$GAP_E
+  else
+    # 基本区画 4 つとも使用中: 空き領域のすぐ後ろ (または前) の Windows 以外の区画を論理区画へ
+    for ((k=0;k<N;k++)); do
+      [ "$(pnum "${P_NODE[k]}")" -le 4 ] || continue
+      case "${P_FS[k]}" in ntfs|vfat|"") continue ;; esac            # Windows / ESP / 不明は動かさない
+      [ $k -eq $WIN ] && continue
+      if [ ${P_START[k]} -gt $GAP_E ] && ! prim_between $GAP_E ${P_START[k]}; then CONV=$k; break; fi
+      if [ ${P_END[k]} -lt $GAP_S ] && ! prim_between ${P_END[k]} $GAP_S && \
+         ! prim_between $(( P_START[k] - ALIGN )) ${P_START[k]}; then CONV=$k; break; fi
+    done
+    [ $CONV -ge 0 ] || fail "MBR の基本区画が 4 つとも使用中で、空き領域の隣に論理区画へ変えられる Linux/データ区画がありません"
+    MBRMODE=convert
+    if [ ${P_START[CONV]} -gt $GAP_E ]; then
+      X_S=$GAP_S; X_E=${P_END[CONV]}
+      GAP_E=$(( GAP_E - ALIGN ))                       # 変換する区画の EBR 用に 1MiB 残す
+    else
+      X_S=$(( P_START[CONV] - 1 )); X_E=$GAP_E
+    fi
+  fi
+  [ "$MBRMODE" = primary ] || USE_EXT=1
+fi
+
 # 空きを分割: [BIOS 起動 1MiB (GPT+Legacy のみ)] [専用ブート FAT] [OS 本体 ext4]
 # 論理区画は前に 1MiB (EBR 用) 空ける
 #   VBR_MODE: GRUB 本体 (core.img) を FAT 直前の未使用 1MiB (EMB_S から) に埋め込む
@@ -208,7 +256,7 @@ fi
 cur=$GAP_S; LGAP=0; [ $USE_EXT = 1 ] && LGAP=$ALIGN
 EMB_S=0
 if [ $VBR_MODE = 1 ]; then
-  if [ $USE_EXT = 1 ]; then EMB_S=$(( GAP_S + 1 )); else EMB_S=$cur; cur=$(( cur + ALIGN )); fi
+  if [ $USE_EXT = 1 ]; then EMB_S=-1; else EMB_S=$cur; cur=$(( cur + ALIGN )); fi   # -1: FAT 直前の隙間 (書き込み時に EBR を避けて決める)
 fi
 cur=$(( cur + LGAP ))
 if [ $NEED_BIOSGRUB = 1 ]; then BG_S=$cur; BG_E=$(( cur + ALIGN - 1 )); cur=$(( BG_E + 1 )); fi
@@ -241,15 +289,23 @@ gib(){ awk -v s="$1" -v b="$SECT" 'BEGIN{ if (s*b < 1073741824) printf "%dMiB", 
   elif [ $VBR_MODE = 1 ]; then
     echo "Windows の MBR 起動コード: 変更しない (Bada VM Pro の起動コードは$( [ $USE_EXT = 1 ] && echo '拡張区画の先頭 (EBR)' || echo '専用 FAT の先頭 (VBR)')、それをアクティブに)"
   else echo "GPT + Legacy: 保護 MBR の起動コードと BIOS 起動区画を使用"; fi
+  [ -n "$MBRMODE" ] && [ "$MBRMODE" != primary ] && \
+    echo "MBR の作り方: $MBRMODE (論理区画を使用。既存の論理区画の番号が変わることがあります。区画表は事前に保存)"
   echo "--- 予定のレイアウト (ディスク先頭から) ---"
   {
     for ((k=0;k<N;k++)); do
+      [ $k -eq $EXT ] && continue      # 拡張区画は下の「拡張区画」行で表示
       e=${P_END[k]}; [ $SHRINK = 1 ] && [ $k -eq $WIN ] && e=$NEW_WIN_END
       printf '%012d  %-24s %-6s %9s\n' "${P_START[k]}" "${P_NODE[k]}" "${P_FS[k]:-?}" "$(gib $(( e-P_START[k]+1 )))"
     done
     [ $NEED_BIOSGRUB = 1 ] && printf '%012d  %-24s %-6s %9s  ★ GRUB 埋め込み用\n' "$BG_S" "(新規)BIOS起動" "-" "$(gib $(( BG_E-BG_S+1 )))"
     [ $VBR_MODE = 1 ] && [ $USE_EXT = 0 ] && printf '%012d  %-24s %-6s %9s  ★ GRUB 本体 (未割り当て)\n' "$EMB_S" "(新規)GRUB 埋め込み" "-" "1MiB"
-    [ $USE_EXT = 1 ] && printf '%012d  %-24s %-6s %9s  ★ 拡張区画 (中に論理区画)\n' "$GAP_S" "(新規)拡張区画" "-" "$(gib $(( GAP_E-GAP_S+1 )))"
+    case "$MBRMODE" in
+      newext)  printf '%012d  %-24s %-6s %9s  ★ 拡張区画 (中に論理区画)\n' "$X_S" "(新規)拡張区画" "-" "$(gib $(( X_E-X_S+1 )))" ;;
+      growext) printf '%012d  %-24s %-6s %9s  ★ 既存の拡張区画を広げる\n' "$X_S" "(拡張)拡張区画" "-" "$(gib $(( X_E-X_S+1 )))" ;;
+      inext)   printf '%012d  %-24s %-6s %9s  ★ 既存の拡張区画の中に追加\n' "$X_S" "(既存)拡張区画" "-" "$(gib $(( X_E-X_S+1 )))" ;;
+      convert) printf '%012d  %-24s %-6s %9s  ★ 拡張区画 (%s を論理区画へ)\n' "$X_S" "(新規)拡張区画" "-" "$(gib $(( X_E-X_S+1 )))" "${P_NODE[CONV]}" ;;
+    esac
     printf '%012d  %-24s %-6s %9s  ★ Bada VM Pro 専用ブートローダ\n' "$BOOT_S" "(新規)BADAVMBOOT" "vfat" "$(gib $(( BOOT_E-BOOT_S+1 )))"
     printf '%012d  %-24s %-6s %9s  ★ Bada VM Pro OS\n' "$ROOT_S" "(新規)BADAVMPRO" "ext4" "$(gib $(( ROOT_E-ROOT_S+1 )))"
     if [ $NEWLINUX = 1 ]; then printf '%012d  %-24s %-6s %9s  ★ Ubuntu 用 (空き)\n' "$UBU_S" "(新規)UBUNTU" "ext4" "$(gib $(( UBU_E-UBU_S+1 )))"; fi
@@ -293,11 +349,54 @@ if [ "$LABEL" = "gpt" ]; then
   [ $NEWLINUX = 1 ] && { sgdisk -n "0:${UBU_S}:${UBU_E}" -t 0:8300 -c "0:Ubuntu" "$DISK" >&2 || fail "Ubuntu 区画の作成に失敗"; }
 else
   # MBR: ブート FAT は type ef (Windows に隠れる)、OS は 83。アクティブ区画は変えない
-  {
-    [ $USE_EXT = 1 ] && printf '%s,%s,5\n' "$GAP_S" $(( GAP_E-GAP_S+1 ))
-    printf '%s,%s,ef\n%s,%s,83\n' "$BOOT_S" $(( BOOT_E-BOOT_S+1 )) "$ROOT_S" $(( ROOT_E-ROOT_S+1 ))
-    if [ $NEWLINUX = 1 ]; then printf '%s,%s,83\n' "$UBU_S" $(( UBU_E-UBU_S+1 )); fi
-  } | sfdisk --no-reread --append "$DISK" >&2 || fail "MBR にパーティションを追加できません"
+  sfdisk --dump "$DISK" > /tmp/badaos-ptable-before.sfdisk 2>/dev/null || true
+  if [ "$MBRMODE" = primary ]; then
+    {
+      printf '%s,%s,ef\n%s,%s,83\n' "$BOOT_S" $(( BOOT_E-BOOT_S+1 )) "$ROOT_S" $(( ROOT_E-ROOT_S+1 ))
+      if [ $NEWLINUX = 1 ]; then printf '%s,%s,83\n' "$UBU_S" $(( UBU_E-UBU_S+1 )); fi
+    } | sfdisk --no-reread --append "$DISK" >&2 || fail "MBR にパーティションを追加できません"
+  else
+    # 区画表を丸ごと組み直す: 既存の基本区画 (番号・位置) はそのまま、拡張区画を作る/広げる、
+    # 論理区画 = 既存の論理区画 + 変換した区画 + BADAVMBOOT/BADAVMPRO/UBUNTU を位置順に
+    NEWP="${BOOT_S}:$(( BOOT_E-BOOT_S+1 )):ef ${ROOT_S}:$(( ROOT_E-ROOT_S+1 )):83"
+    [ $NEWLINUX = 1 ] && NEWP="$NEWP ${UBU_S}:$(( UBU_E-UBU_S+1 )):83"
+    CONV_START=0; [ $CONV -ge 0 ] && CONV_START=${P_START[CONV]}
+    sfdisk -J "$DISK" | python3 -c '
+import json, re, sys
+mode, xs, xe, conv_start = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+newp = [tuple(x.split(":")) for x in sys.argv[5].split()]
+t = json.load(sys.stdin)["partitiontable"]
+parts = t.get("partitions", [])
+num = lambda p: int(re.search(r"(\d+)$", p["node"]).group(1))
+prefix = re.sub(r"\d+$", "", parts[0]["node"])
+EXT = {"5", "f", "85"}
+prim = {num(p): p for p in parts if num(p) <= 4}
+logi = [p for p in parts if num(p) >= 5]
+xnum = None
+for n, p in list(prim.items()):
+    if str(p["type"]).lower() in EXT: xnum = n
+    if mode == "convert" and int(p["start"]) == conv_start:
+        logi.append(p); xnum = n
+if mode == "newext":
+    xnum = min(n for n in range(1, 5) if n not in prim)
+out = ["label: dos"]
+if t.get("id"): out.append("label-id: %s" % t["id"])
+out += ["unit: sectors", ""]
+for n in range(1, 5):
+    if n == xnum:
+        out.append("%s%d : start=%d, size=%d, type=5, bootable" % (prefix, n, xs, xe - xs + 1))
+    elif n in prim:
+        p = prim[n]
+        out.append("%s%d : start=%s, size=%s, type=%s" % (prefix, n, p["start"], p["size"], p["type"]))
+L = [(int(p["start"]), int(p["size"]), str(p["type"])) for p in logi]
+L += [(int(a), int(b), c) for a, b, c in newp]
+for i, (st, sz, ty) in enumerate(sorted(L)):
+    out.append("%s%d : start=%d, size=%d, type=%s" % (prefix, 5 + i, st, sz, ty))
+print("\n".join(out))' "$MBRMODE" "$X_S" "$X_E" "$CONV_START" "$NEWP" > /tmp/badaos-ptable-new.sfdisk \
+      || fail "新しい区画表を作れません"
+    cat /tmp/badaos-ptable-new.sfdisk >&2
+    sfdisk --no-reread --force "$DISK" < /tmp/badaos-ptable-new.sfdisk >&2 || fail "MBR 区画表の書き込みに失敗 (元に戻す: sfdisk $DISK < /tmp/badaos-ptable-before.sfdisk)"
+  fi
 fi
 partprobe "$DISK" 2>/dev/null || true; udevadm settle 2>/dev/null || true; sleep 2
 
@@ -415,14 +514,36 @@ elif [ $VBR_MODE = 1 ]; then
   dd if="$DISK" of="$BACK/mbr-before-badavmpro.bin" bs=512 count=1 2>/dev/null || true
   chroot "$MNT" grub-install --target=i386-pc --boot-directory=/boot/efi --no-bootsector --recheck "$DISK" >&2 \
     || fail "grub-install (i386-pc, --no-bootsector) に失敗"
-  if [ $USE_EXT = 1 ]; then VBR_LBA=$GAP_S; ACT_DEV="$(node_at "$GAP_S")"; else VBR_LBA=$BOOT_S; ACT_DEV="$BOOT_DEV"; fi
+  if [ $USE_EXT = 1 ]; then VBR_LBA=$X_S; ACT_DEV="$(node_at "$X_S")"; else VBR_LBA=$BOOT_S; ACT_DEV="$BOOT_DEV"; fi
+  cp -f /tmp/badaos-ptable-before.sfdisk "$BACK/ptable-before-badavmpro.sfdisk" 2>/dev/null || true
   [ -n "$ACT_DEV" ] || fail "アクティブにする区画が見つかりません"
   TMPG="$(mktemp -d)"; cp "$BACK/i386-pc/core.img" "$TMPG/core.img"
   sync; umount "$MNT/boot/efi"   # VBR を書く前に FAT を外す
   python3 - "$DISK" "$MNT/usr/lib/grub/i386-pc/boot.img" "$TMPG/core.img" \
-            "$EMB_S" "$VBR_LBA" "$SECT" "$(( ALIGN - 2 ))" <<'PY' >&2 || fail "GRUB 起動コードの書き込みに失敗"
+            "$EMB_S" "$VBR_LBA" "$SECT" "$(( ALIGN - 2 ))" "$(( BOOT_S - LGAP ))" "$(( BOOT_S - 1 ))" "$X_S" <<'PY' >&2 || fail "GRUB 起動コードの書き込みに失敗"
 import struct, sys
-disk, bootimg, coreimg, emb, vbr, sect, maxsec = sys.argv[1], sys.argv[2], sys.argv[3], *map(int, sys.argv[4:])
+disk, bootimg, coreimg = sys.argv[1], sys.argv[2], sys.argv[3]
+emb, vbr, sect, maxsec, reg_s, reg_e, xs = map(int, sys.argv[4:11])
+if emb < 0:
+    # 論理区画方式: FAT 直前の隙間 [reg_s, reg_e] のうち EBR が無い最長の範囲に core.img を置く
+    ebrs = set()
+    with open(disk, 'rb') as f:
+        e = xs
+        for _ in range(128):
+            ebrs.add(e); f.seek(e * sect); b = f.read(512)
+            nxt_type = b[0x1be + 16 + 4]
+            nxt = struct.unpack_from('<I', b, 0x1be + 16 + 8)[0]
+            if nxt_type not in (0x05, 0x0f, 0x85) or nxt == 0: break
+            e = xs + nxt
+    best = (0, -1); run_s = None
+    for x in range(reg_s, reg_e + 2):
+        free = x <= reg_e and x not in ebrs
+        if free and run_s is None: run_s = x
+        if not free and run_s is not None:
+            if x - run_s > best[1] - best[0] + 1: best = (run_s, x - 1)
+            run_s = None
+    emb = best[0]; maxsec = best[1] - best[0] + 1
+    print(f"EBR: {sorted(ebrs)}  core area: {best}")
 boot = open(bootimg, 'rb').read()
 core = bytearray(open(coreimg, 'rb').read())
 n = (len(core) + 511) // 512
