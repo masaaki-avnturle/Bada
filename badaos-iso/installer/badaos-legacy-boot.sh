@@ -22,12 +22,14 @@ pnum(){ echo "$1" | grep -o '[0-9]*$'; }
 BOOT_DEV="$(findmnt -no SOURCE "$MNT/boot/efi")" || fail "$MNT/boot/efi がマウントされていません"
 BOOT_UUID="$(blkid -s UUID -o value "$BOOT_DEV")"
 [ -n "$BOOT_UUID" ] || fail "BADAVMBOOT の UUID を読めません"
-read -r SECT BOOT_S X_S < <(sfdisk -J "$DISK" | python3 -c '
+GEOM="$(sfdisk -J "$DISK" | python3 -c '
 import json, sys
 t = json.load(sys.stdin)["partitiontable"]; dev = sys.argv[1]
 b = [p for p in t["partitions"] if p["node"] == dev][0]
 x = [p for p in t["partitions"] if str(p["type"]).lower() in ("5", "f", "85")]
-print(t.get("sectorsize", 512), b["start"], x[0]["start"] if x else 0)' "$BOOT_DEV")
+print(t.get("sectorsize", 512), b["start"], x[0]["start"] if x else 0)' "$BOOT_DEV")"
+read -r SECT BOOT_S X_S <<< "$GEOM"
+[ -n "$BOOT_S" ] || fail "BADAVMBOOT の位置を読めません"
 ALIGN=$(( 1048576 / SECT ))
 if [ "$(pnum "$BOOT_DEV")" -ge 5 ]; then
   LOGICAL=1; VBR_LBA=$X_S

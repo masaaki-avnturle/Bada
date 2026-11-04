@@ -16,7 +16,7 @@ if [ -n "${DISPLAY:-}" ] && [ -z "${BADA_IN_XTERM:-}" ] && command -v xterm >/de
     -T "Bada VM Pro 起動の修復" -e bash -c "'$0'; echo; read -r -p 'Enter で閉じる' _"
 fi
 fail(){ echo "ERROR: $*"; exit 1; }
-exec > >(tee "$LOG") 2>&1
+exec > >(tee "$LOG" 2>/dev/null || cat) 2>&1
 
 ROOT_DEV="$(blkid -L BADAVMPRO || true)"; BOOT_DEV="$(blkid -L BADAVMBOOT || true)"
 [ -b "$ROOT_DEV" ] && [ -b "$BOOT_DEV" ] || fail "BADAVMPRO / BADAVMBOOT partitions not found (is Bada VM Pro installed?)"
