@@ -52,7 +52,7 @@ SHRINK_WINDOWS="${SHRINK_WINDOWS:-0}"
 UBUNTU_SIZE_GB="${UBUNTU_SIZE_GB:-0}"   # Linux が無いディスク: Ubuntu 用に割り当てる大きさ (0 = 残り全部)
 UBU_MIN=20                               # Ubuntu 用パーティションの最小 GiB
 PLAN_ONLY="${PLAN_ONLY:-0}"
-MIN_GB=20                  # OS 本体 (ext4) の最小サイズ (最小構成 約 6GiB + 後から apt で texlive-full 等を入れる余裕)
+MIN_GB=30                  # OS 本体 (ext4) の最小サイズ (texlive-full 込み 約 12GiB + 余裕)
 BOOT_MIB=512               # 専用ブートローダ FAT の大きさ
 BOOT_ID="BadaVMPro"        # \EFI\BadaVMPro\ と UEFI 起動メニュー名
 BOOT_LABEL="Bada VM Pro"

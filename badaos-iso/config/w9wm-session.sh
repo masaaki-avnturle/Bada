@@ -28,12 +28,12 @@ echo "パーティションマネージャ (GParted):          badaos-partition"
 echo "かんたんインストール (ウィザード):           install-badaos-simple"; \
 echo "トリプルブート (Win|BadaVMPro|Linux):         install-badaos-triboot"; \
 echo "Ubuntu アプリを簡単導入 (GUI):               badaos-apps"; \
-echo "追加ソフト (apt):                            badaos-extras ssh xinetd screen texlive"; \
-echo "  (または sudo apt update && sudo apt install openssh-server xinetd screen texlive-full)"; \
+echo "入っているもの:                              mlterm vim emacs screen ssh xinetd python3 perl gcc/make texlive-full"; \
+echo "アプリの追加 (NAT 経由で apt):                sudo apt update && sudo apt install <パッケージ名>   /  badaos-apps"; \
 echo "ネットワーク (有線/Wi-Fi):                   nmtui  /  nm-connection-editor  (NAT/DHCP は自動)"; \
 echo "NAT ルータ:                                  sudo badaos-nat on <外側IF> <内側IF> / share <内側IF>"; \
 echo "プリンター:                                  system-config-printer (または http://localhost:631)"; \
-echo "エディタ:                                    vim / gvim / emacs"; \
+echo "エディタ / TeX:                              vim / gvim / emacs (AUCTeX) / platex uplatex lualatex"; \
 echo "日本語入力の設定 (fcitx):                    fcitx-configtool"; \
 echo "アプリ再起動:                                bada-launcher bada_vm_pro"; \
 echo "Ubuntu アプリ導入例:                         sudo apt update && sudo apt install <pkg>"; \

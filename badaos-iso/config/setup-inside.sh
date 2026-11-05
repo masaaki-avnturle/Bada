@@ -52,7 +52,8 @@ apt_try_rec(){ for p in "$@"; do apt-get install -y "$p" \
 #   事前に入れるもの: 日本語 (fcitx-mozc)・w9wm・NAT (NetworkManager)・印刷 (CUPS)・
 #   vim・emacs・apt とインストーラ一式。端末は xterm (日本語入力対応の設定済み)。
 #   端末 mlterm (日本語入力付き)・Wi-Fi・日本語 106 キーボードも事前導入。
-#   ssh・xinetd・screen・texlive-full などは入れない → 後から apt で導入
+#   texlive-full・python3・perl・build-essential・ssh・xinetd・screen も事前導入。
+#   それ以外は Ubuntu と同じく apt (NAT/DHCP 経由) で後から導入
 #   (`badaos-extras` / `badaos-apps` / `sudo apt install ...`)。
 
 # ---- キーボード: 日本語 106/109 配列 (X・テキストコンソール・ライブ環境すべて) ----
@@ -120,9 +121,42 @@ apt-get purge -y --auto-remove gcc libc6-dev libx11-dev libxext-dev
 rm -rf "$W9D" /tmp/w9wm-patches
 /usr/bin/w9wm -version 2>&1 | head -1 || true
 
+# ---- 開発・サーバ一式 (事前導入): python3 / perl / build-essential / ssh / xinetd / screen ----
+apt-get install -y --no-install-recommends python3 python3-pip python3-venv perl build-essential \
+  openssh-server openssh-client xinetd screen git
+# ssh: ホスト鍵は ISO に焼き込まず、その PC の初回起動時に作る
+rm -f /etc/ssh/ssh_host_*
+cat > /etc/systemd/system/badaos-ssh-hostkeys.service <<'EOF'
+[Unit]
+Description=Bada VM Pro OS: generate SSH host keys on first boot
+Before=ssh.service
+ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-keygen -A
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable badaos-ssh-hostkeys.service ssh xinetd 2>/dev/null || true
+cat > /etc/skel/.screenrc <<'EOF'
+defutf8 on
+defencoding utf8
+startup_message off
+defscrollback 10000
+hardstatus alwayslastline "%{= kw}[Bada VM Pro] %-w%{= Wk}%n %t%{-}%+w %=%Y-%m-%d %c"
+EOF
+
+# ---- TeX: texlive-full (日本語 platex / uplatex / lualatex-ja 含む全パッケージ) ----
+#   PDF マニュアル (texlive-doc 約 2GB) だけは容量のため展開しない。
+#   ISO 内の squashfs は 4GiB 未満のレイヤに分けるので Rufus の ISO モードでも書ける。
+cat > /etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc <<'EOF'
+path-exclude=/usr/share/doc/texlive-doc/*
+EOF
+apt-get install -y --no-install-recommends texlive-full
+
 # ---- エディタ: vim と emacs (事前導入) ----
 #   vim-gtk3: GUI (gvim) + X クリップボード。emacs: GTK 版 + emacs-mozc (Emacs 内の日本語入力)
-apt_try vim vim-gtk3 emacs emacs-mozc
+apt_try vim vim-gtk3 emacs emacs-mozc auctex
 
 # ---- 日本語入力 (fcitx-mozc + fcitx-configtool) ----
 #   fcitx-mozc の依存で fcitx 本体・モジュールが入る。recommends 込みで
@@ -607,6 +641,7 @@ grep -q '^XKBMODEL="jp106"' /etc/default/keyboard || { echo "FATAL: /etc/default
 
 # ---- 要求パッケージの最終確認 (1 つでも欠けたらビルド失敗) ----
 REQUIRED="ubuntu-minimal ubuntu-standard language-pack-ja network-manager iptables dnsmasq-base apt
+  texlive-full texlive-lang-japanese python3 perl build-essential openssh-server xinetd screen
   cups cups-filters cups-browsed avahi-daemon printer-driver-all system-config-printer
   fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
   xterm w9wm lightdm xserver-xorg xserver-xorg-video-vesa xserver-xorg-video-fbdev
@@ -617,7 +652,7 @@ MISSING=""
 for p in $REQUIRED; do dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"; done
 if [ -n "$MISSING" ]; then echo "FATAL: 必須パッケージが入っていません:$MISSING"; exit 1; fi
 echo "required packages OK"
-for c in mlterm nm-applet wpa_supplicant setxkbmap nmcli cupsd lp lpstat system-config-printer fcitx xterm w9wm vim gvim emacs apt-get; do
+for c in platex uplatex lualatex python3 perl gcc make sshd xinetd screen mlterm nm-applet wpa_supplicant setxkbmap nmcli cupsd lp lpstat system-config-printer fcitx xterm w9wm vim gvim emacs apt-get; do
   command -v "$c" >/dev/null 2>&1 || { echo "FATAL: コマンド $c がありません"; exit 1; }
 done
 echo "required commands OK"

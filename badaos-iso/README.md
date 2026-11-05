@@ -17,6 +17,7 @@ mlterm・ssh・xinetd・texlive-full・screen などは**後から apt コマン
 | キーボード | **日本語 106/109 配列**(X・テキストコンソール・fcitx すべて jp) |
 | ネットワーク | 有線 + **Wi-Fi**(wpasupplicant・ファームウェア)。画面右下のアイコン / `nmtui` / 「ネットワーク設定」で接続 |
 | 起動 (インストール後) | 既定は **nomodeset**(GPU ドライバを使わない汎用表示)で、どの PC でも通常起動。GRUB の「Bada VM Pro (GPU accelerated graphics)」で GPU 高速表示 |
+| 事前導入 (1.6.0〜) | **texlive-full**(日本語 platex/uplatex/lualatex)・**python3**・**perl**・**build-essential**(gcc/make)・**ssh**(ホスト鍵は初回起動時に生成)・**xinetd**・**screen**・git・Ubuntu 標準一式 (ubuntu-minimal/standard)・日本語翻訳 |
 | エディタ (事前導入) | **vim** / gvim / **emacs**(emacs-mozc 付き) |
 | apt | パッケージ索引を同梱 → **起動直後から** `sudo apt install <pkg>` が使える |
 | インストーラ | トリプルブート導入 / Calamares / かんたんウィザード / GParted |
