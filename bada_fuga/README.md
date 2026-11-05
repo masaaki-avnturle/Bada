@@ -2923,6 +2923,25 @@ ffmpeg -i tablet117.mp4 -vn -ac 1 -ar 44100 src/20261003_117000.wav && python3 b
 python3 compose_tablet139.py bank117/bank.json src score_tablet139.json && python3 synth.py score_tablet139.json tablet139.wav && python3 video.py score_tablet139.json tablet139.wav tablet139.mp4
 ```
 
+## 🎻🎹🍂 Requiem BADA — Tablet Sessions CXL · Sinfonia della tristezza (tablet139 の曲をショパンの「別れの曲」に合わせて、シンフォニーで作り換える, 変ニ長調 → ヘ長調 → ヘ短調 / 変イ長調 → 変ロ長調, ♩=60, 13 分 24 秒)
+
+土台は CXXXIX · Lebewohl (tablet139.mp4 の音をそのまま; 4 段階)。主題はショパンの練習曲 Op. 10-3 ホ長調「別れの曲」(Tristesse、1832 年、公有) の旋律の頭 — **記憶からの採譜** (この環境には楽譜のコーパスもネットも無いので; 細部は原曲と違いうる): ソ# | シ ラ ソ# ファ# ソ# ファ# ミ レ# ミ ／ 上る句 ソ# ラ シ ド# レ# ミ レ# ド# シ ラ ソ# ファ# ミ レ# ミ (16.5 拍)。各段階の調に移して (変ニ長調 = 変ロ短調の平行長調、ヘ長調、変イ長調 = ヘ短調の平行長調、変ロ長調)。被せるのはシンフォニー (管弦楽だけ、synth の合成)
+
+| 段落 | 小節 (秒) | 土台 | シンフォニー |
+|---|---|---|---|
+| I. Tristesse — 弦が歌う (変ニ長調) | 0〜38 | 変ロ短調 (くつろぎ) | Vn I が旋律を 3 度 (2 度目はホルンが支え、3 度目は 1 オクターヴ上でフルートと)、Vn II・Va の和音、Vc・Cb の根音、高い開いた 5 度、深い鐘 |
+| II. 木管から総奏へ (ヘ長調) | 38〜80 | ヘ長調 (暖まり) | フルートとオーボエ → クラリネットとホルン → 総奏の第 1 主題 (Vn I・フルート・ホルン・トランペット、Va・トロンボーンの和音、ティンパニ) → 上る句を総奏で |
+| III. 中間部 — 嵐 (ヘ短調 → 変イ長調) | 80〜141 | ヘ短調 (冷え) | 旋律の頭が短調の上で Va・クラリネット → Vc・ホルンに → 原曲の中間部のように弦のトレモロ、Vc・Cb の半音の動き (Fm・D♭・B♭m・C7・A♭ の固定の和音)、トロンボーン・ホルン、ティンパニの高まり、Vn I とフルートが半音で下る → 鎮まって旋律が変イ長調で (Vn I → Va) |
+| IV. 再現と結尾 (変ロ長調) | 141〜199 | 変ロ長調 (眠り) | 旋律を総奏で 2 度 (2 度目は 1 オクターヴ上)、Va・トロンボーンの和音、ティンパニ → 旋律の頭だけが Vn I → ホルンに残り、高い開いた 5 度 (ファ・シ♭) と深い鐘で消える |
+
+- 和音は土台の採譜 (`build_sampler`、2555 区間) を拍ごとに優先しつつ主題の音を含む和音を選ぶ。土台が小さい所 (III の始め、IV の総奏) は被せる管弦楽を 1.3〜1.4 倍に
+- mp4 は 30 MiB に収めるため 960×540・245 kbps に。`compose_tablet140.py` (bank139 と tablet139 の wav だけで作れる)
+
+```bash
+ffmpeg -i tablet139.mp4 -vn -ac 1 -ar 44100 src/20261105_139000.wav && python3 build_sampler.py bank139 src/20261105_139000.wav
+python3 compose_tablet140.py bank139/bank.json src score_tablet140.json && python3 synth.py score_tablet140.json tablet140.wav && python3 video.py score_tablet140.json tablet140.wav tablet140.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
