@@ -24,7 +24,7 @@ BPM = 60
 S1, S2, S3, S4 = 0, 38, 80, 141
 LOOP = {1: ['Bbm', 'Gb', 'Db', 'Ab'], 2: ['Dm', 'Bb', 'F', 'C'], 3: ['Fm', 'Db', 'Ab', 'Eb'], 4: ['Gm', 'Eb', 'Bb', 'F']}
 TRK = {1: 1, 2: 5, 3: 8, 4: -2}                                                                  # イ短調 → 変ロ短調・ニ短調・ヘ短調・ト短調
-CANDS = {1: ['Bbm', 'Gb', 'Db', 'Ab', 'Ebm', 'Fm', 'F', 'Bbm/Db', 'Gb/Bb', 'Cb'],
+CANDS = {1: ['Bbm', 'Gb', 'Db', 'Ab', 'Ebm', 'Fm', 'F', 'Bbm/Db', 'Gb/Bb', 'B'],
          2: ['Dm', 'Bb', 'F', 'C', 'Gm', 'Am', 'A', 'Dm/F', 'Bb/D', 'Eb'],
          3: ['Fm', 'Db', 'Ab', 'Eb', 'Bbm', 'Cm', 'C', 'Fm/Ab', 'Db/F', 'Gb'],
          4: ['Gm', 'Eb', 'Bb', 'F', 'Cm', 'Dm', 'D', 'Gm/Bb', 'Eb/G', 'Ab']}
