@@ -29,7 +29,7 @@ def clip(mat, max_beats):
     return out
 CANDS = ['Dm', 'F', 'C', 'Bb', 'Gm', 'Am', 'A', 'A7', 'Dm/F', 'Bb/D', 'C/E', 'Gm7', 'Dm/A', 'Fmaj7', 'G', 'Gmaj7', 'D7', 'Em7', 'E', 'Cmaj7']
 # (録音, 小節, 大きさ, 移調, 抜粋の始まり, 長さ (秒; None = 全部))
-PLAYS = [(R39, 1, 0.5, 0, 0.0, None), (R42, ERB_S + 1, 0.5, 0, 0.0, None), (R39, DOPPIO + 1, 0.42, 0, 0.0, 80.0), (R42, FINE + 1, 0.42, 0, 150.0, 76.0)]
+PLAYS = [(R39, 1, 0.65, 0, 0.0, None), (R42, ERB_S + 1, 0.5, 0, 0.0, None), (R39, DOPPIO + 1, 0.42, 0, 0.0, 80.0), (R42, FINE + 1, 0.42, 0, 150.0, 76.0)]
 def play_len(rid, dur): return RECS[rid]['dur'] if dur is None else dur
 RATE = lambda semis: 2 ** (semis / 12.0)
 extras = []; RH = []; RECQ = set()
@@ -70,7 +70,7 @@ def build():
         RH.append(cur); P.harm[q] = cur
     for k in range(TOTAL):
         P.tempo[k] = BPM
-        P.dyn[k] = 0.35 if k < 12 else 0.5 if k < ERB_S else 0.6 if k < ERB_S + 30 else 0.75 if k < DOPPIO else 0.9 if k < DOPPIO + 24 else 0.7 if k < FINE else max(0.08, 0.7 - 0.03 * (k - FINE))
+        P.dyn[k] = 0.45 if k < 12 else 0.62 if k < ERB_S else 0.6 if k < ERB_S + 30 else 0.75 if k < DOPPIO else 0.9 if k < DOPPIO + 24 else 0.7 if k < FINE else max(0.08, 0.7 - 0.03 * (k - FINE))
     for v in VOICES: P.rest_bars(v, 0, TOTAL)
     E = []
     # I. 序: 06:39 の上で、脈と大黒柱のマントラ
