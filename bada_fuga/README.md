@@ -3042,6 +3042,18 @@ python3 compose_tablet145.py bank1106/bank.json src score_tablet145.json && pyth
 python3 compose_tablet146.py bank1106/bank.json src score_tablet146.json && python3 synth.py score_tablet146.json tablet146.wav && python3 video.py score_tablet146.json tablet146.wav tablet146.mp4
 ```
 
+## 🔈🌊🌀 Requiem BADA — Tablet Sessions CXLVII · Basso profondo ipnotico (2026/11/06 の曲をメインにして、tablet117 を合わせて、両方とも高音の響く音を重低音に変換して、静かな洗脳的な曲に, ♩=60, 8 分 24 秒)
+
+変換は `deep_bass.py`: 録音の高い帯域 (1.2〜8 kHz、ピアノの響きの倍音) を取り出して位相ボコーダーで 4 オクターヴ下げ (−48 半音)、220 Hz 以下だけを残す (28 Hz 以下は落とす)。元の低い帯域 (< 500 Hz) は 0.2〜0.3 で小さく残す。変換した 06:42 のスペクトルの重心は 199 Hz (60〜250 Hz に集まる)
+- メイン: 11/06 06:42 の重低音 (227 秒) を 2 度 (0.9 / 0.85)。バック: tablet117 (眠りへの曲) の重低音を全曲に (0.5)
+- 洗脳: 和音の根音 (06:42 の採譜から、31〜43 の音域) の正弦波の低音 (SUB) が 2 小節ごとにゆっくり脈打ち、2 度目は 5 度を重ねて少し深く、最後の 16 小節で消える。低いピアノの音が 4 か所にまれに。高い音は何もない。鐘なし、声なし
+- mp4 は 30 MiB に収めるため 960×540 に (音は 64 kbps)。`compose_tablet147.py`
+
+```bash
+python3 deep_bass.py src/20261106_064228_clean.wav src/20261106_064228_deep.wav 4 0.3 && python3 deep_bass.py src/20261003_117000.wav src/20261003_117000_deep.wav 4 0.2
+python3 compose_tablet147.py bank1106/bank.json src score_tablet147.json && python3 synth.py score_tablet147.json tablet147.wav && python3 video.py score_tablet147.json tablet147.wav tablet147.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
