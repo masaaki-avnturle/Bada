@@ -2942,6 +2942,17 @@ ffmpeg -i tablet139.mp4 -vn -ac 1 -ar 44100 src/20261105_139000.wav && python3 b
 python3 compose_tablet140.py bank139/bank.json src score_tablet140.json && python3 synth.py score_tablet140.json tablet140.wav && python3 video.py score_tablet140.json tablet140.wav tablet140.mp4
 ```
 
+## 🎻🍂🌀 Requiem BADA — Tablet Sessions CXLI · Sinfonia della tristezza XVI (CXL を 16 倍に伸ばして、フーガを醸す曲に, 変ニ長調 → ヘ長調 → ヘ短調 / 変イ長調 → 変ロ長調, ♩=60, 3 時間 32 分 16 秒)
+
+CXL (199 小節) をまるごと 16 倍に (`compose_tablet105.py`)。199 × 16 = 3184 小節。すべての 3 小節を ×16 (2 拍ごとの打ち直し)・×4 (4 回)・×1 (遠くで 8 回) の 3 つの速さで同時に鳴らし、フーガを醸す。管弦楽の層はその楽器のまま
+- 土台 (tablet139 の音) は 16 倍には伸ばせないので採譜に置き換えるが、今回はピアノの 1 音の bank が無いので **弦で** (`strings`: 採譜の上 2 音を音域で Vn II・Va・Vc に、0.25 秒未満の音は省く) — `compose_tablet105.py` の 4 つ目の引数
+- 楽章はそのまま 16 倍に: I. Tristesse ×16 (0〜608) → II. 木管から総奏へ ×16 (608〜1280) → III. 中間部の嵐 ×16 (1280〜2256) → IV. 再現と結尾 ×16 (2256〜3184)。ショパンの「別れの曲」の旋律 (記憶からの採譜) は 16 倍で 1 句 (16.5 拍) が 4 分 24 秒に
+- 48 拍ごとの音の量をそろえる (`equalize(orch=True)`)。要所を短く合成して測った音量 (rms): I −15 dB、II −14、III (嵐) −13、IV (総奏) −13
+
+```bash
+python3 compose_tablet105.py score_tablet140.json score_tablet141.json bank139/bank.json strings && python3 render_long.py score_tablet141.json out141 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash

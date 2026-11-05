@@ -15,6 +15,7 @@ from collections import Counter
 
 SRC = sys.argv[1]; OUT = sys.argv[2] if len(sys.argv) > 2 else 'score_tablet105.json'
 BANKP = sys.argv[3] if len(sys.argv) > 3 else None                                # 録音 (REC) を採譜に置き換えるための bank (CVI → CVII)
+TRV = sys.argv[4] if len(sys.argv) > 4 else 'PF'                                  # 採譜を鳴らす楽器: 'PF' (ピアノのサンプラー) か 'strings' (Vn II・Va・Vc — bank にピアノの 1 音が無いとき, CXLI)
 REC_G = 1.6                                                                       # 採譜の音の大きさ (録音の代わり、表として)
 K = 16; WIN = 12
 ORCH = ('V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP')                       # 管弦楽の層はその楽器のまま 16 倍に (CXXIX)
@@ -41,8 +42,10 @@ def source_events(d):
             for sg in bank[rid]['segs']:
                 t = t0 + (sg['t'] - e.get('off', 0.0)) / rate * sc
                 if t < t0 or t >= t0 + d0: continue
-                for m in sg['m']:
+                for m in (sg['m'][-2:] if TRV == 'strings' else sg['m']):                                            # 弦のときは上 2 音だけ (音の数を抑える)
                     m += sm
+                    if TRV == 'strings' and sg['d'] < 0.25: continue
+                    if TRV == 'strings': ev.append((t, min(max(0.5, sg['d'] / rate * sc), t0 + d0 - t), m, 0.12 * float(e.get('gain', 0.8)) / 0.8, ('土台 (%s) の採譜 — 弦で' % rid) if first else None, 'VC' if m < 52 else 'VA' if m < 64 else 'V2', None)); first = False; continue
                     ev.append((t, min(max(0.5, sg['d'] / rate * sc), t0 + d0 - t), m, rec_g * float(e.get('gain', 0.8)) / 0.8 * (1.2 if m < 48 else 1.0), ('録音 %s:%s の採譜 (実音の代わり)' % (rid[9:11], rid[11:13])) if first else None, 'PF', rid)); first = False
     return sorted(ev, key=lambda x: x[0])
 
@@ -127,7 +130,12 @@ def equalize(out, block=32, orch=False):
 if __name__ == '__main__':
     d = json.load(open(SRC)); out = build(d)
     h, rem = divmod(out['duration'], 3600); dur_s = '%d 時間 %d 分' % (h, rem // 60)
-    if 'Stille Nacht' in d['meta'].get('title', ''):
+    if 'tristezza' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXLI · Sinfonia della tristezza XVI',
+                    subtitle='CXL をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。管弦楽はその楽器のまま (2 拍ごとに弓を返すように打ち直す)、土台 (tablet139) は採譜を弦で (♩=60)' % dur_s,
+                    footer=['CXL の 199 小節 × 16 = 3184 小節: I. Tristesse ×16 → II. 木管から総奏へ ×16 → III. 中間部の嵐 ×16 → IV. 再現と結尾 ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 が遠くで 8 回。ショパンの「別れの曲」の旋律 (記憶からの採譜) は 16 倍で 1 句が 4 分を超える。声なし。'])
+    elif 'Stille Nacht' in d['meta'].get('title', ''):
         meta = dict(title='Requiem BADA — CXXXIV · Stille Nacht — Requiem nel palazzetto XVI',
                     subtitle='CXXXIII をまるごと 16 倍に (%s) — すべての 12 拍 (3/4 の 4 小節) を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。実音のピアノの 4 声と管弦楽はそのまま 16 倍に (2 拍ごとに打ち直す)、10/13 の録音は採譜のピアノに (3/4, ♩=60)' % dur_s,
                     footer=['CXXXIII の 181 小節 × 16 = 2896 小節: Introitus ×16 → Stille Nacht I ×16 → Kyrie ×16 → Stille Nacht II ×16 → Agnus Dei ×16 → Lux aeterna ×16 → Coda ×16',
