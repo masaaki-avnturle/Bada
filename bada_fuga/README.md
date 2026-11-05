@@ -3024,6 +3024,23 @@ ffmpeg -i 20261106_063938.mp3 -ac 1 -ar 44100 src/20261106_063938.wav && python3
 python3 compose_tablet145.py bank1106/bank.json src score_tablet145.json && python3 synth.py score_tablet145.json tablet145.wav && python3 video.py score_tablet145.json tablet145.wav tablet145.mp4
 ```
 
+## 🎹🌙🍂 Requiem BADA — Tablet Sessions CXLVI · Addio sul sonno (2026/11/06 の 2 曲をメインにして、バックで tablet117 を睡眠導入剤に混ぜて、ショパンとベートーヴェンの別れの曲を雰囲気に合わせて, ト長調 / ヘ長調, ♩=60, 11 分 4 秒)
+
+メイン (表) は 11/06 06:39 (ト長調〜ニ・ドリア、160 秒) → 06:42 (ヘ長調、227 秒) → 06:39 (2 度目) → 06:42 の終わり (76 秒) の実音 (喘ぎの区間だけ下げて、そのまま; 0.58〜0.7)。バックには tablet117 (CXVII · Ninna nanna 10/03 — 眠りへの曲) を小さく全曲に (0.22、睡眠導入剤)。別れの曲はショパン Op. 10-3 の旋律の頭 (記憶からの採譜、2 倍に伸ばして録音の調に) とベートーヴェン「告別」の Lebewohl (ソ・ファ・ミ) の 2 つの動機だけ。4 声は 11/06 06:42 の実音のピアノの 1 音のサンプラー、高い共鳴と低いペダルは合成のピアノ。鐘なし、声なし、脈なし (眠りのために、間を多く)
+
+| 段落 | 小節 | 実音 | 別れの曲 |
+|---|---|---|---|
+| I. 06:39 (ト長調) | 0〜42 | 06:39 | ソプラノがショパンの頭 (2 倍に、ト長調) を 2 度 (2 度目は上る句まで)、アルトとテノールが Lebewohl (レ・ド・シ) で答える |
+| II. 06:42 (ヘ長調) | 42〜100 | 06:42 | Lebewohl (ド・シ♭・ラ) がテノールに低く、ショパンの頭をヘ長調で、上る句をソプラノが 1 オクターヴ上で pp、頭をもう一度 |
+| III. 06:39 (ト長調) | 100〜142 | 06:39 (2 度目) | 別れの曲の頭がアルトに (1 オクターヴ下)、Lebewohl がソプラノに高く、テノールが上る句を 4 倍にゆっくり、頭をソプラノで |
+| IV. 06:42 の終わり (ヘ長調) | 142〜164 | 06:42 (150 秒から) | Lebewohl だけが遠くで 3 度 (アルト → テノール → バス、だんだん低く)、高い共鳴が消える |
+
+- 和音は録音の採譜 (拍ごと) を優先しつつ動機の音を含む和音を半小節ごとに (ト長調・ヘ長調の候補)。低いペダルの音は 2 小節ごと pp、高い共鳴は頭の反響。`compose_tablet146.py` (bank1106 と 11/06・tablet117 の wav だけで作れる)
+
+```bash
+python3 compose_tablet146.py bank1106/bank.json src score_tablet146.json && python3 synth.py score_tablet146.json tablet146.wav && python3 video.py score_tablet146.json tablet146.wav tablet146.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
