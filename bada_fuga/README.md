@@ -3035,7 +3035,8 @@ python3 compose_tablet145.py bank1106/bank.json src score_tablet145.json && pyth
 | III. 06:39 (ト長調) | 100〜142 | 06:39 (2 度目) | 別れの曲の頭がアルトに (1 オクターヴ下)、Lebewohl がソプラノに高く、テノールが上る句を 4 倍にゆっくり、頭をソプラノで |
 | IV. 06:42 の終わり (ヘ長調) | 142〜164 | 06:42 (150 秒から) | Lebewohl だけが遠くで 3 度 (アルト → テノール → バス、だんだん低く)、高い共鳴が消える |
 
-- 和音は録音の採譜 (拍ごと) を優先しつつ動機の音を含む和音を半小節ごとに (ト長調・ヘ長調の候補)。低いペダルの音は 2 小節ごと pp、高い共鳴は頭の反響。`compose_tablet146.py` (bank1106 と 11/06・tablet117 の wav だけで作れる)
+- 和音は録音の採譜 (拍ごと) を優先しつつ動機の音を含む和音を半小節ごとに (ト長調・ヘ長調の候補)。低いペダルの音は 2 小節ごと pp、高い共鳴は頭の反響
+- 測った音量 (rms、実音込み): I −18〜−22 dB、II −15〜−27 (06:42 の間の静けさも含めて)、III −19、IV −16。mp4 は 30 MiB に収めるため 960×540 に。`compose_tablet146.py` (bank1106 と 11/06・tablet117 の wav だけで作れる)
 
 ```bash
 python3 compose_tablet146.py bank1106/bank.json src score_tablet146.json && python3 synth.py score_tablet146.json tablet146.wav && python3 video.py score_tablet146.json tablet146.wav tablet146.mp4
