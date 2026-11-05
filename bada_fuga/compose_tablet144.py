@@ -28,6 +28,13 @@ CANDS = {1: ['Bbm', 'Gb', 'Db', 'Ab', 'Ebm', 'Fm', 'F', 'Bbm/Db', 'Gb/Bb', 'B', 
 def stage(bar): return 1 if bar < S2 else 2 if bar < S3 else 3 if bar < S4 else 4
 ERB = [(d, m) for d, m in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'erbarm_melody.json')))['notes']]
 def cantus(st, oct_=0, k=2): return [(d * k, m + TRK[st] + oct_) for d, m in ERB]
+def clip(mat, max_beats):
+    """曲の終わりを越えないように切る"""
+    out = []; t = 0.0
+    for d, m in mat:
+        if t >= max_beats: break
+        out.append((min(d, max_beats - t), m)); t += d
+    return out
 CF_BARS = int(math.ceil(2 * sum(d for d, _ in ERB) / 4.0))                                         # 26
 CF_AT = [(S1 + 6, 1, 0), (S2 + 2, 2, 0), (S3 + 2, 3, 0), (S3 + 31, 3, -12), (S4 + 2, 4, 0), (S4 + 31, 4, 0)]   # (小節, 段階, オクターヴ)
 extras = []; RH = []; RECQ = set()
@@ -68,7 +75,7 @@ def build():
         P.dyn[k] = 0.5 if k < S2 else 0.65 if k < S3 else (0.85 if k < S3 + 30 else 0.75) if k < S4 else (0.8 if k < S4 + 30 else max(0.25, 0.8 - 0.025 * (k - S4 - 30)))
     # 定旋律 (ソプラノ) と和音
     for b0, st, oc in CF_AT:
-        harm_fit(P, b0, min(TOTAL - 2, b0 + CF_BARS + 1), [(b0 * BPB, cantus(st, oc))], CANDS[st])
+        harm_fit(P, b0, min(TOTAL - 2, b0 + CF_BARS + 1), [(b0 * BPB, clip(cantus(st, oc), (TOTAL - 3 - b0) * BPB))], CANDS[st])
     P.section(S1, 'I. 脈と定旋律 (変ロ短調, ♩=60)', 'BWV 721 の書法をグランドピアノで: アルト・テノール・バスが 8 分音符で和音を打ち続け (pp)、ソプラノが「Erbarm dich mein」の定旋律 (2 倍に伸ばして) を — 土台は tablet117 の実音のピアノ')
     P.section(S2, 'II. 脈が近づく (ニ短調)', '定旋律 2 度目、脈が少し強く、低いペダルの音が小節ごとに、高い共鳴が定旋律の反響として')
     P.section(S3, 'III. 頂点 (ヘ短調)', '定旋律 3 度目は脈が強く (頂点) → 4 度目は定旋律が 1 オクターヴ下で、脈が少し引く')
@@ -76,7 +83,7 @@ def build():
     for v in VOICES: P.rest_bars(v, 0, TOTAL)
     for b0, st, oc in CF_AT:
         for b in range(b0, min(TOTAL - 2, b0 + CF_BARS + 1)): P.rest[ 'S'].difference_update(range(b * BPB, b * BPB + BPB))
-        P.place('S', b0, cantus(st, oc), 0, '定旋律「Erbarm dich mein」(%s)' % KEY[st])
+        P.place('S', b0, clip(cantus(st, oc), (TOTAL - 3 - b0) * BPB), 0, '定旋律「Erbarm dich mein」(%s)' % KEY[st])
     # 脈: 8 分音符の和音 (A・T・B)
     for b in range(2, TOTAL - 3):
         for v in 'ATB': P.rest[v].difference_update(range(b * BPB, b * BPB + BPB))
@@ -98,7 +105,7 @@ def post(P, events, ex):
     first = True
     for b0, st, oc in CF_AT[1:]:
         t = b0 * BPB + 2
-        for d, m in cantus(st, oc):
+        for d, m in clip(cantus(st, oc), (TOTAL - 3 - b0) * BPB - 2):
             add('H', t, d, m + 12, 0.1 * P.dyn.get(int(t // BPB), 0.8) / 0.8, '高い共鳴 (定旋律の反響、pp)' if first else None); first = False; t += d
 
 META = {'style': 'elegia', 'detach': 0.85, 'humanize': True, 'reverb': [5.0, 2.0, 0.4],
