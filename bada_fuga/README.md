@@ -3074,6 +3074,16 @@ ffmpeg -i track18.wma -ac 1 -ar 44100 src/20261107_180000.wav && python3 build_s
 python3 compose_tablet148.py bank148.json src score_tablet148.json && python3 synth.py score_tablet148.json tablet148.wav && python3 video.py score_tablet148.json tablet148.wav tablet148.mp4
 ```
 
+## 🎹🎧🌀 Requiem BADA — Tablet Sessions CXLIX · Mescolanza XVI (CXLVIII を 16 倍に伸ばして、フーガを醸す曲に, ニ短調 / ヘ長調, ♩=60, 2 時間 57 分 4 秒)
+
+CXLVIII (166 小節) をまるごと 16 倍に (`compose_tablet105.py`)。166 × 16 = 2656 小節。すべての 3 小節を ×16 (2 拍ごとの打ち直し)・×4 (4 回)・×1 (遠くで 8 回) の 3 つの速さで同時に鳴らし、フーガを醸す
+- 4 つの音源 (tablet117・11/06 06:39・06:42・トラック 18) は 16 倍には伸ばせないので採譜に置き換え、11/06 06:42 の実音のピアノの 1 音 (bank148 の 11 音) で鳴らす (抜粋の始まりの位置 `off` も反映)。4 声 (つなぐ旋律) はそのまま声部として 16 倍に、ピアノで重ねる
+- 段落はそのまま 16 倍に: I (06:39) ×16 (0〜640) → II (トラック 18) ×16 (640〜1248) → III (06:42) ×16 (1248〜2160) → IV (tablet117 の眠り) ×16 (2160〜2656)。高い共鳴と低いペダル (合成のピアノ) は伸ばさない
+
+```bash
+python3 compose_tablet105.py score_tablet148.json score_tablet149.json bank148.json && python3 render_long.py score_tablet149.json out149 192 3
+```
+
 ## 作り方 (再現)
 
 ```bash

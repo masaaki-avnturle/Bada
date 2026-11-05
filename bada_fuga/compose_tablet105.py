@@ -130,7 +130,12 @@ def equalize(out, block=32, orch=False):
 if __name__ == '__main__':
     d = json.load(open(SRC)); out = build(d)
     h, rem = divmod(out['duration'], 3600); dur_s = '%d 時間 %d 分' % (h, rem // 60)
-    if 'tristezza' in d['meta'].get('title', ''):
+    if 'Mescolanza' in d['meta'].get('title', ''):
+        meta = dict(title='Requiem BADA — CXLIX · Mescolanza XVI',
+                    subtitle='CXLVIII をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。4 つの音源 (tablet117・11/06 の 2 曲・トラック 18) は採譜を実音のピアノ (06:42 の 1 音) で、4 声もそのまま 16 倍に (♩=60)' % dur_s,
+                    footer=['CXLVIII の 166 小節 × 16 = 2656 小節: I (06:39) ×16 → II (トラック 18) ×16 → III (06:42) ×16 → IV (tablet117 の眠り) ×16',
+                            '×16 の骨組み (2 拍ごとの打ち直し) の中で、×4 が 4 回、×1 が遠くで 8 回。録音は 16 倍には伸ばせないので採譜に。声なし。'])
+    elif 'tristezza' in d['meta'].get('title', ''):
         meta = dict(title='Requiem BADA — CXLI · Sinfonia della tristezza XVI',
                     subtitle='CXL をまるごと 16 倍に (%s) — すべての 3 小節を ×16・×4・×1 の 3 つの速さで同時に、フーガを醸す。管弦楽はその楽器のまま (2 拍ごとに弓を返すように打ち直す)、土台 (tablet139) は採譜を弦で (♩=60)' % dur_s,
                     footer=['CXL の 199 小節 × 16 = 3184 小節: I. Tristesse ×16 → II. 木管から総奏へ ×16 → III. 中間部の嵐 ×16 → IV. 再現と結尾 ×16',
