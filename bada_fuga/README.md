@@ -2991,6 +2991,19 @@ python3 synth.py score_tablet142.json src/20261105_142000.wav   # 土台
 python3 compose_tablet143.py bank142.json src score_tablet143.json && python3 synth.py score_tablet143.json tablet143.wav && python3 video.py score_tablet143.json tablet143.wav tablet143.mp4
 ```
 
+## 🎹🕯🌀 Requiem BADA — Tablet Sessions CXLIV · Erbarm dich mein — BWV 721 al pianoforte (電子音ではなく、グランドピアノの音で、バッハの BWV 721 を共鳴的洗脳の仕上がりに — tablet117・tablet140 を材料に, 変ロ短調 → ニ短調 → ヘ短調 → ト短調, ♩=60, 13 分 11 秒)
+
+合成は**グランドピアノだけ** (style `elegia`、シンセ不使用)。土台は tablet117 (CXVII — タブレットの実音のピアノ) の音をそのまま表に (0.7)、tablet140 からは和音の流れ (採譜) だけを借りる。被せるのはバッハのコラール前奏曲 BWV 721「Erbarm dich mein, o Herre Gott」の書法: 8 分音符で打ち続ける和音 (脈) の上にコラールの定旋律を長い音で
+- ソプラノ = 定旋律 (コラール「Erbarm dich mein」、music21 の bach/bwv305 のソプラノ、2 倍に伸ばして 26 小節) を 6 度: 変ロ短調 (7 小節〜) → ニ短調 (41〜) → ヘ短調 (83〜、112〜は 1 オクターヴ下) → ト短調 (144〜、173〜は曲の終わりで切る)
+- アルト・テノール・バス = 8 分音符で打ち続ける和音 (上・中・低の和音の音、全曲 4925 音)。低いペダルの音 (L) が 38 小節から小節ごとに、高い共鳴 (H) が定旋律の反響として pp
+- 強弱: 脈は I で pp (dyn 0.3) → II 0.5 → III 0.95 (頂点) → 0.7 → IV 0.8 → 少しずつ消える (0.08 まで)。ピアノの vel は 0.62·dyn + 0.08 なので幅を大きく取る。測った音量 (rms、土台込み): I −16 dB、II −15〜−16、III −13 (頂点)、IV −14 → −17
+- 和音は tablet140 の採譜を優先しつつ定旋律の音を含む和音を半小節ごとに。鐘なし、声なし。mp4 は 30 MiB に収めるため 960×540 に。`compose_tablet144.py`
+
+```bash
+ffmpeg -i tablet117.mp4 -vn -ac 1 -ar 44100 src/20261003_117000.wav   # 土台 (実音のピアノ)
+python3 compose_tablet144.py bank140/bank.json src score_tablet144.json && python3 synth.py score_tablet144.json tablet144.wav && python3 video.py score_tablet144.json tablet144.wav tablet144.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

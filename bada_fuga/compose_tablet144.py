@@ -72,7 +72,7 @@ def build():
         RH.append(cur); P.harm[q] = cur
     for k in range(TOTAL):
         P.tempo[k] = BPM
-        P.dyn[k] = 0.5 if k < S2 else 0.65 if k < S3 else (0.85 if k < S3 + 30 else 0.75) if k < S4 else (0.8 if k < S4 + 30 else max(0.25, 0.8 - 0.025 * (k - S4 - 30)))
+        P.dyn[k] = 0.3 if k < S2 else 0.5 if k < S3 else (0.95 if k < S3 + 30 else 0.7) if k < S4 else (0.8 if k < S4 + 30 else max(0.08, 0.8 - 0.03 * (k - S4 - 30)))   # ピアノの vel は 0.62·dyn + 0.08 なので、幅を大きく
     # 定旋律 (ソプラノ) と和音
     for b0, st, oc in CF_AT:
         harm_fit(P, b0, min(TOTAL - 2, b0 + CF_BARS + 1), [(b0 * BPB, clip(cantus(st, oc), (TOTAL - 3 - b0) * BPB))], CANDS[st])
@@ -96,7 +96,7 @@ def build():
     return P
 
 def post(P, events, ex):
-    add('REC', 0, DUR, 0, 0.55, None, src=os.path.join(WDIR, R117 + '.wav'), off=0.0, fin=0.02, fout=6.0, semis=0, rid=R117 + '.wav', tag='CXVII (tablet117、実音のピアノ) — 土台、そのまま')
+    add('REC', 0, DUR, 0, 0.7, None, src=os.path.join(WDIR, R117 + '.wav'), off=0.0, fin=0.02, fout=6.0, semis=0, rid=R117 + '.wav', tag='CXVII (tablet117、実音のピアノ) — 土台、そのまま')
     first = True
     for b in range(S2, TOTAL - 4):
         r = 24 + chord(P.harm[b * BPB])['root']
