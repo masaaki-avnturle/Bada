@@ -2972,6 +2972,25 @@ ffmpeg -i tablet140.mp4 -vn -ac 1 -ar 44100 src/20261105_140000.wav && python3 b
 python3 compose_tablet142.py bank140/bank.json src score_tablet142.json && python3 synth.py score_tablet142.json tablet142.wav && python3 video.py score_tablet142.json tablet142.wav tablet142.mp4
 ```
 
+## 🎻🕯🌀 Requiem BADA — Tablet Sessions CXLIII · Erbarm dich mein — BWV 721 ipnotico (tablet142 の曲に、バッハの BWV 721 を共鳴的洗脳の仕上がりに, 変ロ短調 → ニ短調 → ヘ短調 → ト短調, ♩=60, 13 分 47 秒)
+
+土台は CXLII · Ballata ipnotica (tablet142 の音をそのまま、表として; 4 つの和音の輪)。被せるのはバッハのコラール前奏曲 BWV 721「Erbarm dich mein, o Herre Gott」の**書法** — 8 分音符で打ち続ける和音 (脈) の上に、コラールの定旋律を長い音で。定旋律はコラール「Erbarm dich mein, o Herre Gott」(music21 の収録譜 bach/bwv305 のソプラノ、イ短調、52 拍; `erbarm_melody.json`) を 2 倍に伸ばして (26 小節)、各段階の関係短調に移す (+1・+5・+8・−2)。被せるのは管弦楽だけ (synth の合成)
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| I. 脈と定旋律 (変ロ短調) | 0〜38 | 打ち続ける和音 (Vn II・Va、pp) が始まり、ホルンが定旋律を遠くで (1 オクターヴ下)、コントラバスの保続、深い鐘 |
+| II. 定旋律が近づく (ニ短調) | 38〜80 | 定旋律がクラリネットと Vn I に、脈に Vc とトロンボーンの和音が加わる |
+| III. 脈が強く (ヘ短調) | 80〜141 | 定旋律がトランペットと Vn I (1 オクターヴ上)、ホルンに、脈が強く (トロンボーンも)、ティンパニが脈に → 2 度目は定旋律が低く (Vc・Cb、2 オクターヴ下)、オーボエが上で |
+| IV. 総奏と消える脈 (ト短調) | 141〜205 | 総奏の定旋律 (Vn I・フルート・トランペット・ホルン)、ティンパニ → ホルンだけの定旋律、脈が少しずつ消えていき、高い開いた 5 度の共鳴と深い鐘 |
+
+- 和音は土台の 4 つの和音の輪を優先しつつ定旋律の音を含む和音を半小節ごとに選ぶ (`harm_fit`)
+- 測った音量 (rms、土台込み): I −16〜−21 dB、II −14〜−17、III −13〜−18、IV −14 → −23 (消える)。mp4 は 30 MiB に収めるため 960×540 に。`compose_tablet143.py` (土台の wav は CXLII の譜面から合成し直す)
+
+```bash
+python3 synth.py score_tablet142.json src/20261105_142000.wav   # 土台
+python3 compose_tablet143.py bank142.json src score_tablet143.json && python3 synth.py score_tablet143.json tablet143.wav && python3 video.py score_tablet143.json tablet143.wav tablet143.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
