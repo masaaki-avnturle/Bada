@@ -28,6 +28,18 @@ apt-get install -y --no-install-recommends \
 # 導入確認 (カーネルの実体があるか)
 ls -1 /boot/vmlinuz-* >/dev/null 2>&1 || { echo "FATAL: kernel not installed in chroot"; exit 1; }
 
+# ---- Ubuntu 一式: Ubuntu 標準のコマンド群 (ubuntu-minimal + ubuntu-standard) と日本語翻訳 ----
+#   (デスクトップは w9wm のまま。GNOME などは入れない)
+apt-get install -y --no-install-recommends ubuntu-minimal ubuntu-standard language-pack-ja language-pack-en
+# netplan は NetworkManager に任せる (有線/無線とも NM が管理)
+mkdir -p /etc/netplan
+cat > /etc/netplan/01-network-manager-all.yaml <<'EOF'
+network:
+  version: 2
+  renderer: NetworkManager
+EOF
+chmod 600 /etc/netplan/01-network-manager-all.yaml
+
 # ---- パッケージを 1 つずつ導入するヘルパ ----
 #   グループ一括 `apt-get install a b c || true` は 1 つでも無効名があると
 #   グループ全体が入らない。ここでは 1 パッケージずつ入れ、失敗しても続行する。
@@ -594,7 +606,7 @@ grep -q '^XKBMODEL="jp106"' /etc/default/keyboard && grep -q '^XKBLAYOUT="jp"' /
 grep -q '^XKBMODEL="jp106"' /etc/default/keyboard || { echo "FATAL: /etc/default/keyboard が jp106 になりません"; exit 1; }
 
 # ---- 要求パッケージの最終確認 (1 つでも欠けたらビルド失敗) ----
-REQUIRED="network-manager iptables dnsmasq-base apt
+REQUIRED="ubuntu-minimal ubuntu-standard language-pack-ja network-manager iptables dnsmasq-base apt
   cups cups-filters cups-browsed avahi-daemon printer-driver-all system-config-printer
   fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
   xterm w9wm lightdm xserver-xorg xserver-xorg-video-vesa xserver-xorg-video-fbdev
