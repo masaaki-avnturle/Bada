@@ -3004,6 +3004,26 @@ ffmpeg -i tablet117.mp4 -vn -ac 1 -ar 44100 src/20261003_117000.wav   # 土台 (
 python3 compose_tablet144.py bank140/bank.json src score_tablet144.json && python3 synth.py score_tablet144.json tablet144.wav && python3 video.py score_tablet144.json tablet144.wav tablet144.mp4
 ```
 
+## 🎹🌀🕯 Requiem BADA — Tablet Sessions CXLV · Mantra del pilastro (11/06 の 2 曲を雰囲気に、tablet117 と tablet144 をメインテーマにして、洗脳的な曲に, ニ短調, ♩=60, 10 分 56 秒)
+
+雰囲気は 2026/11/06 06:39 (Gmaj7・D7・Dm7 — ト長調〜ニ・ドリア) と 06:42 (F・Fmaj7・E・C — ヘ長調) の実音 (喘ぎの区間だけ下げて、そのまま)。メインテーマは tablet117 (CXVII) の**大黒柱の主題** (ド・ファ・ソ・ファ・ソ・ファ・ミ・レ、変ロ短調 → ニ短調) と tablet144 (CXLIV) の**定旋律「Erbarm dich mein, o Herre Gott」** (イ短調 → ニ短調)。4 声は 11/06 06:42 の実音のピアノの 1 音 (`build_sampler` で 11 音) のサンプラー、高い共鳴と低いペダルは合成のピアノ。電子音なし、鐘なし、声なし
+
+| 段落 | 小節 | 実音 | 内容 |
+|---|---|---|---|
+| I. 序 | 0〜44 | 06:39 (全部、160 秒) | BWV 721 の打ち続ける和音 (8 分音符、バスとテノール) が pp で始まり、大黒柱の主題がアルトで 4 小節ごとに 8 度 (マントラ)、後半はテノールが 1 オクターヴ下で重なる |
+| II. Erbarm dich | 44〜104 | 06:42 (全部、227 秒) | ソプラノが定旋律 (2 倍に伸ばして 26 小節) を 2 度、途中からテノールが大黒柱を 2 小節ごとに、2 度目はアルトのマントラ (2 小節ごと 13 度) と。低いペダルの音、高い共鳴 |
+| III. 二重 | 104〜136 | 06:39 (始めの 80 秒) | ソプラノが大黒柱の拡大 (×2) を 4 度、テノールが定旋律 (そのままの速さ) を 2 度、アルトのマントラ、脈は頂点 (dyn 0.9) |
+| IV. 消える | 136〜162 | 06:42 (150 秒から 76 秒) | 脈が少しずつ消え (dyn 0.7 → 0.08)、大黒柱の頭 (ド・ファ) だけがアルトで 2 小節ごとに、高い共鳴が反響 |
+
+- 和音は録音の採譜 (拍ごと) を優先しつつ主題の音を含む和音を半小節ごとに選ぶ (候補にニ短調・ヘ長調・ト長調の和音)。声部の重ね (PF の層) は主題の音を 1.3 倍に
+- `compose_tablet145.py`
+
+```bash
+python3 build_sampler.py bank1106 20261106_063938.mp3 20261106_064228.mp3   # 採譜と 06:42 の 1 音 (11 音)
+ffmpeg -i 20261106_063938.mp3 -ac 1 -ar 44100 src/20261106_063938.wav && python3 dip_breath.py src/20261106_063938.wav src/20261106_063938_clean.wav   # 06:42 も同じく
+python3 compose_tablet145.py bank1106/bank.json src score_tablet145.json && python3 synth.py score_tablet145.json tablet145.wav && python3 video.py score_tablet145.json tablet145.wav tablet145.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
