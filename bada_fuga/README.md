@@ -2903,6 +2903,26 @@ python3 compose_tablet137.py bank1013/bank.json src score_tablet137.json && pyth
 python3 compose_tablet138.py bank1013/bank.json src score_tablet138.json && python3 synth.py score_tablet138.json tablet138.wav && python3 video.py score_tablet138.json tablet138.wav tablet138.mp4
 ```
 
+## 🎹🎺🕯 Requiem BADA — Tablet Sessions CXXXIX · Lebewohl — Requiem sulla ninna nanna (tablet117 の曲に合わせて、ベートーヴェンの「告別」の動機を被せて、requiem に仕上げる, 変ロ短調 → ヘ長調 → ヘ短調 → 変ロ長調, ♩=60, 13 分 12 秒)
+
+土台は CXVII · Ninna nanna 10/03 (tablet117.mp4 の音をそのまま、表として; 4 段階、♩=60 → 44)。被せる主題はベートーヴェンのピアノ・ソナタ第 26 番「告別」(Les Adieux, Op. 81a, 1810 年、公有) の冒頭「Le-be-wohl」の動機 — ソ・ファ・ミ (角笛の別れの呼び声) — を各段階の調で。「別れの曲」として有名なのはショパンの練習曲 Op. 10-3 だが、依頼の「ベートーヴェン」に従い「告別」の動機を使った (ほかの旋律の引用はなし)。被せるのは管弦楽だけ (synth の合成)。♩=60 で 1 拍 = 1 秒にして、土台のテンポの変化は和音の採譜 (`build_sampler`、2164 区間) で追う
+
+| 段落 | 小節 (秒) | 土台 (CXVII) | 被せるもの |
+|---|---|---|---|
+| I. Introitus (変ロ短調) | 0〜38 | くつろぎ (10/03 13:24) | ホルンの Lebewohl (ファ・ミ♭・レ♭、拡大 ×2) が遠くで 5 度呼び交わし、低いクラリネットが答える。高い開いた 5 度 (シ♭・ファ) の弦が pp、コントラバスの保続、深い鐘 |
+| II. Kyrie (ヘ長調) | 38〜80 | 暖まり (9/24 11:18) | Lebewohl (ド・シ♭・ラ) のカノン: フルート → オーボエ → クラリネット → ホルン (2 小節ずつ、2 度)、弦のフガート (ソ・ファ・ミ・レ・ド・ミ)、薄い和音と根音 |
+| III. Lacrimosa (ヘ短調) | 80〜141 | 冷え (9/24 08:49、♩=60 → 50) | Lebewohl (ド・シ♭・ラ♭) の拡大が Vn I・Va に 7 度、弦のため息 (2 音のスラー)、半音で下る低音 (ファ・ミ・ミ♭・レ・レ♭・ド、2 小節 × 8)、トロンボーンの和音、ティンパニの遠い拍、オーボエの展開 |
+| IV. Agnus Dei — Lux aeterna (変ロ長調) | 141〜196 | 眠り (10/03 13:27、♩=50 → 44) | Lebewohl (ファ・ミ♭・レ) の大きな拡大 (×4) がホルン → Vn I → フルート → ホルンに、高い開いた 5 度 (ファ・シ♭) が pp、低い弦の和音 — 土台が小さいので被せるものも 0.6 倍に、最後は深い鐘と一緒に消える |
+
+- 和音は土台の採譜 (拍ごと) を優先しつつ主題の音を含む和音を選ぶ (`harm_fit`, `RECQ`)。Lacrimosa の下る低音の区間は和音を固定 (Fm・C/E・Fm/E♭・B♭m/D♭・D♭・C7)
+- 測った音量 (rms、土台込み): Introitus −18 → −13 dB、Kyrie −15〜−18、Lacrimosa −14〜−20、Agnus Dei −20〜−24 (静かに消える)。被せる管弦楽は土台より 3 dB ほど下 (Kyrie・Lacrimosa で測って)
+- mp4 は 30 MiB に収めるため 960×540・250 kbps に。`compose_tablet139.py` (bank117 と tablet117 の wav だけで作れる)
+
+```bash
+ffmpeg -i tablet117.mp4 -vn -ac 1 -ar 44100 src/20261003_117000.wav && python3 build_sampler.py bank117 src/20261003_117000.wav   # 土台の採譜 (和音)
+python3 compose_tablet139.py bank117/bank.json src score_tablet139.json && python3 synth.py score_tablet139.json tablet139.wav && python3 video.py score_tablet139.json tablet139.wav tablet139.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
