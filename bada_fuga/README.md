@@ -3054,6 +3054,25 @@ python3 deep_bass.py src/20261106_064228_clean.wav src/20261106_064228_deep.wav 
 python3 compose_tablet147.py bank1106/bank.json src score_tablet147.json && python3 synth.py score_tablet147.json tablet147.wav && python3 video.py score_tablet147.json tablet147.wav tablet147.mp4
 ```
 
+## 🎹🎧🌙 Requiem BADA — Tablet Sessions CXLVIII · Mescolanza (tablet117・2026/11/06 の 2 曲・トラック 18 を混ぜて, ニ短調 / ヘ長調, ♩=60, 11 分 12 秒)
+
+4 つの音源 (すべて実音、そのまま; 11/06 は喘ぎの区間だけ下げて) を段落ごとに表と裏を入れ替えながら混ぜる。トラック 18 (wma、2 分 29 秒) はニ短調 (Dm・Gm・F・A・B♭、`build_sampler` で 468 区間)。つなぐのはトラック 18 の最上声の音から作った旋律 (ニ短調の五音に寄せて、讃美歌のリズム × 4 句) を 11/06 06:42 の実音のピアノの 1 音 (サンプラー) で
+
+| 段落 | 小節 | 表 | 裏 | 旋律 |
+|---|---|---|---|---|
+| I | 0〜40 | 06:39 (160 秒、0.62) | tablet117 の始め (0.22) | 第 1 句をソプラノ、第 2 句をアルト、第 1・2 句、第 3 句をテノール低く |
+| II | 40〜78 | トラック 18 (全部、0.62) | 06:42 の始め (0.28) | 第 3 句をアルト、第 4 句をテノール、全句を 2 倍に伸ばしてソプラノ |
+| III | 78〜135 | 06:42 (227 秒、0.6) | tablet117 の中 (0.2)、32 小節目からトラック 18 の終わり (Dm、0.3) | 第 1 句をテノール低く、全句をソプラノ、第 1・2 句を 2 倍に |
+| IV | 135〜166 | tablet117 の眠りの段階 (564 秒から、0.55) | 06:39 の終わり (0.26)、トラック 18 の始まり (0.26) | 旋律の頭だけがアルトに 4 小節ごと、高い共鳴が消える (dyn 0.55 → 0.15) |
+
+- 和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに。低いペダルの音 (2 小節ごと pp)、高い共鳴 (旋律の反響)。鐘なし、声なし
+- bank は 3 つ (bank1106・bank18・bank117) の recordings を合わせたもの (`bank148.json`)。`compose_tablet148.py`
+
+```bash
+ffmpeg -i track18.wma -ac 1 -ar 44100 src/20261107_180000.wav && python3 build_sampler.py bank18 src/20261107_180000.wav
+python3 compose_tablet148.py bank148.json src score_tablet148.json && python3 synth.py score_tablet148.json tablet148.wav && python3 video.py score_tablet148.json tablet148.wav tablet148.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
