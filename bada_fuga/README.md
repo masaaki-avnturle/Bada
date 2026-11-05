@@ -3084,6 +3084,24 @@ CXLVIII (166 小節) をまるごと 16 倍に (`compose_tablet105.py`)。166 ×
 python3 compose_tablet105.py score_tablet148.json score_tablet149.json bank148.json && python3 render_long.py score_tablet149.json out149 192 3
 ```
 
+## 🎹🎧🌀 Requiem BADA — Tablet Sessions CL · Mantra della traccia 8 (tablet148 とトラック 8 の 2 曲を洗脳的に, ハ長調 / イ短調, ♩=60, 11 分 36 秒)
+
+材料は tablet148 (CXLVIII · Mescolanza、11 分 11 秒) とトラック 8 (wma、4 分 9 秒; Fmaj7・Em7・C・Am7・Dm7 — ハ長調〜イ短調、`build_sampler` で 607 区間)。どちらも実音のまま、段落ごとに表と裏を入れ替える。洗脳はトラック 8 の最上声の音から作った旋律 (ハ長調の五音、讃美歌のリズム × 4 句) の第 1 句 (4 音 + 伸ばす) をマントラのように繰り返すことと、BWV 721 の打ち続ける和音 (8 分音符、バスとテノール) の脈。4 声は 11/06 06:42 の実音のピアノの 1 音のサンプラー、低いペダルと高い共鳴は合成のピアノ。鐘なし、声なし
+
+| 段落 | 小節 | 表 | 裏 | マントラと脈 |
+|---|---|---|---|---|
+| I | 0〜40 | tablet148 の始め (160 秒、0.6) | — | 脈が pp で始まり (dyn 0.4 → 0.55)、マントラがアルトで 4 小節ごとに 7 度 |
+| II | 40〜102 | トラック 8 (全部、0.6) | tablet148 の中 (0.3) | マントラがアルトとテノールで 2 小節ごとに、ソプラノが全句を 2 倍に伸ばして 2 度、脈が強く (0.7 → 0.85) |
+| III | 102〜140 | tablet148 の 06:42 の段落 (316 秒から、0.6) | トラック 8 の抜粋 (0.3) | マントラがソプラノ高く・テノール低く・アルトと 3 声で、脈は頂点 (0.9) |
+| IV | 140〜172 | tablet148 の終わり (0.5) | トラック 8 の終わり (0.25) | 脈が少しずつ消え (0.7 → 0.08)、マントラの頭 (2 音) だけがアルトで 2 小節ごとに、高い共鳴が反響 |
+
+- 和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (ハ長調・イ短調の候補)。`compose_tablet150.py` (bank150 = bank148 + bank08 + tablet148 の採譜)
+
+```bash
+ffmpeg -i track08.wma -ac 1 -ar 44100 src/20261107_080000.wav && python3 build_sampler.py bank08 src/20261107_080000.wav && ffmpeg -i tablet148.mp4 -vn -ac 1 -ar 44100 src/20261107_148000.wav && python3 build_sampler.py bank148a src/20261107_148000.wav
+python3 compose_tablet150.py bank150.json src score_tablet150.json && python3 synth.py score_tablet150.json tablet150.wav && python3 video.py score_tablet150.json tablet150.wav tablet150.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
