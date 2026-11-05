@@ -109,6 +109,7 @@ install -Dm755 "$HERE/installer/badaos-install-core.sh" "$CHROOT/usr/local/lib/b
 # トリプルブート: Windows の下に Bada VM Pro 専用ブート FAT + OS 区画 (UEFI / Legacy)
 install -Dm755 "$HERE/config/install-badaos-triboot.sh"          "$CHROOT/usr/local/bin/install-badaos-triboot"
 install -Dm755 "$HERE/installer/badaos-triboot-installer.sh"     "$CHROOT/usr/local/bin/badaos-triboot-installer"
+install -Dm755 "$HERE/installer/badaos-installer-gtk.py"         "$CHROOT/usr/local/bin/badaos-installer-gtk"
 install -Dm755 "$HERE/installer/badaos-triboot-core.sh"          "$CHROOT/usr/local/lib/badaos/badaos-triboot-core.sh"
 install -Dm755 "$HERE/installer/badaos-triboot-text.sh"          "$CHROOT/usr/local/bin/badaos-triboot-text"
 install -Dm755 "$HERE/installer/badaos-disks.sh"                 "$CHROOT/usr/local/lib/badaos/badaos-disks"
@@ -163,7 +164,7 @@ split_out(){ # $1=レイヤ名  $2...=chroot からの相対パス (同じ FS �
     mv "$CHROOT/$p" "$LAYERS/$name/$p"
     mkdir -p "$CHROOT/$p"            # 空の置き場所 (overlay で上のレイヤが見える)
   done; }
-split_out fonts usr/share/texlive/texmf-dist/fonts usr/share/fonts
+split_out fonts usr/share/texlive/texmf-dist/fonts usr/share/fonts   # (texlive は今は ISO に含めない)
 split_out tex   usr/share/texlive usr/share/texmf var/lib/texmf
 SQ_OPTS="-noappend -no-progress -comp xz -b 1M"
 mksquashfs "$CHROOT" "$IMAGE/casper/filesystem.squashfs" $SQ_OPTS \
@@ -271,3 +272,6 @@ test -s "$OUT/$ISO_NAME" || { echo "FATAL: ISO 生成に失敗"; exit 1; }
 echo "== built: $OUT/$ISO_NAME =="
 ls -lh "$OUT/$ISO_NAME"
 sha256sum "$OUT/$ISO_NAME" | tee "$OUT/$ISO_NAME.sha256"
+# GitHub Releases は 1 ファイル 2GiB 未満しか置けない (ISO を直接ダウンロードできるように)
+ISO_SZ=$(stat -c %s "$OUT/$ISO_NAME"); echo "ISO size: $(( ISO_SZ / 1048576 )) MiB"
+[ "$ISO_SZ" -lt 2147483648 ] || { echo "FATAL: ISO が 2GiB 以上です (GitHub Releases に置けません)"; exit 1; }

@@ -147,12 +147,45 @@ hardstatus alwayslastline "%{= kw}[Bada VM Pro] %-w%{= Wk}%n %t%{-}%+w %=%Y-%m-%
 EOF
 
 # ---- TeX: texlive-full (日本語 platex / uplatex / lualatex-ja 含む全パッケージ) ----
+#   texlive-full を ISO に入れると ISO が 3GB を超え、GitHub の配布上限 (1 ファイル 2GiB)
+#   に収まらない。そこで ISO には入れず、インストール済みシステムに NAT (インターネット)
+#   経由で自動導入する:
+#     1. インストーラが、ネットにつながっていればインストール中に apt で導入
+#     2. 間に合わなかった時は、インストール後の起動でネットにつながった時点で
+#        badaos-texlive.service が自動で導入 (失敗しても 10 分ごとに再試行)
 #   PDF マニュアル (texlive-doc 約 2GB) だけは容量のため展開しない。
-#   ISO 内の squashfs は 4GiB 未満のレイヤに分けるので Rufus の ISO モードでも書ける。
 cat > /etc/dpkg/dpkg.cfg.d/01-badaos-texlive-nodoc <<'EOF'
 path-exclude=/usr/share/doc/texlive-doc/*
 EOF
-apt-get install -y --no-install-recommends texlive-full
+cat > /usr/local/sbin/badaos-texlive-install <<'EOF'
+#!/bin/sh
+# texlive-full を apt で導入する (インストール済みシステム用。済んでいれば何もしない)
+dpkg -s texlive-full >/dev/null 2>&1 && exit 0
+getent hosts archive.ubuntu.com >/dev/null 2>&1 || { echo "network not ready"; exit 1; }
+export DEBIAN_FRONTEND=noninteractive
+apt-get update && apt-get install -y --no-install-recommends texlive-full
+EOF
+chmod 755 /usr/local/sbin/badaos-texlive-install
+cat > /etc/systemd/system/badaos-texlive.service <<'EOF'
+[Unit]
+Description=Bada VM Pro: install texlive-full over the network
+Wants=network-online.target
+After=network-online.target
+# ライブ (USB) 起動では動かさない (RAM に数 GB 入れないように)
+ConditionKernelCommandLine=!boot=casper
+ConditionPathExists=!/var/lib/dpkg/info/texlive-full.list
+
+[Service]
+Type=simple
+Nice=10
+ExecStart=/usr/local/sbin/badaos-texlive-install
+Restart=on-failure
+RestartSec=600
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable badaos-texlive.service 2>/dev/null || true
 
 # ---- エディタ: vim と emacs (事前導入) ----
 #   vim-gtk3: GUI (gvim) + X クリップボード。emacs: GTK 版 + emacs-mozc (Emacs 内の日本語入力)
@@ -195,7 +228,7 @@ EOF
 apt_try_rec calamares gparted
 apt_try qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-controls2 \
   qml-module-qtquick-layouts \
-  parted gdisk dosfstools e2fsprogs util-linux zenity \
+  parted gdisk dosfstools e2fsprogs util-linux zenity python3-gi python3-gi-cairo gir1.2-gtk-3.0 \
   squashfs-tools rsync \
   grub-common grub2-common grub-pc-bin grub-efi-amd64-bin os-prober
 # トリプルブート用: NTFS 検出/縮小、UEFI 起動メニュー登録、Secure Boot 用署名済み GRUB
@@ -641,18 +674,18 @@ grep -q '^XKBMODEL="jp106"' /etc/default/keyboard || { echo "FATAL: /etc/default
 
 # ---- 要求パッケージの最終確認 (1 つでも欠けたらビルド失敗) ----
 REQUIRED="ubuntu-minimal ubuntu-standard language-pack-ja network-manager iptables dnsmasq-base apt
-  texlive-full texlive-lang-japanese python3 perl build-essential openssh-server xinetd screen
+  python3 perl build-essential openssh-server xinetd screen
   cups cups-filters cups-browsed avahi-daemon printer-driver-all system-config-printer
   fcitx fcitx-mozc mozc-server fcitx-config-gtk fonts-noto-cjk locales
   xterm w9wm lightdm xserver-xorg xserver-xorg-video-vesa xserver-xorg-video-fbdev
   mlterm mlterm-im-fcitx keyboard-configuration console-setup wpasupplicant network-manager-gnome linux-firmware
   vim vim-gtk3 emacs
-  grub-pc-bin grub-efi-amd64-bin dosfstools ntfs-3g zenity calamares"
+  grub-pc-bin grub-efi-amd64-bin dosfstools ntfs-3g zenity calamares python3-gi python3-gi-cairo gir1.2-gtk-3.0"
 MISSING=""
 for p in $REQUIRED; do dpkg -s "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"; done
 if [ -n "$MISSING" ]; then echo "FATAL: 必須パッケージが入っていません:$MISSING"; exit 1; fi
 echo "required packages OK"
-for c in platex uplatex lualatex python3 perl gcc make sshd xinetd screen mlterm nm-applet wpa_supplicant setxkbmap nmcli cupsd lp lpstat system-config-printer fcitx xterm w9wm vim gvim emacs apt-get; do
+for c in python3 perl gcc make sshd xinetd screen mlterm nm-applet wpa_supplicant setxkbmap nmcli cupsd lp lpstat system-config-printer fcitx xterm w9wm vim gvim emacs apt-get; do
   command -v "$c" >/dev/null 2>&1 || { echo "FATAL: コマンド $c がありません"; exit 1; }
 done
 echo "required commands OK"

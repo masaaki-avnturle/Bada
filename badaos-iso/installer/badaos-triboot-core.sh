@@ -52,6 +52,11 @@ SHRINK_WINDOWS="${SHRINK_WINDOWS:-0}"
 UBUNTU_SIZE_GB="${UBUNTU_SIZE_GB:-0}"   # Linux が無いディスク: Ubuntu 用に割り当てる大きさ (0 = 残り全部)
 UBU_MIN=20                               # Ubuntu 用パーティションの最小 GiB
 PLAN_ONLY="${PLAN_ONLY:-0}"
+NEW_TZ="${NEW_TZ:-Asia/Tokyo}"           # タイムゾーン
+NEW_KBLAYOUT="${NEW_KBLAYOUT:-jp}"       # キーボード: jp (日本語 106/109) / us (英語 US)
+NEW_FULLNAME="${NEW_FULLNAME:-}"         # ユーザーの名前 (表示名)
+NEW_AUTOLOGIN="${NEW_AUTOLOGIN:-1}"      # 1 = 自動ログイン / 0 = ログイン時にパスワード
+NEW_TEXLIVE="${NEW_TEXLIVE:-1}"          # 1 = ネットにつながっていればインストール中に texlive-full を導入
 MIN_GB=30                  # OS 本体 (ext4) の最小サイズ (texlive-full 込み 約 12GiB + 余裕)
 BOOT_MIB=512               # 専用ブートローダ FAT の大きさ
 BOOT_ID="BadaVMPro"        # \EFI\BadaVMPro\ と UEFI 起動メニュー名
@@ -438,6 +443,21 @@ UUID=${BOOT_UUID} /boot/efi vfat umask=0077 0 1
 EOF
 echo "$HOST" > "$MNT/etc/hostname"
 printf '127.0.0.1\tlocalhost\n127.0.1.1\t%s\n' "$HOST" > "$MNT/etc/hosts"
+# タイムゾーン
+if [ -f "$MNT/usr/share/zoneinfo/$NEW_TZ" ]; then
+  ln -sf "/usr/share/zoneinfo/$NEW_TZ" "$MNT/etc/localtime"; echo "$NEW_TZ" > "$MNT/etc/timezone"
+fi
+# キーボード配列 (既定は日本語 106/109)
+case "$NEW_KBLAYOUT" in
+  us) KBM=pc105; KBL=us ;;
+  *)  KBM=jp106; KBL=jp ;;
+esac
+if [ -f "$MNT/etc/default/keyboard" ]; then
+  sed -i "s/^XKBMODEL=.*/XKBMODEL=\"$KBM\"/; s/^XKBLAYOUT=.*/XKBLAYOUT=\"$KBL\"/; s/^XKBVARIANT=.*/XKBVARIANT=\"\"/" "$MNT/etc/default/keyboard"
+fi
+if [ -f "$MNT/etc/X11/xorg.conf.d/00-keyboard.conf" ]; then
+  sed -i "s/\"XkbModel\" \".*\"/\"XkbModel\" \"$KBM\"/; s/\"XkbLayout\" \".*\"/\"XkbLayout\" \"$KBL\"/" "$MNT/etc/X11/xorg.conf.d/00-keyboard.conf"
+fi
 
 cat > "$MNT/etc/default/grub" <<'EOF'
 GRUB_DEFAULT=0
@@ -476,17 +496,35 @@ mount --bind /run "$MNT/run" 2>/dev/null || true
 cp -f /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null || true
 
 emit 80 "ユーザー ${USER_NAME} を作成中"
+FN_SAFE="$(printf '%s' "$NEW_FULLNAME" | tr -d '"$`\\:,')"
 chroot "$MNT" /bin/bash -e >&2 <<CHROOT
 # 存在するグループだけに入れる (lpadmin=プリンタ管理, scanner=スキャナ)
 GRPS=\$(for g in sudo adm cdrom dip plugdev netdev audio video lpadmin scanner; do getent group \$g >/dev/null && printf '%s,' \$g; done; true)
-id "${USER_NAME}" >/dev/null 2>&1 || useradd -m -s /bin/bash -G "\${GRPS%,}" "${USER_NAME}"
-echo "${USER_NAME}:${PASS}" | chpasswd
+id "${USER_NAME}" >/dev/null 2>&1 || useradd -m -s /bin/bash -G "\${GRPS%,}" -c "${FN_SAFE}" "${USER_NAME}"
 mkdir -p /etc/lightdm/lightdm.conf.d
-printf '[Seat:*]\nautologin-user=%s\nautologin-user-timeout=0\nuser-session=badaos-w9wm\ngreeter-session=lightdm-gtk-greeter\n' "${USER_NAME}" > /etc/lightdm/lightdm.conf.d/50-badaos.conf
+if [ "${NEW_AUTOLOGIN}" = 1 ]; then
+  printf '[Seat:*]\nautologin-user=%s\nautologin-user-timeout=0\nuser-session=badaos-w9wm\ngreeter-session=lightdm-gtk-greeter\n' "${USER_NAME}" > /etc/lightdm/lightdm.conf.d/50-badaos.conf
+else
+  printf '[Seat:*]\nuser-session=badaos-w9wm\ngreeter-session=lightdm-gtk-greeter\n' > /etc/lightdm/lightdm.conf.d/50-badaos.conf
+fi
 apt-get -y purge casper 2>/dev/null || true
 systemctl enable NetworkManager 2>/dev/null || true
 systemctl enable lightdm 2>/dev/null || true
 CHROOT
+# パスワードは chroot のシェルを通さずに渡す ($ や " を含んでもよいように)
+printf '%s:%s\n' "$USER_NAME" "$PASS" | chroot "$MNT" chpasswd >&2 || fail "パスワードの設定に失敗"
+
+# texlive-full (ISO には入らない大きさなので、NAT 経由で apt 導入)。
+# ここで失敗・未接続でも、インストール後の起動時に badaos-texlive.service が自動で入れる
+if [ "$NEW_TEXLIVE" = 1 ] && getent hosts archive.ubuntu.com >/dev/null 2>&1; then
+  emit 82 "texlive-full をダウンロードしてインストール中 (約 2.5GB。回線により 10〜40 分)"
+  chroot "$MNT" /usr/local/sbin/badaos-texlive-install >&2 \
+    || log "注意: texlive-full を導入できませんでした。インストール後、ネット接続時に自動で導入します"
+elif [ "$NEW_TEXLIVE" = 1 ]; then
+  log "texlive-full は、インストール後にネットにつながった時点で自動で導入します"
+else
+  rm -f "$MNT/etc/systemd/system/multi-user.target.wants/badaos-texlive.service"   # 自動導入しない
+fi
 
 emit 86 "専用 FAT パーティションに Bada VM Pro ブートローダを作成中"
 # (a) UEFI 用: 専用 FAT の \EFI\BadaVMPro\ と \EFI\BOOT\BOOTX64.EFI (この FAT は Bada 専用なので

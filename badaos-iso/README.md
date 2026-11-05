@@ -17,7 +17,7 @@ mlterm・ssh・xinetd・texlive-full・screen などは**後から apt コマン
 | キーボード | **日本語 106/109 配列**(X・テキストコンソール・fcitx すべて jp) |
 | ネットワーク | 有線 + **Wi-Fi**(wpasupplicant・ファームウェア)。画面右下のアイコン / `nmtui` / 「ネットワーク設定」で接続 |
 | 起動 (インストール後) | 既定は **nomodeset**(GPU ドライバを使わない汎用表示)で、どの PC でも通常起動。GRUB の「Bada VM Pro (GPU accelerated graphics)」で GPU 高速表示 |
-| 事前導入 (1.6.0〜) | **texlive-full**(日本語 platex/uplatex/lualatex)・**python3**・**perl**・**build-essential**(gcc/make)・**ssh**(ホスト鍵は初回起動時に生成)・**xinetd**・**screen**・git・Ubuntu 標準一式 (ubuntu-minimal/standard)・日本語翻訳 |
+| 事前導入 (1.7.0〜) | **texlive-full** は ISO (2GiB 上限) に入らないため、インストール中またはインストール後にネット (NAT) 経由で自動導入・**python3**・**perl**・**build-essential**(gcc/make)・**ssh**(ホスト鍵は初回起動時に生成)・**xinetd**・**screen**・git・Ubuntu 標準一式 (ubuntu-minimal/standard)・日本語翻訳 |
 | エディタ (事前導入) | **vim** / gvim / **emacs**(emacs-mozc 付き) |
 | apt | パッケージ索引を同梱 → **起動直後から** `sudo apt install <pkg>` が使える |
 | インストーラ | トリプルブート導入 / Calamares / かんたんウィザード / GParted |
@@ -38,6 +38,17 @@ sudo apt install texlive-full             # TeX 一式 (日本語 platex/uplatex
 
 その他のアプリは `badaos-apps`(GUI チェックリスト)か `sudo apt install <pkg>` で。
 起動方式: GRUB による BIOS + UEFI ハイブリッド ISO(各ファイル 4GB 未満なので **Rufus の ISO イメージモード**で書けます)。
+
+
+## GUI インストーラ (1.7.0〜, Ubuntu のインストーラと同じ流れ)
+
+ようこそ → キーボードレイアウト (日本語 106/109) → 無線 (Wi-Fi 接続) → アップデートと他のソフトウェア
+(texlive-full) → インストールの種類 (ディスクの割り当てを色付きの帯で表示、大きさをスライダーで指定)
+→ 「変更をディスクに書き込みますか?」→ どこに住んでいますか? (Asia/Tokyo) → あなたの情報
+(名前・コンピューター名・ユーザー名・パスワード・自動ログイン) → スライドショー付きの進行状況 → 今すぐ再起動する。
+
+パーティションは `[Windows][BADAVMBOOT (FAT32, ブートローダ)][BADAVMPRO (OS)][Linux / UBUNTU]`。
+ディスク先頭 (MBR) と Windows の起動パーティションは書き換えません。UEFI / Legacy BIOS 両対応。
 
 ## 🪟🜁🐧 トリプルブート: Windows | Bada VM Pro | Linux (UEFI / Legacy 両対応)
 
