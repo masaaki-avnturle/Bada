@@ -451,8 +451,20 @@ GRUB_GFXPAYLOAD_LINUX=keep
 GRUB_DISABLE_OS_PROBER=false
 GRUB_DISABLE_RECOVERY=false
 EOF
-# 既定は nomodeset (GPU ドライバを使わない汎用表示) で、どの PC でも通常起動できるようにする。
-# GPU ドライバで高速表示する起動項目は 35_badavmpro_triboot が別に追加する。
+# 画面の既定:
+#   Legacy … nomodeset (GPU ドライバ不使用) + GRUB の 1024x768 画面を Linux に渡す
+#             (古い PC で通常起動が止まる問題の対策)。GPU 高速表示は別項目
+#   UEFI   … GPU ドライバ (KMS) を使う。UEFI では nomodeset だと画面が崩れることがある。
+#             「Safe graphics (nomodeset)」を別項目で用意
+if [ "$FW" = "uefi" ]; then
+  sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' "$MNT/etc/default/grub"
+fi
+# /etc/default/grub.d/90-badaos.cfg (ISO 側の既定) も同じ内容にそろえる (こちらが後から読まれる)
+if [ -f "$MNT/etc/default/grub.d/90-badaos.cfg" ]; then
+  grep -E '^GRUB_(CMDLINE_LINUX_DEFAULT|GFXMODE|GFXPAYLOAD_LINUX)=' "$MNT/etc/default/grub" > "$MNT/tmp/gfx.cfg"
+  sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/d; /^GRUB_GFXMODE=/d; /^GRUB_GFXPAYLOAD_LINUX=/d' "$MNT/etc/default/grub.d/90-badaos.cfg"
+  cat "$MNT/tmp/gfx.cfg" >> "$MNT/etc/default/grub.d/90-badaos.cfg"; rm -f "$MNT/tmp/gfx.cfg"
+fi
 install -Dm755 /usr/local/lib/badaos/35_badavmpro_triboot "$MNT/etc/grub.d/35_badavmpro_triboot" 2>/dev/null \
   || log "注意: 35_badavmpro_triboot が無いため os-prober のみで Windows/Linux を検出します"
 
@@ -488,8 +500,10 @@ if chroot "$MNT" grub-install --target=x86_64-efi --efi-directory=/boot/efi --bo
   EFI_OK=1
 fi
 [ "$FW" = "uefi" ] && [ $EFI_OK = 0 ] && fail "grub-install (x86_64-efi) に失敗"
-# 署名済み GRUB (shim 経由) が自分のフォルダの grub.cfg を読むので、FAT 上の本設定へ誘導する
-for d in "$MNT/boot/efi/EFI/$BOOT_ID" "$MNT/boot/efi/EFI/BOOT"; do
+# 署名済み GRUB (shim 経由) は \EFI\ubuntu\grub.cfg を読む (Ubuntu の署名版の固定パス)。
+# Bada VM Pro 専用 FAT の上に置くので Windows / Ubuntu の ESP には触れない。
+mkdir -p "$MNT/boot/efi/EFI/ubuntu"
+for d in "$MNT/boot/efi/EFI/$BOOT_ID" "$MNT/boot/efi/EFI/BOOT" "$MNT/boot/efi/EFI/ubuntu"; do
   [ -d "$d" ] && printf 'search --no-floppy --fs-uuid --set=root %s\nset prefix=($root)/grub\nconfigfile $prefix/grub.cfg\n' "$BOOT_UUID" > "$d/grub.cfg"
 done
 

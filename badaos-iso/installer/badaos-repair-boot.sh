@@ -44,7 +44,8 @@ if [ -d /sys/firmware/efi ]; then
     --bootloader-id=BadaVMPro --no-nvram --recheck || fail "grub-install (UEFI) failed"
   chroot "$MNT" grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot/efi \
     --removable --no-nvram --recheck || true
-  for d in "$MNT/boot/efi/EFI/BadaVMPro" "$MNT/boot/efi/EFI/BOOT"; do
+  mkdir -p "$MNT/boot/efi/EFI/ubuntu"   # Ubuntu の署名版 GRUB が読む場所 (Bada 専用 FAT 上)
+  for d in "$MNT/boot/efi/EFI/BadaVMPro" "$MNT/boot/efi/EFI/BOOT" "$MNT/boot/efi/EFI/ubuntu"; do
     [ -d "$d" ] && printf 'search --no-floppy --fs-uuid --set=root %s\nset prefix=($root)/grub\nconfigfile $prefix/grub.cfg\n' "$BOOT_UUID" > "$d/grub.cfg"
   done
   L='\EFI\BadaVMPro\grubx64.efi'; [ -f "$MNT/boot/efi/EFI/BadaVMPro/shimx64.efi" ] && L='\EFI\BadaVMPro\shimx64.efi'

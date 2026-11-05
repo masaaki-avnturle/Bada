@@ -9,14 +9,19 @@
 set -e
 # GPU ドライバで高速表示する起動項目 (既定の項目は nomodeset = どの PC でも起動する汎用表示)
 ROOT_UUID="$(grub-probe --target=fs_uuid / 2>/dev/null || true)"
+# 既定が nomodeset (Legacy) なら「GPU 高速表示」、既定が GPU (UEFI) なら「Safe graphics」を追加
+case " ${GRUB_CMDLINE_LINUX_DEFAULT:-} " in
+  *" nomodeset "*) ALT_TITLE="Bada VM Pro (GPU accelerated graphics)"; ALT_OPTS="quiet splash" ;;
+  *)               ALT_TITLE="Bada VM Pro (Safe graphics, nomodeset)"; ALT_OPTS="nomodeset" ;;
+esac
 if [ -n "$ROOT_UUID" ] && [ -e /boot/vmlinuz ] && [ -e /boot/initrd.img ]; then
   cat <<GRUB
-menuentry "Bada VM Pro (GPU accelerated graphics)" --class gnu-linux --class os {
+menuentry "$ALT_TITLE" --class gnu-linux --class os {
     insmod part_msdos
     insmod part_gpt
     insmod ext2
     search --no-floppy --fs-uuid --set=root $ROOT_UUID
-    linux /boot/vmlinuz root=UUID=$ROOT_UUID ro quiet splash
+    linux /boot/vmlinuz root=UUID=$ROOT_UUID ro $ALT_OPTS
     initrd /boot/initrd.img
 }
 GRUB
@@ -30,9 +35,6 @@ if [ "$grub_platform" = "efi" ]; then
     insmod chain
     search --no-floppy --file --set=root /EFI/Microsoft/Boot/bootmgfw.efi
     chainloader /EFI/Microsoft/Boot/bootmgfw.efi
-  }
-  menuentry "UEFI Firmware Settings" --class settings {
-    fwsetup
   }
 else
   menuentry "Windows (Legacy BIOS)" --class windows --class os {
