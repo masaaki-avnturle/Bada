@@ -3095,7 +3095,8 @@ python3 compose_tablet105.py score_tablet148.json score_tablet149.json bank148.j
 | III | 102〜140 | tablet148 の 06:42 の段落 (316 秒から、0.6) | トラック 8 の抜粋 (0.3) | マントラがソプラノ高く・テノール低く・アルトと 3 声で、脈は頂点 (0.9) |
 | IV | 140〜172 | tablet148 の終わり (0.5) | トラック 8 の終わり (0.25) | 脈が少しずつ消え (0.7 → 0.08)、マントラの頭 (2 音) だけがアルトで 2 小節ごとに、高い共鳴が反響 |
 
-- 和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (ハ長調・イ短調の候補)。`compose_tablet150.py` (bank150 = bank148 + bank08 + tablet148 の採譜)
+- 和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (ハ長調・イ短調の候補)
+- 測った音量 (rms、実音込み): I −32 (始まりの静けさ) → −18 dB、II −13〜−16、III −12〜−17 (頂点)、IV −15〜−17。mp4 は 30 MiB に収めるため 960×540 に。`compose_tablet150.py` (bank150 = bank148 + bank08 + tablet148 の採譜)
 
 ```bash
 ffmpeg -i track08.wma -ac 1 -ar 44100 src/20261107_080000.wav && python3 build_sampler.py bank08 src/20261107_080000.wav && ffmpeg -i tablet148.mp4 -vn -ac 1 -ar 44100 src/20261107_148000.wav && python3 build_sampler.py bank148a src/20261107_148000.wav
