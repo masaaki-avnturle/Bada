@@ -2953,6 +2953,25 @@ CXL (199 小節) をまるごと 16 倍に (`compose_tablet105.py`)。199 × 16 
 python3 compose_tablet105.py score_tablet140.json score_tablet141.json bank139/bank.json strings && python3 render_long.py score_tablet141.json out141 192 3
 ```
 
+## 🎸🌀🎻 Requiem BADA — Tablet Sessions CXLII · Ballata ipnotica (tablet140 の曲に、LUNA SEA の「ray」のバラードの響きを共鳴させて、洗脳的な曲に, 変ニ長調 → ヘ長調 → ヘ短調 → 変ロ長調, ♩=60, 13 分 35 秒)
+
+土台は CXL · Sinfonia della tristezza (tablet140.mp4 の音をそのまま、表として)。共鳴させるのは 1990 年代の日本のロック・バラード (LUNA SEA の「ray」のバラードのような) の**様式だけ** (旋律の引用はなし): クリーンなアルペジオ (8 分音符、左右に振って、全曲)、4 つの和音の輪 vi → IV → I → V を各段階の調で (B♭m G♭ D♭ A♭ / Dm B♭ F C / Fm D♭ A♭ E♭ / Gm E♭ B♭ F)、柔らかいロックのドラム (キック・スネア・ハイハット → サビはライドとクラッシュ、タムのフィル)、シンセ・ベースの根音、サビでは歪んだギターのパワーコードと弦のトレモロ。短い動機 (ソ・ラ・ソ・ミ、短調ではソ・ラ♭・ソ・ミ♭) を 2 小節ごとに繰り返して洗脳的に
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| I. 序 (変ニ長調) | 0〜38 | アルペジオと弦のパッドだけ、高い開いた 5 度の共鳴、動機が Vn I で遠くに、深い鐘 |
+| II. A メロ (ヘ長調) | 38〜80 | ドラムとベースが入る、動機にフルートとホルン、弦の和音 |
+| III. サビの嵐 (ヘ短調) | 80〜141 | 歪んだギター、クラッシュとライド、8 小節ごとのタムのフィル、動機にトランペットと Vn I、弦のトレモロ → 130 小節から鎮まってアルペジオと動機だけに |
+| IV. 大サビと溶解 (変ロ長調) | 141〜202 | 総奏のサビ (ギター・ドラム・ベース・弦・動機の重ね: トランペット・Vn I・フルート・ホルン・Vn II) → 175 小節から少しずつ消えて、アルペジオと高い開いた 5 度だけが残り、深い鐘と消える |
+
+- 測った音量 (rms、土台込み): 序 −16〜−20 dB、A メロ −14〜−16、サビ −13〜−14、大サビ −14、溶解 −18 → −26。ドラムは `DRUM_G` 0.33 (CXX と同じ)、ギター 0.3、アルペジオ 0.5〜0.6
+- `video.py`: 管弦楽にロックバンドも重ねた曲 (`band_gain` + `orchestra`) の色を追加。mp4 は 30 MiB に収めるため 960×540・240 kbps に。`compose_tablet142.py` (bank140 と tablet140 の wav だけで作れる)
+
+```bash
+ffmpeg -i tablet140.mp4 -vn -ac 1 -ar 44100 src/20261105_140000.wav && python3 build_sampler.py bank140 src/20261105_140000.wav
+python3 compose_tablet142.py bank140/bank.json src score_tablet142.json && python3 synth.py score_tablet142.json tablet142.wav && python3 video.py score_tablet142.json tablet142.wav tablet142.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
