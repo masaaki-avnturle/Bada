@@ -3739,6 +3739,7 @@ python3 compose_tablet185.py bank150.json src score_tablet185.json && python3 sy
 | III | 108〜150 | 06:42 の後半 (60 秒から) | 06:42 (ソプラノ) と 06:39 (テノール) の旋律を同時に、もう一度アルトとバスで |
 | IV | 150〜176 | 06:39 の終わり (90 秒から) | 旋律の頭を 2 倍に伸ばして、tablet117 とペダルだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −22〜−16 / II −19〜−17 / III −21〜−16 / IV −18〜−16 → −24 (消える); ステレオ平均 −15.7 dB、11:51、27.3 MiB
 - `compose_tablet186.py` (compose_tablet185 から; bank150 と 4 つの wav で作れる)
 
 ```bash
