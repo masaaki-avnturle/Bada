@@ -3159,6 +3159,23 @@ ffmpeg -i tablet152.mp4 -vn -ac 1 -ar 44100 src/20261107_152000.wav && python3 b
 python3 compose_tablet153.py bank153.json src score_tablet153.json && python3 synth.py score_tablet153.json tablet153.wav && python3 video.py score_tablet153.json tablet153.wav tablet153.mp4
 ```
 
+## 🎹🌙🕊 Requiem BADA — Tablet Sessions CLIV · Purificazione nel sonno (tablet152 と tablet117 の 2 曲で、洗脳的に、睡眠導入剤の心が清らかになる曲を, 変ニ → ハ → 変イ → 変ロ, ♩=60, 12 分 48 秒)
+
+2 つの音源 (実音、そのまま、抜粋) を眠りの段階に沿って表と裏を入れ替えながら敷く。心が清らかになるように: 高い開いた 5 度の共鳴 (合成のピアノ、pp) が各段階の調で 4 小節ごとに澄んで鳴り、全音符の根音の鼓動 (実音のピアノ、1 小節に 1 つ) が静かに続く。洗脳は tablet152 の旋律の第 1 句の音を低い方から上って最後を伸ばす清めの動機 (5 音、2 倍に) を 8 小節ごと → 4 小節ごとに繰り返すこと。強弱は 0.42 → 0.4 → 0.33 → 0.1。4 声は 11/06 06:42 の実音のピアノの 1 音のサンプラー。鐘なし、声なし、電子音なし
+
+| 段階 | 小節 | 表 | 裏 | 動機 |
+|---|---|---|---|---|
+| I. くつろぎ (変ロ短調 / 変ニ長調) | 0〜40 | tablet117 の始め (0.55) | tablet152 の始め — 06:39 の空気 (0.22) | アルトで 8 小節ごとに 4 度 |
+| II. 清め (ハ長調〜ニ短調) | 40〜100 | tablet152 の二重フーガの段落 (160 秒から、0.5) | tablet117 の暖まり (0.22) | ソプラノとアルトで 4 小節ごとに交互 |
+| III. 冷え (ヘ短調 / 変イ長調) | 100〜150 | tablet117 の冷え (320 秒から、0.5) | tablet152 のストレッタ (0.2) | アルト pp とテノール (2 オクターヴ下) で交互 |
+| IV. 眠り (変ロ長調) | 150〜190 | tablet117 の眠り (564 秒から、0.48) | tablet152 の終わり (0.16) | 頭の 2 音だけがアルトで 4 小節ごと、高い 5 度の共鳴だけが残って消える |
+
+- 和音は表の録音の採譜を優先しつつ動機の音を含む和音を半小節ごとに (段階ごとの調の候補)。低いペダルの音は 2 小節ごと pp。`compose_tablet154.py` (bank153 と 2 つの wav だけで作れる)
+
+```bash
+python3 compose_tablet154.py bank153.json src score_tablet154.json && python3 synth.py score_tablet154.json tablet154.wav && python3 video.py score_tablet154.json tablet154.wav tablet154.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
