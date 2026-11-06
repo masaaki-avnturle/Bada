@@ -3344,6 +3344,7 @@ python3 compose_tablet162.py bank150.json src score_tablet162.json && python3 sy
 
 トラック 3 は半音上げて全曲の裏にも (0〜560 秒、0.5)。和音は表の録音の採譜を優先しつつ主題と定旋律の音を含む和音を半小節ごとに
 
+- 音量 (dBFS rms, 4 秒窓): I 06:42 −20〜−16 (録音の静かな所で −25) / II 06:39 −20〜−17 / III tablet162 (頂点) −17〜−13 / IV トラック 3 −20 → −23; 12:23、27.3 MiB
 - `compose_tablet163.py` (compose_tablet160 の仕組みから; bank163.json = bank150 + トラック 3 の採譜、4 つの wav — tablet162 の音声は `20261107_162000.wav` に)
 
 ```bash
