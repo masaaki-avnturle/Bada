@@ -3436,6 +3436,23 @@ CLXVII と同じ作り (11/06 18:54 の実音を 3 回リピートして表に 0
 python3 compose_tablet168.py bank150.json src score_tablet168.json && python3 synth.py score_tablet168.json tablet168.wav && python3 video.py score_tablet168.json tablet168.wav tablet168.mp4
 ```
 
+## 🎧🎧🌒 Requiem BADA — Tablet Sessions CLXIX · Due nastri (tablet168 と tablet152 を合成して作り換え, ニ短調 / ニ・ドリア, ♩=60, 11 分 28 秒)
+
+2 つの音声だけ (楽器なし): tablet168 (CLXVIII — 11/06 18:54 の実音 3 回 + tablet166) と tablet152 (CLII — トラック 8・18 の旋律の二重フーガ、06:39 の空気) を、段落ごとに表と裏を入れ替えて重ねる。どちらもニ短調 / ニ・ドリアなのでそのまま。段落の境で 6 秒のフェード・イン、8 秒のフェード・アウト
+
+| 段落 | 小節 | 表 | 裏 |
+|---|---|---|---|
+| I | 0〜40 | tablet168 (0〜162 秒、0.55) | tablet152 (0〜162 秒、0.25) |
+| II | 40〜85 | tablet152 (160〜342 秒、0.55) | tablet168 (160〜342 秒、0.25) |
+| III | 85〜125 | tablet168 と tablet152 を同じ大きさで (340〜502 秒、0.42) | |
+| IV | 125〜170 | tablet152 (500〜690 秒、0.55) | tablet168 (500〜633 秒、0.25、消える) |
+
+- `compose_tablet169.py` (2 つの mp4 の音声を wav にしたものだけで作れる)
+
+```bash
+python3 compose_tablet169.py bank150.json src score_tablet169.json && python3 synth.py score_tablet169.json tablet169.wav && python3 video.py score_tablet169.json tablet169.wav tablet169.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
