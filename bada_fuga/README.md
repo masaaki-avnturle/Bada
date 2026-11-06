@@ -3371,6 +3371,23 @@ python3 compose_tablet164.py bank150.json src score_tablet164.json && python3 sy
 ffmpeg -i tablet164.mp4 -c:v copy -af "volume=3.5dB,alimiter=limit=0.95:attack=5:release=100:level=false" -c:a aac -b:a 56k tablet164_out.mp4
 ```
 
+## 🎹🌙💤 Requiem BADA — Tablet Sessions CLXV · BWV 721 nel sonno (tablet117 の高音の電子音を取り除いて睡眠導入剤にしてバックで静かに、メインはトラック 18 と 8、バッハの BWV 721 を 2026/11/06 06:42 に合わせて — 睡眠導入剤の洗脳的な曲, ニ短調 / ヘ長調, ♩=54, 13 分 1 秒)
+
+バック = tablet117 (CXVII) の 1.8 kHz より上を落としたもの (scipy の butter、零位相)。調が変わらないようにヘ長調の段 (152〜320 秒) だけを 0.2 で 5 回繰り返して敷く。メイン (表) = トラック 18 (ニ短調、そのまま) とトラック 8 (4 度上げてヘ長調 / ニ短調) を交互に。III では 06:42 (ヘ長調) が表になり、その採譜の和音に合わせて BWV 721 の書法 — 8 分音符で打ち続ける和音 (アルト・テノール・バス、pp) の上にコラール「Erbarm dich mein」の定旋律 (4 度上げてニ短調、2 倍に伸ばして 26 小節) — を 06:42 の実音のピアノの 1 音のサンプラーで。♩=54、強弱 0.3〜0.6、鐘なし、高い共鳴なし
+
+| 段落 | 小節 | 表 | BWV 721 |
+|---|---|---|---|
+| I | 0〜36 | トラック 18 (0.6) | 脈 (バス) が 16 小節目から pp |
+| II | 36〜82 | トラック 8 (4 度上げて、0.58) | 脈がバスとテノールに、定旋律がアルトで一度 |
+| III | 82〜136 | 06:42 (0.6) | 脈が 3 声 (アルト・テノール・バス)、定旋律をソプラノで 2 度 (2 度目は 1 オクターヴ下) |
+| IV | 136〜174 | トラック 18 (0.55)、トラック 8 の続きが遠くで (0.2) | 脈が小節ごとに抜けて消え、定旋律の頭だけがアルトで |
+
+- `compose_tablet165.py` (compose_tablet160 の仕組み + compose_tablet144 の BWV 721; bank150、erbarm_melody.json、4 つの wav — tablet117 は高域を落としたもの — で作れる)
+
+```bash
+python3 compose_tablet165.py bank150.json src score_tablet165.json && python3 synth.py score_tablet165.json tablet165.wav && python3 video.py score_tablet165.json tablet165.wav tablet165.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
