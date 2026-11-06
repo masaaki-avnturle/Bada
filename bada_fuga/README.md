@@ -3454,6 +3454,23 @@ python3 compose_tablet168.py bank150.json src score_tablet168.json && python3 sy
 python3 compose_tablet169.py bank150.json src score_tablet169.json && python3 synth.py score_tablet169.json tablet169.wav && python3 video.py score_tablet169.json tablet169.wav tablet169.mp4
 ```
 
+## 🎧🎛🎹 Requiem BADA — Tablet Sessions CLXX · Due nastri con la banda (tablet169 に元の楽器を演奏させて作り換え, ニ短調 / ニ・ドリア, ♩=60, 11 分 28 秒)
+
+2 本のテープは CLXIX のまま (tablet168 と tablet152 を段落ごとに表と裏を入れ替えて)。そこに tablet167 の元の楽器 — Sweet Revenge 風のシンセ・パッド、エレピ風のアルペジオ (8 分音符)、ベース、柔らかいドラム、フック (Sweet Trio の自作をニ・ドリアに: D5 C5 A4 / F4 G4 A4 / B4 A4 G4 / E4 F4 E4 D4、シンセ・リードと実音のピアノ)、弦のパッド (III) — を演奏させる。和音は tablet152 (CLII) の楽譜に記録された拍ごとの和音の流れ (06:39 の採譜) をそのまま使う: tablet152 は全曲ずっと鳴っていて時間がそのまま一致するので、2 本のテープのどちらにも合う (強拍の不協和 0)
+
+| 段落 | 小節 | テープ (表 / 裏) | 楽器 |
+|---|---|---|---|
+| I | 0〜40 | tablet168 / tablet152 | パッド、アルペジオ、ベース、ドラム、フックを 16 小節ごと |
+| II | 40〜85 | tablet152 / tablet168 | フックを 8 小節ごと (アルトに 1 オクターヴ下も) |
+| III | 85〜125 | 同じ大きさ | 弦のパッドが重なる、フックを 8 小節ごと |
+| IV | 125〜170 | tablet152 / tablet168 (消える) | ドラム → ベース → アルペジオの順に抜け、フックの頭だけ、パッドが残る |
+
+- `compose_tablet170.py` (bank150、2 つの wav、score_tablet152.json (和音) で作れる)
+
+```bash
+python3 compose_tablet170.py bank150.json src score_tablet152.json score_tablet170.json && python3 synth.py score_tablet170.json tablet170.wav && python3 video.py score_tablet170.json tablet170.wav tablet170.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
