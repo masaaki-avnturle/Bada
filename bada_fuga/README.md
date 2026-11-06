@@ -3389,6 +3389,23 @@ ffmpeg -i tablet164.mp4 -c:v copy -af "volume=3.5dB,alimiter=limit=0.95:attack=5
 python3 compose_tablet165.py bank150.json src score_tablet165.json && python3 synth.py score_tablet165.json tablet165.wav && python3 video.py score_tablet165.json tablet165.wav tablet165.mp4
 ```
 
+## 🎹🌙🤝 Requiem BADA — Tablet Sessions CLXVI · BWV 721 nel sonno — tablet117 fra i principali (tablet165 の、tablet117 の静かに流れる曲をメインの仲間に入れて作り換え, ニ短調 / ヘ長調, ♩=54, 13 分 1 秒)
+
+CLXV と同じ作り (トラック 18 と 8 が表、III で 06:42 + BWV 721 の脈と「Erbarm dich mein」の定旋律、tablet117 は 1.8 kHz より上を落としてヘ長調の段だけを 5 回) だが、tablet117 を裏 (0.2) からメインの仲間 (0.42) に上げ、和音も tablet117 の採譜に従う (トラック 18・8・06:42 が鳴っていないところ)。IV では tablet117 が主役 (0.5) でトラック 18 (0.4) が並ぶ。他の表は少し下げて (0.55〜0.58) 釣り合いを取る
+
+| 段落 | 小節 | 表 (メインの仲間) | BWV 721 |
+|---|---|---|---|
+| I | 0〜36 | トラック 18 (0.55) + tablet117 (0.42) | 脈 (バス) が 16 小節目から pp |
+| II | 36〜82 | トラック 8 (4 度上げて、0.55) + tablet117 | 脈がバスとテノールに、定旋律がアルトで一度 |
+| III | 82〜136 | 06:42 (0.58) + tablet117 | 脈が 3 声、定旋律をソプラノで 2 度 |
+| IV | 136〜174 | tablet117 (主役、0.5) + トラック 18 (0.4)、トラック 8 の続きが遠くで | 脈が抜けて消え、定旋律の頭だけがアルトで |
+
+- `compose_tablet166.py` (compose_tablet165 から; 同じ bank150 と 4 つの wav で作れる)
+
+```bash
+python3 compose_tablet166.py bank150.json src score_tablet166.json && python3 synth.py score_tablet166.json tablet166.wav && python3 video.py score_tablet166.json tablet166.wav tablet166.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
