@@ -3313,6 +3313,23 @@ python3 compose_tablet160.py bank150.json src score_tablet160.json && python3 sy
 python3 compose_tablet161.py bank150.json src score_tablet161.json && python3 synth.py score_tablet161.json tablet161.wav && python3 video.py score_tablet161.json tablet161.wav tablet161.mp4
 ```
 
+## 🎧🎹🌫 Requiem BADA — Tablet Sessions CLXII · Sei voci senza metallo (tablet161・トラック 8・トラック 18・tablet117・2026/11/06 06:42・06:39 の金属の電子音を取り除いて、トラック 18 にトラック 8 を共鳴させて、全部を合成, ヘ長調 / ニ短調, ♩=60, 12 分 8 秒)
+
+6 つの音源はすべて実音のまま、高域を低域通過 (scipy の butter、零位相) で落として金属的な電子音・高音の電子音を取り除く: tablet117 1.8 kHz、tablet161 1.6 kHz、トラック 8 2.2 kHz、トラック 18 2.4 kHz、06:42・06:39 3 kHz。鐘なし、高い共鳴なし、シンセなし。共鳴 = トラック 18 (ニ短調、表) が鳴るたびにトラック 8 を 4 度上げて (ハ長調 / イ短調 → ヘ長調 / ニ短調) 同じ調で下に重ね、トラック 8 の旋律の頭を低い実音のピアノ (06:42 の 1 音のサンプラー、1〜2 オクターヴ下) で 2 小節遅れに反響。調はヘ長調 / ニ短調に揃える (06:39 は全音下げて、tablet117 はヘ長調の段と変ロ長調の終わり、tablet161 はニ短調の頂点の段)。和音は表の録音 (トラック 18 が優先) の採譜から、低いペダルの音が 2 小節ごと
+
+| 段落 | 小節 | 表 | 共鳴 | 裏 |
+|---|---|---|---|---|
+| I | 0〜44 | 06:42 (全部、0.5)、トラック 18 (0.62) | トラック 8 (4 度上げて 0.3)、低いピアノの頭 | tablet117 ヘ長調の段 (160 秒から、0.18) |
+| II | 44〜88 | 06:39 (全音下げて、0.45)、トラック 18 | トラック 8 の続き、低いピアノ、トラック 18 の頭を 2 倍に (バス) | tablet117 (330 秒から) |
+| III | 88〜136 | tablet161 の頂点の段 (412 秒から、0.4)、トラック 18 (0.58) | トラック 8、低いピアノが 2 声に | tablet117 (200 秒から) |
+| IV | 136〜180 | 06:42 の終わり (130 秒から、0.5)、トラック 18 (0.5) | トラック 8 (100 秒から、0.26)、低いピアノ | tablet117 の終わり (600 秒から、変ロ長調)、消える |
+
+- `compose_tablet162.py` (bank150 と高域を落とした 6 つの wav で作れる。tablet161 の音声は `20261107_161000.wav` に)
+
+```bash
+python3 compose_tablet162.py bank150.json src score_tablet162.json && python3 synth.py score_tablet162.json tablet162.wav && python3 video.py score_tablet162.json tablet162.wav tablet162.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
