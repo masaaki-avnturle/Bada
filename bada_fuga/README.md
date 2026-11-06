@@ -3472,6 +3472,16 @@ python3 compose_tablet169.py bank150.json src score_tablet169.json && python3 sy
 python3 compose_tablet170.py bank150.json src score_tablet152.json score_tablet170.json && python3 synth.py score_tablet170.json tablet170.wav && python3 video.py score_tablet170.json tablet170.wav tablet170.mp4
 ```
 
+## 🎧🎛🎹 Requiem BADA — Tablet Sessions CLXXI · Due nastri con la banda — senza arpeggio (tablet170 からアルペジオだけを消して作り換え, ニ短調 / ニ・ドリア, ♩=60, 11 分 28 秒)
+
+CLXX と同じ作り (tablet168 と tablet152 の 2 本のテープ、tablet152 の楽譜の和音、パッド・ベース・柔らかいドラム・フック・弦のパッド) で、エレピ風のアルペジオ (8 分音符) だけを消したもの。IV ではドラム → ベースの順に抜けて、フックの頭とパッドが残る
+
+- `compose_tablet171.py` (compose_tablet170 から; 同じ bank150、2 つの wav、score_tablet152.json で作れる)
+
+```bash
+python3 compose_tablet171.py bank150.json src score_tablet152.json score_tablet171.json && python3 synth.py score_tablet171.json tablet171.wav && python3 video.py score_tablet171.json tablet171.wav tablet171.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
