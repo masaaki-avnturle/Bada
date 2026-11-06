@@ -3177,6 +3177,26 @@ python3 compose_tablet153.py bank153.json src score_tablet153.json && python3 sy
 python3 compose_tablet154.py bank153.json src score_tablet154.json && python3 synth.py score_tablet154.json tablet154.wav && python3 video.py score_tablet154.json tablet154.wav tablet154.mp4
 ```
 
+## 🎸🎹🌫 Requiem BADA — Tablet Sessions CLV · Ballata senza amore (LOVELESS をメインに、tablet152 をバックにして、2026/11/06 06:42 を曲の雰囲気に合わせて, ホ短調 / ト長調, ♩=80, 9 分 20 秒)
+
+LOVELESS (LUNA SEA、1994) からは**音も旋律も使わない**: `build_sampler` の採譜 (702 区間) で読んだ調 (ホ短調〜ト長調: Em7・E7・G・C・D7)、テンポ (♩≈80)、和音の流れ (A メロ Em7 → Cmaj7 → G → D7、サビ G → D7 → Em7 → C) と、ロック・バラードの様式 (クリーンなアルペジオ、ドラム、シンセ・ベース、サビの歪んだギターと弦のトレモロ) だけを借りる。旋律は 11/06 06:42 の最上声の音から (全音上げてホ短調の五音に寄せて、讃美歌のリズム × 4 句)、サビの動機 ミ・レ・シ・レ・ミ・ソ・ミ。バックに tablet152 (CLII) を全曲小さく (0.24)、06:42 の実音は全音上げて (ヘ長調 → ト長調 / ホ短調) 間奏と終わりに表で。4 声は 06:42 の実音のピアノの 1 音のサンプラー
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| 序 | 0〜16 | アルペジオ、弦のパッド、高い開いた 5 度、tablet152 がバックに |
+| A メロ | 16〜48 | 旋律 (4 句) を実音のピアノで、ドラム (柔らかく) とベース |
+| サビ | 48〜72 | 歪んだギター、クラッシュとライド、タムのフィル、弦のトレモロ、動機を Vn I・フルート・実音のピアノ (S・A) で 2 小節ごと |
+| 間奏 | 72〜96 | 06:42 の実音 (全音上げて、表)、アルペジオとベース、弦のパッド、旋律の第 1 句をテノールで |
+| 2 番 | 96〜128 | 旋律をもう一度、ホルンが重なる |
+| 大サビ | 128〜160 | 総奏: 動機を Vn I・トランペット・フルート、実音のピアノの 3 声で |
+| 終わり | 160〜184 | 06:42 の実音の終わり (表)、アルペジオと高い開いた 5 度だけが残って消える、小さな鐘 |
+
+- 和音は録音が鳴っている所はその採譜、ほかは和音の輪。`video.py` の管弦楽 + バンドの色。`compose_tablet155.py` (bank153 と 2 つの wav だけで作れる)
+
+```bash
+python3 compose_tablet155.py bank153.json src score_tablet155.json && python3 synth.py score_tablet155.json tablet155.wav && python3 video.py score_tablet155.json tablet155.wav tablet155.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
