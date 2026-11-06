@@ -3209,7 +3209,8 @@ python3 compose_tablet155.py bank153.json src score_tablet155.json && python3 sy
 | III (ハ長調〜イ短調) | 96〜158 | トラック 8 (全部、0.55) | 06:42 (0.26) | マントラがソプラノ高く・アルト・テノール低くの 3 声で 4 小節ごと、全句を 2 倍に伸ばしてソプラノが、脈は頂点 (0.9) |
 | IV (ヘ長調) | 158〜190 | 06:42 の終わり (150 秒から、0.5) | トラック 18 の終わり (0.24) | 脈が少しずつ消え (0.7 → 0.08)、マントラの頭 (2 音) だけがアルトで 2 小節ごとに、高い共鳴が反響 |
 
-- 和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (段落ごとの調の候補)。`compose_tablet156.py` (bank150 と 3 つの wav だけで作れる)
+- 和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (段落ごとの調の候補)
+- 測った音量 (rms、実音込み): I −17〜−26 dB (06:42 の静けさ)、II −14〜−16、III −13〜−15 (頂点)、IV −15 → −20。mp4 は 30 MiB に収めるため 960×540 に。`compose_tablet156.py` (bank150 と 3 つの wav だけで作れる)
 
 ```bash
 python3 compose_tablet156.py bank150.json src score_tablet156.json && python3 synth.py score_tablet156.json tablet156.wav && python3 video.py score_tablet156.json tablet156.wav tablet156.mp4
