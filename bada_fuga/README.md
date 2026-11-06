@@ -3191,7 +3191,8 @@ LOVELESS (LUNA SEA、1994) からは**音も旋律も使わない**: `build_samp
 | 大サビ | 128〜160 | 総奏: 動機を Vn I・トランペット・フルート、実音のピアノの 3 声で |
 | 終わり | 160〜184 | 06:42 の実音の終わり (表)、アルペジオと高い開いた 5 度だけが残って消える、小さな鐘 |
 
-- 和音は録音が鳴っている所はその採譜、ほかは和音の輪。`video.py` の管弦楽 + バンドの色。`compose_tablet155.py` (bank153 と 2 つの wav だけで作れる)
+- 和音は録音が鳴っている所はその採譜、ほかは和音の輪。`video.py` の管弦楽 + バンドの色
+- 測った音量 (rms): 序 −16〜−19 dB、A メロ −16、サビ −13、間奏 −16〜−17、大サビ −13、終わり −15 → −20。mp4 は 30 MiB に収めるため 960×540 に (音は 64 kbps)。`compose_tablet155.py` (bank153 と 2 つの wav だけで作れる)
 
 ```bash
 python3 compose_tablet155.py bank153.json src score_tablet155.json && python3 synth.py score_tablet155.json tablet155.wav && python3 video.py score_tablet155.json tablet155.wav tablet155.mp4
