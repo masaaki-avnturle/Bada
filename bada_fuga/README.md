@@ -3674,6 +3674,7 @@ python3 compose_tablet181.py bank150.json src score_tablet161.json score_tablet1
 | III | 80〜142 | トラック 8 の頂点 | 3 回目 | 3 声で 4 小節ごと、全句を 2 倍に伸ばしてソプラノが、脈は頂点、高い共鳴 |
 | IV | 142〜174 | 06:39 の帰り | 4 回目 (前半) | 脈が消え、頭の 2 音だけがアルトで、高い共鳴が反響 |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −28 → −17 (脈が pp で始まる) / II −17〜−13.5 / III (頂点) −16〜−12.6 / IV −18〜−16 → 消える; ステレオ平均 −17.1 dB、11:44、27.5 MiB
 - `compose_tablet182.py` (compose_tablet157 から; bank150、2 つの wav — tablet157 の音声は `20261107_157000.wav` に —、score_tablet157.json (和音) で作れる)
 
 ```bash
