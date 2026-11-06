@@ -148,10 +148,10 @@ def post(P, events, ex):
     for b in range(2, TOTAL - 6, 2):
         r = 24 + chord(P.harm[b * BPB])['root']
         if r < 26: r += 12
-        add('L', b * BPB, 7.6, r, 0.13 * P.dyn.get(b, 0.7) / 0.7, '低いペダルの音 (2 小節ごと)' if first else None); first = False
+        add('L', b * BPB, 7.6, r, 0.1 * P.dyn.get(b, 0.7) / 0.7, '低いペダルの音 (2 小節ごと)' if first else None); first = False
     first = True
     for b in range(0, TOTAL - 4, 8):                                                              # 低い持続音 (ドローン、ニ短調の開いた 5 度 レ・ラ) — 「リラックス 3」の性格だけ
-        g = 0.09 * P.dyn.get(b, 0.7) / 0.7
+        g = 0.035 * P.dyn.get(b, 0.7) / 0.7
         add('L', b * BPB, 8 * BPB + 1, 38, g, '低い持続音 (開いた 5 度、ドローン)' if first else None); add('L', b * BPB + 0.1, 8 * BPB + 1, 45, g * 0.8); first = False
     first = True
     for b, g in [(S1 + 2, 0.16), (S2 + 1, 0.16), (S3 + 1, 0.2), (S4 + 1, 0.16), (TOTAL - 4, 0.14)] + [(S3 + 9 + 8 * k, 0.11) for k in range(4)] + [(S4 + 9 + 8 * k, 0.1) for k in range(2)]:
