@@ -3274,6 +3274,23 @@ python3 compose_tablet158.py bank150.json src score_tablet158.json && python3 sy
 python3 compose_tablet159.py bank150.json score_tablet159.json && python3 synth.py score_tablet159.json tablet159.wav && python3 video.py score_tablet159.json tablet159.wav tablet159.mp4
 ```
 
+## 🎹🎼🔔 Requiem BADA — Tablet Sessions CLX · Fuga doppia sotto le mattine (2026/11/06 の 2 曲をメインに、バックはトラック 8・18 をバッハのフーガに、レクイエムを醸す, ヘ長調 / ト長調, ♩=60, 11 分 28 秒)
+
+メイン (表) は 11/06 06:42 (ヘ長調) と 06:39 (ト長調) の実音そのまま、段落ごとに入れ替える。バックはバッハ風の二重フーガ (4 声、06:42 の実音のピアノの 1 音のサンプラー): 主題 A = トラック 8 の最上声の音から作った 8 小節の旋律、主題 B = トラック 18 の最上声の音から作った 8 小節の短調の旋律、応答は 5 度上 (属調)。トラック 8・18 の録音そのものは鳴らさず主題だけ。和音は表の録音の採譜を優先しつつ主題の音を含む和音を半小節ごとに。レクイエムの気配は低い鐘 (段落の頭と頂点の 8 小節ごと)、低いペダルの音、頂点から消えていく強弱
+
+| 段落 | 小節 | 表 (実音) | フーガ |
+|---|---|---|---|
+| I (ヘ長調) | 0〜60 | 06:42 (全部、0.6) | 主題 A の提示部 (アルト → ソプラノの応答 → テノール → バス、4 小節ごと) → 頭のストレッタ → 主題 B (ニ短調) の提示 |
+| II (ト長調〜ホ短調) | 60〜102 | 06:39 (全部、0.6) | 主題 B (ホ短調) の提示部 (バスから上へ) → A と B を同時に → 頭のストレッタ |
+| III (ヘ長調) | 102〜150 | 06:42 の後半 (50 秒から 180 秒、0.55) | 二重フーガの頂点: A と B を対で、2 小節遅れのストレッタ、バスに B の拡大 (2 倍)、鐘が 8 小節ごと |
+| IV (ト長調) | 150〜170 | 06:39 の終わり (100 秒から 60 秒、0.5) | 主題の頭を拡大して、鐘と高い共鳴だけが残って消える |
+
+- `compose_tablet160.py` (compose_tablet157 の仕組みから; bank150 と 06:42・06:39 の wav だけで作れる)
+
+```bash
+python3 compose_tablet160.py bank150.json src score_tablet160.json && python3 synth.py score_tablet160.json tablet160.wav && python3 video.py score_tablet160.json tablet160.wav tablet160.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
