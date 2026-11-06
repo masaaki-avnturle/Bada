@@ -3151,7 +3151,8 @@ python3 compose_tablet152.py bank150.json src score_tablet152.json && python3 sy
 | III. 冷え (ヘ長調) | 102〜160 | 06:42 (全部、0.5) | tablet152 の終わり (0.2) | アルト pp とテノール (2 オクターヴ下) で交互 |
 | IV. 眠り (変ロ長調) | 160〜198 | tablet117 の眠りの段階 (564 秒から、0.48) | 06:39 の終わり (0.16) | 頭の 2 音だけがアルトで 4 小節ごと、鼓動は 1 小節に 1 つ、高い共鳴が消える |
 
-- 和音は表の録音の採譜を優先しつつ動機の音を含む和音を半小節ごとに。tablet152 の採譜は `build_sampler` (1617 区間)。`compose_tablet153.py` (bank153 = bank150 + tablet152 の採譜)
+- 和音は表の録音の採譜を優先しつつ動機の音を含む和音を半小節ごとに。tablet152 の採譜は `build_sampler` (1617 区間)
+- 測った音量 (rms、実音込み): I −16〜−21 dB、II −16〜−20、III −16〜−27 (06:42 の間の静けさも)、IV −20〜−27 (消える)。mp4 は 30 MiB に収めるため 960×540 に。`compose_tablet153.py` (bank153 = bank150 + tablet152 の採譜)
 
 ```bash
 ffmpeg -i tablet152.mp4 -vn -ac 1 -ar 44100 src/20261107_152000.wav && python3 build_sampler.py bank152 src/20261107_152000.wav
