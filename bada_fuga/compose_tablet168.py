@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Requiem BADA — Tablet Sessions CLXVIII · Sweet revenge nel 18:54 — senza arpeggio (tablet167 のアルペジオを消して作り換え)
-  CLXVII と同じ (18:54 を 3 回リピート、tablet166 を裏に、循環コード、パッド・ベース・柔らかいドラム・フック) で、エレピ風のアルペジオ (8 分音符) だけを消す
+Requiem BADA — Tablet Sessions CLXVIII · Sweet revenge nel 18:54 — senza arpeggio né batteria (tablet167 のアルペジオとドラムを消して作り換え)
+  CLXVII と同じ (18:54 を 3 回リピート、tablet166 を裏に、循環コード、パッド・ベース・フック) で、エレピ風のアルペジオ (8 分音符) とドラムを消す
   実音: 11/06 18:54 の録音 (3 分 26 秒、とても静かなので rms −22 dB に揃えて) を **そのまま 3 回リピート** して表に、tablet166 (CLXVI) の実音を裏に (3 つの抜粋)
   雰囲気: Sweet Trio (BADA 528) と同じ、坂本龍一「Sweet Revenge」を思わせるダウンテンポの循環コード (ニ短調: Dm7 → Bbmaj7 → Gm7 → A7、旋律の引用はしない) — シンセ・パッド、ベース、柔らかいドラム、Sweet Trio の自作フック (アルペジオなし) (D5 C5 A4 / F4 G4 A4 / Bb4 A4 G4 / E4 F4 E4 C#4) をシンセ・リードと実音のピアノ (06:42 の 1 音のサンプラー) で
   形式: 序 (パッド、18:54 が始まる) → A (グルーヴ、フック 16 小節ごと) → B (2 回目のリピート、フック 8 小節ごと、弦) → C (3 回目、グルーヴが薄れ、パッドと 18:54 だけが残る)。♩=72
@@ -48,11 +48,11 @@ def build():
         for d, m in mat: P.rest[v].difference_update(range(int(math.floor(t)), min(TOTAL * BPB, int(math.ceil(t + d - 1e-9))))); t += d
         P.place(v, b, mat, 0, label)
     P.section(INTRO, '序 — パッドと 18:54 (ニ短調, ♩=72)', 'シンセ・パッドの上で 11/06 18:54 の実音 (表) が始まる、tablet166 の実音が裏に。循環コード Dm7 → Bbmaj7 → Gm7 → A7')
-    P.section(A, 'A — グルーヴとフック', 'ベース、柔らかいドラム (アルペジオなし)。Sweet Trio のフックを 16 小節ごとにシンセ・リードと実音のピアノで')
+    P.section(A, 'A — ベースとフック', 'ベースだけが下で (アルペジオもドラムもなし)。Sweet Trio のフックを 16 小節ごとにシンセ・リードと実音のピアノで')
     for k in range(3): put('S', A + 4 + 16 * k, HOOK, 'フック (Sweet Trio の自作)' if k == 0 else None)
     P.section(B, 'B — 18:54 の 2 回目、フックが近づく', '18:54 の 2 回目のリピート (表)、tablet166 の 06:42 + BWV 721 の段が裏に。フックを 8 小節ごと、弦のパッドが重なる、アルトに 1 オクターヴ下のフック')
     for k in range(7): put('S', B + 2 + 8 * k, HOOK, None); put('A', B + 6 + 8 * k, HOOK, None, -12)
-    P.section(C, 'C — 18:54 の 3 回目、消えていく', '18:54 の 3 回目のリピート (表)、tablet166 の終わりが裏に。ドラムとベースが抜け、フックの頭だけが実音のピアノで、パッドと 18:54 だけが残る')
+    P.section(C, 'C — 18:54 の 3 回目、消えていく', '18:54 の 3 回目のリピート (表)、tablet166 の終わりが裏に。ベースが抜け、フックの頭だけが実音のピアノで、パッドと 18:54 だけが残る')
     for k in range(5): put('S', C + 4 + 10 * k, HOOK[:3], None)
     return P
 
@@ -78,12 +78,6 @@ def post(P, events, ex):
         rb = 38 + c['root']
         if rb > 45: rb -= 12
         add('SB', b * BPB, 1.9, rb, 0.4, 'ベース' if first_sb else None); add('SB', b * BPB + 2, 1.4, rb, 0.34); add('SB', b * BPB + 3.5, 0.45, rb + 7, 0.24); first_sb = False
-        if s == 'c' and b > C + 16: continue
-        g = 0.55 if s == 'b' else 0.45
-        dr(b * BPB, 'kick', g, 0, 'ドラム (柔らかく)' if first_dr else None); dr(b * BPB + 2, 'kick', g * 0.8)
-        dr(b * BPB + 1, 'snare', g * 0.55, 0.05); dr(b * BPB + 3, 'snare', g * 0.6, 0.05)
-        for k in range(8): dr(b * BPB + k * 0.5, 'hatc', 0.3 * (1.0 if k % 2 == 0 else 0.6), 0.25)
-        first_dr = False
     # フックをシンセ・リードで (S の音符に重ねる) と、弦のパッド (B)
     def line(v, bar, mat, tr, g, label=None):
         t = bar * BPB; first_ = True
@@ -97,9 +91,9 @@ def post(P, events, ex):
             for i, m in enumerate(tones_of(h, lo, hi)[:3]): add(v, b * BPB + 0.03 * i, BPB + 0.3, m, 0.1 * OG * (1.0 if i == 0 else 0.8), '弦のパッド' if (b == B + 4 and v == 'V2' and i == 0) else None)
 
 META = {'style': 'recsampler', 'bank': BANKP, 'rec_order': [R1854, R166], 'piano_decay': 2.6, 'reverb': [5.0, 2.0, 0.4], 'band_gain': 0.9, 'orchestra': True,
-        'title': 'Requiem BADA — CLXVIII · Sweet revenge nel 18:54 — senza arpeggio',
-        'subtitle': 'tablet167 のアルペジオを消して作り換え: tablet166 の Sweet Revenge に、11/06 18:54 の実音をそのまま 3 回リピートして表に、tablet166 の実音を裏に: ダウンテンポの循環コード Dm7 → Bbmaj7 → Gm7 → A7 (旋律の引用はしない)、パッド・ベース・柔らかいドラム・Sweet Trio の自作フック (アルペジオなし)。序 → A → B (2 回目) → C (3 回目、消える)。ニ短調、♩=72',
-        'legend': ['PD', 'LD', 'SB', 'DR', 'PF', 'V2', 'VA', 'VC'], 'vname': {'PD': 'パッド', 'LD': 'リード', 'SB': 'ベース', 'DR': 'ドラム', 'PF': '実音のピアノ (06:42 の 1 音)', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc'}, 'src_name': {R42: '06:42 の音'},
+        'title': 'Requiem BADA — CLXVIII · Sweet revenge nel 18:54 — senza arpeggio né batteria',
+        'subtitle': 'tablet167 のアルペジオとドラムを消して作り換え: tablet166 の Sweet Revenge に、11/06 18:54 の実音をそのまま 3 回リピートして表に、tablet166 の実音を裏に: ダウンテンポの循環コード Dm7 → Bbmaj7 → Gm7 → A7 (旋律の引用はしない)、パッド・ベース・柔らかいドラム・Sweet Trio の自作フック (アルペジオなし)。序 → A → B (2 回目) → C (3 回目、消える)。ニ短調、♩=72',
+        'legend': ['PD', 'LD', 'SB', 'PF', 'V2', 'VA', 'VC'], 'vname': {'PD': 'パッド', 'LD': 'リード', 'SB': 'ベース', 'PF': '実音のピアノ (06:42 の 1 音)', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc'}, 'src_name': {R42: '06:42 の音'},
         'footer': ['18:54 の録音は rms −22 dB に揃えて (tanh で軽く抑える) そのまま 3 回 (0.62)。tablet166 は 3 つの抜粋 (0〜207 秒、365〜572 秒、600〜780 秒) を 0.3 で裏に。和音は循環コードを固定 (催眠的な反復)',
                    '「Sweet Revenge」(坂本龍一) からは循環コードの型・音色・グルーヴだけを参照、旋律の引用はしない。フックは BADA 528 (Sweet Trio) の自作。4 声は 06:42 の実音のピアノの 1 音のサンプラー。鐘なし、声なし。']}
 
