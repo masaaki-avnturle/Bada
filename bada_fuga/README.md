@@ -3573,6 +3573,23 @@ python3 compose_tablet175.py bank150.json src score_tablet175.json && python3 sy
 python3 compose_tablet176.py bank150.json src score_tablet152.json score_tablet176.json && python3 synth.py score_tablet176.json tablet176.wav && python3 video.py score_tablet176.json tablet176.wav tablet176.mp4
 ```
 
+## 🎧🎧🕯 Requiem BADA — Tablet Sessions CLXXVII · Due nastri II (tablet175 と tablet164 を合成, ニ短調 / ヘ長調, ♩=60, 12 分 16 秒)
+
+2 つの音声だけ (楽器なし): tablet175 (CLXXV — 11/06 18:54 × 3 + tablet152、ニ短調 / ニ・ドリア) と tablet164 (CLXIV — 5 音源の二重フーガと Dies irae のレクイエム、ヘ長調 / ニ短調) を、段落ごとに表と裏を入れ替えて重ねる。どちらもニ短調系なのでそのまま。段落の境で 6 秒のフェード・イン、8 秒のフェード・アウト
+
+| 段落 | 小節 | 表 | 裏 |
+|---|---|---|---|
+| I | 0〜46 | tablet175 (0〜186 秒、0.55) | tablet164 の主題 A の提示部 (0.25) |
+| II | 46〜92 | tablet164 の主題 B の提示部と Dies irae (184〜370 秒、0.55) | tablet175 (0.25) |
+| III | 92〜138 | 同じ大きさで (368〜554 秒、0.42; tablet164 は二重フーガの頂点) | |
+| IV | 138〜182 | tablet164 の終わり (552〜743 秒、拡大・鐘・ドローン、0.55) | tablet175 (552〜695 秒、0.25、消える) |
+
+- `compose_tablet177.py` (compose_tablet169 から; 2 つの mp4 の音声を wav にしたものだけで作れる)
+
+```bash
+python3 compose_tablet177.py bank150.json src score_tablet177.json && python3 synth.py score_tablet177.json tablet177.wav && python3 video.py score_tablet177.json tablet177.wav tablet177.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
