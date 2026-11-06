@@ -3644,6 +3644,23 @@ python3 compose_tablet179.py bank150.json src score_tablet179.json && python3 sy
 python3 compose_tablet180.py bank150.json src score_tablet180.json && python3 synth.py score_tablet180.json tablet180.wav && python3 video.py score_tablet180.json tablet180.wav tablet180.mp4
 ```
 
+## 🎧🎹🌑 Requiem BADA — Tablet Sessions CLXXXI · Il 18:54 sul 161 con il pianoforte basso (tablet180 に元の楽器を演奏させて作り換え — アルペジオや元の曲に無い楽器は付け加えない, ニ短調 / ホ短調, ♩=60, 12 分 0 秒)
+
+テープは CLXXX のまま (tablet161 を全曲 0.5、11/06 18:54 の実音を途切れなく 3 回半 0.5)。元の楽器 = tablet161 (CLXI) に元からある 2 つだけ: トラック 18 の最上声の音から作った旋律 (各段の調に寄せて 8 小節) を低い実音のピアノ (06:42 の 1 音のサンプラー、1〜2 オクターヴ下) で、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は tablet161 の楽譜に記録された拍ごとの和音の流れをそのまま
+
+| 段落 | 小節 | tablet161 | 低いピアノ |
+|---|---|---|---|
+| I | 0〜50 | トラック 18 (ニ短調) | 旋律をテノール → バス → テノール |
+| II | 50〜100 | トラック 18 (ホ短調) | 旋律をホ短調で、頭を 2 倍に伸ばしてバスに |
+| III | 100〜150 | トラック 18 (ニ短調、頂点) | 旋律を 2 声で (テノールとバス、2 小節遅れ) |
+| IV | 150〜178 | 終わり (ホ短調) | 頭を 2 倍に伸ばして、ペダルだけが残って一緒に消える |
+
+- `compose_tablet181.py` (bank150、2 つの wav、score_tablet161.json (和音) で作れる)
+
+```bash
+python3 compose_tablet181.py bank150.json src score_tablet161.json score_tablet181.json && python3 synth.py score_tablet181.json tablet181.wav && python3 video.py score_tablet181.json tablet181.wav tablet181.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
