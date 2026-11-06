@@ -3609,6 +3609,23 @@ python3 compose_tablet177.py bank150.json src score_tablet177.json && python3 sy
 python3 compose_tablet178.py bank150.json src score_tablet178.json && python3 synth.py score_tablet178.json tablet178.wav && python3 video.py score_tablet178.json tablet178.wav tablet178.mp4
 ```
 
+## 🎧🎧🌀 Requiem BADA — Tablet Sessions CLXXIX · Il 18:54 sul 157 — continuo (tablet157 と 2026/11/06 18:54 を、余計な楽器を付け加えずにミックス、2 つ目の配置, ト長調 / ニ短調 / ハ長調, ♩=60, 11 分 52 秒)
+
+CLXXVIII と同じ 2 つの音声だけ (楽器なし) で、配置を変えたもの: tablet157 (CLVII) を全曲そのまま (0.5)、11/06 18:54 の実音 (rms −22 dB に揃えたもの) を途切れなく続けて (50 小節 = 200 秒ごとに始めて 3 回半、切れ目は 6 秒のクロスフェード、0.5) 同じ大きさで重ねる。終わりは 2 つとも一緒に消える
+
+| 段落 | 小節 | 18:54 | tablet157 |
+|---|---|---|---|
+| I | 0〜50 | 1 回目 | 06:39 の段 (脈とマントラ) |
+| II | 50〜100 | 2 回目 | トラック 18 の段 |
+| III | 100〜150 | 3 回目 | トラック 8 の頂点 |
+| IV | 150〜176 | 4 回目 (前半) | 06:39 の帰り、一緒に消える |
+
+- `compose_tablet179.py` (compose_tablet178 から; 同じ 2 つの wav で作れる)
+
+```bash
+python3 compose_tablet179.py bank150.json src score_tablet179.json && python3 synth.py score_tablet179.json tablet179.wav && python3 video.py score_tablet179.json tablet179.wav tablet179.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
