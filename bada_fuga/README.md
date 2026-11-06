@@ -3728,6 +3728,23 @@ python3 compose_tablet184.py bank150.json src score_tablet161.json score_tablet1
 python3 compose_tablet185.py bank150.json src score_tablet185.json && python3 synth.py score_tablet185.json tablet185.wav && python3 video.py score_tablet185.json tablet185.wav tablet185.mp4
 ```
 
+## 🎧🎹🌅 Requiem BADA — Tablet Sessions CLXXXVI · Le due mattine, il 18:54 e il 117 (2026/11/06 18:54・06:39・06:42・tablet117 を重ね合わせて、元の楽器を演奏させて — アルペジオや元の曲に無い楽器は付け加えない, ヘ長調, ♩=60, 11 分 52 秒)
+
+テープ: 11/06 18:54 の実音 (rms −22 dB に揃えたもの) を途切れなく 3 回半 (0.5)、06:42 (ヘ長調、そのまま、0.55) を全部と後半、06:39 (ト長調 → 全音下げてヘ長調に、0.55) を全部と終わり、tablet117 (CXVII、そのまま) はヘ長調の段 (152〜320 秒) を 5 回繰り返して裏に (0.3)。元の楽器 = 録音の中にある楽器 (ピアノ) だけ: 06:42・06:39 の最上声の音から作った旋律 (各 8 小節、ヘ長調に寄せて) を 06:42 の実音のピアノの 1 音のサンプラーで — 06:42 が鳴っているときは 06:42 の旋律、06:39 のときは 06:39 の旋律、III では 2 つを同時に (2 小節遅れ)。低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに
+
+| 段落 | 小節 | 表の実音 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜60 | 06:42 (全部) | 06:42 の旋律 (アルト → テノール → ソプラノ) |
+| II | 60〜108 | 06:39 (全音下げて、全部) | 06:39 の旋律 (ソプラノ → テノール → アルト)、06:42 の頭を 2 倍にバスで |
+| III | 108〜150 | 06:42 の後半 (60 秒から) | 06:42 (ソプラノ) と 06:39 (テノール) の旋律を同時に、もう一度アルトとバスで |
+| IV | 150〜176 | 06:39 の終わり (90 秒から) | 旋律の頭を 2 倍に伸ばして、tablet117 とペダルだけが残って消える |
+
+- `compose_tablet186.py` (compose_tablet185 から; bank150 と 4 つの wav で作れる)
+
+```bash
+python3 compose_tablet186.py bank150.json src score_tablet186.json && python3 synth.py score_tablet186.json tablet186.wav && python3 video.py score_tablet186.json tablet186.wav tablet186.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
