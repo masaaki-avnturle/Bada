@@ -3656,6 +3656,7 @@ python3 compose_tablet180.py bank150.json src score_tablet180.json && python3 sy
 | III | 100〜150 | トラック 18 (ニ短調、頂点) | 旋律を 2 声で (テノールとバス、2 小節遅れ) |
 | IV | 150〜178 | 終わり (ホ短調) | 頭を 2 倍に伸ばして、ペダルだけが残って一緒に消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −22〜−16 / II −22〜−18 / III −21〜−15 / IV −20 → 消える; ステレオ平均 −16.0 dB、12:00、27.2 MiB
 - `compose_tablet181.py` (bank150、2 つの wav、score_tablet161.json (和音) で作れる)
 
 ```bash
