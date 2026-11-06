@@ -3352,6 +3352,23 @@ python3 build_sampler.py bank03 20261107_030000.wav   # トラック 3 を wav �
 python3 compose_tablet163.py bank163.json src score_tablet163.json && python3 synth.py score_tablet163.json tablet163.wav && python3 video.py score_tablet163.json tablet163.wav tablet163.mp4
 ```
 
+## 🎹🎼🌌 Requiem BADA — Tablet Sessions CLXIV · Requiem e fuga doppia nel sonno (tablet162・「苫米地リラックス 3」・トラック 18・トラック 8・2026/11/06 06:42・06:39 を合成して、レクイエムとフーガを併せ持つ曲に, ヘ長調 / ニ短調, ♩=60, 12 分 24 秒)
+
+「03_________3.wma」の中身は苫米地英人「苫米地リラックス 3」(商品の音源) だったので、**音も旋律も使わず**、分析で読んだ性格 (ハ短調〜変ホ長調の低い持続音 ド・ソ、静かで暗く柔らかい音色) だけを、実音のピアノの開いた 5 度のドローン (レ・ラ、8 小節ごと、pp) として借りる。音として使うのは tablet162・トラック 18・トラック 8・06:42・06:39 の 5 つ。調はヘ長調 / ニ短調に揃える (06:39 は全音下げて、トラック 8 は 4 度上げて)。フーガは二重フーガ (4 声、06:42 の実音のピアノの 1 音のサンプラー): 主題 A = トラック 18 の音から (ニ短調)、主題 B = トラック 8 の音から (4 度上げてヘ長調)。レクイエムは CLXIII と同じく「Dies irae」の冒頭句の定旋律 (2 倍・4 倍)、低い鐘 (小さく)、低いペダル、2 分音符の心拍、頂点から消えていく強弱
+
+| 段落 | 小節 | 表 (実音) | 裏 | フーガとレクイエム |
+|---|---|---|---|---|
+| I | 0〜60 | 06:42 (全部、0.6) | トラック 8 (4 度上げて、0.28) | 主題 A の提示部 (アルト → ソプラノの応答 → テノール → バス) → 頭のストレッタ → Dies irae がテノールで |
+| II | 60〜106 | 06:39 (全音下げて、0.6) | トラック 18 (0.3) | 主題 B の提示部 (バスから上へ)、Dies irae がアルト、A と B が重なり、心拍が始まる |
+| III | 106〜154 | tablet162 の II の段 (176 秒から、0.55) | トラック 8 (続き、0.3) | 二重フーガ: A と B を対で、2 小節遅れのストレッタ、Dies irae を 4 倍にソプラノで、鐘が 8 小節ごと (頂点) |
+| IV | 154〜184 | トラック 18 (112 秒、0.62) | — | A と B の頭を 2 倍に、Dies irae がアルトで最後に一度、鐘とドローンだけが残って消える |
+
+- `compose_tablet164.py` (compose_tablet163 から; bank150 と 5 つの wav — tablet162 の音声は `20261107_162000.wav` に — で作れる。「リラックス 3」の音源は要らない)
+
+```bash
+python3 compose_tablet164.py bank150.json src score_tablet164.json && python3 synth.py score_tablet164.json tablet164.wav && python3 video.py score_tablet164.json tablet164.wav tablet164.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
