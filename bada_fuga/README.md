@@ -3255,6 +3255,24 @@ CLV と同じロック・バラードの作りで、5 つの音源を合成。LU
 python3 compose_tablet158.py bank150.json src score_tablet158.json && python3 synth.py score_tablet158.json tablet158.wav && python3 video.py score_tablet158.json tablet158.wav tablet158.mp4
 ```
 
+## 🎹🎼🌙 Requiem BADA — Tablet Sessions CLIX · Melodia sola al pianoforte (MOTHER・LOVELESS・トラック 8 から、グランドピアノで、メロディーだけ取り上げて合成, ト長調 / ホ短調, ♩=68, 10 分 42 秒)
+
+グランドピアノだけ (合成、録音は鳴らさない、シンセ不使用)。LUNA SEA の MOTHER・LOVELESS の旋律は採譜して使わない (著作権のある楽曲の旋律の再現になるので) — 2 曲からは採譜で読んだ調 (ト長調〜ホ短調)、テンポ (♩≈68)、和音の輪 (MOTHER: G → D/F# → Em7 → Cmaj7 / LOVELESS: Em7 → Cmaj7 → G → D7、サビ G → D7 → Em7 → C) とバラードの形式だけ。旋律はトラック 8 (録音、249 秒) の最上声を採譜したもの全部 (390 音、8 分音符に量子化、オクターヴの跳びは下の音に寄せて、ハ長調 / イ短調 → 4 度下げてト長調 / ホ短調に)。和音もトラック 8 の採譜を 4 度下げて。右手 = 旋律、左手 = 根音 (2 分音符) と分散和音 (8 分音符)
+
+| 段落 | 小節 | 内容 |
+|---|---|---|
+| 序 | 0〜12 | MOTHER の輪を左手の分散和音で pp、高い開いた 5 度が反響 |
+| 1 番 | 12〜80 | トラック 8 の旋律の全部 (右手)、左手は根音と分散和音、和音はトラック 8 の採譜 |
+| 間奏 | 80〜96 | LOVELESS の輪 → サビの輪、旋律の最初の句をテノールで、分散和音はアルトに |
+| 2 番 | 96〜164 | 旋律が 1 オクターヴ上 (頂点へ)、アルトが 2 小節遅れて 1 オクターヴ下でカノン (1 つの旋律でフーガを醸す)、低いペダル、旋律の反響 (2 オクターヴ上、pp) |
+| 終わり | 164〜182 | MOTHER の輪、旋律の終わりの句を 2 倍に伸ばして、分散和音と高い共鳴だけが残って消える |
+
+- `compose_tablet159.py` (bank150.json のトラック 8 の採譜だけで作れる。wav は要らない)
+
+```bash
+python3 compose_tablet159.py bank150.json score_tablet159.json && python3 synth.py score_tablet159.json tablet159.wav && python3 video.py score_tablet159.json tablet159.wav tablet159.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
