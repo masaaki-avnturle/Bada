@@ -3692,6 +3692,7 @@ python3 compose_tablet182.py bank150.json src score_tablet157.json score_tablet1
 | III | 102〜140 | トラック 18 が表 | 3 回目 | ストレッタと拡大、高い共鳴 |
 | IV | 140〜170 | 06:39 の帰り | 4 回目 (前半) | 消えていく、ペダルと高い共鳴 |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −25〜−19 / II −22〜−14 / III −21〜−17.5 / IV −21〜−20 → 消える; ステレオ平均 −17.3 dB、11:27、27.2 MiB
 - `compose_tablet183.py` (compose_tablet152 から; bank150、2 つの wav — tablet152 の音声は `20261107_152000.wav` に —、score_tablet152.json (和音) で作れる)
 
 ```bash
