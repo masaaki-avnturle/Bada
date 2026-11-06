@@ -3699,6 +3699,16 @@ python3 compose_tablet182.py bank150.json src score_tablet157.json score_tablet1
 python3 compose_tablet183.py bank150.json src score_tablet152.json score_tablet183.json && python3 synth.py score_tablet183.json tablet183.wav && python3 video.py score_tablet183.json tablet183.wav tablet183.mp4
 ```
 
+## 🎧🎹🌑 Requiem BADA — Tablet Sessions CLXXXIV · Il 18:54 sul 161 — come l'originale (tablet161 と 2026/11/06 18:54 を重ね合わせて、元の楽器を元の位置どおりに演奏させて作り換え — アルペジオや元の曲に無い楽器は付け加えない, ニ短調 / ホ短調, ♩=60, 11 分 52 秒)
+
+テープは CLXXX と同じ (tablet161 を全曲 0.5、11/06 18:54 の実音を途切れなく 3 回半 0.5)。元の楽器 = tablet161 (CLXI) の楽譜のまま: トラック 18 の最上声の音から作った旋律を低い実音のピアノ (06:42 の 1 音のサンプラー、1〜2 オクターヴ下) で 4 つの間 (39〜60 小節: テノール → バス、98〜103: 頭、141〜150: 頭を 2 倍に伸ばして) に、低いペダルの音 (2 小節ごと)。CLXXXI は同じ楽器を自由に置き直した版、こちらは元の位置どおり。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は tablet161 の楽譜に記録された拍ごとの和音の流れをそのまま
+
+- `compose_tablet184.py` (compose_tablet161 から; bank150、2 つの wav — tablet161 の音声は `20261107_161000.wav` に —、score_tablet161.json (和音) で作れる)
+
+```bash
+python3 compose_tablet184.py bank150.json src score_tablet161.json score_tablet184.json && python3 synth.py score_tablet184.json tablet184.wav && python3 video.py score_tablet184.json tablet184.wav tablet184.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
