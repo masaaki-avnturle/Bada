@@ -3512,6 +3512,7 @@ python3 compose_tablet172.py bank150.json src score_tablet152.json score_tablet1
 | III | 108〜162 | 3 回目 | tablet161 の頂点の段 |
 | IV | 162〜182 | — | 06:42 の終わりと tablet117 の終わりだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −19〜−14 / II −17〜−13 / III −17〜−15 / IV −24 → 消える; ステレオ平均 −15.9 dB、12:15、27.5 MiB
 - `compose_tablet173.py` (2 つの wav だけで作れる — tablet162 の音声は `20261107_162000.wav` に)
 
 ```bash
