@@ -3382,6 +3382,7 @@ ffmpeg -i tablet164.mp4 -c:v copy -af "volume=3.5dB,alimiter=limit=0.95:attack=5
 | III | 82〜136 | 06:42 (0.6) | 脈が 3 声 (アルト・テノール・バス)、定旋律をソプラノで 2 度 (2 度目は 1 オクターヴ下) |
 | IV | 136〜174 | トラック 18 (0.55)、トラック 8 の続きが遠くで (0.2) | 脈が小節ごとに抜けて消え、定旋律の頭だけがアルトで |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −26〜−19 / II −24〜−16 / III (06:42 + 脈 3 声) −18〜−15 / IV −21 → −26; ステレオ平均 −17.0 dB、13:00、27.2 MiB
 - `compose_tablet165.py` (compose_tablet160 の仕組み + compose_tablet144 の BWV 721; bank150、erbarm_melody.json、4 つの wav — tablet117 は高域を落としたもの — で作れる)
 
 ```bash
