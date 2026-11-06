@@ -3216,6 +3216,23 @@ python3 compose_tablet155.py bank153.json src score_tablet155.json && python3 sy
 python3 compose_tablet156.py bank150.json src score_tablet156.json && python3 synth.py score_tablet156.json tablet156.wav && python3 video.py score_tablet156.json tablet156.wav tablet156.mp4
 ```
 
+## 🎹🎧🌀 Requiem BADA — Tablet Sessions CLVII · Mantra a tre nel 06:39 (2026/11/06 06:39・トラック 18・トラック 8 で洗脳的な曲に合成, ト長調 / ニ短調 / ハ長調, ♩=60, 11 分 44 秒)
+
+CLVI と同じ作りで、06:42 の代わりに 06:39 (ト長調〜ニ・ドリア) を表と裏に。3 つの音源 (実音、そのまま; 06:39 は喘ぎの区間だけ下げて) を段落ごとに表と裏を入れ替えて敷き、トラック 8 の旋律の第 1 句 (4 音 + 伸ばす) をマントラとして各段落の調 (ト・ヘ・ハ・ト) で 4 小節ごと → 2 小節ごと → 3 声に繰り返し、BWV 721 の打ち続ける和音 (8 分音符、実音のピアノ) が脈。4 声は 06:42 の実音のピアノの 1 音のサンプラー。鐘なし、声なし
+
+| 段落 | 小節 | 表 | 裏 | マントラと脈 |
+|---|---|---|---|---|
+| I (ト長調) | 0〜42 | 06:39 (全部、0.6) | — | 脈が pp で始まり、マントラがアルトで 4 小節ごとに 7 度 |
+| II (ニ短調) | 42〜80 | トラック 18 (全部、0.55) | トラック 8 (0.28) | アルトとテノールで 2 小節ごとに交互、脈が強く |
+| III (ハ長調〜イ短調) | 80〜142 | トラック 8 (全部、0.55) | 06:39 (0.26) | 3 声で 4 小節ごと、全句を 2 倍に伸ばしてソプラノが、脈は頂点 |
+| IV (ト長調) | 142〜174 | 06:39 の後半 (40 秒から、0.5) | トラック 18 の終わり (0.24) | 脈が消え、頭の 2 音だけがアルトで 2 小節ごとに、高い共鳴が反響 |
+
+- `compose_tablet157.py` (compose_tablet156 から; bank150 と 3 つの wav だけで作れる)
+
+```bash
+python3 compose_tablet157.py bank150.json src score_tablet157.json && python3 synth.py score_tablet157.json tablet157.wav && python3 video.py score_tablet157.json tablet157.wav tablet157.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
