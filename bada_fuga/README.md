@@ -3122,6 +3122,23 @@ python3 compose_tablet150.py bank150.json src score_tablet150.json && python3 sy
 python3 compose_tablet151.py bank150.json src score_tablet151.json && python3 synth.py score_tablet151.json tablet151.wav && python3 video.py score_tablet151.json tablet151.wav tablet151.mp4
 ```
 
+## 🎹🎧🌫 Requiem BADA — Tablet Sessions CLII · Due tracce nell'aria del 06:39 (トラック 8 と 18 を合成して、2026/11/06 06:39 を醸す曲に, ト長調〜ニ・ドリア / ハ長調 / ニ短調, ♩=60, 11 分 28 秒)
+
+材料はトラック 8 (ハ長調〜イ短調、4 分 9 秒) とトラック 18 (ニ短調、2 分 29 秒)。実音のまま重ね合わせ (表と裏を入れ替えて)、それぞれの最上声の音から作った旋律 (主題 I = トラック 8、主題 II = トラック 18; ニ・ドリア / ハ長調の音階に寄せて讃美歌のリズム × 4 句) を二重フーガのように 4 声で追いかける。醸すのは 11/06 06:39 (Gmaj7・D7・Dm7・Fmaj7): 始めと終わりに実音をそのまま、中では遠くで、録音のない所も 06:39 の和音の輪 (Gmaj7 → D7 → Dm7 → Fmaj7、2 小節ずつ) を下に敷く。4 声は 11/06 06:42 の実音のピアノの 1 音のサンプラー。鐘なし、声なし
+
+| 段落 | 小節 | 表 | 裏 | 主題 |
+|---|---|---|---|---|
+| I. 06:39 の空気 | 0〜40 | 06:39 (全部、0.6) | — | 主題 I をソプラノ → アルト、主題 II をテノール → バスが提示、第 2 句も |
+| II. 二重フーガ | 40〜102 | トラック 8 (全部、0.5) | トラック 18 (全部、0.3) | 主題 I (S・A) と II (T・B) が 2 小節ごとに重なり合う × 6、最後に両方の拡大 (×2) |
+| III. ストレッタ | 102〜140 | トラック 18 (全部、0.5) | トラック 8 の中 (0.3)、18 小節目から 06:39 の中 (0.3) | 主題 I と II のストレッタ (1 小節ずつ、A → T → S (1 オクターヴ上) → B) × 4、主題 II の拡大を高く |
+| IV. 06:39 に戻る | 140〜170 | 06:39 (始めから 115 秒、0.55) | トラック 8・18 の終わり (0.2) | 主題 I の頭がアルトに、主題 II の頭がテノールに 4 小節ごと、だんだん小さく (dyn 0.55 → 0.2) |
+
+- 和音は表の録音の採譜を優先しつつ主題の音を含む和音を半小節ごとに。低いペダルの音 (2 小節ごと pp)、高い共鳴 (拡大の反響)。`compose_tablet152.py` (bank150 と 3 つの wav だけで作れる)
+
+```bash
+python3 compose_tablet152.py bank150.json src score_tablet152.json && python3 synth.py score_tablet152.json tablet152.wav && python3 video.py score_tablet152.json tablet152.wav tablet152.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
