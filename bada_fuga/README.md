@@ -3554,6 +3554,23 @@ python3 compose_tablet174.py bank150.json src score_tablet174.json && python3 sy
 python3 compose_tablet175.py bank150.json src score_tablet175.json && python3 synth.py score_tablet175.json tablet175.wav && python3 video.py score_tablet175.json tablet175.wav tablet175.mp4
 ```
 
+## 🎧🎛🎹 Requiem BADA — Tablet Sessions CLXXVI · Il 18:54 sul 152 con la banda (tablet175 に元の楽器を演奏させて作り換え, ニ短調 / ニ・ドリア, ♩=60, 11 分 28 秒)
+
+テープは CLXXV のまま (tablet152 を全曲 0.5、11/06 18:54 の実音を 3 回リピート 0.55)。そこに CLXVII の元の楽器一式 (アルペジオも含めて全部): Sweet Revenge 風のシンセ・パッド、エレピ風のアルペジオ (8 分音符)、ベース、柔らかいドラム、フック (Sweet Trio の自作をニ・ドリアに、シンセ・リードと実音のピアノ)、弦のパッド (III) を演奏させる (CLXXII はアルペジオなしの版)。和音は tablet152 の楽譜に記録された拍ごとの和音の流れをそのまま (強拍の不協和 0)
+
+| 段落 | 小節 | 18:54 | 楽器 |
+|---|---|---|---|
+| I | 0〜53 | 1 回目 | パッド、アルペジオ、ベース、ドラム、フックを 16 小節ごと |
+| II | 53〜105 | 2 回目 | フックを 8 小節ごと (アルトに 1 オクターヴ下も) |
+| III | 105〜157 | 3 回目 | 弦のパッドが重なる、フックを 8 小節ごと |
+| IV | 157〜170 | — (tablet152 の終わりだけ) | ドラム → ベース → アルペジオの順に抜け、フックの頭だけ、パッドが消える |
+
+- `compose_tablet176.py` (compose_tablet172 から; bank150、2 つの wav、score_tablet152.json で作れる)
+
+```bash
+python3 compose_tablet176.py bank150.json src score_tablet152.json score_tablet176.json && python3 synth.py score_tablet176.json tablet176.wav && python3 video.py score_tablet176.json tablet176.wav tablet176.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
