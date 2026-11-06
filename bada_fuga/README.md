@@ -3429,6 +3429,7 @@ python3 compose_tablet167.py bank150.json src score_tablet167.json && python3 sy
 
 CLXVII と同じ作り (11/06 18:54 の実音を 3 回リピートして表に 0.62、tablet166 の実音を 3 つの抜粋で裏に 0.3) で、楽器をすべて消したもの — アルペジオ・ドラム・ベース・シンセ・パッド・弦のパッド・フック (リードと実音のピアノ) をなくし、残るのは 2 つの実音だけ
 
+- 音量 (dBFS rms, 4 秒窓, モノ): 序 −21 → −15 / A −17〜−14 / B −20〜−14 / C −20〜−14 (録音の起伏そのまま); ステレオ平均 −16.2 dB、10:33、26.6 MiB
 - `compose_tablet168.py` (compose_tablet167 から; 同じ bank150 と 2 つの wav で作れる)
 
 ```bash
