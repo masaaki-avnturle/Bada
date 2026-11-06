@@ -3133,7 +3133,8 @@ python3 compose_tablet151.py bank150.json src score_tablet151.json && python3 sy
 | III. ストレッタ | 102〜140 | トラック 18 (全部、0.5) | トラック 8 の中 (0.3)、18 小節目から 06:39 の中 (0.3) | 主題 I と II のストレッタ (1 小節ずつ、A → T → S (1 オクターヴ上) → B) × 4、主題 II の拡大を高く |
 | IV. 06:39 に戻る | 140〜170 | 06:39 (始めから 115 秒、0.55) | トラック 8・18 の終わり (0.2) | 主題 I の頭がアルトに、主題 II の頭がテノールに 4 小節ごと、だんだん小さく (dyn 0.55 → 0.2) |
 
-- 和音は表の録音の採譜を優先しつつ主題の音を含む和音を半小節ごとに。低いペダルの音 (2 小節ごと pp)、高い共鳴 (拡大の反響)。`compose_tablet152.py` (bank150 と 3 つの wav だけで作れる)
+- 和音は表の録音の採譜を優先しつつ主題の音を含む和音を半小節ごとに。低いペダルの音 (2 小節ごと pp)、高い共鳴 (拡大の反響)
+- 測った音量 (rms、実音込み): I −18〜−22 dB、II −14〜−21、III −17〜−20、IV −19〜−20。mp4 は 30 MiB に収めるため 960×540 に。`compose_tablet152.py` (bank150 と 3 つの wav だけで作れる)
 
 ```bash
 python3 compose_tablet152.py bank150.json src score_tablet152.json && python3 synth.py score_tablet152.json tablet152.wav && python3 video.py score_tablet152.json tablet152.wav tablet152.mp4
