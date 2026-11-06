@@ -3501,21 +3501,21 @@ python3 compose_tablet171.py bank150.json src score_tablet152.json score_tablet1
 python3 compose_tablet172.py bank150.json src score_tablet152.json score_tablet172.json && python3 synth.py score_tablet172.json tablet172.wav && python3 video.py score_tablet172.json tablet172.wav tablet172.mp4
 ```
 
-## 🎧🎛🎼 Requiem BADA — Tablet Sessions CLXXIII · Il 18:54 sul 162 (tablet162 と 2026/11/06 18:54 を実音で合成 — 入っている楽器は省かずに, ヘ長調 / ニ短調, ♩=60, 12 分 16 秒)
+## 🎧🎧🌫 Requiem BADA — Tablet Sessions CLXXIII · Il 18:54 sul 162 (tablet162 と 2026/11/06 18:54 を、実音で、余計な楽器を加えずに合成, ヘ長調 / ニ短調, ♩=60, 12 分 16 秒)
 
-tablet162 (CLXII — 6 つの音源の金属音を落として合成したもの、低いピアノとペダルの音もそのまま) を全曲 (0.5)、11/06 18:54 の実音 (rms −22 dB に揃えたもの) をそのまま 3 回リピートして重ねる (0.55)。入っている楽器は省かない: CLXXI・CLXXII と同じ Sweet Revenge 風の編成 (アルペジオなし) — シンセ・パッド、ベース、柔らかいドラム、フック (Sweet Trio の自作をニ・ドリアに、シンセ・リードと実音のピアノ)、弦のパッド (III)。和音は tablet162 の楽譜に記録された拍ごとの和音の流れをそのまま (時間が一致する、強拍の不協和 0)
+2 つの音声だけ、楽器は加えない (tablet162 の中に入っている低いピアノとペダルの音はそのまま): tablet162 (CLXII — 6 つの音源の金属音を落として合成したもの) を全曲そのまま (0.5)、11/06 18:54 の実音 (rms −22 dB に揃えたもの) を 3 回リピートして重ねる (0.55、4 秒のフェード・イン、8 秒のフェード・アウト)
 
-| 段落 | 小節 | 18:54 | tablet162 | 楽器 |
-|---|---|---|---|---|
-| I | 0〜54 | 1 回目 | 06:42 とトラック 18 の段 | パッド、ベース、ドラム、フックを 16 小節ごと |
-| II | 54〜108 | 2 回目 | 06:39 (全音下げて) の段 | フックを 8 小節ごと (アルトに 1 オクターヴ下も) |
-| III | 108〜162 | 3 回目 | tablet161 の頂点の段 | 弦のパッドが重なる、フックを 8 小節ごと |
-| IV | 162〜182 | — | 06:42 の終わりと tablet117 の終わり | ドラム → ベースの順に抜け、フックの頭だけ、パッドが消える |
+| 段落 | 小節 | 18:54 | tablet162 |
+|---|---|---|---|
+| I | 0〜54 | 1 回目 | 06:42 とトラック 18 の段 |
+| II | 54〜108 | 2 回目 | 06:39 (全音下げて) の段 |
+| III | 108〜162 | 3 回目 | tablet161 の頂点の段 |
+| IV | 162〜182 | — | 06:42 の終わりと tablet117 の終わりだけが残って消える |
 
-- `compose_tablet173.py` (compose_tablet172 から; bank150、2 つの wav — tablet162 の音声は `20261107_162000.wav` に —、score_tablet162.json で作れる)
+- `compose_tablet173.py` (2 つの wav だけで作れる — tablet162 の音声は `20261107_162000.wav` に)
 
 ```bash
-python3 compose_tablet173.py bank150.json src score_tablet162.json score_tablet173.json && python3 synth.py score_tablet173.json tablet173.wav && python3 video.py score_tablet173.json tablet173.wav tablet173.mp4
+python3 compose_tablet173.py bank150.json src score_tablet173.json && python3 synth.py score_tablet173.json tablet173.wav && python3 video.py score_tablet173.json tablet173.wav tablet173.mp4
 ```
 
 ## 作り方 (再現)
