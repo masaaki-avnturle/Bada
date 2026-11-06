@@ -3140,6 +3140,24 @@ python3 compose_tablet151.py bank150.json src score_tablet151.json && python3 sy
 python3 compose_tablet152.py bank150.json src score_tablet152.json && python3 synth.py score_tablet152.json tablet152.wav && python3 video.py score_tablet152.json tablet152.wav tablet152.mp4
 ```
 
+## 🎹🌙💤 Requiem BADA — Tablet Sessions CLIII · Sonnifero ipnotico (2026/11/06 の 2 曲・tablet152・tablet117 で、洗脳的な睡眠導入剤の曲を, ト → ハ〜ニ短 → ヘ → 変ロ, ♩=60, 13 分 20 秒)
+
+4 つの音源 (すべて実音、そのまま; 11/06 は喘ぎの区間だけ下げて) を眠りの段階に沿って表と裏を入れ替えながら敷く。洗脳は 06:42 の最上声の音から作った眠りの動機 (4 音 + 伸ばす、2 倍に伸ばして 16 拍) を各段階の調で 8 小節ごと → 4 小節ごとに繰り返すことと、2 分音符の根音の鼓動 (実音のピアノ、pp、眠りでは 1 小節に 1 つ)。強弱は 0.45 → 0.42 → 0.34 → 0.1。4 声は 11/06 06:42 の実音のピアノの 1 音のサンプラー。鐘なし、声なし、電子音なし
+
+| 段階 | 小節 | 表 | 裏 | 動機 |
+|---|---|---|---|---|
+| I. くつろぎ (ト長調) | 0〜40 | 06:39 (0.55) | tablet117 の始め (0.22) | アルトで 8 小節ごとに 4 度、鼓動が始まる |
+| II. 暖まり (ハ長調〜ニ短調) | 40〜102 | tablet152 の二重フーガの段落 (160 秒から 240 秒、0.5) | 06:42 (0.22) | ソプラノとテノールで 4 小節ごとに交互、高い共鳴が反響 |
+| III. 冷え (ヘ長調) | 102〜160 | 06:42 (全部、0.5) | tablet152 の終わり (0.2) | アルト pp とテノール (2 オクターヴ下) で交互 |
+| IV. 眠り (変ロ長調) | 160〜198 | tablet117 の眠りの段階 (564 秒から、0.48) | 06:39 の終わり (0.16) | 頭の 2 音だけがアルトで 4 小節ごと、鼓動は 1 小節に 1 つ、高い共鳴が消える |
+
+- 和音は表の録音の採譜を優先しつつ動機の音を含む和音を半小節ごとに。tablet152 の採譜は `build_sampler` (1617 区間)。`compose_tablet153.py` (bank153 = bank150 + tablet152 の採譜)
+
+```bash
+ffmpeg -i tablet152.mp4 -vn -ac 1 -ar 44100 src/20261107_152000.wav && python3 build_sampler.py bank152 src/20261107_152000.wav
+python3 compose_tablet153.py bank153.json src score_tablet153.json && python3 synth.py score_tablet153.json tablet153.wav && python3 video.py score_tablet153.json tablet153.wav tablet153.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
