@@ -3681,6 +3681,23 @@ python3 compose_tablet181.py bank150.json src score_tablet161.json score_tablet1
 python3 compose_tablet182.py bank150.json src score_tablet157.json score_tablet182.json && python3 synth.py score_tablet182.json tablet182.wav && python3 video.py score_tablet182.json tablet182.wav tablet182.mp4
 ```
 
+## 🎧🎹🎼 Requiem BADA — Tablet Sessions CLXXXIII · Il 18:54 sul 152 con la fuga (tablet152 と 2026/11/06 18:54 を重ね合わせて、元の楽器を演奏させて作り換え — アルペジオや元の曲に無い楽器は付け加えない, ト長調 / ニ・ドリア, ♩=60, 11 分 28 秒)
+
+テープは CLXXV と同じ配置を途切れなくしたもの (tablet152 を全曲 0.5、11/06 18:54 の実音を途切れなく 3 回半 0.5、切れ目は 6 秒のクロスフェード)。元の楽器 = tablet152 (CLII) に元からあるものだけを改めて演奏: トラック 8 と 18 の最上声の音から作った 2 つの主題の二重フーガ (4 声、06:42 の実音のピアノの 1 音のサンプラー: 提示 → 2 つ目の主題 → ストレッタと拡大 → 消える)、低いペダルの音 (2 小節ごと、pp)、高い共鳴 (拡大の反響と終わり)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は tablet152 の楽譜に記録された拍ごとの和音の流れをそのまま (時間が一致する)
+
+| 段落 | 小節 | tablet152 | 18:54 | 元の楽器 |
+|---|---|---|---|---|
+| I | 0〜40 | 06:39 の空気 | 1 回目 | 主題 I (トラック 8) の提示 |
+| II | 40〜102 | トラック 8 が表 | 2 回目 | 主題 II (トラック 18) と二重の提示 |
+| III | 102〜140 | トラック 18 が表 | 3 回目 | ストレッタと拡大、高い共鳴 |
+| IV | 140〜170 | 06:39 の帰り | 4 回目 (前半) | 消えていく、ペダルと高い共鳴 |
+
+- `compose_tablet183.py` (compose_tablet152 から; bank150、2 つの wav — tablet152 の音声は `20261107_152000.wav` に —、score_tablet152.json (和音) で作れる)
+
+```bash
+python3 compose_tablet183.py bank150.json src score_tablet152.json score_tablet183.json && python3 synth.py score_tablet183.json tablet183.wav && python3 video.py score_tablet183.json tablet183.wav tablet183.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
