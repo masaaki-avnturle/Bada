@@ -3476,6 +3476,7 @@ python3 compose_tablet170.py bank150.json src score_tablet152.json score_tablet1
 
 CLXX と同じ作り (tablet168 と tablet152 の 2 本のテープ、tablet152 の楽譜の和音、パッド・ベース・柔らかいドラム・フック・弦のパッド) で、エレピ風のアルペジオ (8 分音符) だけを消したもの。IV ではドラム → ベースの順に抜けて、フックの頭とパッドが残る
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −17〜−13 / II −16〜−14 / III −15〜−13 / IV −15 → −24 (消える); ステレオ平均 −15.2 dB、11:27、27.2 MiB
 - `compose_tablet171.py` (compose_tablet170 から; 同じ bank150、2 つの wav、score_tablet152.json で作れる)
 
 ```bash
