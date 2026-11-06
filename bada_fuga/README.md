@@ -3115,7 +3115,8 @@ python3 compose_tablet150.py bank150.json src score_tablet150.json && python3 sy
 | IV. 冷え (ヘ長調) | 138〜195 | 06:42 (0.5) | 06:39 の終わり (0.2) | ソプラノ pp とテノール (2 オクターヴ下) で交互 |
 | V. 眠り (変ロ長調) | 195〜232 | tablet117 の眠りの段階 (564 秒から、0.48) | トラック 8・18 の終わり (0.16) | 頭の 2 音だけがアルトで 4 小節ごと、鼓動は 1 小節に 1 つ、高い共鳴が消える |
 
-- 和音は表の録音の採譜を優先しつつ動機の音を含む和音を半小節ごとに (段階ごとの調の候補)。低いペダルの音は 2 小節ごと pp。mp4 は 30 MiB に収めるため 960×540・200 kbps に。`compose_tablet151.py` (bank150 と 5 つの wav だけで作れる)
+- 和音は表の録音の採譜を優先しつつ動機の音を含む和音を半小節ごとに (段階ごとの調の候補)。低いペダルの音は 2 小節ごと pp
+- 測った音量 (rms、実音込み): I −16〜−21 dB、II −16〜−21、III −14〜−22、IV −15〜−24、V −16 → −30 (消える)。mp4 は 30 MiB に収めるため 960×540・200 kbps に。`compose_tablet151.py` (bank150 と 5 つの wav だけで作れる)
 
 ```bash
 python3 compose_tablet151.py bank150.json src score_tablet151.json && python3 synth.py score_tablet151.json tablet151.wav && python3 video.py score_tablet151.json tablet151.wav tablet151.mp4
