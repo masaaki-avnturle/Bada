@@ -3425,9 +3425,9 @@ python3 compose_tablet166.py bank150.json src score_tablet166.json && python3 sy
 python3 compose_tablet167.py bank150.json src score_tablet167.json && python3 synth.py score_tablet167.json tablet167.wav && python3 video.py score_tablet167.json tablet167.wav tablet167.mp4
 ```
 
-## 🎹🎛🌃 Requiem BADA — Tablet Sessions CLXVIII · Sweet revenge nel 18:54 — senza arpeggio, batteria né basso (tablet167 のアルペジオ・ドラム・ベースを消して作り換え, ニ短調, ♩=72, 10 分 35 秒)
+## 🎹🎛🌃 Requiem BADA — Tablet Sessions CLXVIII · Sweet revenge nel 18:54 — solo le registrazioni e il gancio (tablet167 のアルペジオ・ドラム・ベース・パッドを消して作り換え, ニ短調, ♩=72, 10 分 35 秒)
 
-CLXVII と同じ作り (11/06 18:54 の実音を 3 回リピートして表に、tablet166 の実音を裏に、循環コード Dm7 → Bbmaj7 → Gm7 → A7、Sweet Trio の自作フック) で、エレピ風のアルペジオ (8 分音符)・ドラム・ベースを消したもの。残るのはシンセ・パッド、フック (リードと実音のピアノ)、弦のパッド (B) と 2 つの実音だけ。C ではフックの頭とパッドと 18:54 が残って消える
+CLXVII と同じ作り (11/06 18:54 の実音を 3 回リピートして表に、tablet166 の実音を裏に、循環コード Dm7 → Bbmaj7 → Gm7 → A7、Sweet Trio の自作フック) で、エレピ風のアルペジオ (8 分音符)・ドラム・ベース・シンセ・パッド・弦のパッドを消したもの。残るのは 2 つの実音とフック (シンセ・リードと実音のピアノ、A は 16 小節ごと、B は 8 小節ごと、C は頭だけ) だけ
 
 - `compose_tablet168.py` (compose_tablet167 から; 同じ bank150 と 2 つの wav で作れる)
 
