@@ -3663,6 +3663,23 @@ python3 compose_tablet180.py bank150.json src score_tablet180.json && python3 sy
 python3 compose_tablet181.py bank150.json src score_tablet161.json score_tablet181.json && python3 synth.py score_tablet181.json tablet181.wav && python3 video.py score_tablet181.json tablet181.wav tablet181.mp4
 ```
 
+## 🎧🎹🌀 Requiem BADA — Tablet Sessions CLXXXII · Il 18:54 sul 157 con il mantra (tablet157 と 2026/11/06 18:54 を重ね合わせて、元の楽器を演奏させて作り換え — アルペジオや元の曲に無い楽器は付け加えない, ト長調 / ニ短調 / ハ長調, ♩=60, 11 分 44 秒)
+
+テープは CLXXIX と同じ配置 (tablet157 を全曲 0.5、11/06 18:54 の実音を途切れなく 3 回半 0.5)。元の楽器 = tablet157 (CLVII) に元からあるものだけを改めて演奏: トラック 8 の旋律の頭のマントラ (I アルトで 4 小節ごと → II アルトとテノールで 2 小節ごと → III 3 声と全句の拡大 → IV 頭だけ)、BWV 721 の打ち続ける和音 (8 分音符、バスとテノール、pp → 頂点 → 消える)、低いペダルの音 (小節ごと)、高い共鳴 (III・IV) — すべて 06:42 の実音のピアノの 1 音のサンプラー。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は tablet157 の楽譜に記録された拍ごとの和音の流れをそのまま (時間が一致する)
+
+| 段落 | 小節 | tablet157 | 18:54 | 元の楽器 |
+|---|---|---|---|---|
+| I | 0〜42 | 06:39 の段 | 1 回目 | 脈が pp で始まり、マントラがアルトで 4 小節ごとに 7 度 |
+| II | 42〜80 | トラック 18 の段 | 2 回目 | マントラがアルトとテノールで 2 小節ごと、脈が強く |
+| III | 80〜142 | トラック 8 の頂点 | 3 回目 | 3 声で 4 小節ごと、全句を 2 倍に伸ばしてソプラノが、脈は頂点、高い共鳴 |
+| IV | 142〜174 | 06:39 の帰り | 4 回目 (前半) | 脈が消え、頭の 2 音だけがアルトで、高い共鳴が反響 |
+
+- `compose_tablet182.py` (compose_tablet157 から; bank150、2 つの wav — tablet157 の音声は `20261107_157000.wav` に —、score_tablet157.json (和音) で作れる)
+
+```bash
+python3 compose_tablet182.py bank150.json src score_tablet157.json score_tablet182.json && python3 synth.py score_tablet182.json tablet182.wav && python3 video.py score_tablet182.json tablet182.wav tablet182.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
