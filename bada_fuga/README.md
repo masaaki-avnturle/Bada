@@ -3407,6 +3407,23 @@ CLXV と同じ作り (トラック 18 と 8 が表、III で 06:42 + BWV 721 の
 python3 compose_tablet166.py bank150.json src score_tablet166.json && python3 synth.py score_tablet166.json tablet166.wav && python3 video.py score_tablet166.json tablet166.wav tablet166.mp4
 ```
 
+## 🎹🎛🌃 Requiem BADA — Tablet Sessions CLXVII · Sweet revenge nel 18:54 (tablet166 の Sweet Revenge に、2026/11/06 18:54 をリピートで、実音で, ニ短調, ♩=72, 10 分 35 秒)
+
+実音: 11/06 18:54 の録音 (3 分 26 秒、rms −35 dB ととても静かなので −22 dB に揃えて、tanh で軽く抑える) を **そのまま 3 回リピート** して表に (0.62)、tablet166 (CLXVI) の実音を 3 つの抜粋 (0〜207 秒、365〜572 秒 = 06:42 + BWV 721 の段、600〜780 秒) で裏に (0.3)。雰囲気は BADA 528 (Sweet Trio) と同じ、坂本龍一「Sweet Revenge」を思わせるダウンテンポの循環コード (ニ短調: Dm7 → Bbmaj7 → Gm7 → A7、旋律の引用はしない、和音は固定して催眠的に) — シンセ・パッド、ベース、柔らかいドラム、エレピ風のアルペジオ (8 分音符)、Sweet Trio の自作フック (D5 C5 A4 / F4 G4 A4 / Bb4 A4 G4 / E4 F4 E4 C#4) をシンセ・リードと実音のピアノ (06:42 の 1 音のサンプラー) で
+
+| 段落 | 小節 | 18:54 | tablet166 (裏) | 楽器 |
+|---|---|---|---|---|
+| 序 | 0〜8 | 1 回目が始まる | 0〜207 秒 | パッドだけ |
+| A | 8〜63 | 1 回目 | | ベース、ドラム、アルペジオ、フックを 16 小節ごと |
+| B | 63〜125 | 2 回目 | 365〜572 秒 (06:42 + BWV 721) | フックを 8 小節ごと (アルトに 1 オクターヴ下も)、弦のパッド |
+| C | 125〜188 | 3 回目 | 600〜780 秒 | ドラム → ベース → アルペジオの順に抜け、フックの頭だけ、パッドと 18:54 が残って消える |
+
+- `compose_tablet167.py` (bank150 と 2 つの wav — 18:54 は音量を揃えたもの、tablet166 の音声は `20261107_166000.wav` に — で作れる)
+
+```bash
+python3 compose_tablet167.py bank150.json src score_tablet167.json && python3 synth.py score_tablet167.json tablet167.wav && python3 video.py score_tablet167.json tablet167.wav tablet167.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
