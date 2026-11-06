@@ -3363,10 +3363,12 @@ python3 compose_tablet163.py bank163.json src score_tablet163.json && python3 sy
 | III | 106〜154 | tablet162 の II の段 (176 秒から、0.55) | トラック 8 (続き、0.3) | 二重フーガ: A と B を対で、2 小節遅れのストレッタ、Dies irae を 4 倍にソプラノで、鐘が 8 小節ごと (頂点) |
 | IV | 154〜184 | トラック 18 (112 秒、0.62) | — | A と B の頭を 2 倍に、Dies irae がアルトで最後に一度、鐘とドローンだけが残って消える |
 
+- 音量: 合成の正規化で全体が静かになったので (ステレオ平均 −20.1 dB)、動画化のあとに ffmpeg で +3.5 dB とリミッター (0.95) をかけて平均 −16.7 dB に (CLXIII と同じ)。段落ごと (dBFS rms, 4 秒窓, モノ): I −25〜−19 / II −23〜−16 / III (頂点) −16〜−19 / IV −22〜−19 → 消える; 12:23、27.2 MiB
 - `compose_tablet164.py` (compose_tablet163 から; bank150 と 5 つの wav — tablet162 の音声は `20261107_162000.wav` に — で作れる。「リラックス 3」の音源は要らない)
 
 ```bash
 python3 compose_tablet164.py bank150.json src score_tablet164.json && python3 synth.py score_tablet164.json tablet164.wav && python3 video.py score_tablet164.json tablet164.wav tablet164.mp4
+ffmpeg -i tablet164.mp4 -c:v copy -af "volume=3.5dB,alimiter=limit=0.95:attack=5:release=100:level=false" -c:a aac -b:a 56k tablet164_out.mp4
 ```
 
 ## 作り方 (再現)
