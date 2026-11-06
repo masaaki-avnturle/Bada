@@ -3584,6 +3584,7 @@ python3 compose_tablet176.py bank150.json src score_tablet152.json score_tablet1
 | III | 92〜138 | 同じ大きさで (368〜554 秒、0.42; tablet164 は二重フーガの頂点) | |
 | IV | 138〜182 | tablet164 の終わり (552〜743 秒、拡大・鐘・ドローン、0.55) | tablet175 (552〜695 秒、0.25、消える) |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −22〜−15 / II −24〜−16 (tablet164 の静かな所で下がる) / III −18〜−14 / IV −17 → −23 (消える); ステレオ平均 −16.4 dB、12:15、27.5 MiB
 - `compose_tablet177.py` (compose_tablet169 から; 2 つの mp4 の音声を wav にしたものだけで作れる)
 
 ```bash
