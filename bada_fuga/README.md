@@ -3292,6 +3292,26 @@ python3 compose_tablet159.py bank150.json score_tablet159.json && python3 synth.
 python3 compose_tablet160.py bank150.json src score_tablet160.json && python3 synth.py score_tablet160.json tablet160.wav && python3 video.py score_tablet160.json tablet160.wav tablet160.mp4
 ```
 
+## 🎧🎹🌑 Requiem BADA — Tablet Sessions CLXI · Traccia 18 in primo piano (トラック 18 を全面に押し出して、tablet160 とトラック 8 をベースに、高音の金属音を取り除いて, ニ短調 / ホ短調, ♩=60, 11 分 52 秒)
+
+表 = トラック 18 の実音を 4 回 (0.7)、tablet160 (CLX) の調に合わせてヘ長調の段落ではそのまま (ニ短調)、ト長調の段落では全音上げて (ホ短調)。裏 = tablet160 全曲 (0.34) とトラック 8 (0.22、2 回)。高音の金属音を取り除くため、tablet160 は 1.6 kHz、トラック 8 は 2 kHz、トラック 18 は 3.2 kHz より上を低域通過で落とし (scipy の butter、4 次 / 3 次、零位相)、鐘も高い共鳴も使わない。間はトラック 18 の最上声の音から作った旋律を低い実音のピアノ (06:42 の 1 音のサンプラー、1〜2 オクターヴ下) で。和音は表のトラック 18 の採譜から、低いペダルの音が 2 小節ごと
+
+| 段落 | 小節 | 表 | 裏 |
+|---|---|---|---|
+| I | 0〜39 | トラック 18 (ニ短調) | tablet160 I (ヘ長調) |
+| 間 | 39〜60 | 低いピアノの旋律 (テノール → バス) | tablet160、トラック 8 (1 回目) が入る |
+| II | 60〜98 | トラック 18 (全音上げてホ短調) | tablet160 II (ト長調)、トラック 8 |
+| 間 | 98〜103 | 旋律の頭を低いピアノで | |
+| III | 103〜141 | トラック 18 (ニ短調、0.72) | tablet160 III (頂点)、トラック 8 (2 回目) |
+| 間 | 141〜150 | 旋律の頭を 2 倍に伸ばして低いピアノで | |
+| IV | 150〜176 | トラック 18 (全音上げて、90 秒) | tablet160 IV、裏が消えていく |
+
+- `compose_tablet161.py` (bank150 と 3 つの wav — トラック 18・トラック 8・tablet160 の音声を高域を落として `20261107_160000.wav` にしたもの — で作れる)
+
+```bash
+python3 compose_tablet161.py bank150.json src score_tablet161.json && python3 synth.py score_tablet161.json tablet161.wav && python3 video.py score_tablet161.json tablet161.wav tablet161.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
