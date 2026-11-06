@@ -3170,7 +3170,8 @@ python3 compose_tablet153.py bank153.json src score_tablet153.json && python3 sy
 | III. 冷え (ヘ短調 / 変イ長調) | 100〜150 | tablet117 の冷え (320 秒から、0.5) | tablet152 のストレッタ (0.2) | アルト pp とテノール (2 オクターヴ下) で交互 |
 | IV. 眠り (変ロ長調) | 150〜190 | tablet117 の眠り (564 秒から、0.48) | tablet152 の終わり (0.16) | 頭の 2 音だけがアルトで 4 小節ごと、高い 5 度の共鳴だけが残って消える |
 
-- 和音は表の録音の採譜を優先しつつ動機の音を含む和音を半小節ごとに (段階ごとの調の候補)。低いペダルの音は 2 小節ごと pp。`compose_tablet154.py` (bank153 と 2 つの wav だけで作れる)
+- 和音は表の録音の採譜を優先しつつ動機の音を含む和音を半小節ごとに (段階ごとの調の候補)。低いペダルの音は 2 小節ごと pp
+- 測った音量 (rms、実音込み): I −15〜−25 dB、II −18〜−21、III −17〜−22、IV −23〜−29 (消える)。mp4 は 30 MiB に収めるため 960×540 に。`compose_tablet154.py` (bank153 と 2 つの wav だけで作れる)
 
 ```bash
 python3 compose_tablet154.py bank153.json src score_tablet154.json && python3 synth.py score_tablet154.json tablet154.wav && python3 video.py score_tablet154.json tablet154.wav tablet154.mp4
