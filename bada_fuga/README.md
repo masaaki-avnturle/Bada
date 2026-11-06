@@ -3566,6 +3566,7 @@ python3 compose_tablet175.py bank150.json src score_tablet175.json && python3 sy
 | III | 105〜157 | 3 回目 | 弦のパッドが重なる、フックを 8 小節ごと |
 | IV | 157〜170 | — (tablet152 の終わりだけ) | ドラム → ベース → アルペジオの順に抜け、フックの頭だけ、パッドが消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −17〜−14 / II −15〜−13 / III −16〜−13 / IV −17 → 消える; ステレオ平均 −14.9 dB、11:27、27.2 MiB
 - `compose_tablet176.py` (compose_tablet172 から; bank150、2 つの wav、score_tablet152.json で作れる)
 
 ```bash
