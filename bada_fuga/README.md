@@ -3331,6 +3331,26 @@ python3 compose_tablet161.py bank150.json src score_tablet161.json && python3 sy
 python3 compose_tablet162.py bank150.json src score_tablet162.json && python3 synth.py score_tablet162.json tablet162.wav && python3 video.py score_tablet162.json tablet162.wav tablet162.mp4
 ```
 
+## 🎹🎼🕯 Requiem BADA — Tablet Sessions CLXIII · Requiem e fuga sopra la traccia 3 (2026/11/06 06:39・06:42・tablet162・トラック 3 を合成して、レクイエムとフーガを併せ持つ曲に, ヘ長調 / ニ短調, ♩=60, 12 分 24 秒)
+
+トラック 3 (2021 年の 14 分の静かな録音、ホ長調、作者情報なし) を半音上げてヘ長調に揃え (rms −19.5 dB に正規化、tanh で軽く抑える)、06:39 は全音下げて、06:42 と tablet162 はそのまま。トラック 3 の採譜 (build_sampler、997 区間) の最上声から 8 小節の主題を作り、4 声のフーガ (06:42 の実音のピアノの 1 音のサンプラー) に。レクイエムは「Dies irae」の聖歌の冒頭句 (ファ・ミ・ファ・レ・ミ・ド・レ・レ、ニ短調) を定旋律として 2 倍・4 倍に伸ばし、低い鐘 (小さく、段落の頭と頂点の 8 小節ごと)、低いペダル、2 分音符の心拍 (バス)、頂点から消えていく強弱
+
+| 段落 | 小節 | 表 (実音) | フーガとレクイエム |
+|---|---|---|---|
+| I | 0〜60 | 06:42 (全部、0.6) | 主題の提示部 (アルト → ソプラノの応答 → テノール → バス) → 頭のストレッタ → Dies irae がテノールで (2 倍) |
+| II | 60〜106 | 06:39 (全音下げて、0.6) | 主題のストレッタ (2 小節遅れ、バスから)、Dies irae がアルト (2 倍)、心拍が始まる |
+| III | 106〜154 | tablet162 の頂点の段 (352 秒から、0.55) | Dies irae を 4 倍にソプラノで、その下で主題が 4 声に (2 回)、心拍、鐘が 8 小節ごと (頂点) |
+| IV | 154〜184 | トラック 3 の終わり近く (640 秒から、半音上げて、0.7) | 主題の頭を 2 倍にバス・テノール・ソプラノで、Dies irae がアルトで最後に一度、鐘とペダルだけが残って消える |
+
+トラック 3 は半音上げて全曲の裏にも (0〜560 秒、0.5)。和音は表の録音の採譜を優先しつつ主題と定旋律の音を含む和音を半小節ごとに
+
+- `compose_tablet163.py` (compose_tablet160 の仕組みから; bank163.json = bank150 + トラック 3 の採譜、4 つの wav — tablet162 の音声は `20261107_162000.wav` に)
+
+```bash
+python3 build_sampler.py bank03 20261107_030000.wav   # トラック 3 を wav にして日付名に
+python3 compose_tablet163.py bank163.json src score_tablet163.json && python3 synth.py score_tablet163.json tablet163.wav && python3 video.py score_tablet163.json tablet163.wav tablet163.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
