@@ -3874,6 +3874,24 @@ python3 compose_tablet192.py bank150.json src score_tablet192.json && python3 sy
 python3 compose_tablet193.py bank150.json src score_tablet193.json && python3 synth.py score_tablet193.json tablet193.wav && python3 video.py score_tablet193.json tablet193.wav tablet193.mp4
 ```
 
+## 🎧🎹🎼 Requiem BADA — Tablet Sessions CXCIV · I due pomeriggi e il 18:54 sul 89 (tablet89・2026/11/08 13:16・13:10・11/06 18:54 を重ね合わせて、元の楽器を演奏させて — アルペジオや元の曲に無い楽器は付け加えない, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+テープ: tablet89 (LXXXIX、ニ短調) を全曲 (0.45) と後半 (90 秒から、0.4)、11/06 18:54 の実音 (rms −22 dB に揃えたもの) を途切れなく 3 回半 (0.4)、11/08 13:10 (ハ長調 / イ短調 → 4 度上げてヘ長調 / ニ短調に) と 13:16 (変イ長調 / ヘ短調 → 短 3 度下げて) の実音を表に (0.55)。元の楽器 = 録音と tablet89 の中にある楽器 (ピアノ) だけ: 13:10・13:16・tablet89 の最上声の採譜 (build_sampler) から作った旋律 (各 8 小節、ヘ長調 / ニ短調に寄せて) を 06:42 の実音のピアノの 1 音のサンプラーで、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに
+
+| 段落 | 小節 | 表の実音 | tablet89 | 実音のピアノ |
+|---|---|---|---|---|
+| I | 0〜40 | 13:10 (4 度上げて) | 始まり | 13:10 の旋律 (アルト → テノール)、tablet89 の旋律 (バス) |
+| II | 40〜100 | 13:16 (短 3 度下げて、全部) | フーガ | 13:16 の旋律 (ソプラノ → テノール)、tablet89 (アルト)、13:10 の頭を 2 倍にバスで |
+| III | 100〜140 | 13:10 (2 回目) | 後半 (90 秒から) | 13:10 と 13:16 を同時に、tablet89 と 13:10 を同時に (3 つの旋律) |
+| IV | 140〜176 | 13:16 の前半 | 終わり | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet194.py` (compose_tablet191 から; bank194.json = bank190 + 13:10・13:16 の採譜、4 つの wav で作れる)
+
+```bash
+python3 build_sampler.py bank1108 20261108_131016.wav 20261108_131650.wav
+python3 compose_tablet194.py bank194.json src score_tablet194.json && python3 synth.py score_tablet194.json tablet194.wav && python3 video.py score_tablet194.json tablet194.wav tablet194.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
