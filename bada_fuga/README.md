@@ -4247,6 +4247,23 @@ python3 compose_tablet216.py bank201.json src score_tablet216.json && python3 sy
 python3 compose_tablet217.py bank201.json src score_tablet217.json && python3 synth.py score_tablet217.json tablet217.wav && python3 video.py score_tablet217.json tablet217.wav tablet217.mp4
 ```
 
+## 🎤📼📼 Requiem BADA — Tablet Sessions CCXVIII · L'aureola della giovane donna e le due tracce (若かりし女性の光輪様の声に、トラック 18 とトラック 8 を、無い楽器を加えずに重ね合わせて, ヘ長調 / ニ短調, ♩=60, 11 分 44 秒)
+
+3 つの音だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘もなし)。組み立ては CCIX と同じで、声だけ若かりし女性の光輪様の声 (CCXVI の三賢者 — 13 半音上げ・フォルマント 1.15 倍の若い女性の声 + 5 度上 + 1 オクターヴ上、3.5 秒の残響、rms −22.5 dB) を 2 回 (0.55)。トラック 18 (ニ短調) はそのまま 3 回 (0.5 / 0.45)、トラック 8 (ハ長調 / イ短調) は 4 度上げて全部と続き (0.5 / 0.4)。6 秒のフェード・イン、6〜10 秒のフェード・アウト
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜52 | 光輪の声 + トラック 18 |
+| II | 52〜100 | トラック 8 (4 度上げて、全部) + トラック 18 (2 回目) |
+| III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き (100 秒から) |
+| IV | 150〜176 | トラック 18 の後半、消える |
+
+- `compose_tablet218.py` (compose_tablet209 から; bank201.json、3 つの wav — 光輪の声は CCXVI のもの — で作れる)
+
+```bash
+python3 compose_tablet218.py bank201.json src score_tablet218.json && python3 synth.py score_tablet218.json tablet218.wav && python3 video.py score_tablet218.json tablet218.wav tablet218.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
