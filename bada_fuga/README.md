@@ -4396,6 +4396,23 @@ CCXXIV のテープ (tablet89 を全曲と後半、tablet86 を 2 半音下げ�
 python3 compose_tablet225.py bank201.json src score_tablet225.json && python3 synth.py score_tablet225.json tablet225.wav && python3 video.py score_tablet225.json tablet225.wav tablet225.mp4
 ```
 
+## 🎤📼 Requiem BADA — Tablet Sessions CCXXVI · L'aureola della giovane donna sul 89 (若かりし女性の光輪様の声に tablet89 を重ね合わせて, ニ短調, ♩=60, 11 分 44 秒)
+
+2 つの音だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘もなし)、移調もなし。若かりし女性の光輪様の声 (CCXVI の三賢者 — 13 半音上げ・フォルマント 1.15 倍の若い女性の声 + 5 度上 + 1 オクターヴ上、3.5 秒の残響、rms −22.5 dB) を 2 回 (0.6)、tablet89 (LXXXIX — レクイエムとフーガ、ニ短調、6 分 31 秒) を全曲そのまま (0.5) と後半 (90 秒から、0.45)。6 秒のフェード・イン、6〜10 秒のフェード・アウト
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜50 | 光輪の声 + tablet89 の始まり (レクイエム) |
+| II | 50〜100 | tablet89 のフーガ |
+| III | 100〜140 | 光輪の声 (2 回目) + tablet89 の後半 (90 秒から) |
+| IV | 140〜176 | tablet89 の終わり、消える |
+
+- `compose_tablet226.py` (compose_tablet218 から; bank201.json、2 つの wav — 光輪の声は CCXVI のもの、tablet89 の音は mp4 から — で作れる)
+
+```bash
+python3 compose_tablet226.py bank201.json src score_tablet226.json && python3 synth.py score_tablet226.json tablet226.wav && python3 video.py score_tablet226.json tablet226.wav tablet226.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
