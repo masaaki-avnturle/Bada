@@ -3802,6 +3802,24 @@ CLXXXVI と同じ 4 つの音源で配置を変えたもの: 06:39 を先に元�
 python3 compose_tablet189.py bank150.json src score_tablet189.json && python3 synth.py score_tablet189.json tablet189.wav && python3 video.py score_tablet189.json tablet189.wav tablet189.mp4
 ```
 
+## 🎧🎹🎼 Requiem BADA — Tablet Sessions CXC · La fuga d'organo al pianoforte vero (2026/11/06 18:54・06:39・06:42・tablet86・tablet89・fuga を重ね合わせて、元の楽器を演奏させて — アルペジオや元の曲に無い楽器は付け加えない、電子音はグランドピアノの実音で書き換え, ヘ長調 / ニ短調, ♩=60, 12 分 24 秒)
+
+電子音の書き換え: fuga (Requiem BADA の最初のオルガンのフーガ、score.json、ニ短調 130 小節 ♩=96) はオルガン (合成) なので音声は使わず、楽譜の音符 (4 声 2,324 音のうち提示部 0〜100 秒と終わり 232〜332 秒) を秒のまま 06:42 の実音のピアノの 1 音のサンプラーで弾き直す (II と IV)。tablet89 (LXXXIX) は cp14 の合成の伴奏を含むので音声は使わず、採譜した旋律 (8 小節) だけを実音のピアノで。tablet86 (LXXXVI) はもともと実音のピアノの 1 音のサンプラーだけで作った曲なので、音声を全音下げて (ト長調 → ヘ長調) 裏に (0.3)。テープ: 11/06 18:54 の実音 (rms −22 dB に揃えたもの) を途切れなく 3 回半 (0.4)、06:42 (ヘ長調、そのまま) と 06:39 (全音下げてヘ長調に) を表に。楽器は実音のピアノ (06:42・06:39・tablet89・tablet86 の旋律と fuga の音符) と低いペダルだけ。和音は表の録音の採譜、fuga が鳴るところは fuga の楽譜の和音
+
+| 段落 | 小節 | 表の実音 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜60 | 06:42 (全部)、tablet86 が裏 | 06:42 の旋律、tablet86 の旋律 |
+| II | 60〜108 | 06:39 (全音下げて) | fuga の提示部 (0〜100 秒) を弾き直す、06:39 と tablet89 の旋律 |
+| III | 108〜150 | 06:42 の後半、tablet86 が裏 | 06:42 と 06:39 を同時に、tablet89 と tablet86 を同時に |
+| IV | 150〜184 | 06:39 の終わり | fuga の終わり (232〜332 秒、ストレッタと終止) を弾き直す、頭を 2 倍に伸ばして消える |
+
+- `compose_tablet190.py` (compose_tablet186 から; bank190.json = bank150 + tablet86・89 の採譜 (build_sampler を mp4 の音声に)、4 つの wav、score.json で作れる)
+
+```bash
+python3 build_sampler.py bank86 20261107_086000.wav && python3 build_sampler.py bank89 20261107_089000.wav   # tablet86・89 の音声を日付名の wav にして採譜
+python3 compose_tablet190.py bank190.json src score.json score_tablet190.json && python3 synth.py score_tablet190.json tablet190.wav && python3 video.py score_tablet190.json tablet190.wav tablet190.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
