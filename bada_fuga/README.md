@@ -4335,7 +4335,7 @@ python3 compose_tablet221.py bank201.json src score.json score_tablet221.json &&
 | III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) + 指弾き |
 | IV | 150〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、指弾きと低音弦だけが残って消える |
 
-- `compose_tablet222.py` (compose_tablet220 から; bank201.json、3 つの wav — 光輪の声はドエロの光輪様の声 — で作れる)。`synth.py` に `acoustic_guitar` と `AG`、`notes_silent` を追加
+- `compose_tablet222.py` (compose_tablet220 から; bank201.json、3 つの wav — 光輪の声はドエロの光輪様の声 — で作れる)。`synth.py` に `acoustic_guitar` と `AG`、`notes_silent` を、`video.py` に `AG` の色と凡例を追加
 
 ```bash
 python3 compose_tablet222.py bank201.json src score_tablet222.json && python3 synth.py score_tablet222.json tablet222.wav && python3 video.py score_tablet222.json tablet222.wav tablet222.mp4
