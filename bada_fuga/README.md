@@ -4018,6 +4018,7 @@ python3 compose_tablet200.py bank200.json src score_tablet200.json && python3 sy
 | III | 92〜144 | 声 (2 回目)、トラック 8 の続きが裏 | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
 | IV | 144〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I (声) −24〜−16 / II (トラック 18) −22〜−16 / III (声 2 回目) −22〜−15 / IV −22〜−19 → 消える; ステレオ平均 −16.5 dB、11:51、27.3 MiB
 - `compose_tablet201.py` (compose_tablet200 から; bank201.json = bank200 + 変換した声の採譜、4 つの wav で作れる。声の変換は `feminize_voice.feminize(x, sr, 5, semis=12, formant=1.15)`)
 
 ```bash
