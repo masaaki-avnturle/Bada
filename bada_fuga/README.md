@@ -4210,6 +4210,23 @@ CCXIV (三賢者の合唱 = G3 の 17 歳の女性 + G2 の男性の光輪、ト
 python3 compose_tablet215.py bank201.json src score_tablet215.json && python3 synth.py score_tablet215.json tablet215.wav && python3 video.py score_tablet215.json tablet215.wav tablet215.mp4
 ```
 
+## 🎤✨🎹 Requiem BADA — Tablet Sessions CCXVI · L'aureola della giovane donna con le due tracce e il loro pianoforte (tablet209 に、元の楽器を演奏して、無い楽器を加えずに、歌声を光輪様の若かりし女性の声で, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+テープは CCIX のまま (光輪の声 2 回 0.55、トラック 18 そのまま 3 回、トラック 8 を 4 度上げて全部と続き)、18:54 は入れない。歌声の元を若かりし女性の声に: 11/08 14:55 の男声を 13 半音上げ (基音の中央値 248 Hz)、フォルマント 1.15 倍 (CCIII の若い女性の声) を 1 人目に、その 5 度上 (×1.03、30 ms 遅れ、0.45) と 1 オクターヴ上 (×1.06、55 ms 遅れ、0.35) を重ねた三賢者、ト長調に 0.9 で調律、3.5 秒の残響 (光輪、0.9)、9 kHz 以上を落として rms −22.5 dB。元の楽器 = 録音の中にある楽器 (ピアノ) だけ: 声・トラック 18・トラック 8 の最上声の採譜から作った旋律 (各 8 小節) を 06:42 の実音のピアノで (配置は CCX と同じ)、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない (強拍の不協和 3)
+
+| 段落 | 小節 | 表 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜52 | 若かりし女性の光輪の声 + トラック 18 | 声の旋律 (アルト → テノール)、トラック 18 の旋律 (バス) |
+| II | 52〜100 | トラック 8 (全部) + トラック 18 (2 回目) | トラック 8 の旋律 (ソプラノ → テノール)、トラック 18 (アルト)、声の頭を 2 倍にバスで |
+| III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
+| IV | 150〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet216.py` (compose_tablet210 から 18:54 を外して; bank201.json、3 つの wav — 光輪の声は上の手順で作った若かりし女性のもの — で作れる)
+
+```bash
+python3 compose_tablet216.py bank201.json src score_tablet216.json && python3 synth.py score_tablet216.json tablet216.wav && python3 video.py score_tablet216.json tablet216.wav tablet216.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
