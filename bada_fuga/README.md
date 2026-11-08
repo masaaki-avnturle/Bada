@@ -4360,6 +4360,23 @@ python3 compose_tablet222.py bank201.json src score_tablet222.json && python3 sy
 python3 compose_tablet223.py bank201.json src score_tablet223.json && python3 synth.py score_tablet223.json tablet223.wav && python3 video.py score_tablet223.json tablet223.wav tablet223.mp4
 ```
 
+## 🎤📼📼🎹 Requiem BADA — Tablet Sessions CCXXIV · L'aureola sensuale sull'89 e l'86 (ドエロの光輪様の声・tablet89・tablet86 を混ぜて重ね、曲を演奏に, ニ短調 / ヘ長調, ♩=60, 11 分 44 秒)
+
+声は雑音 (息のノイズ層) を消したドエロの光輪様の声 (CCXXI / CCXXIII と同じ、rms −22.5 dB) を 2 回 (0.6)。tablet89 (LXXXIX — レクイエムとフーガ、ニ短調、6 分 31 秒) は全曲そのまま (0.45) と後半 (90 秒から、0.4)、tablet86 (LXXXVI、ト長調 / ホ短調、4 分 5 秒) は 2 半音下げてヘ長調 / ニ短調に合わせ、II〜III に全曲 (0.4)、IV に後半 (120 秒から、0.35) を裏に。組み立ては CCXXIII に tablet86 を加えたもの。元の楽器 = 録音の中にある楽器 (実音のピアノ) だけ: tablet89・tablet86・声の最上声の採譜から作った旋律 (各 8 小節) を 06:42 の実音のピアノで (342 音)、低いペダル (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フック・鐘は付け加えない。和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (強拍の不協和 3)
+
+| 段落 | 小節 | 表 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜50 | 光輪の声 + tablet89 の始まり | tablet89 の旋律 (アルト)、声の旋律 (テノール → ソプラノ)、tablet86 の旋律 (バス) |
+| II | 50〜100 | tablet89 のフーガ + tablet86 (全曲、裏) | tablet89 を 2 声で、低い形をバスで、声 (アルト)、tablet86 (ソプラノ) |
+| III | 100〜140 | 光輪の声 (2 回目) + tablet89 の後半 + tablet86 の続き | 声 (アルト)、tablet89 の低い形 (バス)、tablet89 (ソプラノ)、2 倍に伸ばして、tablet86 (アルト) |
+| IV | 140〜176 | tablet89 の終わり + tablet86 の後半 (裏) | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet224.py` (compose_tablet223 から; bank201.json、3 つの wav — 光輪の声は CCXXI のもの、tablet89・86 の音は mp4 から — で作れる)
+
+```bash
+python3 compose_tablet224.py bank201.json src score_tablet224.json && python3 synth.py score_tablet224.json tablet224.wav && python3 video.py score_tablet224.json tablet224.wav tablet224.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
