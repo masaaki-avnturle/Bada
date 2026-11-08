@@ -40,7 +40,7 @@ const CONTACT_SRC = fs.readFileSync(path.join(IDE, "exo", "contact-bb84.bada"), 
   let Bada = fn(mod, mod.exports, undefined) || mod.exports;
   if (Bada.BadaLang) Bada = Bada.BadaLang;
   const res = Bada.run(CONTACT_SRC, { maxSteps: 4000000 });
-  if (!res.ok || (res.parseErrors && res.parseErrors.length) || !/@@BB84-OK/.test(res.output) || !/@@GERT-OK/.test(res.output)) {
+  if (!res.ok || (res.parseErrors && res.parseErrors.length) || !/@@BB84-OK/.test(res.output) || !/@@GERT-OK/.test(res.output) || !/@@NONCOMM-OK/.test(res.output)) {
     console.error("ERROR: contact-bb84.bada failed — refusing to package");
     console.error((res.parseErrors || []).join("\n"));
     console.error(res.error || "");
@@ -224,6 +224,44 @@ let html = `<!DOCTYPE html>
   </div>
 
   <div class="card">
+    <h2>📥 受信モード — 重力⇄電磁 交信を受信し量子復号する</h2>
+    <div class="muted" style="line-height:1.75">
+      送信の逆向き:<b>逆Gertsenshtein効果</b>で到来した重力波を磁場中で光子へ戻し、
+      <b>特殊相対性理論の複素回転</b>(ローレンツ変換=虚角 iφ の回転)で到来周波数を補正、
+      <b>tuplenetworkリバイザの順序変換不可の原理</b>(非可換 XZ≠ZX)に根ざす<b>量子復号</b>で
+      本文を復元します。受信信号は光速で届くため<b>過去</b>の記録です —
+      遠方ほど「<b>遺跡信号</b>」(古い時代の文明の痕跡) になります。
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <div>
+        <div class="controls">
+          <label class="muted" style="flex:1;min-width:260px">源の視線速度 β=v/c (−接近 / +後退):
+            <input id="beta" type="range" min="-0.6" max="0.6" step="0.001" value="0.012" style="width:100%"/></label>
+        </div>
+        <div class="kv" id="relInfo"></div>
+        <div class="kv" id="recvBudget" style="margin-top:8px"></div>
+        <div class="controls" style="margin-top:10px">
+          <button class="g" id="recvLoopBtn">📡 自局の送信を受信 (ループバック)</button>
+          <label class="muted" style="display:inline-flex;align-items:center;gap:6px">
+            📂 .qmsg を受信 <input id="qfile" type="file" accept=".qmsg,text/plain" style="max-width:190px"/></label>
+        </div>
+        <div class="warn" id="recvWarn"></div>
+        <div class="ok" id="recvOk"></div>
+      </div>
+      <div>
+        <div class="muted">復元された 23×73 ビットマップ</div>
+        <canvas id="rxmsg" width="138" height="438" style="display:block;background:#04070f;border:1px solid var(--line);border-radius:10px;margin-top:6px;max-width:100%"></canvas>
+        <div class="mono muted" id="rxText" style="margin-top:8px;max-height:90px;overflow:auto"></div>
+      </div>
+    </div>
+    <div class="muted" style="margin-top:10px">
+      ※ 2026年時点で地球外からの受信実績は<b>ゼロ</b>。逆Gertsenshtein変換の確率は ~10⁻²¹ で
+      実在の信号は事実上検出不能です。本モードは自局で作成/保存した .qmsg を復号する
+      <b>シミュレーション</b>であり、実在の交信を傍受・受信するものではありません。
+    </div>
+  </div>
+
+  <div class="card">
     <h2>⚛ Bada量子エンジン — exo/contact-bb84.bada (矢印構文) をブラウザ内で実行</h2>
     <div class="controls">
       <button class="g" id="badaBtn">▶ BB84エンジンを実行</button>
@@ -287,7 +325,7 @@ window.CONTACT_SRC=/*__SRC__*/"";
   }
   var p=$("pick");
   TARGETS.forEach(function(t,i){ var o=document.createElement("option"); o.value=i; o.textContent="📡 "+t[0]+" — "+t[1]+"光年"; if(i===TI)o.selected=true; p.appendChild(o); });
-  p.addEventListener("change",function(){ TI=parseInt(this.value,10); budget(); });
+  p.addEventListener("change",function(){ TI=parseInt(this.value,10); budget(); if(window.__recvBudget) window.__recvBudget(); });
 
   /* ================= Arecibo-style 23x73 composer ======================== */
   var CW=23, CH=73, CELL=18;
@@ -401,11 +439,13 @@ window.CONTACT_SRC=/*__SRC__*/"";
   /* ================= encrypt + package =================================== */
   var CIPHER=null;
   function lcg(s){ return (s*1103+12345)%100003; }
+  // 整数の鍵種: kv と Jones|V| から再現可能に導出 (受信側が厳密に復号できる)
+  function keySeed(K){ return ((K.kv*100003)+Math.round(K.jones*1e6))%2147483647; }
   function encrypt(){
     if(!KEY){ $("encInfo").innerHTML="<b>状態</b><span style='color:#ff9aa5'>先に BB84 で鍵を確立してください (盗聴検出時は鍵なし)</span>"; return; }
     var bytes=messageBytes();
-    var ks=KEY.kv+KEY.jones*1000, ct=[];
-    for(var i=0;i<bytes.length;i++){ ks=lcg(ks); ct.push((bytes[i]+Math.floor(ks))%256); }
+    var ks=keySeed(KEY), ct=[];
+    for(var i=0;i<bytes.length;i++){ ks=lcg(ks); ct.push((bytes[i]+ks)%256); }
     CIPHER=ct;
     var hex=ct.slice(0,24).map(function(b){ return ("0"+b.toString(16)).slice(-2); }).join(" ");
     $("encInfo").innerHTML=
@@ -417,7 +457,7 @@ window.CONTACT_SRC=/*__SRC__*/"";
   $("encBtn").addEventListener("click",encrypt);
   $("dlBtn").addEventListener("click",function(){
     if(!CIPHER){ $("cipherPrev").textContent="先に暗号化してください。"; return; }
-    var head="QMSG/1 QuantumContact\\n宛先: "+TARGETS[TI][0]+"\\n距離: "+TARGETS[TI][1]+" 光年\\n鍵指紋: kv="+KEY.kv+" |V|="+KEY.jones.toFixed(6)+" QBER="+(KEY.qber*100).toFixed(1)+"%\\n注記: 実送信はしていません (2026年時点で接触実績ゼロ)\\n---\\n";
+    var head="QMSG/1 QuantumContact\\n宛先: "+TARGETS[TI][0]+"\\n距離: "+TARGETS[TI][1]+" 光年\\n鍵指紋: kv="+KEY.kv+" |V|="+KEY.jones.toFixed(6)+" QBER="+(KEY.qber*100).toFixed(1)+"%\\n鍵種: "+keySeed(KEY)+"\\n注記: 実送信はしていません (2026年時点で接触実績ゼロ)\\n---\\n";
     var body=CIPHER.map(function(b){ return ("0"+b.toString(16)).slice(-2); }).join("");
     var blob=new Blob([head+body+"\\n"],{type:"text/plain"});
     var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
@@ -559,8 +599,79 @@ window.CONTACT_SRC=/*__SRC__*/"";
   $("gL").addEventListener("input",gert);
   $("gTapBtn").addEventListener("click",tap);
 
+  /* ====== RECEIVER: inverse Gertsenshtein + relativistic complex rotation = */
+  var RCELL=6, rxc=$("rxmsg"), rxx=rxc.getContext("2d");
+  function drawRx(g){
+    rxx.fillStyle="#04070f"; rxx.fillRect(0,0,rxc.width,rxc.height);
+    for(var y=0;y<CH;y++) for(var x=0;x<CW;x++){
+      if(g[y][x]){ rxx.fillStyle=heatColor(150+((x*7+y*11)%900)); rxx.fillRect(x*RCELL+1,y*RCELL,RCELL-1,RCELL-1); }
+    }
+  }
+  function bytesToRx(bytes){
+    var bits=[], i, j;
+    for(i=0;i<210 && i<bytes.length;i++){ for(j=7;j>=0;j--) bits.push((bytes[i]>>j)&1); }
+    var g=[]; for(var y=0;y<CH;y++){ var r=[]; for(var x=0;x<CW;x++){ var k=y*CW+x; r.push(k<bits.length?bits[k]:0); } g.push(r); }
+    var txt=""; try{ txt=new TextDecoder().decode(new Uint8Array(bytes.slice(210))); }catch(e){ txt="(decode error)"; }
+    return {grid:g, text:txt};
+  }
+  function hexToBytes(h){ h=h.replace(/[^0-9a-fA-F]/g,""); var b=[]; for(var i=0;i+1<h.length;i+=2) b.push(parseInt(h.substr(i,2),16)); return b; }
+  function decrypt(ct, seed){ var ks=seed, out=[]; for(var i=0;i<ct.length;i++){ ks=lcg(ks); out.push(((ct[i]-ks)%256+256)%256); } return out; }
+  // 特殊相対性理論の複素回転体: ローレンツ・ブースト = 虚角 iφ の回転
+  function relRot(){
+    var beta=parseFloat($("beta").value);
+    var phi=Math.atanh(beta), ch=Math.cosh(phi), sh=Math.sinh(phi);
+    var D=Math.sqrt((1-beta)/(1+beta)), gam=1/Math.sqrt(1-beta*beta);
+    $("relInfo").innerHTML=
+      "<b>ラピディティ φ</b><span>artanh(β)="+phi.toFixed(4)+" → ブースト=虚角 iφ の回転</span>"+
+      "<b>複素回転体</b><span class='mono'>[[cosh,−sinh],[−sinh,cosh]]=[["+ch.toFixed(3)+","+(-sh).toFixed(3)+"],["+(-sh).toFixed(3)+","+ch.toFixed(3)+"]]</span>"+
+      "<b>ローレンツ因子 γ</b><span>"+gam.toFixed(4)+"</span>"+
+      "<b>相対論ドップラー</b><span>f_rx/f_tx=√((1−β)/(1+β))="+D.toFixed(4)+(beta>0.0005?" (赤方偏移)":beta<-0.0005?" (青方偏移)":" (無偏移)")+"</span>";
+  }
+  // 逆Gertsenshtein受信 + ルックバック (過去=遺跡信号)
+  function recvBudget(){
+    var t=TARGETS[TI], d=t[1], emit=2026-d, ruin=(d>=1000);
+    var B=3e-10, L=d*9.461e15, P=GPREF*B*B*L*L;
+    $("recvBudget").innerHTML=
+      "<b>受信源</b><span>"+t[0].split(" ★")[0]+" — "+d+" 光年</span>"+
+      "<b>発信時期 (光速の遡り)</b><span>"+(emit>=0?("西暦 "+Math.round(emit)+" 年"):("約 "+Math.round(-emit).toLocaleString()+" 年前"))+(ruin?' <span class="badge">遺跡信号</span>':"")+"</span>"+
+      "<b>逆Gertsenshtein P</b><span class='mono'>"+P.toExponential(2)+" (実信号は事実上検出不能)</span>";
+  }
+  function recvLoop(){
+    $("recvWarn").style.display="none"; $("recvOk").style.display="none";
+    if(!CIPHER||!KEY){ $("recvWarn").style.display="block"; $("recvWarn").innerHTML="先に右側で (1) ⚛ BB84で鍵配送 → (2) 🔐 Jones量子鍵で暗号化 を実行してください。"; return; }
+    relRot(); recvBudget();
+    var plain=decrypt(CIPHER, keySeed(KEY)), rx=bytesToRx(plain), orig=messageBytes();
+    drawRx(rx.grid);
+    var match=(plain.length===orig.length)&&plain.every(function(b,i){return b===orig[i];});
+    $("rxText").textContent="復元テキスト: "+rx.text;
+    $("recvOk").style.display="block";
+    $("recvOk").innerHTML="✅ 受信・量子復号に成功 — "+plain.length+" バイトを復元"+(match?" <b>(送信原本と完全一致)</b>":"")+"。順序変換不可(非可換)の量子鍵で守られた交信を復元しました。";
+  }
+  $("beta").addEventListener("input",relRot);
+  $("recvLoopBtn").addEventListener("click",recvLoop);
+  $("qfile").addEventListener("change",function(ev){
+    var f=ev.target.files[0]; if(!f) return;
+    var rd=new FileReader();
+    rd.onload=function(){
+      $("recvWarn").style.display="none"; $("recvOk").style.display="none";
+      try{
+        var txt=String(rd.result), mSeed=txt.match(/鍵種:\\s*(\\d+)/), idx=txt.indexOf("---");
+        var ct=hexToBytes(idx>=0?txt.slice(idx+3):txt);
+        if(!mSeed){ $("recvWarn").style.display="block"; $("recvWarn").innerHTML="このファイルには鍵種がありません (旧形式)。本バージョンで保存した .qmsg を使ってください。"; return; }
+        var plain=decrypt(ct, parseInt(mSeed[1],10)), rx=bytesToRx(plain);
+        drawRx(rx.grid); relRot(); recvBudget();
+        $("rxText").textContent="復元テキスト: "+rx.text;
+        var dst=txt.match(/宛先:\\s*(.+)/);
+        $("recvOk").style.display="block";
+        $("recvOk").innerHTML="✅ .qmsg を受信・量子復号 — "+plain.length+" バイト復元。"+(dst?("源: "+dst[1]):"");
+      }catch(e){ $("recvWarn").style.display="block"; $("recvWarn").innerHTML="復号エラー: "+e.message; }
+    };
+    rd.readAsText(f);
+  });
+
   /* ================= init ================================================= */
-  preset(); budget(); gert();
+  window.__recvBudget=recvBudget;
+  preset(); budget(); gert(); relRot(); recvBudget();
   requestAnimationFrame(loop);
 })();
 </script>
