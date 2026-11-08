@@ -4007,6 +4007,25 @@ python3 build_sampler.py bankraw 20261108_135117.wav   # 原音の声 (音量を
 python3 compose_tablet200.py bank200.json src score_tablet200.json && python3 synth.py score_tablet200.json tablet200.wav && python3 video.py score_tablet200.json tablet200.wav tablet200.mp4
 ```
 
+## 🎤🎹🎧 Requiem BADA — Tablet Sessions CCI · La voce femminile sulle due tracce (2026/11/08 14:55 の声を女性の声にして、トラック 8・18・11/06 18:54 に重ね合わせ、元の楽器を演奏させて — アルペジオや元の曲に無い楽器は付け加えない, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+声: 11/08 14:55 の録音 (3 分 19 秒、男声、f0 中央値 116 Hz) を `feminize_voice.py` の WORLD ボコーダーで 1 オクターヴ上げ、フォルマントを 1.15 倍にして女性の声に (変換後の f0 中央値 233 Hz、10〜90 % が 184〜302 Hz)、音高をヘ長調の音階に 0.6 で寄せ、rms −22 dB に揃える。テープ: 声を 2 回 (0.55、表)、18:54 の実音を途切れなく 3 回半 (0.45)、トラック 18 (ニ短調) はそのまま 2 回、トラック 8 (ハ長調 / イ短調) は 4 度上げてヘ長調 / ニ短調に、裏に 2 回。元の楽器 = 録音の中にある楽器 (ピアノ) だけ: 声・トラック 18・トラック 8 の最上声の採譜から作った旋律 (各 8 小節) を 06:42 の実音のピアノの 1 音のサンプラーで、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (強拍の不協和 3)
+
+| 段落 | 小節 | 表 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜52 | 声 (女性の声に)、トラック 8 が裏 | 声の旋律 (アルト → テノール)、トラック 8 の旋律 (バス) |
+| II | 52〜92 | トラック 18 | トラック 18 の旋律 (ソプラノ → テノール)、声の頭を 2 倍にバスで |
+| III | 92〜144 | 声 (2 回目)、トラック 8 の続きが裏 | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
+| IV | 144〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet201.py` (compose_tablet200 から; bank201.json = bank200 + 変換した声の採譜、4 つの wav で作れる。声の変換は `feminize_voice.feminize(x, sr, 5, semis=12, formant=1.15)`)
+
+```bash
+python3 -c "import soundfile as sf, numpy as np; from feminize_voice import feminize; x, sr = sf.read('20261108_145525_raw.wav'); sf.write('20261108_145525.wav', feminize(x.astype(np.float64), sr, 5, semis=12.0, formant=1.15), sr)"
+python3 build_sampler.py bank1455 20261108_145525.wav
+python3 compose_tablet201.py bank201.json src score_tablet201.json && python3 synth.py score_tablet201.json tablet201.wav && python3 video.py score_tablet201.json tablet201.wav tablet201.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
