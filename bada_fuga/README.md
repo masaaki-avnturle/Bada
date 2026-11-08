@@ -3981,6 +3981,7 @@ python3 compose_tablet198.py bank196.json src score.json score_tablet198.json &&
 | III | 100〜158 | 声 (2 回目) | トラック 8 の続き、18:54 |
 | IV | 158〜176 | トラック 18 の後半 | 18:54 の終わり、一緒に消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I (声) −20〜−14 / II (トラック 18) −21〜−14 / III (声 2 回目) −18〜−13.5 / IV −20〜−17 → 消える; ステレオ平均 −16.1 dB、11:51、27.4 MiB
 - `compose_tablet199.py` (compose_tablet174 から; 4 つの wav だけで作れる)
 
 ```bash
