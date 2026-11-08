@@ -4027,6 +4027,23 @@ python3 build_sampler.py bank1455 20261108_145525.wav
 python3 compose_tablet201.py bank201.json src score_tablet201.json && python3 synth.py score_tablet201.json tablet201.wav && python3 video.py score_tablet201.json tablet201.wav tablet201.mp4
 ```
 
+## 🎤🎧🎧 Requiem BADA — Tablet Sessions CCII · Cinque suoni, nulla tolto (2026/11/08 14:55・tablet89・tablet86・トラック 18・トラック 8 を重ねて — 曲にある音は取り除かず、アルペジオや原曲に無い音は入れない, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+5 つの音だけ、楽器は何も加えず、何も取り除かない (サンプラーのピアノも、ペダルも、鐘もなし): 14:55 の声は原音のまま (rms −22 dB に揃えるだけ、2 回 0.55)、tablet89 (LXXXIX、ニ短調) は全曲と後半 (0.45)、tablet86 (LXXXVI、ト長調) は全音下げてヘ長調に全曲と後半 (0.45)、トラック 18 (ニ短調) はそのまま全部と後半 (0.5 / 0.45)、トラック 8 (ハ長調 / イ短調) は 4 度上げてヘ長調 / ニ短調に (0.4)。6 秒のフェード・イン、6〜10 秒のフェード・アウト
+
+| 段落 | 小節 | 重ねる音 |
+|---|---|---|
+| I | 0〜50 | tablet89 (レクイエム) + 14:55 の声 (原音) |
+| II | 50〜100 | tablet86 (全音下げて) + トラック 18 |
+| III | 100〜150 | tablet89 の後半 (90 秒から) + 声 (2 回目) + トラック 8 (4 度上げて) |
+| IV | 150〜176 | tablet86 の後半 (100 秒から) + トラック 18 の後半、一緒に消える |
+
+- `compose_tablet202.py` (compose_tablet199 から; 5 つの wav だけで作れる — tablet89・86 の音声は `20261107_089000.wav`・`20261107_086000.wav` に)
+
+```bash
+python3 compose_tablet202.py bank150.json src score_tablet202.json && python3 synth.py score_tablet202.json tablet202.wav && python3 video.py score_tablet202.json tablet202.wav tablet202.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
