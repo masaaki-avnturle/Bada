@@ -4230,6 +4230,23 @@ python3 compose_tablet215.py bank201.json src score_tablet215.json && python3 sy
 python3 compose_tablet216.py bank201.json src score_tablet216.json && python3 synth.py score_tablet216.json tablet216.wav && python3 video.py score_tablet216.json tablet216.wav tablet216.mp4
 ```
 
+## 🎤🎼📼 Requiem BADA — Tablet Sessions CCXVII · L'aureola della giovane donna, la fuga e il tablet89 (若かりし女性の光輪様の声・fuga・tablet89 を、無い楽器を加えずに重ね合わせて, ♩=60, 11 分 52 秒)
+
+3 つの音だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘もなし)、移調もなし。若かりし女性の光輪様の声 (CCXVI の三賢者 — 13 半音上げ・フォルマント 1.15 倍の若い女性の声 + 5 度上 + 1 オクターヴ上、3.5 秒の残響) を 2 回 (0.6)、fuga (オルガンのフーガ、ニ短調、329 秒、rms −17.1 dB) を全部 1 回 (0.32) と終わりの 90 秒をもう一度 (0.3)、tablet89 (ヘ長調 / ニ短調、391 秒、rms −18.3 dB) を全部 1 回 (0.35) と 200 秒からの後半をもう一度 (0.3)。6 秒のフェード・イン、6〜10 秒のフェード・アウト。fuga と tablet89 の音は、送られた mp4 から取り出した音そのもの
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜52 | 光輪の声 + tablet89 (始めから) |
+| II | 52〜100 | fuga (全部) + tablet89 の続き (98 小節まで) |
+| III | 100〜152 | 光輪の声 (2 回目) + fuga の終わり (134 小節まで) + tablet89 の後半 (200 秒から) |
+| IV | 152〜178 | fuga の終わり (239 秒から) をもう一度、消える |
+
+- `compose_tablet217.py` (compose_tablet209 から; bank201.json、3 つの wav — 光輪の声は CCXVI のもの、fuga.wav と tablet89 の音は mp4 から — で作れる)
+
+```bash
+python3 compose_tablet217.py bank201.json src score_tablet217.json && python3 synth.py score_tablet217.json tablet217.wav && python3 video.py score_tablet217.json tablet217.wav tablet217.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
