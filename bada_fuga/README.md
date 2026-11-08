@@ -3839,6 +3839,23 @@ python3 compose_tablet190.py bank190.json src score.json score_tablet190.json &&
 python3 compose_tablet191.py bank190.json src score_tablet191.json && python3 synth.py score_tablet191.json tablet191.wav && python3 video.py score_tablet191.json tablet191.wav tablet191.mp4
 ```
 
+## 🎧🎧🎼 Requiem BADA — Tablet Sessions CXCII · Il 18:54 sul 89 — solo l'originale (tablet89 の原曲と 2026/11/06 18:54 だけで — この曲に無い楽器は使わない, ニ短調, ♩=60, 11 分 52 秒)
+
+2 つの音声だけ、楽器は何も加えない (06:42 の実音のピアノのサンプラーも tablet89 には無い楽器なので使わない; CXCI はそれで旋律を弾いた版): tablet89 (LXXXIX — レクイエムとフーガ、ニ短調、6 分 31 秒) を原曲の音声そのまま全曲 (0.5) と後半 (90 秒から、0.45)、11/06 18:54 の実音 (rms −22 dB に揃えたもの) を途切れなく 3 回半 (0.5、切れ目は 6 秒のクロスフェード)、同じ大きさで重ねる
+
+| 段落 | 小節 | tablet89 | 18:54 |
+|---|---|---|---|
+| I | 0〜50 | 始まり (レクイエム) | 1 回目 |
+| II | 50〜100 | 続き (フーガ) | 2 回目 |
+| III | 100〜150 | 後半 (90 秒から、2 回目) | 3 回目 |
+| IV | 150〜176 | 終わり | 4 回目 (前半)、一緒に消える |
+
+- `compose_tablet192.py` (compose_tablet179 から; 2 つの wav だけで作れる — tablet89 の音声は `20261107_089000.wav` に)
+
+```bash
+python3 compose_tablet192.py bank150.json src score_tablet192.json && python3 synth.py score_tablet192.json tablet192.wav && python3 video.py score_tablet192.json tablet192.wav tablet192.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
