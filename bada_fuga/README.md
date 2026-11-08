@@ -3832,6 +3832,7 @@ python3 compose_tablet190.py bank190.json src score.json score_tablet190.json &&
 | III | 100〜140 | 後半 (90 秒から、2 回目) | アルトとバス、2 倍に伸ばしてテノールで |
 | IV | 140〜176 | 終わり | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −20〜−18 / II −23〜−16.5 / III −24〜−17 / IV −24〜−17 → −28 (消える); ステレオ平均 −16.2 dB、11:51、27.4 MiB
 - `compose_tablet191.py` (compose_tablet185 から; bank190.json (tablet89 の採譜入り) と 2 つの wav で作れる)
 
 ```bash
