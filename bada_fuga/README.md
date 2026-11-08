@@ -3988,6 +3988,24 @@ python3 compose_tablet198.py bank196.json src score.json score_tablet198.json &&
 python3 compose_tablet199.py bank150.json src score_tablet199.json && python3 synth.py score_tablet199.json tablet199.wav && python3 video.py score_tablet199.json tablet199.wav tablet199.mp4
 ```
 
+## 🎤🎹🎧 Requiem BADA — Tablet Sessions CC · Quattro suoni originali con il loro pianoforte (tablet199 の 4 つの原音に、元の楽器を省かずに — アルペジオや原曲に無い音は使わない, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+テープは CXCIX のまま (13:51 の声は変換なしの原音 rms −22 dB で 2 回 0.55、18:54 は途切れなく 3 回半 0.45、トラック 18 はそのまま 2 回、トラック 8 は 4 度上げて裏に 2 回)。元の楽器 = 録音の中にある楽器 (ピアノ) だけ: 声 (原音の採譜 `20261108_135117`)・トラック 18・トラック 8 の最上声から作った旋律 (各 8 小節、ヘ長調 / ニ短調) を 06:42 の実音のピアノの 1 音のサンプラーで、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (強拍の不協和 2)
+
+| 段落 | 小節 | 表の原音 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜60 | 声、トラック 8 が裏 | 声の旋律 (アルト → テノール)、トラック 8 の旋律 (バス) |
+| II | 60〜100 | トラック 18 | トラック 18 の旋律 (ソプラノ → テノール)、声の頭を 2 倍にバスで |
+| III | 100〜158 | 声 (2 回目)、トラック 8 の続きが裏 | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
+| IV | 158〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet200.py` (compose_tablet198 から fuga を外したもの; bank200.json = bank196 + 原音の声の採譜、4 つの wav で作れる)
+
+```bash
+python3 build_sampler.py bankraw 20261108_135117.wav   # 原音の声 (音量を揃えたもの) を別の id で採譜
+python3 compose_tablet200.py bank200.json src score_tablet200.json && python3 synth.py score_tablet200.json tablet200.wav && python3 video.py score_tablet200.json tablet200.wav tablet200.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
