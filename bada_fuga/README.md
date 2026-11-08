@@ -4178,6 +4178,16 @@ CCXII (女性版) と対の 2 ファイル。曲は同じで、光輪様の声�
 python3 compose_tablet213.py bank201.json src score_tablet213.json && python3 synth.py score_tablet213.json tablet213.wav && python3 video.py score_tablet213.json tablet213.wav tablet213.mp4
 ```
 
+## 🎤✨🎹 Requiem BADA — Tablet Sessions CCXIV · Il coro dei tre saggi (tablet212 と tablet213 の声を三賢者の合唱で重ね合わせ, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+曲は CCX と同じ (トラック 18・トラック 8・18:54、元の楽器 = 旋律の実音のピアノと低いペダル、段落も同じ) で、光輪様の声を CCXII の 17 歳の女性の光輪 (G3 = 196 Hz に調律、基音 + 5 度上 + 1 オクターヴ上の 3 声) と CCXIII の男性の光輪 (G2 = 98 Hz、3 声) を等しい音量で同時に鳴らした三賢者の合唱 (6 声、rms −22.5 dB) に。同じ録音から作った 2 つの声なので言葉と拍は揃い、女声と男声がオクターヴで重なる。アルペジオ・パッド・ベース・ドラム・フックは付け加えない (強拍の不協和 3)
+
+- `compose_tablet214.py` (compose_tablet213 から; bank201.json、4 つの wav — 光輪の声は tablet212 と tablet213 の声を足したもの — で作れる)
+
+```bash
+python3 compose_tablet214.py bank201.json src score_tablet214.json && python3 synth.py score_tablet214.json tablet214.wav && python3 video.py score_tablet214.json tablet214.wav tablet214.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
