@@ -3894,6 +3894,24 @@ python3 build_sampler.py bank1108 20261108_131016.wav 20261108_131650.wav
 python3 compose_tablet194.py bank194.json src score_tablet194.json && python3 synth.py score_tablet194.json tablet194.wav && python3 video.py score_tablet194.json tablet194.wav tablet194.mp4
 ```
 
+## 🎧🎹🎼 Requiem BADA — Tablet Sessions CXCV · Il 13:40 e le due tracce sul 86 (2026/11/08 13:40・tablet86・トラック 18・トラック 8 を重ね合わせて、元の楽器を演奏させて — アルペジオや元の曲に無い楽器は付け加えない, ト長調 / ホ短調, ♩=60, 11 分 52 秒)
+
+調は tablet86 (LXXXVI — 実音のピアノの 1 音のサンプラーだけで作った曲、ト長調 / ホ短調) に揃える: トラック 18 (ニ短調) は全音上げてホ短調に、トラック 8 (ハ長調 / イ短調) は 5 度上げてト長調 / ホ短調に、11/08 13:40 (ホ長調 / 嬰ハ短調、3 分 51 秒、静かなので rms −21 dB に揃えて) は短 3 度上げて。テープ: tablet86 を全曲 2 回 (0.45 / 0.4)、トラック 18 を 2 回、トラック 8 を全部と続き、13:40 を 1 回 (0.5)。元の楽器 = 録音と tablet86 の中にある楽器 (ピアノ) だけ: 4 つの最上声の採譜から作った旋律 (各 8 小節、ト長調 / ホ短調に寄せて) を 06:42 の実音のピアノの 1 音のサンプラーで、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (強拍の不協和 1)
+
+| 段落 | 小節 | 表の実音 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜44 | トラック 18 (全音上げて) | トラック 18 の旋律 (アルト → テノール)、tablet86 の旋律 (バス) |
+| II | 44〜86 | トラック 8 (5 度上げて、全部) | トラック 8 の旋律 (ソプラノ → テノール)、tablet86 (アルト) |
+| III | 86〜136 | 13:40 (短 3 度上げて、全部)、tablet86 の 2 回目 | 13:40 の旋律 (ソプラノ → アルト)、トラック 18 と 8 を同時に |
+| IV | 136〜176 | トラック 18 (2 回目)、トラック 8 の続き | 4 つの旋律の頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet195.py` (compose_tablet194 から; bank195.json = bank194 + 13:40 の採譜、4 つの wav — tablet86 の音声は `20261107_086000.wav` に — で作れる)
+
+```bash
+python3 build_sampler.py bank1340 20261108_134014.wav
+python3 compose_tablet195.py bank195.json src score_tablet195.json && python3 synth.py score_tablet195.json tablet195.wav && python3 video.py score_tablet195.json tablet195.wav tablet195.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
