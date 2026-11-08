@@ -4322,6 +4322,25 @@ python3 compose_tablet220.py bank201.json src score_tablet220.json && python3 sy
 python3 compose_tablet221.py bank201.json src score.json score_tablet221.json && python3 synth.py score_tablet221.json tablet221.wav && python3 video.py score_tablet221.json tablet221.wav tablet221.mp4
 ```
 
+## 🎤🎸 Requiem BADA — Tablet Sessions CCXXII · L'aureola sensuale con la chitarra acustica (tablet220 をアコースティックギター全面にして、ドエロの光輪様の声も前面に, ヘ長調 / ニ短調, ♩=60, 11 分 44 秒)
+
+テープは CCXIX / CCXX と同じ素材 (ドエロの光輪様の声 2 回、トラック 18 そのまま 3 回、トラック 8 を 4 度上げて全部と続き) で、声を前面に (0.55 → 0.8)、トラック 18・8 は後ろへ (0.3 / 0.25)。ピアノ (旋律の実音のピアノと低いペダル) を全部アコースティックギターに置き換える: 声・トラック 18・トラック 8 の旋律 (各 8 小節、採譜、配置は CCX / CCXX と同じ 282 音) をギターの単音 (0.8) で、その下に全曲、指弾きの分散和音 (8 分: 低音弦 → 5 度 → 3 度 → 5 度、0.32) と低音弦 (半小節ごと、0.45)、1376 音。他の楽器は加えない。測った比: 声 ≈ −19 dB、ギター ≈ −20〜−24 dB、トラック ≈ −23 dB (最初の 80 秒、同じ基準で)
+
+**ギターについて**: 手元に本物のアコースティックギターの録音が無いので、`synth.py` に物理モデル `acoustic_guitar` を追加した — Karplus-Strong の撥弦 (平均化フィルター + 1 次オールパスで音程を数セント以内に)、ピックが弦に当たる 4 ms のノイズ、胴の共鳴 (空気 ≈ 102 Hz、表板 ≈ 205 / 410 Hz、広い 1 kHz) を 2 次の共振で足す、長い音は弦の減衰で、指で止めると 0.22 秒で消える。録音ではない (本物のギターの録音があれば、サンプラーで差し替えられる)。extras の声部 `AG`、`meta.notes_silent` で 4 声のサンプラーの音を止めて extras だけで鳴らす
+
+| 段落 | 小節 | 表 | アコースティックギター |
+|---|---|---|---|
+| I | 0〜52 | 光輪の声 (前面) + トラック 18 | 声の旋律 (アルト → テノール)、トラック 18 の旋律 (バス) + 指弾き |
+| II | 52〜100 | トラック 8 (全部) + トラック 18 (2 回目) | トラック 8 の旋律 (ソプラノ → テノール)、トラック 18 (アルト)、声の頭を 2 倍に + 指弾き |
+| III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) + 指弾き |
+| IV | 150〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、指弾きと低音弦だけが残って消える |
+
+- `compose_tablet222.py` (compose_tablet220 から; bank201.json、3 つの wav — 光輪の声はドエロの光輪様の声 — で作れる)。`synth.py` に `acoustic_guitar` と `AG`、`notes_silent` を追加
+
+```bash
+python3 compose_tablet222.py bank201.json src score_tablet222.json && python3 synth.py score_tablet222.json tablet222.wav && python3 video.py score_tablet222.json tablet222.wav tablet222.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

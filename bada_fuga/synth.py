@@ -559,6 +559,28 @@ def clean_guitar(freq, dur, vel=0.3, sr=SR):
     if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.35)
     return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
 
+def acoustic_guitar(freq, dur, vel=0.3, sr=SR):
+    """アコースティックギター (スチール弦) のモデル: 撥弦 = Karplus-Strong (ピックの短いノイズと指の当たり)、胴の共鳴 (空気の共鳴 ≈ 100 Hz、表板 ≈ 200 / 400 Hz、広い 1 kHz) を 2 次の共振で足す。
+    録音ではなく物理モデル。音程は数セント以内、長い音は弦の減衰で自然に消える"""
+    from scipy.signal import lfilter
+    n = int((dur + 2.2) * sr); P = int(sr / freq) + 1
+    rng = np.random.default_rng(int(freq * 11) % 99991)
+    burst = rng.uniform(-1, 1, P)
+    burst = lfilter([0.7, 0.3], [1.0], burst)                                      # 少し明るいピック
+    y = _ks_string(freq, n, 3.2 * (196.0 / freq) ** 0.45, burst, sr)
+    pick = rng.standard_normal(int(0.004 * sr)).astype(np.float32) * np.exp(-np.arange(int(0.004 * sr)) / (0.0012 * sr)).astype(np.float32)
+    y[:len(pick)] += pick * 0.25                                                      # ピックが弦に当たる音
+    body = np.zeros_like(y)
+    for f0, q, g in ((102.0, 9.0, 0.9), (205.0, 7.0, 0.6), (410.0, 6.0, 0.45), (1000.0, 2.5, 0.3)):
+        w = 2 * math.pi * f0 / sr; r = 1 - w / (2 * q)
+        body += g * lfilter([1 - r], [1.0, -2 * r * math.cos(w), r * r], y).astype(np.float32)
+    y = 0.7 * y + 0.55 * body
+    t = np.arange(n, dtype=np.float32) / sr
+    i0 = int(dur * sr)
+    if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.22)                             # 指で止める
+    y = y - _lp(y, 0.004)                                                             # 低域のこもりを少し取る
+    return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
 def drive_guitar(freq, dur, vel=0.3, mute=False, sr=SR):
     """歪んだエレキギターのパワーコード (撥弦 = Karplus-Strong の根音・5 度・オクターヴ → 真空管のような歪み → キャビネットの低域通過)。
     mute=True はブリッジ・ミュートの刻み。鋸歯波のシンセではないので、ゲームのような音にならない"""
@@ -872,6 +894,7 @@ def main(score='score.json', out='fuga.wav'):
     global VOWEL
     VOWEL = d.get('meta', {}).get('vowel', 'a')
     for nt in d['notes']:
+        if recs and d.get('meta', {}).get('notes_silent'): break                  # 4 声は extras (例: アコースティックギター) で鳴らす
         tb = TIMBRE[nt['v']]
         freq = 440.0 * 2 ** ((nt['m'] - 69) / 12.0)
         dur = max(nt['d'] - 0.035, 0.06)
@@ -1048,9 +1071,10 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
             L[i0:i1] += y[:i1 - i0] * cl * 0.35; R[i0:i1] += y[:i1 - i0] * cr * 0.35
             continue
-        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO', 'DG', 'E8', 'SY'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
+        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO', 'DG', 'E8', 'SY', 'AG'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
             v = ex['v']; vel = ex.get('gain', 0.3)
             if v == 'CG': y = clean_guitar(freq, ex['d'], vel)
+            elif v == 'AG': y = acoustic_guitar(freq, ex['d'], vel)
             elif v == 'EB': y = picked_bass(freq, ex['d'], vel)
             elif v == 'LG': y = lead_guitar(freq, ex['d'], vel)
             elif v == 'OU': y = oud_tone(freq, ex['d'], vel)
@@ -1058,7 +1082,7 @@ def main(score='score.json', out='fuga.wav'):
             elif v == 'SY': y = synth_piano(freq, ex['d'], vel)
             elif v == 'E8': y = bass808(freq, ex['d'], vel, slide_to=440.0 * 2 ** ((ex['slide'] - 69) / 12.0) if ex.get('slide') else None)
             else: y = choir_tone(freq, ex['d'], a=0.5, r=1.2) * vel
-            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0, 'DG': 0.35, 'E8': 0.0, 'SY': 0.2}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8, 'DG': 0.12, 'E8': 0.02, 'SY': 0.35}[v]
+            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0, 'DG': 0.35, 'E8': 0.0, 'SY': 0.2, 'AG': -0.1}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8, 'DG': 0.12, 'E8': 0.02, 'SY': 0.35, 'AG': 0.3}[v]
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
