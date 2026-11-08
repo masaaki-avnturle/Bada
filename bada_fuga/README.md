@@ -4389,6 +4389,7 @@ CCXXIV のテープ (tablet89 を全曲と後半、tablet86 を 2 半音下げ�
 | III | 100〜140 | 光輪の声 (2 回目) + tablet89 の後半 + tablet86 の続き | 声 (アルト → ソプラノ)、tablet89 の低い形 (バス)、tablet89 (ソプラノ → バス)、tablet86 (テノール → アルト) |
 | IV | 140〜176 | tablet89 の終わり + tablet86 の後半 (裏) | 声 (テノール)、tablet89 (アルト)、tablet86 (ソプラノ)、低い形 (バス)、頭を 2 倍に伸ばして、ペダルだけが残って消える |
 
+- 測った音量 (4 秒 rms、モノ): I 声+tablet89 −20.8 → −22.1 → −19.4 → −20.1 → −20.0 dB / II tablet89 のフーガ+tablet86 −24.1 → −22.5 → −20.6 → −19.0 → −21.1 dB / III 声+tablet89+tablet86 −20.6 → −19.7 → −19.2 → −19.0 dB / IV tablet89 の終わり+tablet86 −21.0 → −22.1 → −21.5 dB。全体 mean −15.7 dB、max 0.0 dB。26.7 MiB。
 - `compose_tablet225.py` (compose_tablet224 から; bank201.json、3 つの wav — 光輪の声は CCXIX / CCXX の雑音ありのもの — で作れる)
 
 ```bash
