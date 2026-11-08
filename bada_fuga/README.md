@@ -4414,6 +4414,23 @@ python3 compose_tablet225.py bank201.json src score_tablet225.json && python3 sy
 python3 compose_tablet226.py bank201.json src score_tablet226.json && python3 synth.py score_tablet226.json tablet226.wav && python3 video.py score_tablet226.json tablet226.wav tablet226.mp4
 ```
 
+## 🎤📼 Requiem BADA — Tablet Sessions CCXXVII · L'aureola sensuale sul 89, senza strumenti (ドエロの光輪様の声に tablet89 を重ね合わせて, ニ短調, ♩=60, 11 分 44 秒)
+
+2 つの音だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘もなし)、移調もなし。組み立ては CCXXVI と同じで、声だけドエロの光輪様の声 (CCXIX / CCXX のもの、息のノイズ層あり — 10.5 半音上げ・フォルマント 1.10 倍の少し低めの女声に息・囁き・近接の低音、三賢者の 5 度上 0.3 と 1 オクターヴ上 0.25、3.5 秒の残響、rms −22.5 dB) を 2 回 (0.6)。tablet89 (LXXXIX — レクイエムとフーガ、ニ短調、6 分 31 秒) は全曲そのまま (0.5) と後半 (90 秒から、0.45)
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜50 | ドエロの光輪の声 + tablet89 の始まり (レクイエム) |
+| II | 50〜100 | tablet89 のフーガ |
+| III | 100〜140 | 光輪の声 (2 回目) + tablet89 の後半 (90 秒から) |
+| IV | 140〜176 | tablet89 の終わり、消える |
+
+- `compose_tablet227.py` (compose_tablet226 から; bank201.json、2 つの wav — 光輪の声はドエロの光輪様の声、tablet89 の音は mp4 から — で作れる)
+
+```bash
+python3 compose_tablet227.py bank201.json src score_tablet227.json && python3 synth.py score_tablet227.json tablet227.wav && python3 video.py score_tablet227.json tablet227.wav tablet227.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
