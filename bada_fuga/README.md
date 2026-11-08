@@ -4078,6 +4078,16 @@ CCII と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて�
 python3 compose_tablet205.py bank150.json src score_tablet205.json && python3 synth.py score_tablet205.json tablet205.wav && python3 video.py score_tablet205.json tablet205.wav tablet205.mp4
 ```
 
+## 🎤🎤🎤 Requiem BADA — Tablet Sessions CCVI · Cinque suoni con tre voci (tablet204 の女性の声を 3 声 (3 人) で合わせて作り換え, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+「3G」は三声 (3 人で合わせる) と解釈。CCIV と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて・トラック 18・トラック 8 を 4 度上げて、楽器なし) で、17 歳の女性の声 (14 半音上げ、フォルマント 1.18 倍) を 3 人のユニゾンに: 同じ録音から音高 (+14 / +14.25 / +13.7 半音)・響き (フォルマント 1.18 / 1.16 / 1.21 倍)・時間 (0 / 38 / 74 ms 遅れ) を少しずつ変えた 3 つの声を作り (1 : 0.8 : 0.8)、合わせて rms −22.5 dB (0.52)。f0 中央値 260 Hz のまま、声が広がって合唱のように
+
+- `compose_tablet206.py` (compose_tablet204 から; 声は `feminize` を 3 回 (上の 3 組のパラメータ) かけて遅らせて足したもの)
+
+```bash
+python3 compose_tablet206.py bank150.json src score_tablet206.json && python3 synth.py score_tablet206.json tablet206.wav && python3 video.py score_tablet206.json tablet206.wav tablet206.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
