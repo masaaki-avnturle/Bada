@@ -3913,6 +3913,26 @@ python3 build_sampler.py bank1340 20261108_134014.wav
 python3 compose_tablet195.py bank195.json src score_tablet195.json && python3 synth.py score_tablet195.json tablet195.wav && python3 video.py score_tablet195.json tablet195.wav tablet195.mp4
 ```
 
+## 🎤🎹🎼 Requiem BADA — Tablet Sessions CXCVI · La voce giovane sul 89 (2026/11/08 13:51 の声を 18 歳の女性の声らしくして tablet89 に重ね合わせ、元の楽器を演奏させて — アルペジオや元の曲に無い楽器は付け加えない, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+声: 11/08 13:51 の録音 (3 分 54 秒、男声、f0 中央値 107 Hz、ヘ長調 / ニ短調) を `feminize_voice.py` の WORLD ボコーダー (pyworld) で 13 半音上げ、フォルマントを 1.15 倍にして若い女性の声に (変換後の f0 中央値 228 Hz、10〜90 % が 182〜292 Hz)、音高をヘ長調の音階に 0.6 で寄せ、rms −22 dB に揃える。調は tablet89 (ニ短調) と同じなのでそのまま。テープ: tablet89 (LXXXIX) を全曲 (0.45) と後半 (90 秒から、0.4)、変換した声を 2 回 (0.55、表)。元の楽器 = tablet89 の中にある楽器 (実音のピアノ) だけ: tablet89 と声の最上声の採譜から作った旋律 (各 8 小節) を 06:42 の実音のピアノの 1 音のサンプラーで、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は声の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (強拍の不協和 0)
+
+| 段落 | 小節 | 声 | tablet89 | 実音のピアノ |
+|---|---|---|---|---|
+| I | 0〜60 | 1 回目 | 始まり (レクイエム) | 声の旋律 (アルト → テノール)、tablet89 の旋律 (バス) |
+| II | 60〜100 | 終わり | フーガ | tablet89 の旋律 (ソプラノ → アルト)、声の頭を 2 倍にバスで |
+| III | 100〜160 | 2 回目 | 後半 (90 秒から) | 声と tablet89 の旋律を同時に (2 小節遅れ)、もう一度アルトとバスで |
+| IV | 160〜176 | 終わり | 終わり | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet196.py` (compose_tablet191 から; bank196.json = bank195 + 変換した声の採譜、2 つの wav で作れる。声の変換は `feminize_voice.feminize(x, sr, 5, semis=13, formant=1.15)`)
+
+```bash
+python3 -m pip install pyworld
+python3 -c "import soundfile as sf, numpy as np; from feminize_voice import feminize; x, sr = sf.read('20261108_135116_raw.wav'); sf.write('20261108_135116.wav', feminize(x.astype(np.float64), sr, 5, semis=13.0, formant=1.15), sr)"
+python3 build_sampler.py bank1351 20261108_135116.wav
+python3 compose_tablet196.py bank196.json src score_tablet196.json && python3 synth.py score_tablet196.json tablet196.wav && python3 video.py score_tablet196.json tablet196.wav tablet196.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
