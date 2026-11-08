@@ -4267,6 +4267,23 @@ python3 compose_tablet217.py bank201.json src score_tablet217.json && python3 sy
 python3 compose_tablet218.py bank201.json src score_tablet218.json && python3 synth.py score_tablet218.json tablet218.wav && python3 video.py score_tablet218.json tablet218.wav tablet218.mp4
 ```
 
+## 🎤📼📼 Requiem BADA — Tablet Sessions CCXIX · L'aureola sensuale e le due tracce (ドエロの光輪様の声に、トラック 18 とトラック 8 を重ね合わせて, ヘ長調 / ニ短調, ♩=60, 11 分 44 秒)
+
+3 つの音だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘もなし)。組み立ては CCIX / CCXVIII と同じで、声だけドエロの光輪様の声 (14:55 の声を 10.5 半音上げ・フォルマント 1.10 倍の少し低めの女声 215 Hz に、声の包絡で形作った息 (主声より 12 dB 下)、3 kHz 以上 +4 dB の囁きの成分、250 Hz 以下 +3 dB の近接マイクの低音、柔らかい圧縮。三賢者の 5 度上 0.3 と 1 オクターヴ上 0.25、3.5 秒の残響 0.75、rms −22.5 dB) を 2 回 (0.55)。トラック 18 (ニ短調) はそのまま 3 回 (0.5 / 0.45)、トラック 8 (ハ長調 / イ短調) は 4 度上げて全部と続き (0.5 / 0.4)。6 秒のフェード・イン、6〜10 秒のフェード・アウト
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜52 | ドエロの光輪の声 + トラック 18 |
+| II | 52〜100 | トラック 8 (4 度上げて、全部) + トラック 18 (2 回目) |
+| III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き (100 秒から) |
+| IV | 150〜176 | トラック 18 の後半、消える |
+
+- `compose_tablet219.py` (compose_tablet218 から; bank201.json、3 つの wav — 光輪の声はドエロの光輪様の声 — で作れる)
+
+```bash
+python3 compose_tablet219.py bank201.json src score_tablet219.json && python3 synth.py score_tablet219.json tablet219.wav && python3 video.py score_tablet219.json tablet219.wav tablet219.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
