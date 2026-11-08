@@ -3963,6 +3963,7 @@ python3 compose_tablet197.py bank196.json src score_tablet196.json score_tablet1
 | III | 100〜158 | 声 (2 回目)、トラック 8 の続きが裏 | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
 | IV | 158〜184 | トラック 18 の後半 | fuga の終わりを弾き直す、頭を 2 倍に伸ばして消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I (声) −24〜−16 / II (トラック 18 + fuga の提示部) −22〜−15 / III (声 2 回目) −21〜−16 / IV (fuga の終わり) −18 → −22 (消える); ステレオ平均 −15.8 dB、12:23、27.9 MiB
 - `compose_tablet198.py` (compose_tablet190 から; bank196.json、4 つの wav (声は変換したもの)、score.json で作れる)
 
 ```bash
