@@ -3905,6 +3905,7 @@ python3 compose_tablet194.py bank194.json src score_tablet194.json && python3 sy
 | III | 86〜136 | 13:40 (短 3 度上げて、全部)、tablet86 の 2 回目 | 13:40 の旋律 (ソプラノ → アルト)、トラック 18 と 8 を同時に |
 | IV | 136〜176 | トラック 18 (2 回目)、トラック 8 の続き | 4 つの旋律の頭を 2 倍に伸ばして、ペダルだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −21〜−17 / II −21〜−19 / III −22〜−17 / IV −22〜−18 → 消える; ステレオ平均 −16.5 dB、11:51、27.3 MiB
 - `compose_tablet195.py` (compose_tablet194 から; bank195.json = bank194 + 13:40 の採譜、4 つの wav — tablet86 の音声は `20261107_086000.wav` に — で作れる)
 
 ```bash
