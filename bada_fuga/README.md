@@ -4147,6 +4147,16 @@ python3 compose_tablet209.py bank150.json src score_tablet209.json && python3 sy
 python3 compose_tablet210.py bank201.json src score_tablet210.json && python3 synth.py score_tablet210.json tablet210.wav && python3 video.py score_tablet210.json tablet210.wav tablet210.mp4
 ```
 
+## 🎤✨🎹 Requiem BADA — Tablet Sessions CCXI · L'aureola del giovane con le due tracce e il 18:54 (tablet210 の光輪様の声を、若い男性の声で作り換え, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+CCX と同じ曲 (トラック 18・トラック 8・18:54、元の楽器 = 旋律の実音のピアノと低いペダル、段落も同じ) で、光輪様の声の元だけを若い男性の声にする。11/08 14:55 の元の男声を 3 半音上げ (約 138 Hz、フォルマント 1.06 倍、CCV と同じ若い男性の声) を 1 人目に、その 5 度上 (10 半音、1.08 倍、30 ms 遅れ、0.45) と 1 オクターヴ上 (15 半音、1.10 倍、55 ms 遅れ、0.35) を重ねた三賢者、ト長調に 0.9 で調律 (基音の中央値 129 Hz)、3.5 秒の残響 (光輪、0.9)、10 kHz 以上を落として rms −22.5 dB。アルペジオ・パッド・ベース・ドラム・フックは付け加えない (強拍の不協和 3)
+
+- `compose_tablet211.py` (compose_tablet210 から; bank201.json、4 つの wav — 光輪の声は上の手順で作った若い男性のもの — で作れる)
+
+```bash
+python3 compose_tablet211.py bank201.json src score_tablet211.json && python3 synth.py score_tablet211.json tablet211.wav && python3 video.py score_tablet211.json tablet211.wav tablet211.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
