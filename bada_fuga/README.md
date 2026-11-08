@@ -4093,6 +4093,7 @@ python3 compose_tablet206.py bank150.json src score_tablet206.json && python3 sy
 
 「3G」をバイオリンの G 線 (G3 = 196 Hz、A4 = 440 Hz 基準) と解釈。CCIV と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて・トラック 18・トラック 8 を 4 度上げて、楽器なし) で、女性の声の調律だけを変える: 元の男声 (f0 中央値 116 Hz) を 9.07 半音上げて音高の中央をちょうど G3 に (変換後の f0 中央値 197.7 Hz、10〜90 % が 156〜255 Hz)、フォルマントを 1.15 倍、`feminize_voice.py` の音高補正をト長調の音階に 0.9 で強く (調律)、9 kHz より上だけ丸め、rms −22.5 dB (0.52)。語りの滑りは補正の対象外なので、半音からのずれの中央値は 25 cent
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −18〜−15 / II −17〜−13.6 / III −16.3〜−13.5 / IV −17〜−13 → 消える; ステレオ平均 −15.2 dB、11:51、27.4 MiB
 - `compose_tablet207.py` (compose_tablet204 から; 声の変換は `feminize(x, sr, 7, semis=9.07, formant=1.15, correct=0.9)` のあと 9 kHz の低域通過)
 
 ```bash
