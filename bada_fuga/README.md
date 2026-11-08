@@ -3777,6 +3777,7 @@ python3 compose_tablet187.py bank150.json src score_tablet151.json score_tablet1
 | III | 108〜150 | 06:42 の後半 | 06:42 と 06:39 を同時に、次にトラック 18 とトラック 8 を同時に (4 つの旋律) |
 | IV | 150〜176 | 06:39 の終わり | 頭を 2 倍に伸ばして、tablet117 とペダルだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −20〜−16 / II −19〜−16 / III −18〜−16 / IV −18〜−17 → −26 (消える); ステレオ平均 −15.5 dB、11:51、27.3 MiB
 - `compose_tablet188.py` (compose_tablet187 から; bank150、5 つの wav — tablet185 の音声は `20261107_185000.wav` に —、score_tablet185.json (和音) で作れる)
 
 ```bash
