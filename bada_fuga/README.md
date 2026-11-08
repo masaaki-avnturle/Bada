@@ -3850,6 +3850,7 @@ python3 compose_tablet191.py bank190.json src score_tablet191.json && python3 sy
 | III | 100〜150 | 後半 (90 秒から、2 回目) | 3 回目 |
 | IV | 150〜176 | 終わり | 4 回目 (前半)、一緒に消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −18〜−15 / II −21〜−14 / III −21〜−14.5 / IV −17〜−14.5 → 消える; ステレオ平均 −16.0 dB、11:51、27.4 MiB
 - `compose_tablet192.py` (compose_tablet179 から; 2 つの wav だけで作れる — tablet89 の音声は `20261107_089000.wav` に)
 
 ```bash
