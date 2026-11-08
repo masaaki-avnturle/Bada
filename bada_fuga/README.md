@@ -3999,6 +3999,7 @@ python3 compose_tablet199.py bank150.json src score_tablet199.json && python3 sy
 | III | 100〜158 | 声 (2 回目)、トラック 8 の続きが裏 | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
 | IV | 158〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I (声) −23〜−17 / II (トラック 18) −22〜−16 / III (声 2 回目) −20〜−16 / IV −22〜−19 → 消える; ステレオ平均 −16.1 dB、11:51、27.3 MiB
 - `compose_tablet200.py` (compose_tablet198 から fuga を外したもの; bank200.json = bank196 + 原音の声の採譜、4 つの wav で作れる)
 
 ```bash
