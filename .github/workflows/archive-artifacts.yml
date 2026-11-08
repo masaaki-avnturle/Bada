@@ -1,0 +1,135 @@
+name: Archive Actions artifacts to Releases (permanent)
+
+# Actions のアーティファクトは保持期間 (既定 90 日) が過ぎると自動削除されます。
+# このワークフローはリポジトリ内の「まだ期限切れになっていない」全アーティファクトを
+# ダウンロードし、ワークフロー run ごとの GitHub Release
+#   タグ: archive-run-<run_id>   (prerelease / latest にはしない)
+# にアセットとして添付します。Release のアセットには有効期限がないため、
+# ここに退避されたアプリ (APK / EXE / AppImage / deb / ISO など) は永久に残ります。
+#
+# - 既に同名・同サイズのアセットが退避済みなら何もしない (何度実行しても安全)
+# - 2 GiB を超える (Release アセット上限) アーティファクトは分割して添付
+#   (復元: cat NAME.zip.part-* > NAME.zip)
+# - 6 時間ごとに自動実行されるので、今後のビルド成果物も期限前に必ず退避される
+# - 既に期限切れで GitHub 側から削除されたものは復元できないため、一覧として記録のみ
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+  push:
+    paths:
+      - '.github/workflows/archive-artifacts.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: archive-artifacts
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      DEFAULT_SHA: ${{ github.sha }}
+    steps:
+      - name: Archive all non-expired artifacts into permanent Releases
+        shell: bash
+        run: |
+          set -uo pipefail
+          WORK="$RUNNER_TEMP/archive"
+          mkdir -p "$WORK"
+          LIMIT=$((2000 * 1024 * 1024))   # 2 GiB 未満に収める (Release アセット上限 2 GiB)
+
+          gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | [.id, .name, .size_in_bytes, .expired, .workflow_run.id, (.workflow_run.head_branch // ""), (.workflow_run.head_sha // ""), .created_at] | @tsv' \
+            > "$WORK/all.tsv"
+
+          total=$(wc -l < "$WORK/all.tsv")
+          expired=$(awk -F'\t' '$4=="true"' "$WORK/all.tsv" | wc -l)
+          echo "artifacts total=$total expired=$expired"
+
+          archived=0; skipped=0; failed=0
+          declare -A RUN_READY
+
+          while IFS=$'\t' read -r aid aname asize aexp rid rbranch rsha acreated; do
+            [ "$aexp" = "true" ] && continue
+            tag="archive-run-$rid"
+
+            if [ -z "${RUN_READY[$rid]:-}" ]; then
+              if ! gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
+                info=$(gh api "repos/$REPO/actions/runs/$rid" \
+                  --jq '[.name, (.run_number|tostring), .html_url, .event, (.conclusion // "")] | @tsv' 2>/dev/null || true)
+                IFS=$'\t' read -r wname rnum rurl revent rconc <<< "$info"
+                wname=${wname:-unknown workflow}
+                title="[Archive] ${wname} #${rnum:-?} (${rbranch:-?})"
+                notes=$(printf 'Actions アーティファクトの永久保存版 (期限なし)。\n\n- Workflow: %s\n- Run: %s\n- Branch: `%s`\n- Commit: `%s`\n- Event: %s / %s\n- Built: %s\n\n2 GiB を超えるものは `*.zip.part-*` に分割されています。復元: `cat NAME.zip.part-* > NAME.zip`' \
+                  "$wname" "${rurl:-run $rid}" "$rbranch" "$rsha" "${revent:-?}" "${rconc:-?}" "$acreated")
+                if ! gh release create "$tag" -R "$REPO" --target "$rsha" --prerelease --latest=false \
+                      --title "$title" --notes "$notes" >/dev/null 2>&1; then
+                  # コミットが既に存在しない (ブランチ削除後の GC 等) 場合は現在のコミットに付ける
+                  gh release create "$tag" -R "$REPO" --target "$DEFAULT_SHA" --prerelease --latest=false \
+                      --title "$title" --notes "$notes"$'\n\n(元コミットが見つからないため、タグは現行コミットに付与)' >/dev/null \
+                    || { echo "::warning::release create failed for run $rid"; failed=$((failed+1)); continue; }
+                fi
+              fi
+              gh release view "$tag" -R "$REPO" --json assets \
+                --jq '.assets[] | [.name, (.size|tostring)] | @tsv' > "$WORK/assets-$rid.tsv"
+              RUN_READY[$rid]=1
+            fi
+
+            safe=$(printf '%s' "$aname" | tr -c 'A-Za-z0-9._-' '_')
+            fname="${safe}.zip"
+            if awk -F'\t' -v f="$fname" '$1==f || index($1, f ".part-")==1 {found=1} END {exit !found}' "$WORK/assets-$rid.tsv"; then
+              skipped=$((skipped+1)); continue
+            fi
+
+            echo "::group::run $rid  $aname ($asize bytes)"
+            d="$WORK/dl"; rm -rf "$d"; mkdir -p "$d"
+            if ! gh api "repos/$REPO/actions/artifacts/$aid/zip" > "$d/$fname"; then
+              echo "::warning::download failed: $aname (run $rid)"; failed=$((failed+1)); echo "::endgroup::"; continue
+            fi
+            size=$(stat -c %s "$d/$fname")
+            if [ "$size" -ge "$LIMIT" ]; then
+              split -b 1900M -d -a 3 "$d/$fname" "$d/$fname.part-"
+              rm -f "$d/$fname"
+            fi
+            if gh release upload "$tag" -R "$REPO" "$d"/* --clobber; then
+              archived=$((archived+1))
+              ( cd "$d" && for f in *; do printf '%s\t%s\n' "$f" "$(stat -c %s "$f")"; done ) >> "$WORK/assets-$rid.tsv"
+            else
+              echo "::warning::upload failed: $aname (run $rid)"; failed=$((failed+1))
+            fi
+            rm -rf "$d"
+            echo "::endgroup::"
+          done < "$WORK/all.tsv"
+
+          {
+            echo "## Artifact archive"
+            echo ""
+            echo "| | count |"
+            echo "|---|---|"
+            echo "| artifacts listed | $total |"
+            echo "| newly archived to Releases | $archived |"
+            echo "| already archived (skipped) | $skipped |"
+            echo "| failed | $failed |"
+            echo "| already expired on GitHub (unrecoverable) | $expired |"
+            echo ""
+            echo "永久保存先: https://github.com/$REPO/releases (タグ \`archive-run-*\`)"
+            if [ "$expired" -gt 0 ]; then
+              echo ""
+              echo "<details><summary>期限切れで復元不可だったアーティファクト</summary>"
+              echo ""
+              echo "| run | artifact | created |"
+              echo "|---|---|---|"
+              awk -F'\t' '$4=="true" {printf "| %s | %s | %s |\n", $5, $2, $8}' "$WORK/all.tsv"
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          [ "$failed" -eq 0 ] || exit 1
