@@ -4241,6 +4241,7 @@ python3 compose_tablet216.py bank201.json src score_tablet216.json && python3 sy
 | III | 100〜152 | 光輪の声 (2 回目) + fuga の終わり (134 小節まで) + tablet89 の後半 (200 秒から) |
 | IV | 152〜178 | fuga の終わり (239 秒から) をもう一度、消える |
 
+- 測った音量 (4 秒 rms、モノ): I 声+tablet89 −18.9 → −19.2 → −16.3 → −17.6 → −17.2 dB / II fuga+tablet89 −21.0 → −22.5 → −20.1 → −18.6 → −20.6 dB / III 声+fuga+tablet89 −20.5 → −17.4 → −15.6 → −16.0 → −15.2 dB / IV fuga の終わり −23.1 → −24.8 dB。全体 mean −15.7 dB、max 0.0 dB。24.1 MiB。
 - `compose_tablet217.py` (compose_tablet209 から; bank201.json、3 つの wav — 光輪の声は CCXVI のもの、fuga.wav と tablet89 の音は mp4 から — で作れる)
 
 ```bash
@@ -4258,6 +4259,8 @@ python3 compose_tablet217.py bank201.json src score_tablet217.json && python3 sy
 | III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き (100 秒から) |
 | IV | 150〜176 | トラック 18 の後半、消える |
 
+- 測った音量 (4 秒 rms、モノ): I 声+トラック 18 −30.5 → −15.6 → −15.8 → −17.8 → −19.6 dB / II トラック 8+18 −25.1 → −18.5 → −20.4 → −18.2 → −27.4 dB / III 声+トラック 8 −21.4 → −18.5 → −16.1 → −21.1 → −19.6 dB / IV トラック 18 −25.3 → −24.0 dB。全体 mean −16.3 dB、max 0.0 dB。25.2 MiB。
+- 声だけの音声 (曲なし): ドエロの光輪様の声 — 元の 14:55 の声を 10.5 半音上げ (基音の中央値 215 Hz)、フォルマント 1.10 倍の少し低めの女声に、声の包絡で形作った 1.5〜8 kHz の息 (主声より 12 dB 下)、3 kHz 以上を +4 dB の囁きの成分、250 Hz 以下を +3 dB の近接マイクの低音、柔らかい圧縮。三賢者の 5 度上 (0.3) と 1 オクターヴ上 (0.25) は控えめに、3.5 秒の残響 (0.75)、9 kHz 以上を落として rms −22.5 dB。3 分 18 秒、mp3 192 kbps
 - `compose_tablet218.py` (compose_tablet209 から; bank201.json、3 つの wav — 光輪の声は CCXVI のもの — で作れる)
 
 ```bash
