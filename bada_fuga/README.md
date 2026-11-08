@@ -4100,6 +4100,16 @@ python3 compose_tablet206.py bank150.json src score_tablet206.json && python3 sy
 python3 compose_tablet207.py bank150.json src score_tablet207.json && python3 synth.py score_tablet207.json tablet207.wav && python3 video.py score_tablet207.json tablet207.wav tablet207.mp4
 ```
 
+## 🎤✨🎧 Requiem BADA — Tablet Sessions CCVIII · Cinque suoni con la voce dell'aureola dei tre magi (tablet207 の女性の声を「三賢者の光輪様の声」に作り換え, ♩=60, 11 分 52 秒)
+
+「三賢者の光輪様の声」は、三人の賢者の声が光の輪のように重なる神聖な声、と解釈。CCVII と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて・トラック 18・トラック 8 を 4 度上げて、楽器なし) で、声だけを変える: 三賢者 = G3 に調律した女性の声 (CCVII のまま: 9.07 半音上げ、フォルマント 1.15 倍) + その 5 度上 (D4: 16.07 半音、1.18 倍、30 ms 遅れ、0.45) + 1 オクターヴ上の光のような声 (G4: 21.07 半音、1.22 倍、55 ms 遅れ、0.35) — いずれも WORLD ボコーダーでト長調の音階に 0.9 で調律。光輪 = 3.5 秒の長い残響 (指数減衰する雑音のインパルス応答、5 kHz より上はゆっくり減る) を声にまとわせ (0.9)、10 kHz より上を丸め、rms −22.5 dB (0.52)
+
+- `compose_tablet208.py` (compose_tablet207 から; 声は `feminize` を 3 回 (上の 3 組) かけて遅らせて足し、`scipy.signal.fftconvolve` で残響)
+
+```bash
+python3 compose_tablet208.py bank150.json src score_tablet208.json && python3 synth.py score_tablet208.json tablet208.wav && python3 video.py score_tablet208.json tablet208.wav tablet208.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
