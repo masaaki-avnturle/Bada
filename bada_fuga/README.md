@@ -3857,6 +3857,23 @@ python3 compose_tablet191.py bank190.json src score_tablet191.json && python3 sy
 python3 compose_tablet192.py bank150.json src score_tablet192.json && python3 synth.py score_tablet192.json tablet192.wav && python3 video.py score_tablet192.json tablet192.wav tablet192.mp4
 ```
 
+## 🎧🎧🎧 Requiem BADA — Tablet Sessions CXCIII · I due pomeriggi sul 185 (tablet185 の原曲と 2026/11/08 13:10・13:16 だけで — この曲に無い楽器は使わない, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+3 つの音声だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘も、声もなし): tablet185 (CLXXXV — 18:54・トラック 8・18 とそのピアノ) を原曲の音声そのまま全曲 (0.5)、その上に 11/08 13:10 (ハ長調 / イ短調、3 分 13 秒 → 4 度上げてヘ長調 / ニ短調に) と 13:16 (変イ長調 / ヘ短調、3 分 7 秒 → 短 3 度下げてヘ長調 / ニ短調に) の実音を段落ごとに (0.55)。4 秒のフェード・イン、8 秒のフェード・アウト
+
+| 段落 | 小節 | 重ねる実音 | tablet185 |
+|---|---|---|---|
+| I | 0〜40 | 13:10 (全部、4 度上げて) | 18:54 とトラック 18 の始まり |
+| II | 40〜100 | 13:16 (全部、短 3 度下げて) | トラック 8 の段 |
+| III | 100〜140 | 13:10 (2 回目) | 2 つの旋律の段 |
+| IV | 140〜176 | 13:16 の前半 (0.5) | 終わり、消える |
+
+- `compose_tablet193.py` (compose_tablet174 から; 3 つの wav だけで作れる — tablet185 の音声は `20261107_185000.wav` に)
+
+```bash
+python3 compose_tablet193.py bank150.json src score_tablet193.json && python3 synth.py score_tablet193.json tablet193.wav && python3 video.py score_tablet193.json tablet193.wav tablet193.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
