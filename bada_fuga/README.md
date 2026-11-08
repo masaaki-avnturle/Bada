@@ -3813,6 +3813,7 @@ python3 compose_tablet189.py bank150.json src score_tablet189.json && python3 sy
 | III | 108〜150 | 06:42 の後半、tablet86 が裏 | 06:42 と 06:39 を同時に、tablet89 と tablet86 を同時に |
 | IV | 150〜184 | 06:39 の終わり | fuga の終わり (232〜332 秒、ストレッタと終止) を弾き直す、頭を 2 倍に伸ばして消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −23〜−16 / II (fuga の提示部) −19〜−16 / III −22〜−16 / IV (fuga の終わり) −18〜−15 → 消える; ステレオ平均 −15.4 dB、12:23、27.7 MiB
 - `compose_tablet190.py` (compose_tablet186 から; bank190.json = bank150 + tablet86・89 の採譜 (build_sampler を mp4 の音声に)、4 つの wav、score.json で作れる)
 
 ```bash
