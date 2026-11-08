@@ -4045,6 +4045,16 @@ python3 compose_tablet201.py bank201.json src score_tablet201.json && python3 sy
 python3 compose_tablet202.py bank150.json src score_tablet202.json && python3 synth.py score_tablet202.json tablet202.wav && python3 video.py score_tablet202.json tablet202.wav tablet202.mp4
 ```
 
+## 🎤🎧🎧 Requiem BADA — Tablet Sessions CCIII · Cinque suoni con la voce giovane e dolce (tablet202 の声を若い優しい女性の声で作り換え, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+CCII と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて・トラック 18・トラック 8 を 4 度上げて、楽器なし) で、14:55 の声だけを若い優しい女性の声に: `feminize_voice.py` の WORLD ボコーダーで 13 半音上げ、フォルマントを 1.14 倍 (変換後の f0 中央値 246 Hz、10〜90 % が 194〜320 Hz)、6.5 kHz より上を 2 次の低域通過で少し丸め、音高をヘ長調の音階に 0.6 で寄せ、rms −23 dB と少し小さめ (0.5) に置いて優しく
+
+- `compose_tablet203.py` (compose_tablet202 から; 声の変換は `feminize(x, sr, 5, semis=13, formant=1.14)` のあと 6.5 kHz の低域通過)
+
+```bash
+python3 compose_tablet203.py bank150.json src score_tablet203.json && python3 synth.py score_tablet203.json tablet203.wav && python3 video.py score_tablet203.json tablet203.wav tablet203.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
