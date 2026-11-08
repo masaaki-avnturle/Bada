@@ -3924,6 +3924,7 @@ python3 compose_tablet195.py bank195.json src score_tablet195.json && python3 sy
 | III | 100〜160 | 2 回目 | 後半 (90 秒から) | 声と tablet89 の旋律を同時に (2 小節遅れ)、もう一度アルトとバスで |
 | IV | 160〜176 | 終わり | 終わり | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I (声) −21〜−15 / II −25〜−17 / III (声 2 回目) −23〜−16.5 / IV −19 → 消える; ステレオ平均 −16.1 dB、11:51、27.3 MiB
 - `compose_tablet196.py` (compose_tablet191 から; bank196.json = bank195 + 変換した声の採譜、2 つの wav で作れる。声の変換は `feminize_voice.feminize(x, sr, 5, semis=13, formant=1.15)`)
 
 ```bash
