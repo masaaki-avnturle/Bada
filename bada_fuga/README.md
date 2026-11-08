@@ -4303,6 +4303,24 @@ python3 compose_tablet219.py bank201.json src score_tablet219.json && python3 sy
 python3 compose_tablet220.py bank201.json src score_tablet220.json && python3 synth.py score_tablet220.json tablet220.wav && python3 video.py score_tablet220.json tablet220.wav tablet220.mp4
 ```
 
+## 🎤📼🎼🎹 Requiem BADA — Tablet Sessions CCXXI · L'aureola sensuale, le due tracce e la fuga (ドエロの光輪様の声の雑音を消して、トラック 18・トラック 8・fuga を重ね合わせ、無い楽器を使わずに、元の楽器を弾いて, ヘ長調 / ニ短調, ♩=60, 12 分 24 秒)
+
+ドエロの光輪様の声の「雑音」は、声の包絡で形作った息のノイズ層だったので、それを外して作り直す (14:55 の声を 10.5 半音上げ・フォルマント 1.10 倍の少し低めの女声 215 Hz、3 kHz 以上 +4 dB の囁きの成分 — これは声自身の高域でノイズではない —、250 Hz 以下 +3 dB の近接の低音、柔らかい圧縮、三賢者の 5 度上 0.3 と 1 オクターヴ上 0.25、3.5 秒の残響、rms −22.5 dB)。組み立ては CXCVIII から 18:54 を外したもの: 声を 2 回 (0.55)、トラック 18 (ニ短調) はそのまま 2 回、トラック 8 (ハ長調 / イ短調) は 4 度上げて 2 回 (裏)。fuga (オルガンのフーガ、ニ短調 ♩=96) は CXC / CXCVIII と同じく電子音のオルガンを鳴らさず、楽譜の音符を秒のまま 06:42 の実音のピアノで弾き直す (II に提示部 100 秒、IV に終わり 100 秒、1281 音)。元の楽器 = 実音のピアノだけ: 声・トラック 18・トラック 8 の旋律 (各 8 小節、採譜) と fuga の音符、低いペダル (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フック・鐘は付け加えない。和音は表の録音の採譜、fuga が鳴るところは fuga の楽譜の和音 (強拍の不協和 3)
+
+| 段落 | 小節 | 表 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜60 | 光輪の声、トラック 8 (4 度上げて) が裏 | 声の旋律 (アルト → テノール)、トラック 8 の旋律 (バス) |
+| II | 60〜100 | トラック 18 | fuga の提示部 (0〜100 秒) の音符、トラック 18 の旋律 (アルト → テノール) |
+| III | 100〜158 | 光輪の声 (2 回目)、トラック 8 の続きが裏 | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
+| IV | 158〜184 | トラック 18 の後半 | fuga の終わり (232〜332 秒: ストレッタと終止) の音符、頭を 2 倍に、ペダルだけが残って消える |
+
+- 雑音を消したドエロの光輪様の声だけの音声も 1 ファイル (3 分 18 秒、mp3 192 kbps)
+- `compose_tablet221.py` (compose_tablet198 から 18:54 を外して; bank201.json、3 つの wav、fuga の score.json で作れる)
+
+```bash
+python3 compose_tablet221.py bank201.json src score.json score_tablet221.json && python3 synth.py score_tablet221.json tablet221.wav && python3 video.py score_tablet221.json tablet221.wav tablet221.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
