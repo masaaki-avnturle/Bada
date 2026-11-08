@@ -4371,6 +4371,7 @@ python3 compose_tablet223.py bank201.json src score_tablet223.json && python3 sy
 | III | 100〜140 | 光輪の声 (2 回目) + tablet89 の後半 + tablet86 の続き | 声 (アルト)、tablet89 の低い形 (バス)、tablet89 (ソプラノ)、2 倍に伸ばして、tablet86 (アルト) |
 | IV | 140〜176 | tablet89 の終わり + tablet86 の後半 (裏) | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
 
+- 測った音量 (4 秒 rms、モノ): I 声+tablet89 −20.6 → −22.0 → −19.4 → −19.6 → −19.6 dB / II tablet89 のフーガ+tablet86 −25.1 → −22.5 → −20.7 → −18.9 → −21.2 dB / III 声+tablet89+tablet86 −20.8 → −19.0 → −18.7 → −19.0 dB / IV tablet89 の終わり+tablet86 −20.9 → −22.1 → −21.0 dB。全体 mean −15.5 dB、max 0.0 dB。26.7 MiB。
 - `compose_tablet224.py` (compose_tablet223 から; bank201.json、3 つの wav — 光輪の声は CCXXI のもの、tablet89・86 の音は mp4 から — で作れる)
 
 ```bash
