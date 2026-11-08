@@ -4056,6 +4056,16 @@ CCII と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて�
 python3 compose_tablet203.py bank150.json src score_tablet203.json && python3 synth.py score_tablet203.json tablet203.wav && python3 video.py score_tablet203.json tablet203.wav tablet203.mp4
 ```
 
+## 🎤🎧🎧 Requiem BADA — Tablet Sessions CCIV · Cinque suoni con la voce di diciassette anni (tablet202 の声を 17 歳の日本人の女性の声で作り換え, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+CCII と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて・トラック 18・トラック 8 を 4 度上げて、楽器なし) で、14:55 の声だけを 17 歳の女性の声に。声の変換で変えられるのは音高と響き (フォルマント) だけなので、17 歳の日本人女性に多い少し高めで軽い声を目標に: `feminize_voice.py` の WORLD ボコーダーで 14 半音上げ (f0 中央値 116 → 260 Hz、10〜90 % が 207〜339 Hz)、フォルマントを 1.18 倍、9 kHz より上だけ丸め、音高をヘ長調の音階に 0.6 で寄せ、rms −22.5 dB (0.52)。CCIII (若い優しい声: 13 半音、1.14 倍、6.5 kHz で丸めて小さめ) より少し高く明るい
+
+- `compose_tablet204.py` (compose_tablet203 から; 声の変換は `feminize(x, sr, 5, semis=14, formant=1.18)` のあと 9 kHz の低域通過)
+
+```bash
+python3 compose_tablet204.py bank150.json src score_tablet204.json && python3 synth.py score_tablet204.json tablet204.wav && python3 video.py score_tablet204.json tablet204.wav tablet204.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
