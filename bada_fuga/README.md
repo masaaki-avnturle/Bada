@@ -3952,6 +3952,23 @@ python3 compose_tablet196.py bank196.json src score_tablet196.json && python3 sy
 python3 compose_tablet197.py bank196.json src score_tablet196.json score_tablet197.json && python3 synth.py score_tablet197.json tablet197.wav && python3 video.py score_tablet197.json tablet197.wav tablet197.mp4
 ```
 
+## 🎤🎹🎼 Requiem BADA — Tablet Sessions CXCVIII · La voce, le due tracce e la fuga (2026/11/08 13:51 の声・11/06 18:54・トラック 18・トラック 8・fuga を重ね合わせて、元の楽器を演奏させて — アルペジオや元の曲に無い楽器は付け加えない, ヘ長調 / ニ短調, ♩=60, 12 分 24 秒)
+
+声は CXCVI と同じ、13:51 を若い女性の声に変換したもの (WORLD ボコーダー、13 半音上げ、フォルマント 1.15 倍、rms −22 dB)。fuga (オルガンのフーガ、ニ短調) は CXC と同じく音声を使わず、楽譜の音符を秒のまま 06:42 の実音のピアノの 1 音のサンプラーで弾き直す (II に提示部 0〜100 秒、IV に終わり 232〜332 秒)。テープ: 18:54 の実音を途切れなく 3 回半 (0.4)、声を 2 回 (0.55)、トラック 18 (ニ短調、そのまま) を 2 回、トラック 8 (4 度上げてヘ長調 / ニ短調に) を裏に 2 回。元の楽器 = 実音のピアノだけ: 声・トラック 18・トラック 8 の最上声の採譜から作った旋律 (各 8 小節) と fuga の音符、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は表の録音の採譜、fuga が鳴るところは fuga の楽譜の和音
+
+| 段落 | 小節 | 表の実音 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜60 | 声 (1 回目)、トラック 8 が裏 | 声の旋律 (アルト → テノール)、トラック 8 の旋律 (バス) |
+| II | 60〜100 | トラック 18 | fuga の提示部を弾き直す、トラック 18 の旋律 |
+| III | 100〜158 | 声 (2 回目)、トラック 8 の続きが裏 | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
+| IV | 158〜184 | トラック 18 の後半 | fuga の終わりを弾き直す、頭を 2 倍に伸ばして消える |
+
+- `compose_tablet198.py` (compose_tablet190 から; bank196.json、4 つの wav (声は変換したもの)、score.json で作れる)
+
+```bash
+python3 compose_tablet198.py bank196.json src score.json score_tablet198.json && python3 synth.py score_tablet198.json tablet198.wav && python3 video.py score_tablet198.json tablet198.wav tablet198.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
