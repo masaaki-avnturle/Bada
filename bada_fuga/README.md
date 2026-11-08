@@ -4188,6 +4188,23 @@ python3 compose_tablet213.py bank201.json src score_tablet213.json && python3 sy
 python3 compose_tablet214.py bank201.json src score_tablet214.json && python3 synth.py score_tablet214.json tablet214.wav && python3 video.py score_tablet214.json tablet214.wav tablet214.mp4
 ```
 
+## 🎤✨🎹 Requiem BADA — Tablet Sessions CCXV · Il coro dei tre saggi con il loro pianoforte intero (tablet214 に、元からある楽器も省かずに, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+CCXIV (三賢者の合唱 = G3 の 17 歳の女性 + G2 の男性の光輪、トラック 18・トラック 8・18:54) はそのままで、元の楽器 (録音の中にあるピアノ) を省かずに鳴らす。CCXIV ではピアノが控えめ (0.42) で、第 IV 段落は頭の音形だけ、他の段落も間が空いていた。CCXV では声・トラック 18・トラック 8 の旋律 (各 8 小節、採譜) を 06:42 の実音のピアノで全段落に途切れなく重ね (音の数 282 → 654)、音量を 0.55 に。低いペダルは 2 小節ごと。アルペジオ・パッド・ベース・ドラム・フックは付け加えない (強拍の不協和 10)
+
+| 段落 | 小節 | 表 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜52 | 合唱 + トラック 18 | 声 (アルト → テノール → ソプラノ)、トラック 18 (バス → アルト → バス) |
+| II | 52〜100 | トラック 8 (全部) + トラック 18 (2 回目) | トラック 8 (ソプラノ → テノール → バス → ソプラノ)、トラック 18 (アルト → テノール)、声 (アルト) |
+| III | 100〜150 | 合唱 (2 回目) + トラック 8 の続き | 3 つの旋律を 2 声ずつ重ねて 9 回 |
+| IV | 150〜176 | トラック 18 の後半 | 3 つの旋律を続け、最後にトラック 18 の頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet215.py` (compose_tablet214 から; bank201.json、4 つの wav — 光輪の声は tablet214 と同じ合唱 — で作れる)
+
+```bash
+python3 compose_tablet215.py bank201.json src score_tablet215.json && python3 synth.py score_tablet215.json tablet215.wav && python3 video.py score_tablet215.json tablet215.wav tablet215.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
