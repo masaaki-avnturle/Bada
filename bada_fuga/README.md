@@ -4089,6 +4089,16 @@ python3 compose_tablet205.py bank150.json src score_tablet205.json && python3 sy
 python3 compose_tablet206.py bank150.json src score_tablet206.json && python3 synth.py score_tablet206.json tablet206.wav && python3 video.py score_tablet206.json tablet206.wav tablet206.mp4
 ```
 
+## 🎤🎻🎧 Requiem BADA — Tablet Sessions CCVII · Cinque suoni con la voce accordata al sol (tablet204 の女性の声を、オーケストラのバイオリンの G 線 (G3) に調律して合わせて作り換え, ♩=60, 11 分 52 秒)
+
+「3G」をバイオリンの G 線 (G3 = 196 Hz、A4 = 440 Hz 基準) と解釈。CCIV と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて・トラック 18・トラック 8 を 4 度上げて、楽器なし) で、女性の声の調律だけを変える: 元の男声 (f0 中央値 116 Hz) を 9.07 半音上げて音高の中央をちょうど G3 に (変換後の f0 中央値 197.7 Hz、10〜90 % が 156〜255 Hz)、フォルマントを 1.15 倍、`feminize_voice.py` の音高補正をト長調の音階に 0.9 で強く (調律)、9 kHz より上だけ丸め、rms −22.5 dB (0.52)。語りの滑りは補正の対象外なので、半音からのずれの中央値は 25 cent
+
+- `compose_tablet207.py` (compose_tablet204 から; 声の変換は `feminize(x, sr, 7, semis=9.07, formant=1.15, correct=0.9)` のあと 9 kHz の低域通過)
+
+```bash
+python3 compose_tablet207.py bank150.json src score_tablet207.json && python3 synth.py score_tablet207.json tablet207.wav && python3 video.py score_tablet207.json tablet207.wav tablet207.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
