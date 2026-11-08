@@ -139,6 +139,40 @@
   </div>
 
   <div class="card">
+    <h2>🌀 重力⇄電磁 変換 (Gertsenshtein効果) — 交信路は盗聴できるか?</h2>
+    <div class="muted" style="line-height:1.75">
+      レポート6–7頁の重力テンソル方程式が指し示す<b>実在の物理</b>:
+      強い磁場 B の中では<b>重力波(重力子)が電磁波(光子)へ変換</b>されます
+      (Gertsenshtein 1962、逆変換も成立)。もし系外惑星の交信路の重力的擾乱を
+      電磁信号として拾えれば、それは“盗聴”になり得ます。— そこで変換確率を
+      <b>実際の物理定数で計算</b>します:
+      <span class="mono">P = (16πG / μ₀c⁴)·B²·L² ≈ 3.30×10⁻³⁷·B²·L²</span>。
+      結果は常に、<b>人工の装置では盗聴できない</b>ことを示します。
+    </div>
+    <div class="controls" style="margin-top:10px">
+      <label class="muted">磁場 B (テスラ): <input id="gB" type="number" value="20" step="any" style="width:120px"/></label>
+      <label class="muted">経路長 L (m): <input id="gL" type="number" value="10" step="any" style="width:150px"/></label>
+      <select id="gPreset" style="min-width:230px">
+        <option value="">— プリセット —</option>
+        <option value="20,10">実験室の超伝導磁石 (20T × 10m)</option>
+        <option value="8.3,27000">LHC双極子リング (8.3T × 27km)</option>
+        <option value="3e-10,1.173e17">星間磁場 × 12.4光年 (Luyten b まで)</option>
+        <option value="1e8,1e6">中性子星 磁気圏 (1e8 T × 1000km)</option>
+        <option value="1e11,1e4">マグネター表面 (1e11 T × 10km)</option>
+      </select>
+      <button class="g" id="gTapBtn">🛰 この経路を傍受してみる</button>
+    </div>
+    <div class="kv" id="gertInfo"></div>
+    <div class="warn" id="gertWarn"></div>
+    <div class="ok" id="gertOk"></div>
+    <div class="muted" style="margin-top:9px">
+      ※ これは係数 3.30×10⁻³⁷ の<b>コヒーレント小混合近似</b> (P≪1 で有効)。本アプリは実在の
+      交信機器に<b>接続せず</b>、いかなる実信号も<b>傍受しません</b>。重力⇄電磁変換が非ゼロに
+      なるのはマグネター級の天体だけで、人工の盗聴装置では到達できません。
+    </div>
+  </div>
+
+  <div class="card">
     <h2>⚛ Bada量子エンジン — exo/contact-bb84.bada (矢印構文) をブラウザ内で実行</h2>
     <div class="controls">
       <button class="g" id="badaBtn">▶ BB84エンジンを実行</button>
@@ -2036,7 +2070,7 @@
 });
 </script>
 <script>
-window.CONTACT_SRC="# ============================================================\n# contact-bb84.bada — 宇宙人コンタクトのための量子暗号エンジン\n#                     (BB84 量子鍵配送 + Jones 鍵 + 暗号化)\n#                     全面的に矢印オブジェクト構文で記述。\n#\n# 量子コンピューターでコンタクトを取る、の正直な物理:\n#   ・量子もつれ自体はメッセージを運べない (no-communication 定理)。\n#   ・量子計算機の実際の役割は「鍵」— BB84 量子鍵配送で盗聴不可能な\n#     共有鍵を作り、メッセージ本文は電磁波 (電波) で送る。\n#   ・盗聴者が割り込むと量子力学が QBER ≈ 25% の誤り率として\n#     それを暴露する — これが量子暗号の本体である。\n#   ・地球外文明との接触実績は 2026 年時点でゼロ。これは実在の\n#     METI 送信 (アレシボ 1974 → M13, Sónar Calling 2017 → GJ 273b)\n#     と同じ様式のメッセージを量子暗号で守る装置である。\n#\n# 矢印オブジェクト:  x <- v は束縛、[] で生まれた器への <- は流し込み。\n# 量子命令:          qubit / H / CNOT / Measure (測定台帳へコミット)。\n# ============================================================\n\nprint(\"================================================================\")\nprint(\"CONTACT-BB84 BADA -- 量子鍵配送 x Jones鍵 x コンタクト暗号化\")\nprint(\"================================================================\")\n\nPI <- 3.141592653589793\n\n# ---- 擬似乱数 (LCG): 量子統計 0.5/0.5 からのサンプリングに使う --------\nSEED <- 42.0\ndef lcg(s) { return (s * 1103.0 + 12345.0) % 100003.0 }\n\n# ---- 量子統計の検証: H|0> の測定分布は厳密に 0.5 / 0.5 ----------------\nreg <- qubit(1)\nreg <- H(reg, 0)\nd <- Measure(reg)\nprint(\"\")\nprint(\"[量子] H|0> の測定分布 |psi|^2 :\", f5(d[0]), f5(d[1]), \" (0.5/0.5 が正解)\")\n\n# ---- BB84: アリス (地球) とボブ (受信者) の量子鍵配送 ------------------\nN <- 24\nabits <- []\nabase <- []\nbbase <- []\nbbits <- []\ns <- SEED\ni <- 0\nwhile (i < N) {\n    s <- lcg(s)\n    abits <- s % 2.0\n    s <- lcg(s)\n    abase <- s % 2.0\n    s <- lcg(s)\n    bbase <- s % 2.0\n    i <- i + 1\n}\n# ボブの測定: 基底が一致 -> 確率1で同じビット / 不一致 -> H分布 0.5 の硬貨\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> {\n        bbits <- abits[i]\n    } else {\n        s <- lcg(s)\n        bbits <- s % 2.0\n    }\n    i <- i + 1\n}\n# ふるい (sifting): 基底が一致した位置だけが鍵になる\nkey <- []\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> { key <- abits[i] }\n    i <- i + 1\n}\n# QBER (盗聴なし): ふるい後の不一致率は厳密に 0\nerr <- 0\nkept <- 0\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> {\n        kept <- kept + 1\n        (abits[i] != bbits[i]) -> { err <- err + 1 }\n    }\n    i <- i + 1\n}\nprint(\"\")\nprint(\"[BB84] 量子ビット数:\", N, \" ふるい後の鍵長:\", len(key), \" QBER:\", err, \"/\", kept, \" (盗聴なし=0)\")\n\n# ---- 盗聴者イヴ: 傍受再送攻撃は QBER ~ 25% として必ず露見する ----------\neerr <- 0\nekept <- 0\ni <- 0\ns2 <- SEED + 7.0\nwhile (i < N) {\n    s2 <- lcg(s2)\n    ebase <- s2 % 2.0\n    ebit <- abits[i]\n    (ebase != abase[i]) -> { s2 <- lcg(s2) ebit <- s2 % 2.0 }\n    bbit2 <- ebit\n    (abase[i] != ebase) -> { s2 <- lcg(s2) bbit2 <- s2 % 2.0 }\n    (abase[i] == bbase[i]) -> {\n        ekept <- ekept + 1\n        (bbit2 != abits[i]) -> { eerr <- eerr + 1 }\n    }\n    i <- i + 1\n}\nprint(\"[BB84] 盗聴者イヴ挿入時の QBER:\", eerr, \"/\", ekept, \" (理論値 25% — 量子力学が盗聴を暴露)\")\nprint(\"       判定: QBER > 11% なら鍵を破棄して再配送 — これが量子暗号の防御\")\n\n# ---- Bell 対の零保存: 配送路の完全性証明 (QKD 同型) --------------------\nbell <- qubit(2)\nbell <- H(bell, 0)\nbell <- CNOT(bell, 0, 1)\nbo <- Measure(bell)\nintact <- 0\n(bo[1] == 0) -> { (bo[2] == 0) -> { intact <- 1 } }\nprint(\"[Bell] 零保存 |01>,|10> = 0 (盗聴なし=1):\", intact, \" 台帳 =\", len(tuplespace), \"facts\")\n\n# ---- Jones 鍵: 鍵ビットを三葉結び目の |V(e^{i theta})| に通す ----------\ndef sin_t(x) {\n    x <- x % (2.0 * PI)\n    (x > PI)       -> { x <- x - 2.0 * PI }\n    (x < 0.0 - PI) -> { x <- x + 2.0 * PI }\n    term <- x\n    sm <- x\n    k <- 1\n    while (k <= 11) {\n        term <- 0.0 - term * x * x / ((2.0 * k) * (2.0 * k + 1.0))\n        sm <- sm + term\n        k <- k + 1\n    }\n    return sm\n}\ndef cos_t(x) { return sin_t(PI / 2.0 - x) }\ndef jones_abs(theta) {\n    re <- 0.0 - cos_t(0.0 - 4.0 * theta) + cos_t(0.0 - 3.0 * theta) + cos_t(0.0 - theta)\n    im <- 0.0 - sin_t(0.0 - 4.0 * theta) + sin_t(0.0 - 3.0 * theta) + sin_t(0.0 - theta)\n    return sqrt(re * re + im * im)\n}\nkv <- 0.0\ni <- 0\nwhile (i < len(key)) {\n    kv <- kv * 2.0 + key[i]\n    (kv > 65536.0) -> { kv <- kv % 65521.0 }\n    i <- i + 1\n}\njtheta <- (kv % 1400.0) / 1400.0 * PI\njkey <- jones_abs(jtheta)\nprint(\"\")\nprint(\"[Jones] 鍵値 =\", kv, \" -> theta =\", f5(jtheta), \" -> |V| =\", f5(jkey), \" (Jones量子鍵)\")\n\n# ---- コンタクト文の暗号化 / 復号 (鍵ストリーム, 往復一致を証明) --------\nmsg <- \"WE COME IN PEACE\"\nks <- kv + jkey * 1000.0\nct <- []\ni <- 0\nwhile (i < len(msg)) {\n    ks <- lcg(ks)\n    ct <- (ord(msg, i) + ks) % 65536.0\n    i <- i + 1\n}\nks2 <- kv + jkey * 1000.0\nback <- \"\"\ni <- 0\nwhile (i < len(ct)) {\n    ks2 <- lcg(ks2)\n    back <- back + chr((ct[i] - ks2 + 65536.0) % 65536.0)\n    i <- i + 1\n}\nprint(\"[暗号] 平文:\", msg)\nprint(\"[暗号] 暗号文 (先頭4符号):\", ct[0], ct[1], ct[2], ct[3])\nprint(\"[復号] 復元:\", back)\n(back == msg) -> { print(\"[復号] 往復一致 = 1 (量子鍵で保護されたコンタクト文)\") }\n\nprint(\"\")\nprint(\"正直な注記: もつれ自体は通信に使えない (no-communication 定理)。\")\nprint(\"量子計算機の役割は鍵 (BB84) であり、搬送は電磁波である。実在の\")\nprint(\"METI 送信 (1974 アレシボ -> M13 / 2017 Sonar Calling -> GJ 273b)\")\nprint(\"への返信を含め、地球外からの接触は 2026 年時点でゼロである。\")\nprint(\"@@BB84-OK\")\n";
+window.CONTACT_SRC="# ============================================================\n# contact-bb84.bada — 宇宙人コンタクトのための量子暗号エンジン\n#                     (BB84 量子鍵配送 + Jones 鍵 + 暗号化)\n#                     全面的に矢印オブジェクト構文で記述。\n#\n# 量子コンピューターでコンタクトを取る、の正直な物理:\n#   ・量子もつれ自体はメッセージを運べない (no-communication 定理)。\n#   ・量子計算機の実際の役割は「鍵」— BB84 量子鍵配送で盗聴不可能な\n#     共有鍵を作り、メッセージ本文は電磁波 (電波) で送る。\n#   ・盗聴者が割り込むと量子力学が QBER ≈ 25% の誤り率として\n#     それを暴露する — これが量子暗号の本体である。\n#   ・地球外文明との接触実績は 2026 年時点でゼロ。これは実在の\n#     METI 送信 (アレシボ 1974 → M13, Sónar Calling 2017 → GJ 273b)\n#     と同じ様式のメッセージを量子暗号で守る装置である。\n#\n# 矢印オブジェクト:  x <- v は束縛、[] で生まれた器への <- は流し込み。\n# 量子命令:          qubit / H / CNOT / Measure (測定台帳へコミット)。\n# ============================================================\n\nprint(\"================================================================\")\nprint(\"CONTACT-BB84 BADA -- 量子鍵配送 x Jones鍵 x コンタクト暗号化\")\nprint(\"================================================================\")\n\nPI <- 3.141592653589793\n\n# ---- 擬似乱数 (LCG): 量子統計 0.5/0.5 からのサンプリングに使う --------\nSEED <- 42.0\ndef lcg(s) { return (s * 1103.0 + 12345.0) % 100003.0 }\n\n# ---- 量子統計の検証: H|0> の測定分布は厳密に 0.5 / 0.5 ----------------\nreg <- qubit(1)\nreg <- H(reg, 0)\nd <- Measure(reg)\nprint(\"\")\nprint(\"[量子] H|0> の測定分布 |psi|^2 :\", f5(d[0]), f5(d[1]), \" (0.5/0.5 が正解)\")\n\n# ---- BB84: アリス (地球) とボブ (受信者) の量子鍵配送 ------------------\nN <- 24\nabits <- []\nabase <- []\nbbase <- []\nbbits <- []\ns <- SEED\ni <- 0\nwhile (i < N) {\n    s <- lcg(s)\n    abits <- s % 2.0\n    s <- lcg(s)\n    abase <- s % 2.0\n    s <- lcg(s)\n    bbase <- s % 2.0\n    i <- i + 1\n}\n# ボブの測定: 基底が一致 -> 確率1で同じビット / 不一致 -> H分布 0.5 の硬貨\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> {\n        bbits <- abits[i]\n    } else {\n        s <- lcg(s)\n        bbits <- s % 2.0\n    }\n    i <- i + 1\n}\n# ふるい (sifting): 基底が一致した位置だけが鍵になる\nkey <- []\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> { key <- abits[i] }\n    i <- i + 1\n}\n# QBER (盗聴なし): ふるい後の不一致率は厳密に 0\nerr <- 0\nkept <- 0\ni <- 0\nwhile (i < N) {\n    (abase[i] == bbase[i]) -> {\n        kept <- kept + 1\n        (abits[i] != bbits[i]) -> { err <- err + 1 }\n    }\n    i <- i + 1\n}\nprint(\"\")\nprint(\"[BB84] 量子ビット数:\", N, \" ふるい後の鍵長:\", len(key), \" QBER:\", err, \"/\", kept, \" (盗聴なし=0)\")\n\n# ---- 盗聴者イヴ: 傍受再送攻撃は QBER ~ 25% として必ず露見する ----------\neerr <- 0\nekept <- 0\ni <- 0\ns2 <- SEED + 7.0\nwhile (i < N) {\n    s2 <- lcg(s2)\n    ebase <- s2 % 2.0\n    ebit <- abits[i]\n    (ebase != abase[i]) -> { s2 <- lcg(s2) ebit <- s2 % 2.0 }\n    bbit2 <- ebit\n    (abase[i] != ebase) -> { s2 <- lcg(s2) bbit2 <- s2 % 2.0 }\n    (abase[i] == bbase[i]) -> {\n        ekept <- ekept + 1\n        (bbit2 != abits[i]) -> { eerr <- eerr + 1 }\n    }\n    i <- i + 1\n}\nprint(\"[BB84] 盗聴者イヴ挿入時の QBER:\", eerr, \"/\", ekept, \" (理論値 25% — 量子力学が盗聴を暴露)\")\nprint(\"       判定: QBER > 11% なら鍵を破棄して再配送 — これが量子暗号の防御\")\n\n# ---- Bell 対の零保存: 配送路の完全性証明 (QKD 同型) --------------------\nbell <- qubit(2)\nbell <- H(bell, 0)\nbell <- CNOT(bell, 0, 1)\nbo <- Measure(bell)\nintact <- 0\n(bo[1] == 0) -> { (bo[2] == 0) -> { intact <- 1 } }\nprint(\"[Bell] 零保存 |01>,|10> = 0 (盗聴なし=1):\", intact, \" 台帳 =\", len(tuplespace), \"facts\")\n\n# ---- Jones 鍵: 鍵ビットを三葉結び目の |V(e^{i theta})| に通す ----------\ndef sin_t(x) {\n    x <- x % (2.0 * PI)\n    (x > PI)       -> { x <- x - 2.0 * PI }\n    (x < 0.0 - PI) -> { x <- x + 2.0 * PI }\n    term <- x\n    sm <- x\n    k <- 1\n    while (k <= 11) {\n        term <- 0.0 - term * x * x / ((2.0 * k) * (2.0 * k + 1.0))\n        sm <- sm + term\n        k <- k + 1\n    }\n    return sm\n}\ndef cos_t(x) { return sin_t(PI / 2.0 - x) }\ndef jones_abs(theta) {\n    re <- 0.0 - cos_t(0.0 - 4.0 * theta) + cos_t(0.0 - 3.0 * theta) + cos_t(0.0 - theta)\n    im <- 0.0 - sin_t(0.0 - 4.0 * theta) + sin_t(0.0 - 3.0 * theta) + sin_t(0.0 - theta)\n    return sqrt(re * re + im * im)\n}\nkv <- 0.0\ni <- 0\nwhile (i < len(key)) {\n    kv <- kv * 2.0 + key[i]\n    (kv > 65536.0) -> { kv <- kv % 65521.0 }\n    i <- i + 1\n}\njtheta <- (kv % 1400.0) / 1400.0 * PI\njkey <- jones_abs(jtheta)\nprint(\"\")\nprint(\"[Jones] 鍵値 =\", kv, \" -> theta =\", f5(jtheta), \" -> |V| =\", f5(jkey), \" (Jones量子鍵)\")\n\n# ---- コンタクト文の暗号化 / 復号 (鍵ストリーム, 往復一致を証明) --------\nmsg <- \"WE COME IN PEACE\"\nks <- kv + jkey * 1000.0\nct <- []\ni <- 0\nwhile (i < len(msg)) {\n    ks <- lcg(ks)\n    ct <- (ord(msg, i) + ks) % 65536.0\n    i <- i + 1\n}\nks2 <- kv + jkey * 1000.0\nback <- \"\"\ni <- 0\nwhile (i < len(ct)) {\n    ks2 <- lcg(ks2)\n    back <- back + chr((ct[i] - ks2 + 65536.0) % 65536.0)\n    i <- i + 1\n}\nprint(\"[暗号] 平文:\", msg)\nprint(\"[暗号] 暗号文 (先頭4符号):\", ct[0], ct[1], ct[2], ct[3])\nprint(\"[復号] 復元:\", back)\n(back == msg) -> { print(\"[復号] 往復一致 = 1 (量子鍵で保護されたコンタクト文)\") }\n\n# ---- 重力 <-> 電磁 変換 (Gertsenshtein効果): 交信路を傍受できるか ----------\n# レポート6-7頁の重力テンソル式が指す実在の物理: 強磁場 B の中では\n# 重力波(重力子)が電磁波(光子)へ変換される (Gertsenshtein 1962, 逆も成立)。\n# 変換確率 P = (16 pi G / (mu0 c^4)) * B^2 * L^2, 係数 = 3.30e-37 /T^2/m^2。\n# ゆえ log10(P) = -36.4815 + 2*log10(B) + 2*log10(L)。\ndef log10(x) { return log(x) / log(10.0) }\nLPREF <- 0.0 - 36.4815\ndef lgP(bq, lq) { return LPREF + 2.0 * log10(bq) + 2.0 * log10(lq) }\nprint(\"\")\nprint(\"[重力->電磁] Gertsenshtein変換の log10(P) (P=変換確率):\")\nprint(\"  実験室 20T x 10m          :\", f5(lgP(20.0, 10.0)), \" (P ~ 1e-32: 傍受不可)\")\nprint(\"  星間磁場 3e-10T x 12.4光年 :\", f5(lgP(0.0000000003, 117300000000000000.0)), \" (P ~ 1e-21: 傍受不可)\")\nprint(\"  マグネター 1e11T x 10km    :\", f5(lgP(100000000000.0, 10000.0)), \" (P ~ 1e-6: 天体物理のみ)\")\nprint(\"  結論: 人工装置の変換確率は事実上ゼロ。重力経由で交信路を盗聴することは\")\nprint(\"        物理的に不可能であり, 仮に拾えても BB84 が QBER で傍受を暴露する。\")\nprint(\"@@GERT-OK\")\n\nprint(\"\")\nprint(\"正直な注記: もつれ自体は通信に使えない (no-communication 定理)。\")\nprint(\"量子計算機の役割は鍵 (BB84) であり、搬送は電磁波である。実在の\")\nprint(\"METI 送信 (1974 アレシボ -> M13 / 2017 Sonar Calling -> GJ 273b)\")\nprint(\"への返信を含め、地球外からの接触は 2026 年時点でゼロである。\")\nprint(\"@@BB84-OK\")\n";
 (function(){
   "use strict";
   function $(id){ return document.getElementById(id); }
@@ -2324,8 +2358,44 @@ window.CONTACT_SRC="# ==========================================================
     },30);
   });
 
+  /* ====== Gertsenshtein gravity<->EM conversion (interception demo) ======= */
+  var G_=6.674e-11, C_=2.998e8, MU0=1.2566370614e-6;
+  var GPREF=16*Math.PI*G_/(MU0*Math.pow(C_,4)); // ≈ 3.30e-37 /T^2/m^2
+  function gert(){
+    var B=parseFloat($("gB").value), L=parseFloat($("gL").value);
+    if(!isFinite(B)||!isFinite(L)||B<=0||L<=0){
+      $("gertInfo").innerHTML="<b>入力</b><span>B と L に正の数を入れてください</span>"; return null; }
+    var P=GPREF*B*B*L*L;
+    var photons=P*1e40; // 強い天体源 1e40 グラビトン/秒 を仮定しても取り出せる光子
+    $("gertInfo").innerHTML=
+      "<b>変換係数</b><span class='mono'>16πG/μ₀c⁴ = "+GPREF.toExponential(3)+" /T²/m²</span>"+
+      "<b>変換確率 P</b><span class='mono'>"+P.toExponential(2)+"  (log₁₀P = "+Math.log10(P).toFixed(2)+")</span>"+
+      "<b>入力 B, L</b><span>"+B.toExponential(2)+" T, "+L.toExponential(2)+" m</span>"+
+      "<b>強源(1e40 g/s)から回収</b><span>"+(photons<1?("≈ "+photons.toExponential(2)+" 光子/秒 (事実上ゼロ)"):(photons.toExponential(2)+" 光子/秒"))+"</span>";
+    return P;
+  }
+  function tap(){
+    var P=gert(); if(P==null) return;
+    $("gertWarn").style.display="none"; $("gertOk").style.display="none";
+    if(P<1e-9){
+      $("gertWarn").style.display="block";
+      $("gertWarn").innerHTML="<b>🚫 傍受失敗</b> — 変換確率 P="+P.toExponential(2)+" ≪ 1。重力擾乱から取り出せる光子は事実上ゼロで、この交信路を<b>物理的に盗聴できません</b>。Gertsenshtein変換が意味を持つのはマグネター級 (B≳10¹⁰ T) の天体だけです。";
+    } else {
+      $("gertOk").style.display="block";
+      $("gertOk").innerHTML="⚛ P="+P.toExponential(2)+" — マグネター級の磁場でのみ重力⇄電磁変換が非ゼロになる天体物理の領域です (人工の盗聴装置では到達不能)。"+
+        (KEY?(" さらに本交信路は BB84 量子鍵で守られ、傍受は QBER "+(KEY.qber*100).toFixed(1)+"% として<b>自動的に露見</b>します。"):" さらに BB84 量子鍵を配送すれば、いかなる傍受も QBER で露見します。");
+    }
+  }
+  $("gPreset").addEventListener("change",function(){
+    if(!this.value) return;
+    var pr=this.value.split(","); $("gB").value=pr[0]; $("gL").value=pr[1]; gert();
+  });
+  $("gB").addEventListener("input",gert);
+  $("gL").addEventListener("input",gert);
+  $("gTapBtn").addEventListener("click",tap);
+
   /* ================= init ================================================= */
-  preset(); budget();
+  preset(); budget(); gert();
   requestAnimationFrame(loop);
 })();
 </script>

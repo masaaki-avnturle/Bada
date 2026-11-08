@@ -40,7 +40,7 @@ const CONTACT_SRC = fs.readFileSync(path.join(IDE, "exo", "contact-bb84.bada"), 
   let Bada = fn(mod, mod.exports, undefined) || mod.exports;
   if (Bada.BadaLang) Bada = Bada.BadaLang;
   const res = Bada.run(CONTACT_SRC, { maxSteps: 4000000 });
-  if (!res.ok || (res.parseErrors && res.parseErrors.length) || !/@@BB84-OK/.test(res.output)) {
+  if (!res.ok || (res.parseErrors && res.parseErrors.length) || !/@@BB84-OK/.test(res.output) || !/@@GERT-OK/.test(res.output)) {
     console.error("ERROR: contact-bb84.bada failed — refusing to package");
     console.error((res.parseErrors || []).join("\n"));
     console.error(res.error || "");
@@ -187,6 +187,40 @@ let html = `<!DOCTYPE html>
       <span class="muted">※ 実際の電波送信は行いません (シミュレーションのみ)</span>
     </div>
     <div class="gline" id="gammaDemo"></div>
+  </div>
+
+  <div class="card">
+    <h2>🌀 重力⇄電磁 変換 (Gertsenshtein効果) — 交信路は盗聴できるか?</h2>
+    <div class="muted" style="line-height:1.75">
+      レポート6–7頁の重力テンソル方程式が指し示す<b>実在の物理</b>:
+      強い磁場 B の中では<b>重力波(重力子)が電磁波(光子)へ変換</b>されます
+      (Gertsenshtein 1962、逆変換も成立)。もし系外惑星の交信路の重力的擾乱を
+      電磁信号として拾えれば、それは“盗聴”になり得ます。— そこで変換確率を
+      <b>実際の物理定数で計算</b>します:
+      <span class="mono">P = (16πG / μ₀c⁴)·B²·L² ≈ 3.30×10⁻³⁷·B²·L²</span>。
+      結果は常に、<b>人工の装置では盗聴できない</b>ことを示します。
+    </div>
+    <div class="controls" style="margin-top:10px">
+      <label class="muted">磁場 B (テスラ): <input id="gB" type="number" value="20" step="any" style="width:120px"/></label>
+      <label class="muted">経路長 L (m): <input id="gL" type="number" value="10" step="any" style="width:150px"/></label>
+      <select id="gPreset" style="min-width:230px">
+        <option value="">— プリセット —</option>
+        <option value="20,10">実験室の超伝導磁石 (20T × 10m)</option>
+        <option value="8.3,27000">LHC双極子リング (8.3T × 27km)</option>
+        <option value="3e-10,1.173e17">星間磁場 × 12.4光年 (Luyten b まで)</option>
+        <option value="1e8,1e6">中性子星 磁気圏 (1e8 T × 1000km)</option>
+        <option value="1e11,1e4">マグネター表面 (1e11 T × 10km)</option>
+      </select>
+      <button class="g" id="gTapBtn">🛰 この経路を傍受してみる</button>
+    </div>
+    <div class="kv" id="gertInfo"></div>
+    <div class="warn" id="gertWarn"></div>
+    <div class="ok" id="gertOk"></div>
+    <div class="muted" style="margin-top:9px">
+      ※ これは係数 3.30×10⁻³⁷ の<b>コヒーレント小混合近似</b> (P≪1 で有効)。本アプリは実在の
+      交信機器に<b>接続せず</b>、いかなる実信号も<b>傍受しません</b>。重力⇄電磁変換が非ゼロに
+      なるのはマグネター級の天体だけで、人工の盗聴装置では到達できません。
+    </div>
   </div>
 
   <div class="card">
@@ -489,8 +523,44 @@ window.CONTACT_SRC=/*__SRC__*/"";
     },30);
   });
 
+  /* ====== Gertsenshtein gravity<->EM conversion (interception demo) ======= */
+  var G_=6.674e-11, C_=2.998e8, MU0=1.2566370614e-6;
+  var GPREF=16*Math.PI*G_/(MU0*Math.pow(C_,4)); // ≈ 3.30e-37 /T^2/m^2
+  function gert(){
+    var B=parseFloat($("gB").value), L=parseFloat($("gL").value);
+    if(!isFinite(B)||!isFinite(L)||B<=0||L<=0){
+      $("gertInfo").innerHTML="<b>入力</b><span>B と L に正の数を入れてください</span>"; return null; }
+    var P=GPREF*B*B*L*L;
+    var photons=P*1e40; // 強い天体源 1e40 グラビトン/秒 を仮定しても取り出せる光子
+    $("gertInfo").innerHTML=
+      "<b>変換係数</b><span class='mono'>16πG/μ₀c⁴ = "+GPREF.toExponential(3)+" /T²/m²</span>"+
+      "<b>変換確率 P</b><span class='mono'>"+P.toExponential(2)+"  (log₁₀P = "+Math.log10(P).toFixed(2)+")</span>"+
+      "<b>入力 B, L</b><span>"+B.toExponential(2)+" T, "+L.toExponential(2)+" m</span>"+
+      "<b>強源(1e40 g/s)から回収</b><span>"+(photons<1?("≈ "+photons.toExponential(2)+" 光子/秒 (事実上ゼロ)"):(photons.toExponential(2)+" 光子/秒"))+"</span>";
+    return P;
+  }
+  function tap(){
+    var P=gert(); if(P==null) return;
+    $("gertWarn").style.display="none"; $("gertOk").style.display="none";
+    if(P<1e-9){
+      $("gertWarn").style.display="block";
+      $("gertWarn").innerHTML="<b>🚫 傍受失敗</b> — 変換確率 P="+P.toExponential(2)+" ≪ 1。重力擾乱から取り出せる光子は事実上ゼロで、この交信路を<b>物理的に盗聴できません</b>。Gertsenshtein変換が意味を持つのはマグネター級 (B≳10¹⁰ T) の天体だけです。";
+    } else {
+      $("gertOk").style.display="block";
+      $("gertOk").innerHTML="⚛ P="+P.toExponential(2)+" — マグネター級の磁場でのみ重力⇄電磁変換が非ゼロになる天体物理の領域です (人工の盗聴装置では到達不能)。"+
+        (KEY?(" さらに本交信路は BB84 量子鍵で守られ、傍受は QBER "+(KEY.qber*100).toFixed(1)+"% として<b>自動的に露見</b>します。"):" さらに BB84 量子鍵を配送すれば、いかなる傍受も QBER で露見します。");
+    }
+  }
+  $("gPreset").addEventListener("change",function(){
+    if(!this.value) return;
+    var pr=this.value.split(","); $("gB").value=pr[0]; $("gL").value=pr[1]; gert();
+  });
+  $("gB").addEventListener("input",gert);
+  $("gL").addEventListener("input",gert);
+  $("gTapBtn").addEventListener("click",tap);
+
   /* ================= init ================================================= */
-  preset(); budget();
+  preset(); budget(); gert();
   requestAnimationFrame(loop);
 })();
 </script>
