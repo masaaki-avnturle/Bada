@@ -4111,6 +4111,23 @@ python3 compose_tablet207.py bank150.json src score_tablet207.json && python3 sy
 python3 compose_tablet208.py bank150.json src score_tablet208.json && python3 synth.py score_tablet208.json tablet208.wav && python3 video.py score_tablet208.json tablet208.wav tablet208.mp4
 ```
 
+## 🎤✨🎧 Requiem BADA — Tablet Sessions CCIX · L'aureola e le due tracce (tablet208 の光輪様の声に、トラック 18 とトラック 8 を重ね合わせて, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+3 つの音だけ、楽器は何も加えない: 光輪様の声 (CCVIII と同じ — G3 に調律した女性の声 + 5 度上 + 1 オクターヴ上、3.5 秒の残響、rms −22.5 dB) を 2 回 (0.55)、トラック 18 (ニ短調) はそのまま 3 回 (0.5 / 0.45)、トラック 8 (ハ長調 / イ短調) は 4 度上げてヘ長調 / ニ短調に全部と続き (0.5 / 0.4)。tablet89・86 は使わない。6 秒のフェード・イン、6〜10 秒のフェード・アウト
+
+| 段落 | 小節 | 重ねる音 |
+|---|---|---|
+| I | 0〜52 | 光輪の声 + トラック 18 |
+| II | 52〜100 | トラック 8 (全部、4 度上げて) + トラック 18 (2 回目) |
+| III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き (100 秒から) |
+| IV | 150〜176 | トラック 18 の後半と声の終わり、一緒に消える |
+
+- `compose_tablet209.py` (compose_tablet199 から; 3 つの wav — 光輪の声は tablet208 のもの — で作れる)
+
+```bash
+python3 compose_tablet209.py bank150.json src score_tablet209.json && python3 synth.py score_tablet209.json tablet209.wav && python3 video.py score_tablet209.json tablet209.wav tablet209.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
