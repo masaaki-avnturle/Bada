@@ -3886,6 +3886,7 @@ python3 compose_tablet193.py bank150.json src score_tablet193.json && python3 sy
 | III | 100〜140 | 13:10 (2 回目) | 後半 (90 秒から) | 13:10 と 13:16 を同時に、tablet89 と 13:10 を同時に (3 つの旋律) |
 | IV | 140〜176 | 13:16 の前半 | 終わり | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −18〜−16 / II −20〜−15 / III −22〜−15.5 / IV −22〜−17 → 消える; ステレオ平均 −15.5 dB、11:51、27.3 MiB
 - `compose_tablet194.py` (compose_tablet191 から; bank194.json = bank190 + 13:10・13:16 の採譜、4 つの wav で作れる)
 
 ```bash
