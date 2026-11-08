@@ -4278,6 +4278,7 @@ python3 compose_tablet218.py bank201.json src score_tablet218.json && python3 sy
 | III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き (100 秒から) |
 | IV | 150〜176 | トラック 18 の後半、消える |
 
+- 測った音量 (4 秒 rms、モノ): I 声+トラック 18 −29.6 → −15.2 → −15.4 → −17.3 → −19.2 dB / II トラック 8+18 −24.7 → −18.0 → −19.9 → −17.7 → −26.9 dB / III 声+トラック 8 −21.0 → −18.1 → −15.9 → −20.2 → −19.2 dB / IV トラック 18 −24.9 → −23.5 dB。全体 mean −15.9 dB、max 0.0 dB。26.2 MiB。
 - `compose_tablet219.py` (compose_tablet218 から; bank201.json、3 つの wav — 光輪の声はドエロの光輪様の声 — で作れる)
 
 ```bash
