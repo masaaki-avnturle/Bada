@@ -4049,6 +4049,7 @@ python3 compose_tablet202.py bank150.json src score_tablet202.json && python3 sy
 
 CCII と同じ 5 つの音の重ね方 (tablet89・tablet86 を全音下げて・トラック 18・トラック 8 を 4 度上げて、楽器なし) で、14:55 の声だけを若い優しい女性の声に: `feminize_voice.py` の WORLD ボコーダーで 13 半音上げ、フォルマントを 1.14 倍 (変換後の f0 中央値 246 Hz、10〜90 % が 194〜320 Hz)、6.5 kHz より上を 2 次の低域通過で少し丸め、音高をヘ長調の音階に 0.6 で寄せ、rms −23 dB と少し小さめ (0.5) に置いて優しく
 
+- 音量 (dBFS rms, 4 秒窓, モノ): I −18〜−15 / II −17〜−13.6 / III −16〜−13.5 / IV −17〜−13 → 消える; ステレオ平均 −15.2 dB、11:51、27.4 MiB
 - `compose_tablet203.py` (compose_tablet202 から; 声の変換は `feminize(x, sr, 5, semis=13, formant=1.14)` のあと 6.5 kHz の低域通過)
 
 ```bash
