@@ -4335,6 +4335,7 @@ python3 compose_tablet221.py bank201.json src score.json score_tablet221.json &&
 | III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) + 指弾き |
 | IV | 150〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、指弾きと低音弦だけが残って消える |
 
+- 測った音量 (4 秒 rms、モノ): I 声+トラック 18 −26.9 → −19.8 → −18.0 → −19.7 → −19.4 dB / II トラック 8+18 −26.4 → −24.0 → −23.7 → −22.4 → −26.6 dB / III 声+トラック 8 −24.1 → −19.7 → −17.9 → −19.5 → −19.3 dB / IV トラック 18 −27.8 → −27.6 dB。全体 mean −18.6 dB、max 0.0 dB。26.8 MiB。
 - `compose_tablet222.py` (compose_tablet220 から; bank201.json、3 つの wav — 光輪の声はドエロの光輪様の声 — で作れる)。`synth.py` に `acoustic_guitar` と `AG`、`notes_silent` を、`video.py` に `AG` の色と凡例を追加
 
 ```bash
