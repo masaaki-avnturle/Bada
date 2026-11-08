@@ -3821,6 +3821,23 @@ python3 build_sampler.py bank86 20261107_086000.wav && python3 build_sampler.py 
 python3 compose_tablet190.py bank190.json src score.json score_tablet190.json && python3 synth.py score_tablet190.json tablet190.wav && python3 video.py score_tablet190.json tablet190.wav tablet190.mp4
 ```
 
+## 🎧🎹🎼 Requiem BADA — Tablet Sessions CXCI · Il 18:54 sul 89 (tablet89 と 2026/11/06 18:54 を重ね合わせて、元の楽器を演奏させて — アルペジオや元の曲に無い楽器は付け加えない, ニ短調 / ヘ長調, ♩=60, 11 分 52 秒)
+
+テープ: tablet89 (LXXXIX — レクイエムとフーガ、ニ短調、6 分 31 秒) を全曲そのまま (0.5)、後半 (90 秒から) をもう一度 (0.45)、11/06 18:54 の実音 (rms −22 dB に揃えたもの) を途切れなく 3 回半 (0.5)。元の楽器 = tablet89 の中にある楽器 (実音のピアノ) だけ: tablet89 の最上声の採譜 (音声から build_sampler で) から作った旋律 (8 小節) と低い形を 06:42 の実音のピアノの 1 音のサンプラーで、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は tablet89 の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (強拍の不協和 2)
+
+| 段落 | 小節 | tablet89 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜50 | 始まり (レクイエム) | 旋律をアルト → テノール → ソプラノ |
+| II | 50〜100 | 続き (フーガ) | 旋律を 2 声で (2 小節遅れ)、低い形をバスで |
+| III | 100〜140 | 後半 (90 秒から、2 回目) | アルトとバス、2 倍に伸ばしてテノールで |
+| IV | 140〜176 | 終わり | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet191.py` (compose_tablet185 から; bank190.json (tablet89 の採譜入り) と 2 つの wav で作れる)
+
+```bash
+python3 compose_tablet191.py bank190.json src score_tablet191.json && python3 synth.py score_tablet191.json tablet191.wav && python3 video.py score_tablet191.json tablet191.wav tablet191.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
