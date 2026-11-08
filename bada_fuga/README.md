@@ -4158,6 +4158,26 @@ CCX と同じ曲 (トラック 18・トラック 8・18:54、元の楽器 = 旋�
 python3 compose_tablet211.py bank201.json src score_tablet211.json && python3 synth.py score_tablet211.json tablet211.wav && python3 video.py score_tablet211.json tablet211.wav tablet211.mp4
 ```
 
+## 🎤✨🎹 Requiem BADA — Tablet Sessions CCXII · L'aureola della diciassettenne accordata in Sol (11/08 14:55 の声を、オーケストラの調律の G3 に合わせた 17 歳の女性の光輪様の声で — 女性版, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+CCXIII (男性版) と対の 2 ファイル。曲は CCX と同じ (トラック 18・トラック 8・18:54、元の楽器 = 旋律の実音のピアノと低いペダル、段落も同じ) で、光輪様の声だけを作り換える。元の声 (基音の中央値 116.6 Hz) をオーケストラの調律の G3 = 196 Hz に合わせて 8.99 半音上げ (基音の中央値 197 Hz)、フォルマント 1.18 倍、9 kHz 以上を落とした 17 歳の女性の声を 1 人目に、その 5 度上 (フォルマント ×1.03、30 ms 遅れ、0.45) と 1 オクターヴ上 (×1.06、55 ms 遅れ、0.35) を重ねた三賢者、ト長調に 0.9 で調律、3.5 秒の残響 (光輪、0.9)、rms −22.5 dB。アルペジオ・パッド・ベース・ドラム・フックは付け加えない (強拍の不協和 3)
+
+- `compose_tablet212.py` (compose_tablet211 から; bank201.json、4 つの wav — 光輪の声は上の手順で作った 17 歳の女性のもの — で作れる)
+
+```bash
+python3 compose_tablet212.py bank201.json src score_tablet212.json && python3 synth.py score_tablet212.json tablet212.wav && python3 video.py score_tablet212.json tablet212.wav tablet212.mp4
+```
+
+## 🎤✨🎹 Requiem BADA — Tablet Sessions CCXIII · L'aureola dell'uomo accordata in Sol (11/08 14:55 の声を、オーケストラの調律の G に合わせた男性の光輪様の声で — 男性版, ヘ長調 / ニ短調, ♩=60, 11 分 52 秒)
+
+CCXII (女性版) と対の 2 ファイル。曲は同じで、光輪様の声を男性の声で: 元の声を G3 の 1 オクターヴ下の G2 = 98 Hz に合わせて 3.01 半音下げ (基音の中央値 99 Hz)、フォルマント 1.0 倍、10 kHz 以上を落とした男性の声を 1 人目に、5 度上と 1 オクターヴ上を重ねた三賢者、ト長調に 0.9 で調律、3.5 秒の残響、rms −22.5 dB。男性の声を G3 (196 Hz) そのものにすると裏声になるので、同じ G の 1 オクターヴ下にした
+
+- `compose_tablet213.py` (compose_tablet211 から; bank201.json、4 つの wav — 光輪の声は上の手順で作った男性のもの — で作れる)
+
+```bash
+python3 compose_tablet213.py bank201.json src score_tablet213.json && python3 synth.py score_tablet213.json tablet213.wav && python3 video.py score_tablet213.json tablet213.wav tablet213.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
