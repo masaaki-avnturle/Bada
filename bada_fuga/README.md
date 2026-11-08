@@ -3970,6 +3970,23 @@ python3 compose_tablet197.py bank196.json src score_tablet196.json score_tablet1
 python3 compose_tablet198.py bank196.json src score.json score_tablet198.json && python3 synth.py score_tablet198.json tablet198.wav && python3 video.py score_tablet198.json tablet198.wav tablet198.mp4
 ```
 
+## 🎤🎧🎧 Requiem BADA — Tablet Sessions CXCIX · Quattro suoni originali (トラック 18・トラック 8・2026/11/08 13:51・11/06 18:54 の原音を重ねて — アルペジオや原曲に無い音は使わない, ニ短調 / ヘ長調, ♩=60, 11 分 52 秒)
+
+4 つの原音だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘もなし): 13:51 の声は変換せず原音のまま (rms −22 dB に揃えるだけ、2 回 0.55)、18:54 の実音 (rms −22 dB) を途切れなく 3 回半 (0.45)、トラック 18 (ニ短調) はそのまま全部と後半 (0.5 / 0.45)、トラック 8 (ハ長調 / イ短調) だけ 4 度上げてヘ長調 / ニ短調に、裏に 2 回 (0.35 / 0.4)。6 秒のフェード・イン、6〜10 秒のフェード・アウト
+
+| 段落 | 小節 | 表 | 裏 |
+|---|---|---|---|
+| I | 0〜60 | 13:51 の声 (原音) | トラック 8 (4 度上げて)、18:54 |
+| II | 60〜100 | トラック 18 | 18:54 |
+| III | 100〜158 | 声 (2 回目) | トラック 8 の続き、18:54 |
+| IV | 158〜176 | トラック 18 の後半 | 18:54 の終わり、一緒に消える |
+
+- `compose_tablet199.py` (compose_tablet174 から; 4 つの wav だけで作れる)
+
+```bash
+python3 compose_tablet199.py bank150.json src score_tablet199.json && python3 synth.py score_tablet199.json tablet199.wav && python3 video.py score_tablet199.json tablet199.wav tablet199.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
