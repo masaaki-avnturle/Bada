@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Bada RDP Guard — 端末間 相互デジタル署名で RDP 乗っ取りを防ぐ</title>
+<style>
+:root{
+  --bg:#070b12; --panel:#0e1623; --panel2:#0a1119; --edge:#1d2b40;
+  --text:#dce6f4; --dim:#8296b0; --green:#3ad67f; --amber:#ffcf4a; --cyan:#4fd0ff; --red:#ff6a7a;
+  --mono:"SFMono-Regular",Consolas,Menlo,"Noto Sans Mono CJK JP",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif;padding-bottom:44px}
+header{padding:16px 18px 12px;border-bottom:1px solid var(--edge);background:linear-gradient(180deg,#0b1424,var(--bg))}
+header h1{font-size:19px}header h1 .ic{margin-right:8px}
+header .sub{color:var(--dim);font-size:12px;margin-top:6px;line-height:1.8}
+header .sub b{color:var(--text)} header .sub code{color:var(--cyan)}
+main{max-width:1020px;margin:0 auto;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:840px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:14px}
+.card h2{font-size:14px;color:var(--cyan);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.full{grid-column:1/-1}
+.term{display:flex;gap:12px;flex-wrap:wrap}
+.term .t{flex:1;min-width:220px;background:var(--panel2);border:1px solid var(--edge);border-radius:10px;padding:11px}
+.term .t .nm{font-weight:bold;color:var(--amber)}
+.kv{font-family:var(--mono);font-size:12px;margin-top:5px;color:var(--dim);word-break:break-all}
+.kv b{color:var(--green)}
+button{font:inherit;color:#04140b;background:linear-gradient(135deg,#2ee07f,#16a85c);border:none;border-radius:8px;padding:8px 13px;cursor:pointer;font-weight:bold;font-size:13px}
+button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--edge);font-weight:normal}
+button.atk{background:linear-gradient(135deg,#d05a67,#a7303d)}
+button:active{transform:translateY(1px)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+.status{margin-top:8px;font-size:13px;min-height:20px;line-height:1.6}
+.status.ok{color:var(--green)} .status.ng{color:var(--red)}
+#log,#atklog{max-height:210px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;line-height:1.65;margin-top:8px}
+#log .e,#atklog .e{padding:2px 0;border-bottom:1px dashed #16223622}
+.badge{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;border:1px solid var(--edge);color:var(--dim)}
+.badge.ok{color:var(--green);border-color:var(--green)} .badge.ng{color:var(--red);border-color:var(--red)}
+input,select,textarea{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--edge);border-radius:7px;padding:6px 9px;font-size:12.5px}
+textarea{width:100%;font-family:var(--mono);font-size:11.5px;min-height:76px;resize:vertical}
+label{color:var(--dim);font-size:12px}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px;font-family:var(--mono)}
+th,td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--edge)}
+th{color:var(--dim)}
+td .al{color:var(--green)} td .de{color:var(--red)}
+.connrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.connrow input{width:98px}
+footer{text-align:center;color:var(--dim);font-size:11px;margin-top:18px;line-height:1.8}
+footer a{color:var(--cyan)}
+.note{color:var(--dim);font-size:11.5px;margin-top:8px;line-height:1.7;border-top:1px solid var(--edge);padding-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="ic">🛡️</span>Bada RDP Guard</h1>
+  <div class="sub">
+    RDP の弱点である<b>なりすまし・セッション乗っ取り</b>を防ぐ<b>防御</b>ツール。RDP を許可する前に、2 つの端末が
+    互いに<b>デジタル署名のチャレンジ・レスポンス</b>で身元を証明し合います。署名はハッシュの
+    <b>不可逆性</b>のみに依存する <code>Lamport 一回署名 + Merkle 署名方式</code>。秘密鍵を持たない攻撃者は
+    どちらの端末にもなりすませず、盗んだ資格情報だけでは RDP に入れません。方針は <code>Reviser</code> が
+    tuple-network の辞書式順序でパッチ適用します。<b>概念実装</b>(実 RDP パケットは操作しません)。
+  </div>
+</header>
+<main>
+  <div class="card full">
+    <h2>🖥️ 端末と指紋 (Merkle 根)
+      <span style="margin-left:auto"><button class="ghost" id="regen">🔑 鍵を再生成</button></span>
+    </h2>
+    <div class="term" id="terms"></div>
+    <div class="note">各端末は秘密鍵(原像)から公開鍵(ハッシュ)を作り、複数の公開鍵を Merkle 木で束ねた
+      <b>根</b>を安定した指紋として相手に<b>ピン留め</b>します。相手はこの指紋に対してのみ署名を検証します。</div>
+  </div>
+
+  <div class="card">
+    <h2>🤝 RDP 接続 — 相互認証ハンドシェイク</h2>
+    <div class="btns"><button id="connect">▶ RDP 接続を試行 (正規)</button></div>
+    <div class="status" id="hstatus"></div>
+    <div id="log"></div>
+  </div>
+
+  <div class="card">
+    <h2>🥷 攻撃 — なりすまし / リプレイ</h2>
+    <div class="btns">
+      <button class="atk" id="imposter">ServerB になりすまし接続</button>
+      <button class="atk ghost" id="replay" style="color:var(--red)">盗んだ署名を再利用</button>
+    </div>
+    <div class="status" id="astatus"></div>
+    <div id="atklog"></div>
+  </div>
+
+  <div class="card full">
+    <h2>📜 Reviser — tuple-network 辞書式順序のアクセス方針</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <label>ベース方針 (tuple | effect | note、1 行 1 ルール)</label>
+        <textarea id="base">* | deny | 既定は全拒否
+rdp,office,server1 | allow | 社内→server1 許可</textarea>
+        <label>パッチ patch-a</label>
+        <textarea id="patcha">rdp,office,server1,admin | allow | admin 許可
+rdp,vpn,server1 | allow | VPN 許可</textarea>
+        <label>パッチ patch-b (後勝ち)</label>
+        <textarea id="patchb">rdp,office,server1,admin | deny | インシデント対応で admin 一時停止</textarea>
+        <div class="btns"><button class="ghost" id="applyrev">↻ 方針を改訂 (revise)</button></div>
+      </div>
+      <div>
+        <div style="color:var(--dim);font-size:12px">改訂後の実効方針 (辞書式順序):</div>
+        <table id="efftab"><thead><tr><th>tuple</th><th>effect</th><th>source</th></tr></thead><tbody></tbody></table>
+        <div class="connrow">
+          <label>接続:</label>
+          <input id="c0" value="rdp"/><input id="c1" value="office"/><input id="c2" value="server1"/><input id="c3" value="admin"/>
+          <button id="decide">判定</button>
+        </div>
+        <div class="status" id="dstatus"></div>
+      </div>
+    </div>
+    <div class="note">同じタプルは<b>辞書順で後のパッチ</b>が上書きし、接続には<b>最も具体的(最長一致)</b>なルールを適用、
+      既定は拒否。決定論的なので監査・再現が可能です。</div>
+  </div>
+
+  <footer>
+    Bada RDP Guard — <a href="https://github.com/masaaki-avnturle/Bada">masaaki-avnturle/Bada</a> ·
+    Lamport+Merkle 相互署名認証 · Reviser 方針エンジン · PHP/Web/Bada · 概念実装 · MIT
+  </footer>
+</main>
+
+<script src="rdpguard.js"></script>
+<script>
+(function(){
+  "use strict";
+  var G = window.RdpGuard, $ = function(id){ return document.getElementById(id); };
+  var A, B, pinnedA, pinnedB;
+
+  function mkTerminals(){
+    A = G.createTerminal("WorkstationA", 4);
+    B = G.createTerminal("ServerB", 4);
+    pinnedA = A.root; pinnedB = B.root;    /* 相手にピン留めされた指紋 */
+    renderTerms();
+    $("hstatus").textContent=""; $("log").innerHTML="";
+    $("astatus").textContent=""; $("atklog").innerHTML="";
+  }
+  function renderTerms(){
+    $("terms").innerHTML = [A,B].map(function(t){
+      return '<div class="t"><div class="nm">'+t.name+'</div>'+
+        '<div class="kv">指紋(root 先頭): <b>'+t.fingerprint+'</b></div>'+
+        '<div class="kv">残り鍵(葉): '+(t.nLeaves - t.used)+' / '+t.nLeaves+'</div></div>';
+    }).join("");
+  }
+  function logTo(id, entries){
+    $(id).innerHTML = entries.map(function(e){
+      return '<div class="e"><span style="color:var(--amber)">['+e.who+']</span> '+esc(e.text)+'</div>';
+    }).join("");
+  }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
+  $("regen").onclick = mkTerminals;
+
+  $("connect").onclick = function(){
+    if (A.used >= A.nLeaves || B.used >= B.nLeaves){ mkTerminals(); }
+    var r = G.mutualHandshake(A, B);
+    renderTerms();
+    logTo("log", r.log);
+    $("hstatus").className = "status " + (r.ok ? "ok" : "ng");
+    $("hstatus").innerHTML = (r.ok ? "✅ " : "⛔ ") + r.message +
+      ' <span class="badge '+(r.ok?"ok":"ng")+'">'+(r.ok?"ALLOW":"DENY")+'</span>';
+  };
+
+  $("imposter").onclick = function(){
+    /* 攻撃者は ServerB の名前を詐称するが秘密鍵は持たない別端末 */
+    var impostor = G.createTerminal("ServerB", 4);
+    var chal = "RDPGUARD1|S-atk|ServerB>WorkstationA|"+G.toHex(G.secureRandom(16));
+    var fakeSig = G.signChallenge(impostor, chal);
+    var ok = G.verifyTerminalSig(pinnedB, chal, fakeSig);   /* A は B の *ピン留め指紋* で検証 */
+    logTo("atklog", [
+      { who:"攻撃者", text:"ServerB を名乗り、別の鍵で署名 (偽指紋 "+impostor.fingerprint+")" },
+      { who:"WorkstationA", text:"署名を本物 B の指紋 "+pinnedB.slice(0,16)+" で検証 → "+(ok?"OK":"NG") }
+    ]);
+    $("astatus").className = "status " + (ok ? "ok" : "ng");
+    $("astatus").innerHTML = ok ? "？ 想定外" :
+      "⛔ なりすまし拒否 — 攻撃者の署名は本物の指紋で検証に失敗。RDP 乗っ取りを阻止。";
+  };
+
+  $("replay").onclick = function(){
+    /* 正規 B の署名を 1 つ盗んで、別セッションで使い回す */
+    var old = G.signChallenge(B, "RDPGUARD1|S-old|ServerB>WorkstationA|nOLD");
+    renderTerms();
+    var ok = G.verifyTerminalSig(pinnedB, "RDPGUARD1|S-new|ServerB>WorkstationA|nNEW", old);
+    logTo("atklog", [
+      { who:"攻撃者", text:"過去の正規署名を傍受し、新しいセッション/ノンスで再送" },
+      { who:"WorkstationA", text:"新チャレンジに対し古い署名を検証 → "+(ok?"OK":"NG") }
+    ]);
+    $("astatus").className = "status " + (ok ? "ok" : "ng");
+    $("astatus").innerHTML = ok ? "？ 想定外" :
+      "⛔ リプレイ拒否 — チャレンジ(セッション+ノンス)が違うため古い署名は無効。";
+  };
+
+  /* ── Reviser ── */
+  function parseRules(txt){
+    return txt.split(/\n/).map(function(line){
+      line = line.trim(); if (!line) return null;
+      var p = line.split("|").map(function(x){ return x.trim(); });
+      return { tuple: p[0].split(",").map(function(x){ return x.trim(); }), effect: p[1]||"deny", note: p[2]||"" };
+    }).filter(Boolean);
+  }
+  function revise(){
+    var base = parseRules($("base").value);
+    var pa = { id:"patch-a", rules: parseRules($("patcha").value) };
+    var pb = { id:"patch-b", rules: parseRules($("patchb").value) };
+    var pol = G.revise(base, [pa, pb]);
+    window.__pol = pol;
+    $("efftab").querySelector("tbody").innerHTML = pol.rules.map(function(r){
+      return '<tr><td>'+esc(r.tuple.join(","))+'</td><td class="'+(r.effect==="allow"?"al":"de")+'">'+r.effect+
+        '</td><td style="color:var(--dim)">'+esc(r.source)+'</td></tr>';
+    }).join("");
+    return pol;
+  }
+  $("applyrev").onclick = revise;
+  $("decide").onclick = function(){
+    var pol = window.__pol || revise();
+    var conn = ["c0","c1","c2","c3"].map(function(id){ return $(id).value.trim(); }).filter(Boolean);
+    var d = pol.decide(conn);
+    $("dstatus").className = "status " + (d.effect==="allow" ? "ok" : "ng");
+    $("dstatus").innerHTML = (d.effect==="allow" ? "✅ ALLOW" : "⛔ DENY") +
+      " — " + (d.rule ? ("一致ルール ["+esc(d.rule.tuple.join(","))+"] ("+esc(d.rule.source)+")"+(d.rule.note?" : "+esc(d.rule.note):"")) : "一致なし→既定拒否");
+  };
+
+  mkTerminals(); revise();
+})();
+</script>
+</body>
+</html>

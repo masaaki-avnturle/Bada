@@ -1,0 +1,127 @@
+# ============================================================
+# rdpguard.bada -- Bada 言語による RDP Guard 参照実装
+#
+# RDP の「なりすまし・乗っ取り」を防ぐ *防御* の中核を Bada で示す。
+# ハッシュ関数の *不可逆性* (一方向性) だけを用いた端末認証:
+#
+#   Lamport ハッシュ連鎖 (S/KEY, 1981) ――
+#     端末は秘密シード seed を持ち、一方向関数 owf を K 回適用した
+#     anchor = owf^K(seed) を「指紋」として相手にピン留めする。
+#     i 回目の認証では owf^(K-i)(seed) を 1 つ公開する。
+#     検証側は owf を 1 回かけて直前に受理した値に一致するか確かめる。
+#       ・秘密を知らない攻撃者は anchor の原像を作れない (一方向性) → なりすまし不可
+#       ・公開値は一回限り。古い値を再送しても連鎖が進んでいるので無効 → リプレイ不可
+#
+# 本番の JS/PHP コアは owf を SHA-256 とし、複数鍵を Merkle 木で束ねる
+# (Lamport 一回署名 + Merkle 署名方式)。ここでは owf を FNV 風の一方向
+# 整数ハッシュにして、連鎖の構造だけを Bada で走る形で示す。
+#
+#   node bada_gui_ide/cli/bada-cli.js run rdp_guard/bada/rdpguard.bada
+# ============================================================
+
+# ---- 一方向関数 (本番は SHA-256。ここでは FNV-1a 風の整数ハッシュ) ----
+def owf(s) {
+    h := 2166136261
+    i := 0
+    n := len(s)
+    while (i < n) { h := (h * 16777619 + ord(s, i)) % 2147483647; i := i + 1 }
+    return h
+}
+
+# ---- ハッシュ連鎖: 深さ depth の値 (0 = シード直後) ----
+def node(seed, depth) {
+    v := owf("seed:" + seed)
+    i := 0
+    while (i < depth) { v := owf("c:" + v); i := i + 1 }
+    return v
+}
+
+K := 20
+
+# 端末の指紋 (anchor) = owf を K 回適用した公開値
+def fingerprint(seed) { return node(seed, K) }
+
+# i 回目 (1..K) の認証で公開する値
+def reveal(seed, i) { return node(seed, K - i) }
+
+# 検証: 公開値 r に owf を 1 回かけ、直前に受理した値 prev と一致するか
+def verify_step(r, prev) { if (owf("c:" + r) == prev) { return 1 } else { return 0 } }
+
+print("================================================================")
+print("Bada RDP Guard -- Lamport ハッシュ連鎖による端末相互認証 (防御)")
+print("================================================================")
+
+# ---- 2 つの正規端末。秘密シードは各自だけが知る ----
+seedA := "WorkstationA-secret-9f3c"
+seedB := "ServerB-secret-71ad"
+
+fpA := fingerprint(seedA)
+fpB := fingerprint(seedB)
+print("端末A 指紋(anchor) :", fpA)
+print("端末B 指紋(anchor) :", fpB)
+print("")
+
+# ---- 正規の相互認証: A と B が互いに次の連鎖値を公開し検証し合う ----
+# 相手は相手の anchor をピン留め済み。最初に受理する値は anchor。
+print("[セッション1] 相互認証")
+rA1 := reveal(seedA, 1)
+rB1 := reveal(seedB, 1)
+okA := verify_step(rA1, fpA)       # B が A を検証 (anchor に対して)
+okB := verify_step(rB1, fpB)       # A が B を検証
+print("  A が公開:", rA1, " -> B の検証:", okA)
+print("  B が公開:", rB1, " -> A の検証:", okB)
+if (okA == 1) { if (okB == 1) { print("  => 相互認証 成功: RDP セッションを許可") } }
+print("")
+
+# ---- なりすまし: 攻撃者は B の秘密を知らない別シード ----
+print("[攻撃] 攻撃者が ServerB になりすまし")
+seedX := "attacker-does-not-know-B"
+rX := reveal(seedX, 1)
+okX := verify_step(rX, fpB)        # 本物 B の anchor で検証
+print("  攻撃者が公開:", rX, " -> 本物Bの指紋で検証:", okX)
+if (okX == 0) { print("  => なりすまし 拒否: 原像を作れず検証失敗。RDP 乗っ取りを阻止。") }
+print("")
+
+# ---- リプレイ: 盗んだ古い公開値を次のセッションで再送 ----
+# セッション2 で受理済みの値は rB1。攻撃者が rB1 をもう一度送っても、
+# 次に期待されるのは reveal(seedB,2) であり、verify は rB1 を受理しない。
+print("[攻撃] リプレイ (盗んだ公開値の再送)")
+expected_prev := rB1               # セッション1で受理した値
+replay := rB1                      # 攻撃者は同じ値を再送
+okR := verify_step(replay, expected_prev)   # owf(rB1)==rB1 ? 連鎖は進むので不一致
+print("  再送値:", replay, " -> 検証:", okR)
+if (okR == 0) { print("  => リプレイ 拒否: 公開値は一回限り。古い値は無効。") }
+print("")
+
+# ---- 正当な次ステップは成功する (連鎖が 1 つ進む) ----
+rB2 := reveal(seedB, 2)
+okB2 := verify_step(rB2, rB1)      # owf(reveal2)==reveal1
+print("[セッション2] B の次の公開値:", rB2, " -> A の検証(直前=rB1):", okB2)
+if (okB2 == 1) { print("  => 正規の次セッションは許可 (連鎖が前進)") }
+print("")
+
+# ---- Reviser (方針): tuple-network の辞書式順序でパッチ適用 ----
+# 本番 JS/PHP は base + patch を辞書順に整列し後勝ちで改訂、接続には最長一致。
+# ここでは改訂後の実効方針に対する decide を固定ルールで示す。
+#   既定 deny / office->server1 allow / admin は patch-b で deny に改訂。
+def decide(zone, src, dst, user) {
+    # 最長一致 (最も具体的) を優先
+    if (zone == "rdp") {
+        if (src == "office") {
+            if (dst == "server1") {
+                if (user == "admin") { return "deny" }   # patch-b が patch-a を上書き
+                return "allow"                            # 社内一般ユーザ
+            }
+        }
+        if (src == "vpn") { if (dst == "server1") { return "allow" } }
+    }
+    return "deny"                                         # 既定は全拒否
+}
+print("[Reviser] 改訂後方針の判定 (辞書式順序・後勝ち・最長一致)")
+print("  rdp/office/server1/bob   ->", decide("rdp","office","server1","bob"))
+print("  rdp/office/server1/admin ->", decide("rdp","office","server1","admin"))
+print("  rdp/vpn/server1/carol    ->", decide("rdp","vpn","server1","carol"))
+print("  rdp/internet/server1/bob ->", decide("rdp","internet","server1","bob"))
+print("")
+print("注: owf は本番では SHA-256。完全な Lamport+Merkle 署名と動的 Reviser は")
+print("    core/rdpguard.js と php/RdpGuard.php を参照 (相互運用・検証済み)。")

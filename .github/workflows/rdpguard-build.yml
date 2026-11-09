@@ -1,0 +1,92 @@
+name: RDP Guard build (defensive mutual-auth; Node + PHP + Bada)
+
+# rdp_guard/ の「Bada RDP Guard」— RDP のなりすまし/乗っ取りを防ぐ防御ツール
+# (端末間 相互デジタル署名認証 + Reviser 方針エンジン)。
+# Node / PHP の自己検査、JS↔PHP 相互運用、Bada 参照の実行、core↔web の同一性を
+# 検証し、Web 一式 + PHP + Bada を Actions アーティファクトとして配布します。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'rdpguard-v*'
+    branches:
+      - main
+      - 'claude/quantum-crypto-multiplatform-303qm2'
+    paths:
+      - 'rdp_guard/**'
+      - '.github/workflows/rdpguard-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Core self-check (Node)
+        run: |
+          set -e
+          node rdp_guard/tools/test-rdpguard.js | tee /tmp/rg-node.out
+          grep -q "ALL RDPGUARD TESTS PASSED" /tmp/rg-node.out
+
+      - name: Core self-check (PHP) + JS↔PHP interop
+        run: |
+          set -e
+          JSROOT=$(node -e 'var G=require("./rdp_guard/core/rdpguard.js");var t=G.createTerminal("Interop",4,G.seedRng("interop"));process.stdout.write(t.root);')
+          echo "JS fingerprint root: $JSROOT"
+          php rdp_guard/tools/test-rdpguard.php interop "$JSROOT" | tee /tmp/rg-php.out
+          grep -q "ALL RDPGUARD PHP TESTS PASSED" /tmp/rg-php.out
+          grep -q "相互運用" /tmp/rg-php.out
+
+      - name: Bada reference runs
+        run: |
+          set -e
+          node bada_gui_ide/cli/bada-cli.js run rdp_guard/bada/rdpguard.bada | tee /tmp/rg-bada.out
+          grep -q "相互認証 成功" /tmp/rg-bada.out
+          grep -q "なりすまし 拒否" /tmp/rg-bada.out
+          grep -q "リプレイ 拒否" /tmp/rg-bada.out
+
+      - name: Engine copy is in sync (core == web)
+        run: |
+          set -e
+          diff rdp_guard/core/rdpguard.js rdp_guard/web/rdpguard.js
+          echo "rdpguard.js: core and web copies are byte-identical"
+
+      - name: PHP server smoke (handshake / impostor / revise)
+        run: |
+          set -e
+          php -S 127.0.0.1:8099 rdp_guard/php/server.php >/tmp/php-srv.log 2>&1 &
+          sleep 1
+          curl -s --noproxy 127.0.0.1 http://127.0.0.1:8099/api/health | grep -q '"ok": true'
+          curl -s --noproxy 127.0.0.1 -X POST http://127.0.0.1:8099/api/handshake -d '{"seed":"ci","sessionId":"S1","nonceA":"a","nonceB":"b"}' | grep -q '"ok": true'
+          curl -s --noproxy 127.0.0.1 -X POST http://127.0.0.1:8099/api/handshake -d '{"seed":"ci","impostor":true}' | grep -q '"ok": false'
+          echo "PHP gateway API OK"
+
+      - name: Package web + php + bada
+        run: |
+          mkdir -p dist/bada-rdp-guard
+          cp -r rdp_guard/web rdp_guard/php rdp_guard/bada rdp_guard/README.md dist/bada-rdp-guard/
+          (cd dist && zip -qr bada-rdp-guard.zip bada-rdp-guard)
+          ls -la dist
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-guard-app
+          path: dist/bada-rdp-guard.zip
+
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist/bada-rdp-guard.zip

@@ -201,6 +201,18 @@ zone:// の **Jones 多項式量子暗号**を単独アプリにしたもの。�
 
 ビルドは [`quantumshield-app-build.yml`](.github/workflows/quantumshield-app-build.yml) が自動実行します (`quantumshield-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方と仕組みは [`bada_gui_ide/quantumshield-app/README.md`](bada_gui_ide/quantumshield-app/README.md) を参照。
 
+### 🛡️ RDP ガード (Bada RDP Guard) — 端末間 相互デジタル署名で RDP 乗っ取りを防ぐ
+
+RDP の弱点である**なりすまし・セッション乗っ取り**を防ぐ**防御**ツール。RDP を許可する前に 2 端末が互いに**デジタル署名のチャレンジ・レスポンス**で身元を証明し合い、秘密鍵を持たない攻撃者はどちらにもなりすませません(盗んだ資格情報だけでは RDP に入れない)。署名はハッシュの**不可逆性**のみに依存する `Lamport 一回署名 + Merkle 署名方式`、方針は `Reviser` が tuple-network の辞書式順序でパッチ適用。**Bada 言語・PHP・Web** で実装(概念実装・端末内完結):
+
+| 形態 | 入手 / 実行 |
+|:---|:---|
+| **Web** (依存ゼロ) | [`rdp_guard/web/index.html`](rdp_guard/web/) をブラウザで開くだけ(相互認証・なりすまし/リプレイ拒否・Reviser) |
+| **PHP** (ゲートウェイ API) | `php -S 127.0.0.1:8080 rdp_guard/php/server.php`(`/api/handshake`・`/api/revise`) |
+| **Bada 言語** 参照 | `node bada_gui_ide/cli/bada-cli.js run rdp_guard/bada/rdpguard.bada` |
+
+JS と PHP のコアは同じ seed から**同一の指紋**を生成(相互運用・検証済み)。ビルド/検証は [`rdpguard-build.yml`](.github/workflows/rdpguard-build.yml) が Actions で自動実行し、Web 一式を**アーティファクト**として配布(`rdpguard-v*` タグで Release 添付)。詳細は [`rdp_guard/README.md`](rdp_guard/README.md) を参照。
+
 ### 🜁 Bada VM Pro — 量子 Bada OS (w9wm デスクトップ)
 
 量子 Bada 言語の OS。デスクトップは **w9wm window manager** (9wm + 仮想スクリーン 4 面、右クリック = New/Reshape/Move/Delete/Hide)、カーネルは BadaGPT。**bash / apt / vim / emacs / ssh / xinetd / texlive-full / screen / fcitx-mozc** を事前インストールし、**日本語入力対応**のターミナル (xterm / x-terminal-emulator / terminal) を同梱:
