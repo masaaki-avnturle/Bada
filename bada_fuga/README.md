@@ -4432,6 +4432,23 @@ python3 compose_tablet226.py bank201.json src score_tablet226.json && python3 sy
 python3 compose_tablet227.py bank201.json src score_tablet227.json && python3 synth.py score_tablet227.json tablet227.wav && python3 video.py score_tablet227.json tablet227.wav tablet227.mp4
 ```
 
+## 🎤📼📼 Requiem BADA — Tablet Sessions CCXXVIII · L'aureola sensuale, l'89 e la traccia 16 (ドエロの光輪様の声・tablet89・トラック 16 を重ね合わせて, ニ短調, ♩=60, 11 分 44 秒)
+
+3 つの音だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘もなし)。ドエロの光輪様の声 (CCXIX / CCXX のもの、息のノイズ層あり、rms −22.5 dB) を 2 回 (0.6)、tablet89 (LXXXIX — レクイエムとフーガ、ニ短調、6 分 31 秒) を全曲そのまま (0.45) と後半 (90 秒から、0.4)。トラック 16 は 08・18 と同じ 2023 年の CD の曲 (5 分 3 秒、rms −19.3 dB、4 kHz 以上は −39 dB で金属音なし)。クロマで調を測るとハ短調 (ト短調) なので 2 半音上げてニ短調に合わせ、II〜III に全曲 (0.4)、IV に後半 (150 秒から、0.35)。6 秒のフェード・イン、6〜10 秒のフェード・アウト
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜50 | ドエロの光輪の声 + tablet89 の始まり (レクイエム) |
+| II | 50〜100 | tablet89 のフーガ + トラック 16 (2 半音上げて、全曲) |
+| III | 100〜140 | 光輪の声 (2 回目) + tablet89 の後半 (90 秒から) + トラック 16 の続き |
+| IV | 140〜176 | tablet89 の終わり + トラック 16 の後半 (150 秒から)、消える |
+
+- `compose_tablet228.py` (compose_tablet227 から; bank201.json、3 つの wav — 光輪の声はドエロの光輪様の声、tablet89 の音は mp4 から、トラック 16 は wma から — で作れる)
+
+```bash
+python3 compose_tablet228.py bank201.json src score_tablet228.json && python3 synth.py score_tablet228.json tablet228.wav && python3 video.py score_tablet228.json tablet228.wav tablet228.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
