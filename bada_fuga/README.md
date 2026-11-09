@@ -4517,6 +4517,7 @@ python3 compose_tablet231.py bank201.json src score_tablet231.json && python3 sy
 | CCXXXVI | tablet230 | 声 + トラック 16 (2 半音上げ、途切れなく) |
 | CCXXXVII | tablet231 | 声 + トラック 14 (1 半音上げ、途切れなく) |
 
+- 測った音量 (全体 mean / max、volumedetect): CCXXXII −16.3 / 0.0 dB、26.6 MiB ／ CCXXXIII −16.3 / 0.0 dB、25.8 MiB (tablet209 と 219 は声だけが違う曲だったので、同じ声にした CCXXXII と CCXXXIII は同じ音) ／ CCXXXIV −16.1 / 0.0 dB、26.7 MiB
 - `compose_tablet232.py` 〜 `compose_tablet237.py` (それぞれ compose_tablet209 / 219 / 220 / 229 / 230 / 231 から; 声の wav を差し替え、声の音量を 0.45 に)
 
 ```bash
@@ -4534,6 +4535,7 @@ tablet228 (声・tablet89・トラック 16) の作り換え。声は CCXXXII〜
 | III | 100〜140 | 光輪の声 (2 回目) + tablet89 の後半 + トラック 16 の続き |
 | IV | 140〜176 | tablet89 の終わり + トラック 16 の後半、消える |
 
+- 測った音量 (4 秒 rms、モノ、10 小節ごと): −16.3 → −18.4 → −16.3 → −16.1 → −16.5 → −20.2 → −19.2 → −16.3 → −14.9 → −21.8 → −17.9 → −15.0 → −15.6 → −16.3 → −17.6 → −17.7 → −17.3 → −20.7 dB。全体 mean −14.4 dB、max 0.0 dB。24.9 MiB。
 - `compose_tablet238.py` (compose_tablet228 から; bank201.json、3 つの wav — 声は安心する光輪の声、tablet89 は上の処理をしたもの、トラック 16 は wma から — で作れる)
 
 ```bash
