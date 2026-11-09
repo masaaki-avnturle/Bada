@@ -4523,6 +4523,23 @@ python3 compose_tablet231.py bank201.json src score_tablet231.json && python3 sy
 for n in 232 233 234 235 236 237; do python3 compose_tablet$n.py bank201.json src$n score_tablet$n.json && python3 synth.py score_tablet$n.json tablet$n.wav && python3 video.py score_tablet$n.json tablet$n.wav tablet$n.mp4; done
 ```
 
+## 🎤🕊️📼 Requiem BADA — Tablet Sessions CCXXXVIII · L'aureola sensuale calma, l'89 addolcito e la traccia 16 (tablet228 を、安心するドエロの光輪様の声と、響きを抑えた tablet89 で作り換え, ニ短調, ♩=60, 11 分 44 秒)
+
+tablet228 (声・tablet89・トラック 16) の作り換え。声は CCXXXII〜CCXXXVII と同じ安心するドエロの光輪様の声 (残響 1.5 秒・0.4、上声 0.2 / 0.15、息 −17 dB、2〜4 kHz +2 dB、rms −25 dB) を 2 回 (0.45)。tablet89 (LXXXIX) も声に合うように響きを抑えて柔らかく: 5 kHz 以上を落とし、1.5〜4 kHz の鋭さを少し抑え、0.4 秒の包絡で大きい所だけを抑える圧縮 (静かな所は持ち上げない)、rms −18.3 → −23 dB。全曲 (0.4) と後半 (90 秒から、0.35)。トラック 16 (2 半音上げてニ短調) は全曲 (0.35) と後半 (150 秒から、0.3)。3 つの音だけ、楽器は何も加えない
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜50 | 安心する光輪の声 + tablet89 (響きを抑えて) の始まり |
+| II | 50〜100 | tablet89 のフーガ + トラック 16 (全曲) |
+| III | 100〜140 | 光輪の声 (2 回目) + tablet89 の後半 + トラック 16 の続き |
+| IV | 140〜176 | tablet89 の終わり + トラック 16 の後半、消える |
+
+- `compose_tablet238.py` (compose_tablet228 から; bank201.json、3 つの wav — 声は安心する光輪の声、tablet89 は上の処理をしたもの、トラック 16 は wma から — で作れる)
+
+```bash
+python3 compose_tablet238.py bank201.json src score_tablet238.json && python3 synth.py score_tablet238.json tablet238.wav && python3 video.py score_tablet238.json tablet238.wav tablet238.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
