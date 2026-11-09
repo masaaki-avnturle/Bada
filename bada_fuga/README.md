@@ -4504,6 +4504,25 @@ python3 compose_tablet230.py bank201.json src score_tablet230.json && python3 sy
 python3 compose_tablet231.py bank201.json src score_tablet231.json && python3 synth.py score_tablet231.json tablet231.wav && python3 video.py score_tablet231.json tablet231.wav tablet231.mp4
 ```
 
+## 🎤🕊️ Requiem BADA — Tablet Sessions CCXXXII〜CCXXXVII · Voce calma (tablet209・219・220・229・230・231 の声を、響きと音量を抑えた聞き取りやすく安心するドエロの光輪様の声に作り換え, ♩=60, 各 11 分 44 秒)
+
+6 曲とも、テープ・楽器・組み立ては元の曲のままで、声だけを差し替える。**安心するドエロの光輪様の声**: 11/08 14:55 の声を 10.5 半音上げ・フォルマント 1.10 倍の少し低めの女声 (215 Hz) にするのは同じで、響きと音量を抑えて聞き取りやすく — 残響を 3.5 秒・0.75 → 1.5 秒・0.4 に、三賢者の 5 度上 0.3 → 0.2・1 オクターヴ上 0.25 → 0.15 に、息のノイズを 12 dB 下 → 17 dB 下に、囁きの成分 +4 → +2 dB、2〜4 kHz (子音と明瞭さ) を +2 dB、8 kHz 以上を落とし、強めの柔らかい圧縮 (tanh ×2.2) で音量を均す。rms −22.5 → −25 dB、曲の中の音量 0.55〜0.8 → 0.45。声だけの音声も 1 ファイル (3 分 18 秒、mp3 192 kbps)
+
+| 曲 | 元 | 鳴っているもの |
+|---|---|---|
+| CCXXXII | tablet209 | 声 + トラック 18・トラック 8 (楽器なし) |
+| CCXXXIII | tablet219 | 声 + トラック 18・トラック 8 (楽器なし; 219 の声をこの声に) |
+| CCXXXIV | tablet220 | 声 + トラック 18・トラック 8 + 元の楽器 (実音のピアノの旋律、低いペダル) |
+| CCXXXV | tablet229 | 声 + トラック 14 (1 半音上げ)・トラック 8 (4 度上げ) |
+| CCXXXVI | tablet230 | 声 + トラック 16 (2 半音上げ、途切れなく) |
+| CCXXXVII | tablet231 | 声 + トラック 14 (1 半音上げ、途切れなく) |
+
+- `compose_tablet232.py` 〜 `compose_tablet237.py` (それぞれ compose_tablet209 / 219 / 220 / 229 / 230 / 231 から; 声の wav を差し替え、声の音量を 0.45 に)
+
+```bash
+for n in 232 233 234 235 236 237; do python3 compose_tablet$n.py bank201.json src$n score_tablet$n.json && python3 synth.py score_tablet$n.json tablet$n.wav && python3 video.py score_tablet$n.json tablet$n.wav tablet$n.mp4; done
+```
+
 ## 作り方 (再現)
 
 ```bash
