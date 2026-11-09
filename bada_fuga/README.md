@@ -4517,7 +4517,7 @@ python3 compose_tablet231.py bank201.json src score_tablet231.json && python3 sy
 | CCXXXVI | tablet230 | 声 + トラック 16 (2 半音上げ、途切れなく) |
 | CCXXXVII | tablet231 | 声 + トラック 14 (1 半音上げ、途切れなく) |
 
-- 測った音量 (全体 mean / max、volumedetect): CCXXXII −16.3 / 0.0 dB、26.6 MiB ／ CCXXXIII −16.3 / 0.0 dB、25.8 MiB (tablet209 と 219 は声だけが違う曲だったので、同じ声にした CCXXXII と CCXXXIII は同じ音) ／ CCXXXIV −16.1 / 0.0 dB、26.7 MiB
+- 測った音量 (全体 mean / max、volumedetect): CCXXXII −16.3 / 0.0 dB、26.6 MiB ／ CCXXXIII −16.3 / 0.0 dB、25.8 MiB (tablet209 と 219 は声だけが違う曲だったので、同じ声にした CCXXXII と CCXXXIII は同じ音) ／ CCXXXIV −16.1 / 0.0 dB、26.7 MiB ／ CCXXXV −16.5 / 0.0 dB、25.9 MiB ／ CCXXXVI −15.7 / 0.0 dB、26.1 MiB
 - `compose_tablet232.py` 〜 `compose_tablet237.py` (それぞれ compose_tablet209 / 219 / 220 / 229 / 230 / 231 から; 声の wav を差し替え、声の音量を 0.45 に)
 
 ```bash
