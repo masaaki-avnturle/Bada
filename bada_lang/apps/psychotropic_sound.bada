@@ -1,0 +1,92 @@
+// ============================================================================
+//  PSYCHOTROPIC SOUND BIOFEEDBACK  —  a Bada application
+//
+//  Generates an auditory biofeedback soundscape for a panel of psychotropic
+//  medications.  Each drug is modelled as an ENTRAINMENT operator on the
+//  gamma-manifold brain: it pulls the dominant EEG rhythm toward a target band
+//  and lowers the manifold's THERMAL ENTROPY (arousal).  The biofeedback is a
+//  stereo BINAURAL-BEAT soundscape:
+//
+//     * the beat frequency = the drug's target EEG band
+//       (delta sleep, theta calm, alpha relaxed, beta alert)
+//     * the timbre glides tense -> warm as entropy-relief rises
+//
+//  Formulary: リスパダール・ジプレキサ・シクレスト・ロヒプノール・サイレース・
+//             エチゾラム・ブロチゾラム・デパス・レンドルミン・SSRI・SNRI.
+//
+//  Each administration writes a real, playable .wav (16-bit stereo).
+//
+//  Run:  ./bada run apps/psychotropic_sound.bada
+// ============================================================================
+
+import psychotropic as ps
+import plot
+import imaging
+
+print "=== Psychotropic Auditory Biofeedback ==="
+print "drug = EEG-band entrainment operator on the gamma manifold"
+print "relief = thermal-entropy (arousal) removed -> warm binaural soundscape"
+print ""
+
+let app <- ps.SoundClinic.new()
+let dur <- 3        // seconds per soundscape
+
+// the full panel (key -> human dose 0..1)
+let panel <- [
+    ["risperidone", 1.0],
+    ["olanzapine", 0.9],
+    ["asenapine", 0.8],
+    ["flunitrazepam", 1.0],
+    ["flunitrazepam_silece", 1.0],
+    ["etizolam", 0.9],
+    ["depas", 0.9],
+    ["brotizolam", 0.85],
+    ["ssri", 0.7],
+    ["snri", 0.7]
+]
+
+let i <- 0
+while i < len(panel) {
+    let name <- panel[i][0]
+    let dose <- panel[i][1]
+    let out <- "psy_" + name + ".wav"
+    let e <- app.dose(name, dose, dur, out)
+    print "[" + str(i + 1) + "/" + str(len(panel)) + "]", e["drug"]
+    print "      band", e["band"], "-> beat", e["beat_hz"], "Hz,",
+          "relief", round(e["relief"] * 100, 1), "% ->", out
+    i <- i + 1
+}
+
+print ""
+app.report()
+
+// ---- visualise: relief bars by drug --------------------------------------
+
+print ""
+print "rendering relief chart ..."
+let chart <- imaging.Canvas.new(420, 220)
+chart.clear(12)
+let n <- len(app.log)
+let bw <- floor(400 / n)
+let j <- 0
+while j < n {
+    let e <- app.log[j]
+    let barh <- floor(e["relief"] * 190)
+    let x0 <- 10 + j * bw
+    chart.rect(x0, 200 - barh, x0 + bw - 4, 200, floor(120 + e["relief"] * 135))
+    j <- j + 1
+}
+chart.save("psy_relief_chart.pgm")
+print "      wrote psy_relief_chart.pgm"
+
+// ---- visualise: one binaural-beat waveform (left vs right ear) ------------
+
+print "rendering binaural-beat waveform (etizolam, theta) ..."
+import audio
+let bb <- audio.binaural(150, 6, 1, 4000, 0.8)
+plot.signals([bb[0], bb[1]], "psy_binaural_LR.pgm", 480, 70)
+print "      wrote psy_binaural_LR.pgm (top=left ear, bottom=right ear)"
+
+print ""
+print "done. listen to psy_<drug>.wav with stereo headphones for the"
+print "binaural-beat biofeedback effect."

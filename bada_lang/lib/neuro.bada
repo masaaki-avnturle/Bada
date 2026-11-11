@@ -1,0 +1,274 @@
+// neuro — brain imaging from the report's gamma-manifold thermal entropy.
+//
+//   import neuro
+//   let brain <- neuro.Brain.new(220, 220)
+//   ... add activity ... brain.render_mri("mri.pgm")
+//
+// FOUNDATION.  The report derives, for the gamma operator, a GLOBAL PARTIAL
+// INTEGRAL MANIFOLD whose states are classified by a THERMAL ENTROPY value
+//
+//      S(k, theta) = k + ln(theta) + ln Gamma(k) + (1 - k) psi(k)
+//
+// (the differential entropy of a Gamma(k, theta) law on the manifold).  In
+// this library every neural source is a point on that manifold; its activity
+// is weighted by the heat-entropy S of its local gamma state.  The same
+// entropy-weighted field, sampled different ways, yields the four modalities:
+//
+//   * MRI        — static anatomy (tissue field, high spatial detail)
+//   * fMRI       — BOLD activation overlaid on anatomy (entropy-weighted)
+//   * Topography — scalp potential map (brain topography / qEEG)
+//   * EEG        — multi-channel time series of the entropy-modulated rhythm
+//
+// All four share one manifold + one entropy law, exactly as the report asks.
+
+import mathx
+import imaging
+
+// thermal entropy of a gamma manifold state (native fast path)
+fun thermal_entropy(k, theta) {
+    return gamma_entropy(k, theta)
+}
+
+// ---- a cortical activity source: a point on the gamma manifold -----------
+
+class Source {
+    field x
+    field y
+    field sigma        // spatial spread on the cortex
+    field amp          // baseline activation
+    field k            // gamma shape -> sets the thermal entropy weight
+    field freq         // intrinsic rhythm (Hz) for EEG
+
+    method init(x, y, sigma, amp, k, freq) {
+        self.x <- x
+        self.y <- y
+        self.sigma <- sigma
+        self.amp <- amp
+        self.k <- k
+        self.freq <- freq
+    }
+
+    // entropy-weighted strength of this source
+    method weight() {
+        return self.amp * (1 + 0.5 * thermal_entropy(self.k, 1))
+    }
+
+    method row() { return [self.x, self.y, self.sigma, self.amp, self.k] }
+}
+
+// ---- the brain: a manifold of sources rendered into the four modalities ---
+
+class Brain {
+    field w
+    field h
+    field sources <- []
+    field anatomy <- []     // structural (MRI) sources
+    field cx
+    field cy
+
+    method init(w, h) {
+        self.w <- w
+        self.h <- h
+        self.cx <- w / 2
+        self.cy <- h / 2
+        self.build_anatomy()
+    }
+
+    // structural anatomy: cortex ring, ventricles, white matter, skull
+    method build_anatomy() {
+        let cx <- self.cx
+        let cy <- self.cy
+        // grey-matter cortex (broad, bright)
+        push(self.anatomy, [cx, cy, self.w * 0.30, 120, 2.0])
+        // white matter core
+        push(self.anatomy, [cx, cy, self.w * 0.18, 80, 3.0])
+        // two ventricles (dark CSF) modelled as negative amplitude
+        push(self.anatomy, [cx - self.w * 0.06, cy, self.w * 0.05, 0 - 90, 1.5])
+        push(self.anatomy, [cx + self.w * 0.06, cy, self.w * 0.05, 0 - 90, 1.5])
+    }
+
+    // register a functional activation (an fMRI / EEG generator)
+    method activate(x, y, sigma, amp, k, freq) {
+        push(self.sources, Source.new(x, y, sigma, amp, k, freq))
+    }
+
+    method source_rows() {
+        let rows <- []
+        for s in self.sources { push(rows, s.row()) }
+        return rows
+    }
+
+    // ===== 1. MRI: structural anatomy =====================================
+
+    method render_mri(path) {
+        let img <- image(self.w, self.h, "L", 0)
+        // skull ring: bright shell, dark interior -> draw as two fields
+        field_project(img, self.anatomy, 8, 1.0, false)
+        self.draw_skull(img)
+        img.save(path)
+        return img
+    }
+
+    method draw_skull(img) {
+        let cx <- self.cx
+        let cy <- self.cy
+        let rOuter <- self.w * 0.40
+        let rInner <- self.w * 0.36
+        let y <- 0
+        while y < self.h {
+            let x <- 0
+            while x < self.w {
+                let dx <- x - cx
+                let dy <- y - cy
+                let r <- sqrt(dx * dx + dy * dy)
+                if r < rOuter and r > rInner {
+                    img.set(x, y, 235)
+                }
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+    }
+
+    // ===== 2. fMRI: BOLD activation overlaid on anatomy ===================
+    //
+    // The activation field is ENTROPY-WEIGHTED (entropy_flag = true): each
+    // source's contribution is scaled by the thermal entropy of its gamma
+    // manifold state.  Hot colours mark high activation over grey anatomy.
+
+    method render_fmri(path) {
+        // anatomy backdrop (dim)
+        let anat <- image(self.w, self.h, "L", 0)
+        field_project(anat, self.anatomy, 6, 0.5, false)
+
+        // entropy-weighted BOLD activation
+        let act <- image(self.w, self.h, "L", 0)
+        field_project(act, self.source_rows(), 0, 150, true)
+
+        // composite into RGB: grey anatomy + hot activation
+        let rgb <- image(self.w, self.h, "RGB", 0)
+        let y <- 0
+        while y < self.h {
+            let x <- 0
+            while x < self.w {
+                let g <- anat.get(x, y)
+                let a <- act.get(x, y)
+                if a > 25 {
+                    let c <- imaging.hot_colormap(a)
+                    rgb.set_rgb(x, y, c[0], c[1], c[2])
+                } else {
+                    rgb.set_rgb(x, y, g, g, g)
+                }
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+        rgb.save(path)
+        return rgb
+    }
+
+    // ===== 3. Brain topography (qEEG scalp map) ===========================
+    //
+    // A smooth scalp potential field from the cortical sources, false-coloured
+    // — the classic EEG "brain topography" head map.
+
+    method render_topography(path) {
+        let img <- image(self.w, self.h, "L", 0)
+        field_project(img, self.source_rows(), 40, 150, true)
+        // mask to a circular head
+        self.mask_head(img, 20)
+        // false colour
+        let rgb <- image(self.w, self.h, "RGB", 0)
+        let y <- 0
+        while y < self.h {
+            let x <- 0
+            while x < self.w {
+                let v <- img.get(x, y)
+                if v == 0 {
+                    rgb.set_rgb(x, y, 0, 0, 0)
+                } else {
+                    let c <- imaging.hot_colormap(v)
+                    rgb.set_rgb(x, y, c[0], c[1], c[2])
+                }
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+        rgb.save(path)
+        return rgb
+    }
+
+    method mask_head(img, edge) {
+        let cx <- self.cx
+        let cy <- self.cy
+        let r <- self.w * 0.40
+        let y <- 0
+        while y < self.h {
+            let x <- 0
+            while x < self.w {
+                let dx <- x - cx
+                let dy <- y - cy
+                if dx * dx + dy * dy > r * r {
+                    img.set(x, y, 0)
+                }
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+    }
+
+    // ===== 4. EEG: multi-channel time series ==============================
+    //
+    // Each electrode sums the cortical sources it overlies; each source emits
+    // a sinusoid at its rhythm, amplitude-modulated by its thermal entropy.
+    // Returns a list of channels, each a list of samples.
+
+    method eeg(electrodes, duration, rate) {
+        let channels <- []
+        let dt <- 1 / rate
+        let n <- floor(duration * rate)
+        for e in electrodes {
+            let ex <- e[0]
+            let ey <- e[1]
+            let series <- []
+            let i <- 0
+            while i < n {
+                let t <- i * dt
+                let v <- 0
+                for s in self.sources {
+                    let dx <- ex - s.x
+                    let dy <- ey - s.y
+                    let dist2 <- dx * dx + dy * dy
+                    let lead <- exp(0 - dist2 / (2 * s.sigma * s.sigma))
+                    let ent <- thermal_entropy(s.k, 1)
+                    v <- v + lead * s.amp * (1 + 0.5 * ent) * sin(2 * PI * s.freq * t)
+                }
+                push(series, v)
+                i <- i + 1
+            }
+            push(channels, series)
+        }
+        return channels
+    }
+}
+
+// ---- a ready-made brain with canonical rhythms ---------------------------
+//
+// Places sources for the classic EEG bands so all modalities show structure:
+//   occipital alpha (~10 Hz), frontal beta (~20 Hz), central mu, temporal theta
+
+fun default_brain(w, h) {
+    let b <- Brain.new(w, h)
+    let cx <- w / 2
+    let cy <- h / 2
+    // occipital alpha (back of head, strong, high entropy)
+    b.activate(cx, cy + h * 0.22, w * 0.10, 1.0, 2.5, 10)
+    // left & right frontal beta
+    b.activate(cx - w * 0.14, cy - h * 0.20, w * 0.08, 0.7, 4.0, 20)
+    b.activate(cx + w * 0.14, cy - h * 0.20, w * 0.08, 0.7, 4.0, 20)
+    // central mu rhythm
+    b.activate(cx, cy - h * 0.02, w * 0.09, 0.85, 3.0, 11)
+    // temporal theta (left)
+    b.activate(cx - w * 0.22, cy, w * 0.07, 0.6, 1.8, 6)
+    return b
+}

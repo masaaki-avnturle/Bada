@@ -1,0 +1,130 @@
+// ============================================================================
+//  MEDICAL CONTROL HUB — the integrated Bada GUI
+//
+//  A single control panel that ties together every Bada medical application,
+//  with a live THERMOMETER and INFRARED SENSOR added to the controls.  The
+//  thermometer and IR camera are driven by the gamma manifold's thermal
+//  entropy; a control slider raises the inflammation load and the temperature
+//  readout, IR thermal image and fever status all update live in the browser.
+//
+//  Launcher tiles link to each generated application HTML.
+//
+//  Run:  ./bada run apps/control_hub.bada   ->  control_hub.html
+// ============================================================================
+
+import sensors
+import gui
+
+let N <- 120
+print "=== Bada Medical Control Hub ==="
+
+let thermo <- sensors.Thermometer.new()
+let ir <- sensors.Infrared.new(N)
+
+// pre-render the IR thermal camera across inflammation intensities, and the
+// matching thermometer reading, so a slider can scrub them live.
+print "[1] rendering IR thermal frames across the control range ..."
+let STEPS <- 11
+let ir_frames <- []
+let temps <- []
+let s <- 0
+while s <= STEPS {
+    let intensity <- s / STEPS * 1.4
+    let sources <- sensors.body_sources(N, intensity)
+    let thermal <- ir.thermal_image(sources)
+    push(ir_frames, thermal)
+    // body temperature from the gamma-manifold shape: rest k=1.5 -> 36.5C,
+    // rising with the inflammation load.
+    push(temps, thermo.read_k(1.5 + intensity * 3.2))
+    s <- s + 1
+}
+print "    " + str(len(ir_frames)) + " thermal frames"
+
+// the apps this hub controls (label, file, blurb)
+let apps <- [
+    ["Medical Workstation", "medical_workstation.html", "17 imaging modalities, basal-ganglia gated"],
+    ["Diagnostic Console", "diagnostic_console.html", "PET-CT fusion, 4-D cardiac, AI report"],
+    ["3-D Volume Viewer", "volume_viewer.html", "direct volume rendering of a CT head"],
+    ["Brain Scanner", "brain_scanner.html", "MRI / fMRI / topography / EEG"],
+    ["X-ray Scanner", "chest_xray.html", "Beer-Lambert chest radiograph"],
+    ["Psychotropic Sound", "psychotropic_gui.html", "binaural-beat drug biofeedback"],
+    ["Silent Talk", "silent_talk.html", "subvocal brain-computer interface"]
+]
+
+print "[2] building hub GUI ..."
+let app <- gui.App.new("Bada Medical Control Hub")
+app.style(gui.dark_theme())
+app.style(".hero{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px}
+.therm{background:var(--card);border-radius:14px;padding:18px;text-align:center}
+.tval{font-size:54px;font-weight:800;line-height:1.1}
+.tstat{font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.ir img{width:100%;border-radius:10px;image-rendering:pixelated;background:#000}
+.launch{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+a.tile{display:block;background:var(--card);border:1px solid #1f2a3a;border-radius:14px;
+  padding:16px;text-decoration:none;color:var(--ink);transition:.15s}
+a.tile:hover{border-color:var(--accent);transform:translateY(-2px)}
+a.tile .t{font-weight:800;font-size:16px;margin-bottom:4px}
+a.tile .b{font-size:12px;color:var(--muted)}")
+
+app.add(gui.h1("Bada Medical Control Hub"))
+app.add(gui.h2("integrated control of every Bada medical application - gamma-manifold thermometer & IR sensor"))
+
+// --- hero: thermometer + IR camera, both live ---
+app.add("<div class=\"hero\">"
+    + "<div class=\"therm\">"
+    + "<div class=\"tag\">Thermometer</div>"
+    + "<div class=\"tval\" id=\"tval\">--</div>"
+    + "<div class=\"tstat\" id=\"tstat\">--</div>"
+    + "</div>"
+    + gui.div("ir", gui.div("tag", "Infrared thermal camera")
+        + "<img id=\"irimg\" src=\"" + ir_frames[0].data_uri() + "\">")
+    + "</div>")
+
+// --- control slider: inflammation / heat load ---
+app.add(gui.div("controls",
+    "<div class=\"row\"><label>Heat load</label>"
+    + gui.slider("load", 0, str(STEPS), 1, 0, "setLoad(this.value)")
+    + "<span class=\"val\" id=\"loadv\">0%</span></div>"))
+
+// --- application launcher tiles ---
+let tiles <- ""
+for a in apps {
+    tiles <- tiles + "<a class=\"tile\" href=\"" + a[1] + "\">"
+        + "<div class=\"t\">" + a[0] + "</div><div class=\"b\">" + a[2] + "</div></a>"
+}
+app.add(gui.h2("Applications"))
+app.add("<div class=\"launch\">" + tiles + "</div>")
+
+// --- JS: live thermometer + IR scrubber ---
+let frames_js <- "["
+let temps_js <- "["
+let i <- 0
+while i < len(ir_frames) {
+    if i > 0 { frames_js <- frames_js + ","  temps_js <- temps_js + "," }
+    frames_js <- frames_js + "'" + ir_frames[i].data_uri() + "'"
+    temps_js <- temps_js + str(temps[i])
+    i <- i + 1
+}
+frames_js <- frames_js + "]"
+temps_js <- temps_js + "]"
+
+let js <- [
+    "var IR = " + frames_js + ";",
+    "var TEMP = " + temps_js + ";",
+    "var STEPS = " + str(STEPS) + ";",
+    "function tcolor(t){ if(t>=38) return '#e0563c'; if(t>=37.5) return '#e0a83c'; if(t<35) return '#4a80d0'; return '#5fd0a0'; }",
+    "function tstat(t){ if(t>=38) return 'FEVER'; if(t>=37.5) return 'LOW-GRADE FEVER'; if(t<35) return 'HYPOTHERMIA'; return 'NORMAL'; }",
+    "function setLoad(i){ i=parseInt(i);",
+    "  document.getElementById('irimg').src=IR[i];",
+    "  document.getElementById('loadv').textContent=Math.round(i*100/STEPS)+'%';",
+    "  var t=TEMP[i];",
+    "  var el=document.getElementById('tval'); el.textContent=t.toFixed(1)+'\\u00B0C'; el.style.color=tcolor(t);",
+    "  var st=document.getElementById('tstat'); st.textContent=tstat(t); st.style.color=tcolor(t);",
+    "}",
+    "setLoad(0);"
+]
+app.script(join(js, "\n"))
+
+app.save("control_hub.html")
+print "wrote control_hub.html"
+print "done. open control_hub.html, drag Heat load, and click an app tile."

@@ -1,0 +1,86 @@
+// report — AI-style diagnostic report synthesis.
+//
+//   import report
+//   let r <- report.Reporter.new()
+//   r.add("PET", "focal hypermetabolic uptake, SUV 2.5", 1.2, "abnormal")
+//   print r.generate(gate_winner, gate_confidence)
+//
+// The "AI" is the basal-ganglia principle: findings compete by salience, and
+// the gate selects the dominant one as the leading impression.  The reporter
+// assembles a structured radiology-style note: Findings, Impression (ranked),
+// and Recommendation.
+
+class Reporter {
+    field findings <- []      // list of {modality, text, salience, flag}
+
+    method init() {}
+
+    method add(modality, text, salience, flag) {
+        push(self.findings, {"modality": modality, "text": text,
+                             "salience": salience, "flag": flag})
+    }
+
+    // sort findings by salience (descending) — simple insertion sort
+    method ranked() {
+        let arr <- []
+        for f in self.findings { push(arr, f) }
+        let i <- 1
+        while i < len(arr) {
+            let key <- arr[i]
+            let j <- i - 1
+            while j >= 0 and arr[j]["salience"] < key["salience"] {
+                arr[j + 1] <- arr[j]
+                j <- j - 1
+            }
+            arr[j + 1] <- key
+            i <- i + 1
+        }
+        return arr
+    }
+
+    // a one-line impression from the gated leading finding
+    method impression(winner, confidence) {
+        let lead <- "no dominant finding"
+        for f in self.findings {
+            if f["modality"] == winner { lead <- f["text"] }
+        }
+        let certainty <- "possible"
+        if confidence > 0.6 { certainty <- "probable" }
+        if confidence > 0.85 { certainty <- "highly likely" }
+        return certainty + " primary abnormality on " + winner + ": " + lead
+    }
+
+    // recommendation based on the leading modality
+    method recommendation(winner) {
+        let r <- {}
+        r["PET"] <- "biopsy / oncology referral for the hypermetabolic focus"
+        r["Blood"] <- "repeat chemistry panel; correlate clinically"
+        r["CT"] <- "contrast-enhanced CT for further characterisation"
+        r["MRI"] <- "MRI with contrast for soft-tissue detail"
+        r["DEXA"] <- "start bone-protective therapy; reassess in 12 months"
+        r["ECG"] <- "cardiology review; consider Holter monitoring"
+        r["Thermo"] <- "evaluate the inflammatory focus clinically"
+        if has(r, winner) { return r[winner] }
+        return "clinical correlation and routine follow-up"
+    }
+
+    method generate(winner, confidence) {
+        let out <- "================ DIAGNOSTIC REPORT ================\n"
+        out <- out + "FINDINGS (ranked by salience):\n"
+        let rank <- self.ranked()
+        let i <- 0
+        while i < len(rank) {
+            let f <- rank[i]
+            let mark <- "  - "
+            if f["flag"] != "normal" { mark <- "  * " }
+            out <- out + mark + f["modality"] + ": " + f["text"]
+                + "  [" + f["flag"] + ", salience " + str(round(f["salience"], 2)) + "]\n"
+            i <- i + 1
+        }
+        out <- out + "\nIMPRESSION:\n  " + self.impression(winner, confidence) + "\n"
+        out <- out + "  (basal-ganglia gate confidence " + str(round(confidence * 100, 1)) + "%)\n"
+        out <- out + "\nRECOMMENDATION:\n  " + self.recommendation(winner) + "\n"
+        out <- out + "===================================================\n"
+        return out
+    }
+}

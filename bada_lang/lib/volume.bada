@@ -1,0 +1,80 @@
+// volume — 3-D volume rendering (direct volume ray casting) for CT/MRI.
+//
+//   import volume
+//   let vol <- ct_head_volume(72)
+//   let tf <- volume.bone_tissue_tf()
+//   let img <- volume.render(vol, 0.6, 0.3, tf, 120)
+//
+// A voxel volume is rendered by casting a ray per pixel, mapping each voxel
+// intensity through a TRANSFER FUNCTION (colour + opacity) and compositing
+// front-to-back with gradient shading.  Transfer functions are length-256
+// ramps [r,g,b,a]; helpers below build common presets.
+
+// build an empty transfer function (4 lists of 256 zeros)
+fun empty_tf() {
+    let r <- []
+    let g <- []
+    let b <- []
+    let a <- []
+    let i <- 0
+    while i < 256 {
+        push(r, 0)  push(g, 0)  push(b, 0)  push(a, 0)
+        i <- i + 1
+    }
+    return [r, g, b, a]
+}
+
+// paint a ramp segment [lo,hi] -> colour (cr,cg,cb) with opacity `op`
+fun band(tf, lo, hi, cr, cg, cb, op) {
+    let i <- lo
+    while i <= hi {
+        tf[0][i] <- cr
+        tf[1][i] <- cg
+        tf[2][i] <- cb
+        tf[3][i] <- op
+        i <- i + 1
+    }
+    return tf
+}
+
+// CT-style preset: dark CSF transparent, brain soft translucent, bone opaque
+fun bone_tissue_tf() {
+    let tf <- empty_tf()
+    band(tf, 0, 40, 0, 0, 0, 0.0)              // air / CSF: invisible
+    band(tf, 41, 120, 210, 150, 130, 0.06)     // brain/soft tissue: faint pink
+    band(tf, 121, 200, 220, 90, 70, 0.20)      // lesion / muscle: red, semi
+    band(tf, 201, 255, 245, 240, 225, 0.55)    // bone: near-opaque ivory
+    return tf
+}
+
+// glassy preset: everything faintly visible (overview)
+fun xray_tf() {
+    let tf <- empty_tf()
+    let i <- 0
+    while i < 256 {
+        tf[0][i] <- i
+        tf[1][i] <- i
+        tf[2][i] <- i
+        tf[3][i] <- i / 255 * 0.10
+        i <- i + 1
+    }
+    return tf
+}
+
+// render one view: yaw/pitch radians, transfer function tf, square output
+fun render(vol, yaw, pitch, tf, out_size) {
+    return volume_render(vol, yaw, pitch, tf[0], tf[1], tf[2], tf[3],
+                         out_size, out_size, true)
+}
+
+// a turntable: list of rendered frames spinning around the vertical axis
+fun turntable(vol, tf, out_size, frames) {
+    let imgs <- []
+    let i <- 0
+    while i < frames {
+        let yaw <- i / frames * 2 * PI
+        push(imgs, render(vol, yaw, 0.35, tf, out_size))
+        i <- i + 1
+    }
+    return imgs
+}

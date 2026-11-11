@@ -1,0 +1,141 @@
+// ============================================================================
+//  SILENT TALK — a subvocal brain-computer interface (Bada GUI)
+//
+//  A communication aid for a patient who cannot speak.  "Thinking" a word
+//  emits its neural signature on the gamma manifold; the decoder matches the
+//  measured EEG features against the vocabulary and a basal-ganglia gate
+//  selects the intended word.  Click a word to imagine it: the EEG, the
+//  decoder's candidate scores and the assembled message update live.
+//
+//  Run:  ./bada run apps/silent_talk.bada   ->  silent_talk.html
+// ============================================================================
+
+import silenttalk
+import gui
+
+print "=== Bada Silent Talk (subvocal BCI) ==="
+let st <- silenttalk.SilentTalk.new()
+let vocab <- st.words()
+
+// pre-compute, for each word: its EEG image, decoder candidate scores, winner
+print "[1] encoding vocabulary signatures & decoding ..."
+let eeg_uris <- {}
+let scores <- {}      // word -> list of [candidate, weight]
+let decoded <- {}
+for w in vocab {
+    eeg_uris[w] <- st.eeg_image(w, 360, 26).data_uri()
+    let feat <- st.emit(w)
+    let gate <- st.decode(feat)
+    let ws <- gate.weights()      // [name, weight, salience]
+    let lst <- []
+    for x in ws { push(lst, [x[0], round(x[1], 4)]) }
+    scores[w] <- lst
+    decoded[w] <- gate.select()[0]
+    print "    " + w + " -> " + decoded[w]
+}
+
+print "[2] building GUI ..."
+let app <- gui.App.new("Bada Silent Talk")
+app.style(gui.dark_theme())
+app.style(".pad{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:560px}
+.pad button{width:100%;background:#1f2a3a;font-size:15px;padding:14px}
+.pad button:hover{background:var(--accent)}
+.screen{max-width:560px;margin:16px 0}
+.eeg img{width:100%;border-radius:8px;background:#000}
+.decoded{font-size:40px;font-weight:800;color:#5fd0a0;min-height:50px}
+.msg{font-size:20px;background:#0c121d;border-radius:8px;padding:12px;min-height:28px;letter-spacing:1px}
+.cand .row{margin:3px 0}.cand label{min-width:74px}")
+
+app.add(gui.h1("Bada Silent Talk"))
+app.add(gui.h2("subvocal brain-computer interface - imagine a word, the gate decodes it"))
+
+// word pad
+let pad <- ""
+for w in vocab {
+    pad <- pad + "<button onclick=\"think('" + w + "')\">" + w + "</button>"
+}
+app.add(gui.div("pad", pad))
+
+// screen: decoded word, EEG, candidate bars, assembled message
+app.add(gui.div("screen",
+    gui.div("tag", "imagined EEG")
+    + gui.div("eeg", "<img id=\"eeg\" src=\"" + eeg_uris[vocab[0]] + "\">")
+    + gui.div("tag", "decoded word")
+    + "<div class=\"decoded\" id=\"decoded\">&mdash;</div>"
+    + gui.div("tag", "decoder candidates (basal-ganglia gate)")
+    + "<div class=\"cand\" id=\"cand\"></div>"
+    + gui.div("tag", "message")
+    + "<div class=\"msg\" id=\"msg\"></div>"
+    + "<div class=\"row\"><button onclick=\"clearMsg()\" class=\"stop\">Clear</button>"
+    + "<button onclick=\"speak()\">&#128264; Speak aloud</button></div>"))
+
+// embed EEG images, scores and decoded winners as JS
+fun js_obj_uris(m, keys_list) {
+    let s <- "{"
+    let i <- 0
+    while i < len(keys_list) {
+        let k <- keys_list[i]
+        if i > 0 { s <- s + "," }
+        s <- s + "'" + k + "':'" + m[k] + "'"
+        i <- i + 1
+    }
+    return s + "}"
+}
+
+let scores_js <- "{"
+let i <- 0
+while i < len(vocab) {
+    let w <- vocab[i]
+    if i > 0 { scores_js <- scores_js + "," }
+    scores_js <- scores_js + "'" + w + "':["
+    let lst <- scores[w]
+    let j <- 0
+    while j < len(lst) {
+        if j > 0 { scores_js <- scores_js + "," }
+        scores_js <- scores_js + "{n:'" + lst[j][0] + "',w:" + str(lst[j][1]) + "}"
+        j <- j + 1
+    }
+    scores_js <- scores_js + "]"
+    i <- i + 1
+}
+scores_js <- scores_js + "}"
+
+let dec_js <- "{"
+let k <- 0
+while k < len(vocab) {
+    let w <- vocab[k]
+    if k > 0 { dec_js <- dec_js + "," }
+    dec_js <- dec_js + "'" + w + "':'" + decoded[w] + "'"
+    k <- k + 1
+}
+dec_js <- dec_js + "}"
+
+let js <- [
+    "var EEG = " + js_obj_uris(eeg_uris, vocab) + ";",
+    "var SCORES = " + scores_js + ";",
+    "var DECODED = " + dec_js + ";",
+    "var msg = '';",
+    "function think(w){",
+    "  document.getElementById('eeg').src = EEG[w];",
+    "  var d = DECODED[w];",
+    "  document.getElementById('decoded').textContent = d;",
+    "  var arr = SCORES[w].slice().sort(function(a,b){return b.w-a.w;});",
+    "  var html='';",
+    "  arr.forEach(function(c){",
+    "    var pct=(c.w*100).toFixed(1);",
+    "    var col = c.n===d ? '#5fd0a0' : '#4a80d0';",
+    "    html+='<div class=\"row\"><label>'+c.n+'</label>'+",
+    "      '<div class=\"meter\"><div class=\"bar\" style=\"width:'+pct+'%;background:'+col+'\"></div></div>'+",
+    "      '<span class=\"val\">'+pct+'%</span></div>';",
+    "  });",
+    "  document.getElementById('cand').innerHTML = html;",
+    "  msg += d + ' '; document.getElementById('msg').textContent = msg;",
+    "}",
+    "function clearMsg(){ msg=''; document.getElementById('msg').textContent=''; }",
+    "function speak(){ if('speechSynthesis' in window && msg) speechSynthesis.speak(new SpeechSynthesisUtterance(msg)); }"
+]
+app.script(join(js, "\n"))
+
+app.save("silent_talk.html")
+print "wrote silent_talk.html"
+print "done. open it and click words to silently 'talk'."

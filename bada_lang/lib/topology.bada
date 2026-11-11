@@ -1,0 +1,137 @@
+// topology — point-set topology, simplicial complexes & the fundamental group.
+//
+//   import topology
+//
+// Models topological spaces, continuity, Euler characteristic, and the
+// fundamental group pi_1 via loops with overloaded composition (*) and
+// inverse, plus homotopy comparison.
+
+// ---- Topological space (finite, by its open sets) -------------------------
+
+class Space {
+    field points <- []
+    field opens <- []        // list of lists (each an open set)
+
+    method init(points, opens) {
+        self.points <- points
+        self.opens <- opens
+    }
+
+    method is_open(candidate) {
+        for o in self.opens {
+            if self.same_set(o, candidate) { return true }
+        }
+        return false
+    }
+
+    method same_set(a, b) {
+        if len(a) != len(b) { return false }
+        for x in a {
+            if not contains(b, x) { return false }
+        }
+        return true
+    }
+
+    // a map (Bada function) is continuous if the preimage of every open set
+    // is open; here we accept a precomputed preimage table {open -> preimage}
+    method is_continuous(preimages) {
+        for pre in preimages {
+            if not self.is_open(pre) { return false }
+        }
+        return true
+    }
+}
+
+// ---- Simplicial complex: Euler characteristic & Betti(0,1) ----------------
+
+class Complex {
+    field vertices <- 0
+    field edges <- 0
+    field faces <- 0
+
+    method init(v, e, f) {
+        self.vertices <- v
+        self.edges <- e
+        self.faces <- f
+    }
+
+    // chi = V - E + F
+    method euler() {
+        return self.vertices - self.edges + self.faces
+    }
+
+    // for a connected surface: b0 = 1, and chi = b0 - b1 + b2
+    method genus() {
+        // closed orientable surface: chi = 2 - 2g
+        return (2 - self.euler()) / 2
+    }
+}
+
+// ---- The fundamental group pi_1 -------------------------------------------
+//
+// A Loop is a word over generators (e.g. "a", "A" = a^-1).  Composition is
+// concatenation with free reduction; this realises pi_1 of a wedge of
+// circles, with the manifold operators overloaded for the group structure.
+
+class Loop {
+    field word <- ""
+
+    method init(word) { self.word <- word }
+
+    // group product: a * b = concatenate then freely reduce
+    operator * (other) {
+        return Loop.new(reduce_word(self.word + other.word))
+    }
+
+    // homotopy / right-action  a ~> b : conjugation  b a b^-1
+    operator ~> (other) {
+        return Loop.new(reduce_word(other.word + self.word + invert_word(other.word)))
+    }
+
+    method inverse() { return Loop.new(invert_word(self.word)) }
+
+    method is_identity() { return self.word == "" }
+
+    // two loops are homotopic iff their reduced words are equal
+    operator == (other) {
+        return reduce_word(self.word) == reduce_word(other.word)
+    }
+
+    method show() {
+        if self.word == "" { return "1" }
+        return self.word
+    }
+}
+
+// invert a word: reverse and swap case (a <-> A)
+fun invert_word(w) {
+    let out <- ""
+    let i <- len(w) - 1
+    while i >= 0 {
+        out <- out + swap_case(w[i])
+        i <- i - 1
+    }
+    return out
+}
+
+fun swap_case(c) {
+    if c == upper(c) { return lower(c) }
+    return upper(c)
+}
+
+// free reduction: cancel adjacent inverse pairs (aA, Aa, ...)
+fun reduce_word(w) {
+    let stack <- []
+    for c in w {
+        if len(stack) > 0 and is_inverse(last(stack), c) {
+            pop(stack)
+        } else {
+            push(stack, c)
+        }
+    }
+    return join(stack, "")
+}
+
+fun is_inverse(a, b) {
+    return a != b and lower(a) == lower(b)
+}

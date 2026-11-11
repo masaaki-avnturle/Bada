@@ -1,0 +1,134 @@
+// manifold — differential geometry & integral manifolds (Bada stdlib).
+//
+//   import manifold
+//   let v <- manifold.Vector.new([1, 2, 3])
+//
+// Demonstrates operator overloading on advanced mathematical objects:
+// Vectors, the manifold operators <~ ~> -<, tensors, and integral curves.
+
+import mathx
+
+// ---- Euclidean vectors with overloaded operators -------------------------
+
+class Vector {
+    field comps <- []
+
+    method init(comps) { self.comps <- comps }
+    method dim() { return len(self.comps) }
+    method at(i) { return self.comps[i] }
+
+    operator + (o) {
+        let r <- []
+        let i <- 0
+        while i < len(self.comps) {
+            push(r, self.comps[i] + o.comps[i])
+            i <- i + 1
+        }
+        return Vector.new(r)
+    }
+
+    operator - (o) {
+        let r <- []
+        let i <- 0
+        while i < len(self.comps) {
+            push(r, self.comps[i] - o.comps[i])
+            i <- i + 1
+        }
+        return Vector.new(r)
+    }
+
+    // scalar multiply:  v * k
+    operator * (k) {
+        let r <- []
+        for c in self.comps { push(r, c * k) }
+        return Vector.new(r)
+    }
+
+    // dot product as the manifold "branch / inner" operator  v -< w
+    operator -< (o) {
+        let s <- 0
+        let i <- 0
+        while i < len(self.comps) {
+            s <- s + self.comps[i] * o.comps[i]
+            i <- i + 1
+        }
+        return s
+    }
+
+    method norm() { return sqrt(self -< self) }
+
+    method show() { return "Vector" + str(self.comps) }
+}
+
+// ---- A point on a parametrised manifold -----------------------------------
+//
+// A 2-surface  r(u,v) = [x(u,v), y(u,v), z(u,v)].  The metric, area element
+// and surface integral are computed numerically from the embedding.
+
+class Surface {
+    field fx
+    field fy
+    field fz
+
+    method init(fx, fy, fz) {
+        self.fx <- fx
+        self.fy <- fy
+        self.fz <- fz
+    }
+
+    method point(u, v) {
+        return Vector.new([self.fx(u, v), self.fy(u, v), self.fz(u, v)])
+    }
+
+    // numerical partial derivatives r_u, r_v at (u,v)
+    method du(u, v) {
+        let h <- 0.0001
+        return (self.point(u + h, v) - self.point(u - h, v)) * (1 / (2 * h))
+    }
+    method dv(u, v) {
+        let h <- 0.0001
+        return (self.point(u, v + h) - self.point(u, v - h)) * (1 / (2 * h))
+    }
+
+    // first fundamental form (metric) components E, F, G
+    method metric(u, v) {
+        let ru <- self.du(u, v)
+        let rv <- self.dv(u, v)
+        return {"E": ru -< ru, "F": ru -< rv, "G": rv -< rv}
+    }
+
+    // area element sqrt(EG - F^2): the integral-manifold volume form
+    method area_element(u, v) {
+        let g <- self.metric(u, v)
+        return sqrt(g["E"] * g["G"] - g["F"] * g["F"])
+    }
+
+    // total surface area = ∬ sqrt(EG-F^2) du dv  (an integral over the manifold)
+    method area(u0, u1, v0, v1) {
+        let surf <- self
+        fun dA(u, v) { return surf.area_element(u, v) }
+        return integrate2(dA, u0, u1, v0, v1, 60, 60)
+    }
+}
+
+// ---- An integral curve / flow on a manifold -------------------------------
+//
+// Given a vector field f(t, y), the integral manifold (solution curve) is
+// obtained by integrating the differential equation.
+
+class IntegralCurve {
+    field field_fn
+    field samples <- []
+
+    method init(field_fn) { self.field_fn <- field_fn }
+
+    method flow(y0, t0, t1, steps) {
+        self.samples <- solve_ode(self.field_fn, y0, t0, t1, steps)
+        return self.samples
+    }
+
+    method endpoint() {
+        let last <- self.samples[len(self.samples) - 1]
+        return last[1]
+    }
+}

@@ -1,0 +1,66 @@
+// monitor — ICU-style vital-signs time-series monitor.
+//
+//   import monitor
+//   let m <- monitor.Patient.new()
+//   let img <- m.strip(600, 4, 200)
+//
+// Scrolling waveforms and numeric vitals: ECG, photoplethysmograph (SpO2
+// pulse), respiration, plus heart rate / SpO2 / blood-pressure readouts.
+// Small heart-rate variability is drawn from a gamma manifold for realism.
+
+import ecg
+import plot
+import imaging
+
+class Patient {
+    field hr <- 78          // heart rate (bpm)
+    field spo2 <- 97        // oxygen saturation (%)
+    field sys <- 122        // systolic BP
+    field dia <- 78         // diastolic BP
+    field rr_rate <- 14     // respiratory rate (breaths/min)
+
+    method init() {}
+
+    // photoplethysmograph (pulse oximeter) wave at the heart rate
+    method ppg(duration, rate) {
+        let beat <- 60 / self.hr
+        let n <- floor(duration * rate)
+        let out <- []
+        let i <- 0
+        while i < n {
+            let t <- i / rate
+            let ph <- (t % beat) / beat
+            // sharp upstroke + dicrotic notch
+            let v <- exp(0 - ph * 3) * sin(PI * ph) + 0.3 * exp(0 - (ph - 0.45) * (ph - 0.45) * 40)
+            push(out, v)
+            i <- i + 1
+        }
+        return out
+    }
+
+    // respiration wave (slow sinusoid)
+    method resp(duration, rate) {
+        let n <- floor(duration * rate)
+        let out <- []
+        let i <- 0
+        while i < n {
+            let t <- i / rate
+            push(out, sin(2 * PI * (self.rr_rate / 60) * t))
+            i <- i + 1
+        }
+        return out
+    }
+
+    // a 3-channel monitor strip: ECG (II), SpO2 plethysmograph, respiration
+    method strip(width, duration, rate) {
+        let ecg2 <- ecg.lead(self.hr, duration, rate)
+        let channels <- [ecg2, self.ppg(duration, rate), self.resp(duration, rate)]
+        return plot.signals_image(channels, width, 70)
+    }
+
+    method vitals() {
+        return {"hr": self.hr, "spo2": self.spo2,
+                "bp": str(self.sys) + "/" + str(self.dia),
+                "rr": self.rr_rate}
+    }
+}

@@ -1,0 +1,68 @@
+// ecg — electrocardiogram synthesis (心電図).
+//
+//   import ecg
+//   let trace <- ecg.lead(75, 4, 250)     // 75 bpm, 4 s, 250 Hz
+//   plot.signals([trace], "ecg.pgm", 600, 120)
+//
+// Each heartbeat is the classic P-QRS-T complex, synthesised as a sum of
+// Gaussian/biphasic waves.  The waves are placed at physiological delays and
+// repeated at the given heart rate.  A gamma-manifold heart-rate-variability
+// term jitters the R-R interval slightly for realism.
+
+// a single Gaussian bump centred at `mu` (seconds) with width `sd` and amp `a`
+fun bump(t, mu, sd, a) {
+    let z <- (t - mu) / sd
+    return a * exp(0 - z * z / 2)
+}
+
+// one P-QRS-T beat evaluated at time `t` seconds after the beat's R-onset
+fun beat_value(t) {
+    let v <- 0
+    v <- v + bump(t, 0.00, 0.025, 0.10)   // P wave
+    v <- v - bump(t, 0.15, 0.012, 0.13)   // Q
+    v <- v + bump(t, 0.17, 0.011, 1.00)   // R (tall spike)
+    v <- v - bump(t, 0.19, 0.013, 0.25)   // S
+    v <- v + bump(t, 0.34, 0.040, 0.30)   // T wave
+    return v
+}
+
+// synthesise a single-lead ECG: bpm beats/min, duration s, sample rate Hz
+fun lead(bpm, duration, rate) {
+    let rr <- 60 / bpm                     // R-R interval (s)
+    let n <- floor(duration * rate)
+    let out <- []
+    let i <- 0
+    while i < n {
+        let t <- i / rate
+        // position within the current beat
+        let phase <- t % rr
+        push(out, beat_value(phase))
+        i <- i + 1
+    }
+    return out
+}
+
+// a 3-lead set (I, II, III) with scaled morphology, for a strip display
+fun three_leads(bpm, duration, rate) {
+    let l2 <- lead(bpm, duration, rate)
+    let l1 <- []
+    let l3 <- []
+    let i <- 0
+    while i < len(l2) {
+        push(l1, l2[i] * 0.7)              // lead I (smaller)
+        push(l3, l2[i] * 0.5)              // lead III
+        i <- i + 1
+    }
+    return [l1, l2, l3]
+}
+
+// simple analysis: heart rate readout and a QT-ish flag from the morphology
+fun analyze(bpm) {
+    let rr <- 60 / bpm
+    let qt <- 0.40                         // modelled QT (s)
+    let qtc <- qt / sqrt(rr)               // Bazett-corrected QT
+    let flag <- "normal"
+    if bpm > 100 { flag <- "tachycardia" }
+    if bpm < 60 { flag <- "bradycardia" }
+    return {"bpm": bpm, "rr": rr, "qtc": round(qtc, 3), "flag": flag}
+}

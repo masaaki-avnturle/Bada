@@ -1,0 +1,61 @@
+// ultrasound — B-mode sector echography.
+//
+//   import ultrasound
+//   let img <- ultrasound.scan(phantom, apex_x, apex_y, depth, half_angle)
+//
+// Pulse-echo imaging: scan lines fan out from a transducer apex; each pixel's
+// brightness is the local acoustic-impedance interface strength (gradient of
+// the tissue map) attenuated with depth and modulated by speckle.  The native
+// ultrasound_bmode kernel does the per-pixel work.
+
+import imaging
+
+// draw a soft ellipse of echogenicity into a tissue map
+fun blob(im, cx, cy, rx, ry, echo) {
+    let y <- cy - ry
+    while y <= cy + ry {
+        let x <- cx - rx
+        while x <= cx + rx {
+            let nx <- (x - cx) / rx
+            let ny <- (y - cy) / ry
+            if nx * nx + ny * ny <= 1 { im.set(x, y, echo) }
+            x <- x + 1
+        }
+        y <- y + 1
+    }
+}
+
+// scan a tissue map from an apex at the top-centre; returns a B-mode image
+fun scan(tissue, apex_x, apex_y, max_r, half_angle) {
+    let n <- tissue.width
+    let out <- image(n, tissue.height, "L", 0)
+    // center_angle = straight down (+y) = pi/2
+    ultrasound_bmode(tissue, out, apex_x, apex_y, max_r, half_angle, PI / 2, 0.010, 9)
+    return out
+}
+
+// an obstetric-style phantom: amniotic fluid (anechoic), a fetal head ring
+// (echogenic skull), placenta and uterine wall.
+fun abdomen_phantom(n) {
+    let im <- image(n, n, "L", 0)
+    let cx <- n / 2
+    // soft tissue / fluid background
+    blob(im, cx, n * 0.55, n * 0.42, n * 0.40, 60)
+    // anechoic fluid pocket (dark)
+    blob(im, cx, n * 0.55, n * 0.30, n * 0.28, 18)
+    // fetal head: echogenic ring
+    let hx <- cx
+    let hy <- n * 0.55
+    let y <- 0
+    while y < n { let x <- 0
+        while x < n {
+            let dx <- (x - hx) / (n * 0.14)
+            let dy <- (y - hy) / (n * 0.14)
+            let r <- sqrt(dx * dx + dy * dy)
+            if r < 1 and r > 0.82 { im.set(x, y, 235) }   // skull echo
+            x <- x + 1 }
+        y <- y + 1 }
+    // placenta (echogenic patch) and uterine wall
+    blob(im, cx + n * 0.22, n * 0.40, n * 0.10, n * 0.07, 150)
+    return im
+}

@@ -1,0 +1,110 @@
+// scancode — the GENUINE Windows keyboard remap mechanism (Scancode Map).
+//
+// Windows 10 and 11 remap physical keys at the keyboard-driver level through a
+// single REG_BINARY value in the registry:
+//
+//   HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Keyboard Layout
+//     "Scancode Map" = <binary>
+//
+// Importing the .reg produced here and signing out / rebooting makes Windows
+// itself honour the remaps - no resident program required.  This is how
+// 窓使いの憂鬱 / yamy-style physical remaps (CapsLock->Ctrl, CapsLock->Esc,
+// swap Ctrl/Alt, ...) are registered so the OS obeys them on Win10 and Win11.
+//
+//   import scancode
+//   let m <- scancode.build([["CapsLock","LCtrl"], ["Esc","CapsLock"]])
+//   print m["reg"]          // a ready-to-import .reg file
+//
+// Binary layout of "Scancode Map":
+//   DWORD Version = 0            (00 00 00 00)
+//   DWORD Flags   = 0            (00 00 00 00)
+//   DWORD Count   = N + 1        (mappings incl. the null terminator)
+//   N * { WORD mapped_to ; WORD physical }   each little-endian
+//   DWORD 0                      (null terminator)
+
+let HEX <- "0123456789abcdef"
+
+fun fdiv(a, b) { let q <- 0  while (q + 1) * b <= a { q <- q + 1 }  return q }
+fun hex2(n) { let hi <- fdiv(n, 16)  let lo <- n - hi * 16  return HEX[hi] + HEX[lo] }
+
+// physical key -> set-1 scancode as [low_byte, high_byte].  High byte 0xE0
+// (224) marks an "extended" key (right-hand ctrl/alt, arrows, nav cluster).
+fun table() {
+    return {
+        "None": [0, 0], "Disable": [0, 0],
+        "Esc": [1, 0], "Escape": [1, 0],
+        "Tab": [15, 0], "Enter": [28, 0], "Return": [28, 0], "Space": [57, 0],
+        "Backspace": [14, 0], "CapsLock": [58, 0],
+        "LCtrl": [29, 0], "LControl": [29, 0], "Ctrl": [29, 0], "Control": [29, 0],
+        "LShift": [42, 0], "Shift": [42, 0], "RShift": [54, 0],
+        "LAlt": [56, 0], "Alt": [56, 0],
+        "RCtrl": [29, 224], "RControl": [29, 224], "RAlt": [56, 224],
+        "LWin": [91, 224], "Win": [91, 224], "RWin": [92, 224],
+        "Apps": [93, 224], "Menu": [93, 224],
+        "Left": [75, 224], "Right": [77, 224], "Up": [72, 224], "Down": [80, 224],
+        "Home": [71, 224], "End": [79, 224],
+        "Insert": [82, 224], "Delete": [83, 224],
+        "PageUp": [73, 224], "PageDown": [81, 224],
+        "F1": [59, 0], "F2": [60, 0], "F3": [61, 0], "F4": [62, 0]
+    }
+}
+
+fun code_of(name) {
+    let t <- table()
+    if has(t, name) { return t[name] }
+    return []
+}
+
+// build the Scancode Map from a list of [physical, mapped_to] name pairs.
+// returns {hex, reg, count, errors} - `hex` is the comma-separated REG_BINARY
+// body and `reg` is a complete importable .reg file.
+fun build(remaps) {
+    let bytes <- []
+    let errors <- []
+    // header: Version(0) Flags(0)
+    let i <- 0
+    while i < 8 { push(bytes, 0)  i <- i + 1 }
+    // valid mappings
+    let valid <- []
+    for pair in remaps {
+        let phys <- code_of(pair[0])
+        let dest <- code_of(pair[1])
+        if len(phys) == 0 { push(errors, "unknown key: " + pair[0]) }
+        else if len(dest) == 0 { push(errors, "unknown key: " + pair[1]) }
+        else { push(valid, [dest, phys]) }
+    }
+    // count = N + 1  (DWORD, little-endian; N is always small)
+    push(bytes, len(valid) + 1)
+    push(bytes, 0)  push(bytes, 0)  push(bytes, 0)
+    // each mapping: mapped_to WORD then physical WORD (little-endian)
+    for m in valid {
+        let dest <- m[0]
+        let phys <- m[1]
+        push(bytes, dest[0])  push(bytes, dest[1])
+        push(bytes, phys[0])  push(bytes, phys[1])
+    }
+    // null terminator DWORD
+    push(bytes, 0)  push(bytes, 0)  push(bytes, 0)  push(bytes, 0)
+
+    // hex-encode
+    let parts <- []
+    for b in bytes { push(parts, hex2(b)) }
+    let hexstr <- join(parts, ",")
+
+    let reg <- "Windows Registry Editor Version 5.00\n\n"
+    reg <- reg + "; Physical key remap applied by Windows 10 / 11 at the driver level.\n"
+    reg <- reg + "; Import, then sign out and back in (or reboot) to activate.\n"
+    reg <- reg + "; To undo: delete the \"Scancode Map\" value and sign out.\n\n"
+    reg <- reg + "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout]\n"
+    reg <- reg + "\"Scancode Map\"=hex:" + hexstr + "\n"
+
+    return {"hex": hexstr, "reg": reg, "count": len(valid), "errors": errors,
+            "bytes": len(bytes)}
+}
+
+// a .reg that removes the remap (restores the default keyboard)
+fun uninstall_reg() {
+    return "Windows Registry Editor Version 5.00\n\n"
+        + "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout]\n"
+        + "\"Scancode Map\"=-\n"
+}

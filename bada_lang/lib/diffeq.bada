@@ -1,0 +1,48 @@
+// diffeq — ordinary differential equations & their integral manifolds.
+//
+//   import diffeq
+//
+// Wraps the numerical RK4 solver (solve_ode) in an object-oriented interface
+// and provides a few classic equations. The solution curve sampled by an ODE
+// is an integral manifold of the associated vector field.
+
+class ODE {
+    field rhs                 // f(t, y)  =  dy/dt
+    field trajectory <- []
+
+    method init(rhs) { self.rhs <- rhs }
+
+    method solve(y0, t0, t1, steps) {
+        self.trajectory <- solve_ode(self.rhs, y0, t0, t1, steps)
+        return self.trajectory
+    }
+
+    method value_at_end() {
+        return self.trajectory[len(self.trajectory) - 1][1]
+    }
+
+    // sample the solution as a list of y-values
+    method ys() {
+        let out <- []
+        for pt in self.trajectory { push(out, pt[1]) }
+        return out
+    }
+}
+
+// dy/dt = k*y  (exponential growth/decay); solution y0*e^(k t)
+fun exponential(k) {
+    fun f(t, y) { return k * y }
+    return ODE.new(f)
+}
+
+// logistic growth dy/dt = r*y*(1 - y/K)
+fun logistic(r, K) {
+    fun f(t, y) { return r * y * (1 - y / K) }
+    return ODE.new(f)
+}
+
+// Newton's law of cooling dy/dt = -k(y - env)
+fun cooling(k, env) {
+    fun f(t, y) { return 0 - k * (y - env) }
+    return ODE.new(f)
+}

@@ -1,0 +1,27 @@
+// 04 — TupleSpace / Omega::DATABASE: the write-once "Akashic record".
+//
+// A TupleSpace is an immutable associative store: once a key is bound it can
+// never be overwritten.  This models the core Bada design idea that no memory
+// in the database is ever destroyed.
+
+let db <- Omega::DATABASE.new("akashic")
+
+db.push("alpha", 1.0)
+db.push("beta", 2.5)
+db["gamma"] <- 42        // index-assign also writes once
+
+print "alpha =", db.get("alpha")
+print "gamma =", db["gamma"]
+print "keys  =", db.keys()
+print "size  =", db.len()
+
+// Attempting to overwrite a key raises an ImmutableError.
+// We catch it by checking has() first.
+if db.has("alpha") {
+    print "alpha is already bound — write-once protects it."
+}
+
+// Iterate over the immutable record.
+for key in db {
+    print "record:", key, "=>", db[key]
+}

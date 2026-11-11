@@ -1,0 +1,132 @@
+// psychotropic — auditory biofeedback for psychotropic medication.
+//
+//   import psychotropic as ps
+//   let app <- ps.SoundClinic.new()
+//   app.dose("etizolam", 1.0, 6, "etizolam.wav")
+//
+// MODEL.  Each psychotropic drug shifts the EEG toward a characteristic band
+// and reduces arousal.  We treat a drug as an ENTRAINMENT operator on the
+// gamma-manifold brain: it pulls the dominant rhythm toward a target band and
+// lowers the manifold's thermal entropy (arousal).  The auditory biofeedback
+// is a BINAURAL-BEAT soundscape whose beat frequency is the drug's target
+// band and whose timbre glides from tense (bright) to calm (warm) as the
+// entropy-derived "relief" rises.  The result is a real, playable stereo WAV
+// the patient can listen to as biofeedback.
+
+import audio
+
+// ---- drug formulary -------------------------------------------------------
+//
+// Each entry: label, drug class, target EEG band, sedation in [0,1] (how far
+// toward calm it pulls), carrier pitch (Hz), and the gamma shape k it drives
+// the arousal manifold toward (lower k = calmer / lower thermal entropy).
+
+fun formulary() {
+    let d <- {}
+
+    // antipsychotics — organise/slow cortical rhythm (alpha), moderate sedation
+    d["risperidone"] <- {"label": "リスパダール (risperidone)",
+        "class": "antipsychotic", "band": "alpha", "sedation": 0.55,
+        "carrier": 180, "k": 2.6}
+    d["olanzapine"] <- {"label": "ジプレキサ (olanzapine)",
+        "class": "antipsychotic", "band": "theta", "sedation": 0.75,
+        "carrier": 160, "k": 2.2}
+    d["asenapine"] <- {"label": "シクレスト (asenapine)",
+        "class": "antipsychotic", "band": "alpha", "sedation": 0.6,
+        "carrier": 175, "k": 2.5}
+
+    // benzodiazepine / hypnotics — strong sedation, push toward delta/theta
+    d["flunitrazepam"] <- {"label": "ロヒプノール (flunitrazepam)",
+        "class": "hypnotic-benzo", "band": "delta", "sedation": 0.95,
+        "carrier": 130, "k": 1.4}
+    d["flunitrazepam_silece"] <- {"label": "サイレース (flunitrazepam/Silece)",
+        "class": "hypnotic-benzo", "band": "delta", "sedation": 0.95,
+        "carrier": 132, "k": 1.4}
+    d["etizolam"] <- {"label": "エチゾラム/デパス (etizolam/Depas)",
+        "class": "anxiolytic-benzo", "band": "theta", "sedation": 0.7,
+        "carrier": 150, "k": 2.0}
+    d["depas"] <- {"label": "デパス (etizolam)",
+        "class": "anxiolytic-benzo", "band": "theta", "sedation": 0.7,
+        "carrier": 150, "k": 2.0}
+    d["brotizolam"] <- {"label": "レンドルミン (brotizolam)",
+        "class": "hypnotic-benzo", "band": "delta", "sedation": 0.85,
+        "carrier": 140, "k": 1.6}
+
+    // antidepressants — gentle upward stabilisation toward alpha, mild calm
+    d["ssri"] <- {"label": "SSRI (e.g. sertraline)",
+        "class": "antidepressant-ssri", "band": "alpha", "sedation": 0.4,
+        "carrier": 200, "k": 3.0}
+    d["snri"] <- {"label": "SNRI (e.g. duloxetine)",
+        "class": "antidepressant-snri", "band": "beta", "sedation": 0.3,
+        "carrier": 210, "k": 3.4}
+
+    return d
+}
+
+// ---- a single auditory biofeedback prescription --------------------------
+
+class SoundClinic {
+    field drugs
+    field rate <- 22050
+    field log <- []
+
+    method init() {
+        self.drugs <- formulary()
+    }
+
+    method names() { return keys(self.drugs) }
+
+    // arousal "relief" from the drug: how much thermal entropy it removes
+    // when pulling the arousal manifold from a hyper-aroused state (k_hi) to
+    // the drug's calm shape k, weighted by dose and sedation.
+    method relief_of(drug, dose) {
+        let k_hi <- 7.0                       // hyper-aroused baseline shape
+        let k_target <- drug["k"]
+        let pulled <- k_hi - (k_hi - k_target) * dose * drug["sedation"]
+        // entropy-weighted arousal before vs after (excess over calm k=1.2)
+        let calm <- 1.2
+        let t_before <- (k_hi - calm) * (1 + gamma_entropy(k_hi, 1))
+        let t_after <- (pulled - calm) * (1 + gamma_entropy(pulled, 1))
+        let relief <- 0
+        if t_before > 0 { relief <- (t_before - t_after) / t_before }
+        if relief < 0 { relief <- 0 }
+        if relief > 1 { relief <- 1 }
+        return relief
+    }
+
+    // synthesise the stereo biofeedback soundscape for a drug and save it.
+    method dose(name, dose, duration, path) {
+        if not has(self.drugs, name) {
+            throw "unknown psychotropic: " + name
+        }
+        let drug <- self.drugs[name]
+        let relief <- self.relief_of(drug, dose)
+        let beat <- audio.band_beat(drug["band"])
+        let carrier <- drug["carrier"]
+
+        // synthesise the full binaural soundscape natively (fast path):
+        // binaural carriers + warm overtone + fading shimmer + noise bed +
+        // beat-locked swell, all shaped by `relief`.
+        let stereo <- binaural_soundscape(carrier, beat, relief, duration, self.rate)
+        audio.save_stereo(path, stereo[0], stereo[1], self.rate)
+
+        let entry <- {
+            "drug": drug["label"], "class": drug["class"],
+            "band": drug["band"], "beat_hz": beat, "carrier_hz": carrier,
+            "dose": dose, "relief": relief, "sound": path
+        }
+        push(self.log, entry)
+        return entry
+    }
+
+    method report() {
+        print "=== Psychotropic auditory biofeedback ==="
+        for e in self.log {
+            print "-", e["drug"], "(" + e["class"] + ")"
+            print "    EEG target:", e["band"], "band  ->  binaural beat",
+                  e["beat_hz"], "Hz on", e["carrier_hz"], "Hz carrier"
+            print "    dose:", e["dose"], " relief:", round(e["relief"] * 100, 1), "%"
+            print "    sound:", e["sound"]
+        }
+    }
+}

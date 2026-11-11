@@ -1,0 +1,40 @@
+// 08 — Garbage collection (ガベージコレクション).
+//
+// The VM tracks every heap object it allocates.  A collection traces all
+// objects reachable from the roots (globals + live call frames) and reclaims
+// the rest.  An instance whose class defines `__finalize__` has it run when
+// the object is collected — modelling the manifold being "discarded" once
+// nothing refers to it.
+
+class Node {
+    field id
+    method init(id) { self.id <- id }
+    // finalizer: called by the GC when this object becomes unreachable
+    method __finalize__() {
+        print "  finalizing Node", self.id
+    }
+}
+
+print "heap before:", gc_heap()
+
+// Allocate a pile of objects, but keep only one of them reachable.
+fun make_garbage() {
+    let keep <- Node.new(0)
+    let i <- 1
+    while i <= 5 {
+        let tmp <- Node.new(i)   // these become unreachable after the loop
+        i <- i + 1
+    }
+    return keep
+}
+
+let survivor <- make_garbage()
+print "heap after allocating:", gc_heap()
+
+// Force a collection.  The 5 temporary Nodes are unreachable and get swept;
+// `survivor` (Node 0) is still referenced and survives.
+let reclaimed <- gc_collect()
+print "objects reclaimed:", reclaimed
+print "survivor still alive:", survivor.id
+
+print "gc stats:", gc_stats()

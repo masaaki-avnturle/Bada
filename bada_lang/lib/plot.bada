@@ -1,0 +1,107 @@
+// plot — minimal waveform / signal plotting onto a Bada image.
+//
+//   import plot
+//   plot.signals(channels, "eeg.pgm", width, row_height)
+//
+// Renders one or more time-series (e.g. EEG channels) as stacked traces — a
+// classic polygraph / EEG strip chart.
+
+import imaging
+
+// draw a single channel as a centred trace of height `h` at vertical offset y0
+fun draw_channel(canvas, series, x_scale, y0, h, amp_scale, color) {
+    let n <- len(series)
+    let prev_y <- y0 + h / 2
+    let i <- 0
+    while i < n {
+        let px <- floor(i * x_scale)
+        let v <- series[i] * amp_scale
+        let py <- y0 + h / 2 - v
+        if py < y0 { py <- y0 }
+        if py > y0 + h - 1 { py <- y0 + h - 1 }
+        // vertical line from prev_y to py to connect samples
+        let lo <- prev_y
+        let hi <- py
+        if lo > hi { let t <- lo  lo <- hi  hi <- t }
+        let yy <- lo
+        while yy <= hi {
+            canvas.set(px, yy, color)
+            yy <- yy + 1
+        }
+        prev_y <- py
+        i <- i + 1
+    }
+}
+
+// render a list of channels as a stacked strip chart (grayscale PGM).
+// amp_scale controls trace height; auto-scales each channel to its peak.
+fun signals(channels, path, width, row_height) {
+    return signals_scaled(channels, path, width, row_height, 0)
+}
+
+// signals with an explicit amplitude scale (0 = auto-scale per chart)
+fun signals_scaled(channels, path, width, row_height, amp_scale) {
+    let nch <- len(channels)
+    let h <- nch * row_height
+    let canvas <- imaging.Canvas.new(width, h)
+    canvas.clear(10)
+    let maxlen <- 0
+    for c in channels {
+        if len(c) > maxlen { maxlen <- len(c) }
+    }
+    let x_scale <- (width - 1) / maxlen
+    let ci <- 0
+    while ci < nch {
+        let y0 <- ci * row_height
+        // baseline
+        let x <- 0
+        while x < width {
+            canvas.set(x, y0 + row_height / 2, 40)
+            x <- x + 1
+        }
+        // per-channel amplitude: auto-scale to ~40% of the row height
+        let scale <- amp_scale
+        if scale == 0 {
+            let peak <- 0
+            for v in channels[ci] {
+                let a <- v
+                if a < 0 { a <- 0 - a }
+                if a > peak { peak <- a }
+            }
+            if peak == 0 { peak <- 1 }
+            scale <- (row_height * 0.4) / peak
+        }
+        draw_channel(canvas, channels[ci], x_scale, y0, row_height, scale, 230)
+        ci <- ci + 1
+    }
+    return canvas.save(path)
+}
+
+// like signals() but returns the raw image (for embedding in a GUI)
+fun signals_image(channels, width, row_height) {
+    let nch <- len(channels)
+    let canvas <- imaging.Canvas.new(width, nch * row_height)
+    canvas.clear(10)
+    let maxlen <- 0
+    for c in channels {
+        if len(c) > maxlen { maxlen <- len(c) }
+    }
+    let x_scale <- (width - 1) / maxlen
+    let ci <- 0
+    while ci < nch {
+        let y0 <- ci * row_height
+        let x <- 0
+        while x < width { canvas.set(x, y0 + row_height / 2, 40)  x <- x + 1 }
+        let peak <- 0
+        for v in channels[ci] {
+            let aa <- v
+            if aa < 0 { aa <- 0 - aa }
+            if aa > peak { peak <- aa }
+        }
+        if peak == 0 { peak <- 1 }
+        draw_channel(canvas, channels[ci], x_scale, y0, row_height,
+                     (row_height * 0.4) / peak, 230)
+        ci <- ci + 1
+    }
+    return canvas.raw()
+}

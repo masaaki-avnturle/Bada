@@ -1,0 +1,47 @@
+// ct3d — pseudo-3D stacked rendering of CT axial slices.
+//
+//   import ct3d
+//   let img <- ct3d.stack(slices)
+//
+// CT produces a stack of axial cross-sections.  This renders them as tilted,
+// offset layers — an isometric "slab stack" — so the volume can be seen at a
+// glance, with depth shading so deeper slices appear darker.
+
+// composite a list of grayscale slice images into one isometric stack (RGB).
+// `slices` is a list of [label, image]; drawn back-to-front.
+fun stack(slices) {
+    let n <- len(slices)
+    if n == 0 { return image(10, 10, "RGB", 0) }
+    let sw <- slices[0][1].width
+    let sh <- slices[0][1].height
+    let dx <- floor(sw * 0.5)        // horizontal offset per layer
+    let dy <- floor(sh * 0.42)       // vertical offset per layer
+    let W <- sw + dx * (n - 1) + 8
+    let H <- sh + dy * (n - 1) + 8
+    let out <- image(W, H, "RGB", 0)
+
+    let i <- 0
+    while i < n {
+        let img <- slices[i][1]
+        let ox <- 4 + i * dx
+        let oy <- H - sh - 4 - i * dy
+        // depth shading: top (later) slices brighter
+        let shade <- 0.55 + 0.45 * (i / n)
+        let y <- 0
+        while y < sh {
+            let x <- 0
+            while x < sw {
+                let v <- img.get(x, y)
+                if v > 12 {
+                    let g <- floor(v * shade)
+                    // tint deeper slices blue, top slices warm
+                    out.set_rgb(ox + x, oy + y, g, floor(g * 0.95), floor(g * (1.1 - 0.2 * (i / n))))
+                }
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+        i <- i + 1
+    }
+    return out
+}

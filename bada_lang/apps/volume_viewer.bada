@@ -1,0 +1,108 @@
+// ============================================================================
+//  3-D VOLUME VIEWER — a Bada GUI application
+//
+//  Direct volume rendering (DVR) of a CT/MRI head volume.  Bada builds the
+//  voxel volume and ray-casts it through transfer functions; the GUI embeds a
+//  rotating turntable (animated GIF) plus a frame scrubber so the volume can
+//  be rotated interactively in the browser, and a transfer-function selector
+//  that switches between the "bone/tissue" and "x-ray glass" presets.
+//
+//  Run:  ./bada run apps/volume_viewer.bada   ->  volume_viewer.html
+// ============================================================================
+
+import volume
+import gui
+
+let N <- 72          // voxel resolution (N^3)
+let OUT <- 120       // render size
+let FRAMES <- 16     // turntable frames
+
+print "=== Bada 3-D Volume Viewer ==="
+print "[1] building voxel volume", N, "^3 ..."
+let vol <- ct_head_volume(N)
+
+print "[2] transfer functions ..."
+let tf_bone <- volume.bone_tissue_tf()
+let tf_glass <- volume.xray_tf()
+
+print "[3] rendering turntables (" + str(FRAMES) + " frames each) ..."
+let bone_frames <- []
+let glass_frames <- []
+let i <- 0
+while i < FRAMES {
+    let yaw <- i / FRAMES * 2 * PI
+    push(bone_frames, volume.render(vol, yaw, 0.35, tf_bone, OUT))
+    push(glass_frames, volume.render(vol, yaw, 0.35, tf_glass, OUT))
+    print "    frame", i + 1, "/", FRAMES
+    i <- i + 1
+}
+
+// turntable GIFs
+let bone_gif <- gif("volume_bone.gif", OUT, OUT, 8, 0)
+for f in bone_frames { bone_gif.add(f.to_gray()) }   // gif palette is grayscale
+let glass_gif <- gif("volume_glass.gif", OUT, OUT, 8, 0)
+for f in glass_frames { glass_gif.add(f.to_gray()) }
+
+print "[4] building GUI ..."
+let app <- gui.App.new("Bada 3-D Volume Viewer")
+app.style(gui.dark_theme())
+app.style(".view img{width:100%;image-rendering:auto;border-radius:10px;background:#000}
+.view{max-width:420px;margin:0 auto}
+.controls{max-width:420px;margin:14px auto}
+button.tf{width:auto;margin-right:8px;background:#33405a}
+button.tf.on{background:#4a80d0}")
+
+app.add(gui.h1("Bada 3-D Volume Viewer"))
+app.add(gui.h2("direct volume rendering of a CT head - drag to rotate, switch transfer function"))
+
+// build JS frame arrays (colour stills as data URIs) for each preset
+fun frames_js(frames) {
+    let s <- "["
+    let i <- 0
+    while i < len(frames) {
+        if i > 0 { s <- s + "," }
+        s <- s + "'" + frames[i].data_uri() + "'"
+        i <- i + 1
+    }
+    return s + "]"
+}
+
+app.add(gui.div("view", "<img id=\"vol\" src=\"" + bone_frames[0].data_uri() + "\">"))
+
+app.add(gui.div("controls",
+    "<div class=\"row\"><label>Rotate</label>"
+    + gui.slider("ang", 0, str(FRAMES - 1), 1, 0, "setFrame(this.value)")
+    + "<span class=\"val\" id=\"angv\">0&deg;</span></div>"
+    + "<div class=\"row\">"
+    + "<button class=\"tf on\" id=\"tfb\" onclick=\"setTF('bone')\">Bone / Tissue</button>"
+    + "<button class=\"tf\" id=\"tfg\" onclick=\"setTF('glass')\">X-ray Glass</button>"
+    + "<button onclick=\"toggleSpin()\" id=\"spin\">&#9654; Spin</button>"
+    + "</div>"))
+
+// also offer the animated GIF turntables as a fallback / quick view
+app.add(gui.div("view", gui.div("tag", "auto-rotating turntable (GIF)")
+    + "<img src=\"" + bone_gif.data_uri() + "\">"))
+
+let js <- [
+    "var BONE = " + frames_js(bone_frames) + ";",
+    "var GLASS = " + frames_js(glass_frames) + ";",
+    "var tf='bone', frame=0, N=" + str(FRAMES) + ", spinning=false, timer=null;",
+    "function frames(){ return tf==='bone'?BONE:GLASS; }",
+    "function setFrame(i){ frame=parseInt(i); document.getElementById('vol').src=frames()[frame];",
+    "  document.getElementById('angv').innerHTML=Math.round(frame*360/N)+'&deg;';",
+    "  document.getElementById('ang').value=frame; }",
+    "function setTF(t){ tf=t;",
+    "  document.getElementById('tfb').className='tf'+(t==='bone'?' on':'');",
+    "  document.getElementById('tfg').className='tf'+(t==='glass'?' on':'');",
+    "  setFrame(frame); }",
+    "function toggleSpin(){ spinning=!spinning;",
+    "  document.getElementById('spin').innerHTML=spinning?'&#9632; Stop':'&#9654; Spin';",
+    "  if(spinning){ timer=setInterval(function(){ setFrame((frame+1)%N); }, 90); }",
+    "  else { clearInterval(timer); } }",
+    "setFrame(0);"
+]
+app.script(join(js, "\n"))
+
+app.save("volume_viewer.html")
+print "wrote volume_viewer.html (and volume_bone.gif / volume_glass.gif)"
+print "done. open volume_viewer.html and drag the Rotate slider."

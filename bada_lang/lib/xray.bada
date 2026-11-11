@@ -1,0 +1,203 @@
+// xray — radiographic image synthesis from the report's manifold mathematics.
+//
+//   import xray
+//   let scan <- xray.Radiograph.new(220, 260)
+//   scan.expose()
+//   scan.save("chest.pgm")
+//
+// PRINCIPLE.  A chest X-ray records, for every detector pixel, how much of an
+// incident beam survives passing through the body.  This is the Beer-Lambert
+// law: along a ray L through the tissue manifold M,
+//
+//        I(L) = I0 * exp( - ∫_L mu(s) ds )
+//
+// The exponent is a LINE INTEGRAL over the part of the manifold the ray
+// pierces — exactly the report's "global partial-integral manifold" of the
+// gamma/zeta operator algebra.  We model the linear attenuation coefficient
+// mu of each tissue as a GAMMA-function radial density profile (the report's
+// Gamma(s) = ∫ e^{-x} x^{1-t} dx giving the operator-algebra density), and
+// integrate it across the manifold to form the radiograph.
+//
+// Thus the same equation that the report uses for the global differential
+// manifold of the gamma function is what casts the X-ray shadow image.
+
+import mathx
+
+// gamma-profile radial density: rises then falls like x^k e^{-x},
+// peaking at the tissue's shell radius — the gamma operator's density curve.
+fun gamma_density(r, shell, k) {
+    if r < 0 { return 0 }
+    let x <- (r / shell) * (k + 1)        // normalise so the peak sits at shell
+    if x <= 0 { return 0 }
+    // x^k e^{-x} / Gamma(k+1)   (a normalised gamma profile)
+    return pow(x, k) * exp(0 - x) / gamma(k + 1)
+}
+
+// ---- a tissue element on the manifold: an ellipse with an attenuation mu --
+
+class Tissue {
+    field cx
+    field cy
+    field rx
+    field ry
+    field mu          // peak linear attenuation coefficient
+    field k           // gamma shape (edge softness)
+
+    method init(cx, cy, rx, ry, mu, k) {
+        self.cx <- cx
+        self.cy <- cy
+        self.rx <- rx
+        self.ry <- ry
+        self.mu <- mu
+        self.k <- k
+    }
+
+    // local attenuation contribution at world point (x,y): the gamma-profile
+    // density scaled by mu, zero outside the ellipse.
+    method mu_at(x, y) {
+        let nx <- (x - self.cx) / self.rx
+        let ny <- (y - self.cy) / self.ry
+        let rr <- sqrt(nx * nx + ny * ny)      // 0 at centre, 1 at the rim
+        if rr > 1 { return 0 }
+        // gamma density across the radial manifold, peaked near the shell
+        return self.mu * gamma_density(rr, 0.8, self.k)
+    }
+}
+
+// ---- the radiograph: a tissue manifold + the Beer-Lambert line integral ---
+
+class Radiograph {
+    field w
+    field h
+    field tissues <- []
+    field i0 <- 255          // incident beam intensity
+    field canvas
+
+    method init(w, h) {
+        self.w <- w
+        self.h <- h
+        import imaging
+        self.canvas <- imaging.Canvas.new(w, h)
+    }
+
+    method add_tissue(t) { push(self.tissues, t) }
+
+    // total mu of the whole manifold at a point (superposition of tissues).
+    // Used for analysis / verification of the model in pure Bada.
+    method mu_total(x, y) {
+        let m <- 0
+        for t in self.tissues {
+            m <- m + t.mu_at(x, y)
+        }
+        return m
+    }
+
+    // Beer-Lambert line integral for one vertical ray, in pure Bada — the
+    // reference implementation of  I(L) = I0 * exp(-∫_L mu ds).
+    method ray_intensity(x, samples) {
+        let acc <- 0
+        let step <- self.h / samples
+        let s <- 0
+        while s < samples {
+            let y <- s * step
+            acc <- acc + self.mu_total(x, y) * step
+            s <- s + 1
+        }
+        return self.i0 * exp(0 - acc)
+    }
+
+    // pack the tissue manifold into the [cx,cy,rx,ry,mu,k] rows the native
+    // projection kernel expects.
+    method manifold_rows() {
+        let rows <- []
+        for t in self.tissues {
+            push(rows, [t.cx, t.cy, t.rx, t.ry, t.mu, t.k])
+        }
+        return rows
+    }
+
+    // expose every pixel.  Delegates the hot per-ray partial integral to the
+    // native kernel `xray_project`, which performs exactly the cumulative
+    // Beer-Lambert integral down the gamma-profile manifold and writes the
+    // film-negative density (bone bright, lung dark).
+    method expose() {
+        self.expose_with(0.85, 55)
+    }
+
+    // expose with explicit beam softness (attenuation gain) and edge gain
+    method expose_with(soft, edge) {
+        let img <- self.canvas.raw()
+        xray_project(img, self.manifold_rows(), self.i0, self.h, soft, edge)
+    }
+
+    // slower pure-Bada exposure (no native kernel) — same physics, for study.
+    method expose_pure() {
+        let x <- 0
+        while x < self.w {
+            let acc <- 0
+            let y <- 0
+            while y < self.h {
+                let ml <- self.mu_total(x, y)
+                acc <- acc + ml
+                let dens <- 255 - self.i0 * exp(0 - acc * 0.06)
+                self.canvas.set(x, y, dens + ml * 40)
+                y <- y + 1
+            }
+            x <- x + 1
+        }
+    }
+
+    method save(path) { return self.canvas.save(path) }
+    method save_color(path) { return self.canvas.save_color(path) }
+    method surface() { return self.canvas }
+}
+
+// ---- a ready-made chest phantom ------------------------------------------
+//
+// Builds a recognisable chest radiograph: rib cage, spine, two radiolucent
+// lungs (low mu), the heart shadow and the diaphragm.
+
+fun chest_phantom(w, h) {
+    return chest_phantom_breath(w, h, 0)
+}
+
+// breath in [0,1]: 0 = full exhale, 1 = full inhale (ribs lift, lungs expand).
+// Sweeping breath across frames yields a breathing-motion radiograph video.
+fun chest_phantom_breath(w, h, breath) {
+    let scan <- Radiograph.new(w, h)
+    let cx <- w / 2
+    let cy <- h / 2
+    let lift <- breath * h * 0.03         // ribs rise on inhale
+    let grow <- 1 + breath * 0.12         // lungs enlarge on inhale
+
+    // soft-tissue thorax envelope (low attenuation, large)
+    scan.add_tissue(Tissue.new(cx, cy, w * 0.42, h * 0.45, 0.5, 2.0))
+
+    // two lungs: very low mu (air-filled) -> dark on film
+    scan.add_tissue(Tissue.new(cx - w * 0.18, cy - h * 0.02, w * 0.15, h * 0.30 * grow, 0.08, 1.2))
+    scan.add_tissue(Tissue.new(cx + w * 0.18, cy - h * 0.02, w * 0.15, h * 0.30 * grow, 0.08, 1.2))
+
+    // spine: dense vertical column of bone
+    scan.add_tissue(Tissue.new(cx, cy, w * 0.035, h * 0.46, 2.4, 4.0))
+
+    // heart shadow (mediastinum), slightly left
+    scan.add_tissue(Tissue.new(cx - w * 0.06, cy + h * 0.10, w * 0.13, h * 0.16, 0.9, 2.5))
+
+    // rib pairs: dense curved bones across the thorax
+    let i <- 0
+    while i < 6 {
+        let ry <- cy - h * 0.22 + i * (h * 0.075) - lift
+        scan.add_tissue(Tissue.new(cx - w * 0.18, ry, w * 0.17, h * 0.012, 2.0, 5.0))
+        scan.add_tissue(Tissue.new(cx + w * 0.18, ry, w * 0.17, h * 0.012, 2.0, 5.0))
+        i <- i + 1
+    }
+
+    // diaphragm / abdomen base (dense soft tissue); descends on inhale
+    scan.add_tissue(Tissue.new(cx, cy + h * 0.34 + breath * h * 0.03, w * 0.40, h * 0.10, 1.1, 2.0))
+
+    // clavicles (top bones)
+    scan.add_tissue(Tissue.new(cx - w * 0.16, cy - h * 0.34, w * 0.14, h * 0.012, 1.8, 5.0))
+    scan.add_tissue(Tissue.new(cx + w * 0.16, cy - h * 0.34, w * 0.14, h * 0.012, 1.8, 5.0))
+
+    return scan
+}

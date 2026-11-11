@@ -1,0 +1,109 @@
+// ============================================================================
+//  BADA BRAIN — integrated neuro dashboard (Bada GUI)
+//
+//  Branded front-end for the Bada brain suite: MRI / fMRI / qEEG topography
+//  imaging, a multi-channel EEG, a basal-ganglia diagnostic gate and the
+//  Silent Talk subvocal BCI - all driven by the gamma manifold's thermal
+//  entropy.  Launcher tiles open the detailed brain applications.
+//
+//  Run:  ./bada run apps/bada_brain.bada   ->  bada_brain.html
+// ============================================================================
+
+import neuro
+import plot
+import basal_ganglia
+import silenttalk
+import gui
+
+let N <- 130
+print "=== Bada Brain ==="
+
+let brain <- neuro.default_brain(N, N)
+let mri  <- brain.render_mri("bb_mri.pgm")
+let fmri <- brain.render_fmri("bb_fmri.ppm")
+let topo <- brain.render_topography("bb_topo.ppm")
+
+let cx <- N / 2
+let cy <- N / 2
+let electrodes <- [[cx, cy + N * 0.22], [cx - N * 0.14, cy - N * 0.20],
+                   [cx + N * 0.14, cy - N * 0.20], [cx, cy - N * 0.02],
+                   [cx - N * 0.22, cy], [cx + N * 0.22, cy]]
+let eeg_img <- plot.signals_image(brain.eeg(electrodes, 3, 128), N * 3, 36)
+
+// basal-ganglia gate over the cortical sources' activity
+let bg <- basal_ganglia.Gate.new(0.7)
+bg.input("occipital-alpha", 1.0)
+bg.input("frontal-beta", 0.7)
+bg.input("central-mu", 0.85)
+bg.input("temporal-theta", 0.6)
+let gate <- bg.weights()
+let winner <- bg.select()
+
+// silent-talk demo: decode a short phrase
+let st <- silenttalk.SilentTalk.new()
+let phrase <- ["HELP", "WATER", "YES"]
+let decoded <- st.speak(phrase)
+
+print "rendering dashboard ..."
+let app <- gui.App.new("Bada Brain")
+app.style(gui.dark_theme())
+app.style(".scans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.scans .tile2{background:var(--card);border-radius:14px;padding:12px}
+.scans img{width:100%;border-radius:8px;background:#000}
+.wide img{width:100%;border-radius:8px;background:#000}
+.launch{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:10px}
+a.tile{display:block;background:var(--card);border:1px solid #1f2a3a;border-radius:14px;padding:14px;
+  text-decoration:none;color:var(--ink)}a.tile:hover{border-color:var(--accent)}
+a.tile .t{font-weight:800}a.tile .b{font-size:12px;color:var(--muted)}
+.big{font-size:18px;font-weight:800;color:#5fd0a0}")
+
+app.add(gui.h1("&#129504; Bada Brain"))
+app.add(gui.h2("gamma-manifold neuro suite - MRI / fMRI / topography / EEG, basal-ganglia gate, Silent Talk"))
+
+app.add("<div class=\"scans\">"
+    + "<div class=\"tile2\"><div class=\"tag\">MRI</div><img src=\"" + mri.data_uri() + "\"></div>"
+    + "<div class=\"tile2\"><div class=\"tag\">fMRI (BOLD)</div><img src=\"" + fmri.data_uri() + "\"></div>"
+    + "<div class=\"tile2\"><div class=\"tag\">qEEG topography</div><img src=\"" + topo.data_uri() + "\"></div>"
+    + "</div>")
+
+app.add(gui.div("card", gui.div("name", "EEG (6 channels)") + gui.div("wide", "<img src=\"" + eeg_img.data_uri() + "\">")))
+
+// basal-ganglia gate
+let bgh <- gui.div("name", "Basal-ganglia rhythm gate")
+    + gui.div("tag", "dopamine 0.7 - direct/indirect competition selects the dominant rhythm")
+for w in gate {
+    bgh <- bgh + "<div class=\"row\"><label>" + w[0] + "</label>"
+        + gui.meter("g_" + w[0], w[1], "#4a80d0")
+        + "<span class=\"val\">" + str(round(w[1] * 100, 1)) + "%</span></div>"
+}
+bgh <- bgh + gui.div("big", "&#9658; " + winner[0] + " (" + str(round(winner[1] * 100, 1)) + "%)")
+app.add(gui.div("card", bgh))
+
+// silent talk
+let stc <- gui.div("name", "Silent Talk (subvocal BCI)")
+    + gui.div("tag", "imagined words decoded by the basal-ganglia gate")
+for d in decoded {
+    let mark <- "&#10003;"
+    if not d["correct"] { mark <- "&#10007;" }
+    stc <- stc + "<div class=\"row\"><label>" + d["intended"] + "</label>"
+        + "<span class=\"val\">-> " + d["decoded"] + " (" + str(round(d["confidence"] * 100, 0)) + "%) " + mark + "</span></div>"
+}
+stc <- stc + gui.div("big", "message: " + st.transcript)
+app.add(gui.div("card", stc))
+
+app.add(gui.h2("Applications"))
+let tiles <- [
+    ["Brain Scanner", "brain_scanner.html", "MRI / fMRI / topography / EEG + video"],
+    ["Silent Talk", "silent_talk.html", "subvocal brain-computer interface"],
+    ["Medical Workstation", "medical_workstation.html", "18 imaging modalities"],
+    ["3-D Volume Viewer", "volume_viewer.html", "direct volume rendering"]
+]
+let launch <- ""
+for t in tiles {
+    launch <- launch + "<a class=\"tile\" href=\"" + t[1] + "\"><div class=\"t\">" + t[0]
+        + "</div><div class=\"b\">" + t[2] + "</div></a>"
+}
+app.add("<div class=\"launch\">" + launch + "</div>")
+
+app.save("bada_brain.html")
+print "wrote bada_brain.html"

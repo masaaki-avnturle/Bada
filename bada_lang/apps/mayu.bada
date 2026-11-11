@@ -1,0 +1,180 @@
+// ============================================================================
+//  窓使いの憂鬱 (mayu) — registry key-binding remapper (Bada GUI)
+//
+//  Configure key bindings with a powerful shell-script DSL, COMPILE & REGISTER
+//  them into the Windows Registry (Windows 10 / Windows 11), and watch a live
+//  Emacs/vim editor obey whatever the registry now says - with the
+//  investigation key telling you what any key resolves to.
+//
+//  Tabs:  Config & Registry   (DSL editor -> HKCU\Software\Mayu\<os>, .reg)
+//         Editor              (live Emacs/vim editor driven by the registry)
+//         Investigate         (the 調査キー)
+//
+//  Bada side: lib/mayucfg.bada compiles the same DSL into lib/winreg.bada;
+//  the JS in the page mirrors both.
+//
+//  Run:  ./bada run apps/mayu.bada   ->  mayu.html
+// ============================================================================
+
+import gui
+import winapps
+
+let DEFAULT <- "# mayu config - a powerful key-binding script\nos win11\ndefine MOD = C\n\nkeymap emacs {\n  key $MOD-a -> move-beginning-of-line\n  key $MOD-e -> move-end-of-line\n  key C-f -> forward-char\n  key C-b -> backward-char\n  key C-n -> next-line\n  key C-p -> previous-line\n  key C-k -> kill-line\n  key C-y -> yank\n  key M-f -> forward-word\n  key M-b -> backward-word\n}\n\nkeymap vim-normal {\n  key h -> cursor-left\n  key j -> cursor-down\n  key k -> cursor-up\n  key l -> cursor-right\n  key 0 -> line-start\n  key $ -> line-end\n  key x -> delete-char\n  key d d -> delete-line\n  key p -> paste\n  key i -> insert-mode\n  key a -> append\n  key o -> open-line\n}\n\nkeymap vim-insert {\n  key ESC -> normal-mode\n  key RET -> newline\n}\n\nwindow \"Editor\" : emacs {\n  key C-x C-s -> save-buffer\n}\n\nwindow \"Files\" {\n  key j -> cursor-down\n  key k -> cursor-up\n  key / -> search\n  key RET -> open\n}\n\n# installed-application remaps (target by exe / window class)\n# actions are shell-script-like: send <keys> | exec <cmd> | type <text>\napp \"Notepad\" {\n  exe notepad.exe\n  class Notepad\n  base emacs\n  key C-a -> move-beginning-of-line\n  key C-e -> move-end-of-line\n  key C-k -> kill-line\n  key C-s -> send C-s\n  key F5 -> type \"%date% %time%\"\n  key C-S-e -> exec \"explorer.exe .\"\n}\n\napp \"Explorer\" {\n  exe explorer.exe\n  class CabinetWClass\n  key j -> send Down\n  key k -> send Up\n  key g g -> send Home\n  key / -> send C-e\n}\n\napp \"Chrome\" {\n  exe chrome.exe\n  class Chrome_WidgetWin_1\n  key J -> send C-Tab\n  key K -> send C-S-Tab\n  key C-l -> send C-l\n}\n"
+
+// escape a string for a JS single-quoted literal (defined before use)
+fun js_str(s) {
+    let out <- replace(replace(s, "\\", "\\\\"), "\n", "\\n")
+    return "'" + replace(out, "'", "\\'") + "'"
+}
+
+// build a JS array literal of the installed-application catalog
+fun catalog_js() {
+    let parts <- []
+    for a in winapps.catalog() {
+        push(parts, "{name:" + js_str(a["name"]) + ",exe:" + js_str(a["exe"])
+            + ",cls:" + js_str(a["class"]) + ",style:" + js_str(a["style"]) + "}")
+    }
+    return "[" + join(parts, ",") + "]"
+}
+
+let app <- gui.App.new("mayu")
+app.style(gui.dark_theme())
+app.style(".tabs{display:flex;gap:6px;margin-bottom:14px}.tabs button{width:auto;background:#1f2a3a}.tabs button.on{background:var(--accent)}
+.panel{display:none}.panel.on{display:block}
+.cfg2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+textarea.script{width:100%;height:340px;background:#0c0c12;color:#cfe9d8;border:1px solid #1f2a3a;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:13px;line-height:1.5}
+.regtree{background:#0c0c12;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:12px;max-height:300px;overflow:auto}
+.regtree .k{color:#e0c060}.regtree .v{color:#9fb6d6;margin-left:18px}.regtree .v b{color:#5fd0a0}
+.reg{background:#0c0c12;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:11px;white-space:pre-wrap;max-height:160px;overflow:auto;color:#cfe9d8;margin-top:8px}
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.bar select,.bar button{background:#1f2a3a;color:#eaeef7;border:1px solid #2a3340;border-radius:6px;padding:6px 10px;font-size:13px}
+.ok{color:#5fd0a0}.bad{color:#e0863c}
+.ed{background:#0c0c12;border:1px solid #1f2a3a;border-radius:8px;padding:12px;font-family:Consolas,monospace;font-size:15px;line-height:1.6;min-height:240px;outline:none}
+.ed .ln{white-space:pre}.cur{background:#5fd0a0;color:#04130c}.cur.ins{background:transparent;border-left:2px solid #5fd0a0}
+.modepill{padding:3px 10px;border-radius:999px;font-weight:800;font-size:12px;background:#2a6cf0}
+.inv{background:#0c0c12;border:1px solid #2a6cf0;border-radius:8px;padding:12px;font-family:Consolas,monospace}
+.inv .big{font-size:22px;font-weight:800;color:#5fd0a0}")
+
+app.add(gui.h1("窓使いの憂鬱 &middot; mayu"))
+app.add(gui.h2("registry key-binding remapper - a DSL compiled into the Windows registry (Win10 / Win11)"))
+app.add(gui.div("tabs",
+    "<button id=\"tb_cfg\" onclick=\"tab('cfg')\">Config &amp; Registry</button>"
+    + "<button id=\"tb_apps\" onclick=\"tab('apps')\">Installed Apps</button>"
+    + "<button id=\"tb_ed\" onclick=\"tab('ed')\">Editor</button>"
+    + "<button id=\"tb_inv\" onclick=\"tab('inv')\">Investigate</button>"))
+
+// --- Config tab ---
+app.add("<div class=\"panel\" id=\"p_cfg\">"
+    + gui.div("bar",
+        "<label>Target OS</label><select id=\"os\" onchange=\"recompile()\"><option value=\"win11\">Windows 11</option><option value=\"win10\">Windows 10</option></select>"
+        + "<button class=\"forge\" onclick=\"recompile()\">&#9889; Compile &amp; Register</button>"
+        + "<button onclick=\"downloadReg()\">&#11015; Export .reg</button>"
+        + "<span id=\"cstat\"></span>")
+    + "<div class=\"cfg2\"><div>" + gui.div("tag", "key-binding script (DSL)")
+    + "<textarea class=\"script\" id=\"script\" oninput=\"recompile()\"></textarea></div>"
+    + "<div>" + gui.div("tag", "Windows Registry  (HKEY_CURRENT_USER\\Software\\Mayu)")
+    + "<div class=\"regtree\" id=\"regtree\"></div>"
+    + gui.div("tag", "exported .reg")
+    + "<div class=\"reg\" id=\"regfile\"></div></div></div></div>")
+
+// --- Installed Apps tab ---
+app.add("<div class=\"panel\" id=\"p_apps\">"
+    + gui.div("tag", "installed Windows applications - target a window by its exe / window class")
+    + "<div style=\"color:#9fb6d6;font-size:12px;margin-bottom:8px\">Click an app to insert an <code>app \"...\" { ... }</code> remap block (shell-script actions: <code>send</code> / <code>exec</code> / <code>type</code>) into the DSL, then Compile &amp; Register.</div>"
+    + "<table id=\"apptbl\" style=\"width:100%;border-collapse:collapse;font-family:Consolas,monospace;font-size:13px\"></table></div>")
+
+// --- Editor tab ---
+app.add("<div class=\"panel\" id=\"p_ed\">"
+    + gui.div("bar", "<label>Application</label><select id=\"app\" onchange=\"setApp(this.value)\"><option>Editor</option><option>Files</option></select>"
+        + "<label>Key map</label><select id=\"style\" onchange=\"setStyle(this.value)\"><option value=\"emacs\">Emacs</option><option value=\"vim\">vim</option></select>"
+        + "<span class=\"modepill\" id=\"modepill\">emacs</span>"
+        + "<span style=\"color:#9fb6d6;font-size:12px\">click the editor, then type - it obeys the registered bindings</span>")
+    + "<div class=\"ed\" id=\"ed\" tabindex=\"0\"></div></div>")
+
+// --- Investigate tab ---
+app.add("<div class=\"panel\" id=\"p_inv\">"
+    + gui.div("tag", "調査キー / investigation - click the editor (Editor tab) or focus here and press a key")
+    + "<div class=\"ed\" id=\"ed2\" tabindex=\"0\" style=\"min-height:60px\">focus me and press a key</div>"
+    + "<div class=\"inv\" style=\"margin-top:10px\"><div class=\"big\" id=\"invchord\">-</div><div id=\"invres\" style=\"color:#9fb6d6\">-</div></div></div>")
+
+let js <- [
+    "var DEFAULT=" + js_str(DEFAULT) + ";",
+    "var CATALOG=" + catalog_js() + ";",
+    "var scopes={}, inherits={}, OSVAL='win11';",
+    // --- DSL parser (mirror of lib/mayucfg.bada) ---
+    "function stripComment(line){var q=false;for(var i=0;i<line.length;i++){var c=line[i];if(c==='\"')q=!q;else if(!q&&c==='#')return line.slice(0,i);else if(!q&&c==='/'&&line[i+1]==='/')return line.slice(0,i);}return line;}",
+    "function subst(s,vars){for(var k in vars)s=s.split('$'+k).join(vars[k]);return s;}",
+    "function actionKind(a){if(a.indexOf('send ')===0)return'send-keys';if(a.indexOf('exec ')===0)return'shell-exec';if(a.indexOf('type ')===0)return'type-text';if(a.indexOf('seq')===0)return'sequence';return'command';}",
+    "function parseMayu(script){var os='win11',vars={},sc={},inh={},meta={},cur='',curapp='',errors=[],n=0;",
+    "  script.split('\\n').forEach(function(raw,idx){var line=stripComment(raw).trim();if(!line)return;",
+    "    if(line==='}'){cur='';curapp='';return;}",
+    "    if(line.indexOf('os ')===0){os=line.slice(3).trim();return;}",
+    "    if(line.indexOf('define ')===0){var b=line.slice(7),eq=b.indexOf('=');if(eq>=0)vars[b.slice(0,eq).trim()]=b.slice(eq+1).trim();return;}",
+    "    if(line.indexOf('app ')===0){var m=line.match(/\"([^\"]*)\"/);var name=m?m[1]:'';cur=name;curapp=name;sc[cur]=sc[cur]||{};meta[name]=meta[name]||{exe:'',cls:'',base:''};return;}",
+    "    if(curapp&&line.indexOf('exe ')===0){meta[curapp].exe=line.slice(4).trim();return;}",
+    "    if(curapp&&line.indexOf('class ')===0){meta[curapp].cls=line.slice(6).trim();return;}",
+    "    if(curapp&&line.indexOf('base ')===0){meta[curapp].base=line.slice(5).trim();return;}",
+    "    if(line.indexOf('keymap ')===0){cur=line.slice(7).replace('{','').trim();sc[cur]=sc[cur]||{};inh[cur]='';return;}",
+    "    if(line.indexOf('window ')===0){var rest=line.slice(7);var m=rest.match(/\"([^\"]*)\"/);var name=m?m[1]:'';var base='';var c=rest.indexOf(':');if(c>=0)base=rest.slice(c+1).replace('{','').trim();cur=name;sc[cur]=sc[cur]||{};inh[cur]=base;return;}",
+    "    if(line.indexOf('key ')===0){var body=subst(line.slice(4).trim(),vars);var ar=body.indexOf('->');if(ar<0){errors.push('line '+(idx+1)+': expected ->');return;}if(!cur){errors.push('line '+(idx+1)+': key outside block');return;}var chord=body.slice(0,ar).trim(),action=body.slice(ar+2).trim();sc[cur][chord]=action;n++;return;}",
+    "    errors.push('line '+(idx+1)+': unknown: '+line);});",
+    "  return {os:os,scopes:sc,inherits:inh,meta:meta,errors:errors,n:n};}",
+    // --- compile -> registry + render ---
+    "function recompile(){var script=document.getElementById('script').value;var r=parseMayu(script);scopes=r.scopes;inherits=r.inherits;META=r.meta;",
+    "  OSVAL=document.getElementById('os').value;",
+    "  var st=document.getElementById('cstat');st.innerHTML=r.errors.length?'<span class=bad>'+r.errors.length+' error(s): '+r.errors[0]+'</span>':'<span class=ok>registered '+r.n+' bindings to HKCU\\\\Software\\\\Mayu\\\\'+OSVAL+'</span>';",
+    "  renderReg();render();if(document.getElementById('apptbl'))renderApps();}",
+    "function regBase(){return 'HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\'+OSVAL;}",
+    "var META={};",
+    "function renderReg(){var tree='';var rf='Windows Registry Editor Version 5.00\\n';",
+    "  Object.keys(scopes).sort().forEach(function(scope){var isApp=!!META[scope];var path=isApp?regBase()+'\\\\apps\\\\'+scope:regBase()+'\\\\'+scope;",
+    "    tree+='<div class=\"k\">['+path+']'+(isApp?' <span style=\"color:#5fd0a0;font-weight:400\">&#9881; installed app</span>':'')+'</div>';rf+='\\n['+path+']\\n';",
+    "    if(isApp){var mt=META[scope];if(mt.exe){tree+='<div class=\"v\">(exe) = <b>'+mt.exe+'</b></div>';rf+='\"(exe)\"=\"'+mt.exe+'\"\\n';}if(mt.cls){tree+='<div class=\"v\">(class) = <b>'+mt.cls+'</b></div>';rf+='\"(class)\"=\"'+mt.cls+'\"\\n';}if(mt.base){tree+='<div class=\"v\">(inherits) = <b>'+mt.base+'</b></div>';rf+='\"(inherits)\"=\"'+mt.base+'\"\\n';}}",
+    "    else if(inherits[scope]){tree+='<div class=\"v\">(inherits) = <b>'+inherits[scope]+'</b></div>';rf+='\"(inherits)\"=\"'+inherits[scope]+'\"\\n';}",
+    "    var m=scopes[scope];for(var ch in m){var kind=isApp?' <span style=\"color:#7a8aa0\">['+actionKind(m[ch])+']</span>':'';tree+='<div class=\"v\">'+ch+' = <b>'+esc(m[ch])+'</b>'+kind+'</div>';rf+='\"'+ch+'\"=\"'+m[ch].replace(/\"/g,'\\\\\"')+'\"\\n';}});",
+    "  document.getElementById('regtree').innerHTML=tree;document.getElementById('regfile').textContent=rf;window._REG=rf;}",
+    "function downloadReg(){var blob=new Blob([window._REG||''],{type:'text/plain'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mayu_'+OSVAL+'.reg';a.click();}",
+    // --- editor (mirror of lib/editor.bada), keymap from compiled registry ---
+    "var curApp='Editor', style='emacs';",
+    "var buf={lines:['hello world','the quick brown fox','edit me - the keys come from the registry'],row:0,col:0,mode:'emacs',kill:'',killline:false};",
+    "function line(){return buf.lines[buf.row];}function clamp(){if(buf.row<0)buf.row=0;if(buf.row>=buf.lines.length)buf.row=buf.lines.length-1;var ll=buf.lines[buf.row].length;if(buf.col<0)buf.col=0;if(buf.col>ll)buf.col=ll;}",
+    "function insert(ch){var l=line();buf.lines[buf.row]=l.slice(0,buf.col)+ch+l.slice(buf.col);buf.col+=ch.length;}",
+    "function newline(){var l=line();buf.lines.splice(buf.row,1,l.slice(0,buf.col),l.slice(buf.col));buf.row++;buf.col=0;}",
+    "function fwd(){var l=line(),i=buf.col;while(i<l.length&&l[i]===' ')i++;while(i<l.length&&l[i]!==' ')i++;buf.col=i;}function bwd(){var l=line(),i=buf.col;if(i>0)i--;while(i>0&&l[i]===' ')i--;while(i>0&&l[i-1]!==' ')i--;buf.col=i;}",
+    "function act(a){if(a==='move-beginning-of-line'||a==='line-start')buf.col=0;else if(a==='move-end-of-line'||a==='line-end')buf.col=line().length;else if(a==='forward-char'||a==='cursor-right')buf.col++;else if(a==='backward-char'||a==='cursor-left')buf.col--;else if(a==='next-line'||a==='cursor-down')buf.row++;else if(a==='previous-line'||a==='cursor-up')buf.row--;else if(a==='forward-word')fwd();else if(a==='backward-word')bwd();else if(a==='delete-char'){var l=line();if(buf.col<l.length)buf.lines[buf.row]=l.slice(0,buf.col)+l.slice(buf.col+1);}else if(a==='kill-line'){var l=line();buf.kill=l.slice(buf.col);buf.killline=false;buf.lines[buf.row]=l.slice(0,buf.col);}else if(a==='delete-line'){buf.kill=line();buf.killline=true;if(buf.lines.length===1)buf.lines[0]='';else buf.lines.splice(buf.row,1);buf.col=0;}else if(a==='yank'||a==='paste'){if(buf.killline){buf.lines.splice(buf.row+1,0,buf.kill);buf.row++;buf.col=0;}else insert(buf.kill);}else if(a==='newline')newline();else if(a==='insert-mode')buf.mode='vim-insert';else if(a==='normal-mode'){buf.mode='vim-normal';if(buf.col>0)buf.col--;}else if(a==='append'){buf.mode='vim-insert';buf.col++;}else if(a==='open-line'){buf.lines.splice(buf.row+1,0,'');buf.row++;buf.col=0;buf.mode='vim-insert';}clamp();}",
+    "function curMode(){return style==='emacs'?'emacs':buf.mode;}",
+    "function binds(app,mode){var base=scopes[mode]||{},win=scopes[app]||{},out={};for(var k in base)out[k]=base[k];for(var k in win)out[k]=win[k];return out;}",
+    "function chordFor(e){var c='';if(e.ctrlKey)c+='C-';if(e.altKey||e.metaKey)c+='M-';var k=e.key;if(k===' ')k='SPC';else if(k==='Enter')k='RET';else if(k==='Escape')k='ESC';else if(k.length>1)k='<'+k+'>';return c+k;}",
+    "var pending='', pendOp='';",
+    "function onKey(e){var mode=curMode();var map=binds(curApp,mode);",
+    "  if(pending==='C-x'){pending='';doChord('C-x '+chordFor(e),map,mode,e);e.preventDefault();return;}",
+    "  var ch=chordFor(e);if(ch==='C-x'){pending='C-x';e.preventDefault();return;}",
+    "  if(mode==='vim-normal'&&pendOp){var two=pendOp+' '+e.key;pendOp='';doChord(two,map,mode,e);e.preventDefault();return;}",
+    "  if(mode==='vim-normal'&&!e.ctrlKey&&(e.key==='d'||e.key==='y'||e.key==='g')){pendOp=e.key;e.preventDefault();return;}",
+    "  doChord(ch,map,mode,e);}",
+    "function doChord(ch,map,mode,e){var action=map[ch];if(action){act(action);render();invShow(ch,action,mode);if(e)e.preventDefault();return;}",
+    "  if((mode==='emacs'||mode==='vim-insert')&&ch.length===1&&ch.indexOf('-')<0){insert(ch);render();invShow(ch,'self-insert-command',mode);if(e)e.preventDefault();return;}",
+    "  invShow(ch,'(unbound)',mode);if((ch.indexOf('C-')===0||ch.indexOf('M-')===0)&&e)e.preventDefault();}",
+    "function invShow(ch,action,mode){var a=document.getElementById('invchord');if(a)a.textContent=ch;var r=document.getElementById('invres');if(r)r.textContent=ch+'  \\u2192  '+action+'   [HKCU\\\\..\\\\'+OSVAL+'\\\\'+curApp+'|'+mode+']';}",
+    "function render(){clamp();var html='';for(var r=0;r<buf.lines.length;r++){var l=buf.lines[r];if(r===buf.row){var c=buf.col,cls='cur'+(buf.mode==='vim-insert'?' ins':''),chr=c<l.length?l[c]:' ';html+='<div class=\"ln\">'+esc(l.slice(0,c))+'<span class=\"'+cls+'\">'+esc(chr)+'</span>'+esc(l.slice(c+1))+'</div>';}else html+='<div class=\"ln\">'+esc(l)+'</div>';}var ed=document.getElementById('ed');if(ed)ed.innerHTML=html;var mp=document.getElementById('modepill');if(mp)mp.textContent=curMode();}",
+    "function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}",
+    "function setApp(a){curApp=a;render();}function setStyle(s){style=s;buf.mode=(s==='vim')?'vim-normal':'emacs';render();}",
+    // --- installed-apps catalog (data from winapps.catalog via Bada) ---
+    "function renderApps(){var h='<tr style=\"text-align:left;color:#e0c060;border-bottom:1px solid #2a3340\"><th style=\"padding:6px\">Application</th><th>exe</th><th>window class</th><th>style</th><th></th></tr>';",
+    "  CATALOG.forEach(function(a){var has=!!META[a.name];h+='<tr style=\"border-bottom:1px solid #161c26\"><td style=\"padding:6px\"><b style=\"color:#cfe9d8\">'+a.name+'</b>'+(has?' <span style=\"color:#5fd0a0\">&#10003; remapped</span>':'')+'</td><td style=\"color:#9fb6d6\">'+a.exe+'</td><td style=\"color:#9fb6d6\">'+a.cls+'</td><td><span class=\"modepill\" style=\"background:'+(a.style==='emacs'?'#2a6cf0':'#3c8c4c')+'\">'+a.style+'</span></td><td><button style=\"width:auto;background:#1f2a3a;padding:4px 10px\" onclick=\"addAppBlock('+CATALOG.indexOf(a)+')\">+ remap</button></td></tr>';});",
+    "  document.getElementById('apptbl').innerHTML=h;}",
+    "function addAppBlock(i){var a=CATALOG[i];var ta=document.getElementById('script');if(scopes[a.name]){tab('cfg');return;}",
+    "  var snd=a.style==='vim'?'  key j -> send Down\\n  key k -> send Up\\n':'  key C-a -> move-beginning-of-line\\n  key C-e -> move-end-of-line\\n';",
+    "  var blk='\\napp \"'+a.name+'\" {\\n  exe '+a.exe+'\\n  class '+a.cls+'\\n  base '+a.style+'\\n'+snd+'  key C-S-e -> exec \"explorer.exe .\"\\n}\\n';",
+    "  ta.value=ta.value.replace(/\\s+$/,'')+'\\n'+blk;recompile();tab('cfg');}",
+    "function tab(n){['cfg','apps','ed','inv'].forEach(function(t){document.getElementById('p_'+t).classList.toggle('on',t===n);document.getElementById('tb_'+t).classList.toggle('on',t===n);});if(n==='ed')document.getElementById('ed').focus();if(n==='apps')renderApps();}",
+    // wiring
+    "document.getElementById('script').value=DEFAULT;",
+    "document.getElementById('ed').addEventListener('keydown',onKey);",
+    "document.getElementById('ed2').addEventListener('keydown',onKey);",
+    "recompile();tab('cfg');"
+]
+app.script(join(js, "\n"))
+
+app.save("mayu.html")
+print "wrote mayu.html"

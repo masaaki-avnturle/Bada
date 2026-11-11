@@ -1,0 +1,63 @@
+// thermography — infrared body heat imaging.
+//
+//   import thermography
+//   let img <- thermography.body(160)
+//
+// A thermal camera maps skin temperature.  The heat field is literally the
+// THERMAL ENTROPY of the gamma manifold (the report's heat-entropy of the
+// gamma operator): warm sources (inflammation, metabolism) raise local
+// entropy.  The field is rendered with the classic "iron" IR palette.
+
+// iron palette: cold black -> purple -> red -> orange -> yellow -> white
+fun iron(v) {
+    let t <- v / 255
+    let r <- 0
+    let g <- 0
+    let b <- 0
+    if t < 0.33 {
+        r <- floor(t / 0.33 * 180)
+        b <- floor(t / 0.33 * 160)
+    } else if t < 0.66 {
+        let u <- (t - 0.33) / 0.33
+        r <- floor(180 + u * 75)
+        b <- floor(160 - u * 160)
+        g <- floor(u * 90)
+    } else {
+        let u <- (t - 0.66) / 0.34
+        r <- 255
+        g <- floor(90 + u * 165)
+        b <- floor(u * 200)
+    }
+    return [r, g, b]
+}
+
+// render a thermal map from gamma-entropy heat sources
+fun render(n, sources) {
+    let heat <- image(n, n, "L", 0)
+    field_project(heat, sources, 30, 120, true)
+    let rgb <- image(n, n, "RGB", 0)
+    let y <- 0
+    while y < n {
+        let x <- 0
+        while x < n {
+            let c <- iron(heat.get(x, y))
+            rgb.set_rgb(x, y, c[0], c[1], c[2])
+            x <- x + 1
+        }
+        y <- y + 1
+    }
+    return rgb
+}
+
+// a torso thermogram: warm core, a hot inflammatory focus, cooler limbs
+fun body(n) {
+    let cx <- n / 2
+    let cy <- n / 2
+    let sources <- [
+        [cx, cy, n * 0.30, 0.8, 2.5],                    // warm trunk core
+        [cx + n * 0.12, cy - n * 0.06, n * 0.07, 1.0, 5.0],  // hot inflammation
+        [cx - n * 0.22, cy + n * 0.10, n * 0.06, 0.4, 2.0],  // cooler limb
+        [cx + n * 0.22, cy + n * 0.10, n * 0.06, 0.4, 2.0]
+    ]
+    return render(n, sources)
+}

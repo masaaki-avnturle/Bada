@@ -1,0 +1,112 @@
+// ============================================================================
+//  YAMAGUCHIHEALTH — integrated health dashboard (Bada GUI)
+//
+//  Branded front-end for the Bada health suite: a live thermometer & infrared
+//  sensor, a vital-signs monitor, medication biofeedback (drugs as
+//  entropy-lowering operators on the gamma manifold) and a blood panel - all
+//  on the report's gamma-manifold thermal-entropy model.  Launcher tiles open
+//  the detailed biofeedback applications.
+//
+//  Run:  ./bada run apps/yamaguchi_health_app.bada   ->  yamaguchi_health.html
+// ============================================================================
+
+import sensors
+import monitor
+import yamaguchi_health as yh
+import labtest
+import gui
+
+let N <- 130
+print "=== YamaguchiHealth ==="
+
+// sensors
+let thermo <- sensors.Thermometer.new()
+let ir <- sensors.Infrared.new(N)
+let ir_img <- ir.thermal_image(sensors.body_sources(N, 1.0))
+let body_temp <- thermo.read_k(4.6)
+
+// vitals strip
+let patient <- monitor.Patient.new()
+let vit <- patient.vitals()
+let vitals_img <- patient.strip(N * 3, 4, 150)
+
+// medication biofeedback summary
+let clinic <- yh.Clinic.new(180, 180)
+clinic.symptom("striatum", 1.0)
+clinic.symptom("vasomotor", 0.85)
+clinic.symptom("gaba_cortex", 0.9)
+let doses <- [["risperidone", 1.0], ["amlodipine", 1.0], ["flunitrazepam", 0.8]]
+let admin <- []
+for d in doses { push(admin, clinic.administer(d[0], d[1])) }
+
+// blood panel
+let lab <- labtest.Analyzer.new()
+lab.measure("glucose", 178)
+lab.measure("crp", 2.2)
+lab.measure("hb", 12.1)
+
+print "rendering dashboard ..."
+let app <- gui.App.new("YamaguchiHealth")
+app.style(gui.dark_theme())
+app.style(".hero{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px}
+.tile2{background:var(--card);border-radius:14px;padding:16px}
+.tval{font-size:40px;font-weight:800;color:#e0a83c}
+.tile2 img{width:100%;border-radius:8px;background:#000}
+.launch{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:10px}
+a.tile{display:block;background:var(--card);border:1px solid #1f2a3a;border-radius:14px;padding:14px;
+  text-decoration:none;color:var(--ink)}a.tile:hover{border-color:var(--accent)}
+a.tile .t{font-weight:800}a.tile .b{font-size:12px;color:var(--muted)}")
+
+app.add(gui.h1("&#129469; YamaguchiHealth"))
+app.add(gui.h2("gamma-manifold thermal-entropy health suite - sensors, vitals, medication biofeedback"))
+
+// hero row: thermometer, infrared, vitals
+app.add("<div class=\"hero\">"
+    + "<div class=\"tile2\"><div class=\"tag\">Thermometer</div>"
+    + "<div class=\"tval\">" + str(body_temp) + "&deg;C</div>"
+    + "<div class=\"tag\">" + thermo.classify(body_temp) + "</div></div>"
+    + "<div class=\"tile2\"><div class=\"tag\">Infrared sensor</div>"
+    + "<img src=\"" + ir_img.data_uri() + "\"></div>"
+    + "<div class=\"tile2\"><div class=\"tag\">Vitals  HR " + str(vit["hr"])
+    + "  SpO2 " + str(vit["spo2"]) + "%  BP " + vit["bp"] + "</div>"
+    + "<img src=\"" + vitals_img.data_uri() + "\"></div>"
+    + "</div>")
+
+// medication biofeedback relief
+let med <- gui.div("name", "Medication biofeedback")
+    + gui.div("tag", "each drug lowers a target region's thermal entropy; relief is fed back")
+for e in admin {
+    med <- med + "<div class=\"row\"><label>" + e["drug"] + "</label>"
+        + gui.meter("m_" + e["drug"], e["relief"], "#5fd0a0")
+        + "<span class=\"val\">" + str(round(e["relief"] * 100, 0)) + "% -> " + e["haptic_region"] + "</span></div>"
+}
+app.add(gui.div("card", med))
+
+// blood panel
+let tbl <- gui.div("name", "Blood panel") + "<table style=\"width:100%;font-size:12px;border-collapse:collapse\">"
+for e in lab.results {
+    let col <- "#5fd0a0"
+    if e["flag"] != "normal" { col <- "#e0863c" }
+    tbl <- tbl + "<tr><td style=\"padding:3px 6px\">" + e["name"] + "</td><td>" + str(e["value"])
+        + " " + e["unit"] + "</td><td style=\"color:" + col + "\">" + e["flag"] + "</td></tr>"
+}
+tbl <- tbl + "</table>"
+app.add(gui.div("card", tbl))
+
+// launcher
+app.add(gui.h2("Applications"))
+let tiles <- [
+    ["Medication Biofeedback", "health_biofeedback.html", "haptic + audio relief by drug"],
+    ["Psychotropic Sound", "psychotropic_gui.html", "binaural-beat drug biofeedback"],
+    ["Medical Workstation", "medical_workstation.html", "18 imaging modalities"],
+    ["Control Hub", "control_hub.html", "integrated control + IR sensor"]
+]
+let launch <- ""
+for t in tiles {
+    launch <- launch + "<a class=\"tile\" href=\"" + t[1] + "\"><div class=\"t\">" + t[0]
+        + "</div><div class=\"b\">" + t[2] + "</div></a>"
+}
+app.add("<div class=\"launch\">" + launch + "</div>")
+
+app.save("yamaguchi_health.html")
+print "wrote yamaguchi_health.html"

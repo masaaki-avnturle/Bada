@@ -1,0 +1,151 @@
+// ============================================================================
+//  PROJECT FORGE — upload a project, complete & auto-fix it (Bada GUI)
+//
+//  Drag in a ZIP, a folder, or individual files (index.html + assets).  The
+//  app reads every file, finds the REQUIRED files that are missing (assets
+//  index.html references, plus standard scaffolding), auto-GENERATES them,
+//  auto-FIXES each file by restoring its bracket/quote invariants (the same
+//  integrable-system correction as Bada Forge), shows the file tree with
+//  status, and lets you download the completed project as a new ZIP.
+//
+//  The browser logic mirrors the Bada `project` engine (lib/project.bada),
+//  which does the same from the CLI via zip_read / zip_write / read_tree.
+//
+//  Run:  ./bada run apps/project_forge.bada   ->  project_forge.html
+// ============================================================================
+
+import gui
+
+let app <- gui.App.new("Bada Project Forge")
+app.style(gui.dark_theme())
+app.style(".drop{border:2px dashed #33405a;border-radius:14px;padding:34px;text-align:center;
+  color:var(--muted);background:#0c121d;cursor:pointer}
+.drop.over{border-color:var(--accent);color:var(--ink)}
+.bar2{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.tree{background:#0c121d;border-radius:10px;padding:10px;font-family:monospace;font-size:13px}
+.frow{display:flex;align-items:center;gap:10px;padding:4px 6px;border-bottom:1px solid #141b27;cursor:pointer}
+.frow:hover{background:#141b27}
+.badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px}
+.OK{background:#24472f;color:#5fd0a0}.FIXED{background:#4a3d1a;color:#e0c060}
+.NEW{background:#1a3350;color:#6aa0e0}
+.fname{flex:1}.code{white-space:pre-wrap;font-family:monospace;font-size:12px;
+  background:#0c121d;border-radius:8px;padding:10px;max-height:300px;overflow:auto;color:#cfe9d8}
+.stat{font-size:13px;color:var(--muted);margin:8px 0}")
+
+app.add(gui.h1("&#128230; Bada Project Forge"))
+app.add(gui.h2("upload a ZIP / folder / files - missing files are generated, broken files auto-fixed"))
+
+app.add("<div class=\"drop\" id=\"drop\">Drop a <b>.zip</b>, a folder, or files here &mdash; or use the buttons below<br><small>index.html and its referenced assets are analysed</small></div>")
+
+app.add("<div class=\"bar2\">"
+    + "<button onclick=\"document.getElementById('zipf').click()\">Choose .zip</button>"
+    + "<button onclick=\"document.getElementById('dirf').click()\">Choose folder</button>"
+    + "<button onclick=\"document.getElementById('filf').click()\">Choose files</button>"
+    + "<button class=\"forge\" onclick=\"forge()\">&#9889; Complete &amp; fix</button>"
+    + "<button id=\"dl\" onclick=\"download()\" disabled>&#11015; Download completed .zip</button>"
+    + "<input id=\"zipf\" type=\"file\" accept=\".zip\" style=\"display:none\" onchange=\"loadZip(this.files[0])\">"
+    + "<input id=\"dirf\" type=\"file\" webkitdirectory multiple style=\"display:none\" onchange=\"loadFiles(this.files)\">"
+    + "<input id=\"filf\" type=\"file\" multiple style=\"display:none\" onchange=\"loadFiles(this.files)\">"
+    + "</div>")
+
+app.add("<div class=\"stat\" id=\"stat\">no project loaded</div>")
+app.add("<div class=\"cols\"><div><div class=\"tag\">project files</div>"
+    + "<div class=\"tree\" id=\"tree\"></div></div>"
+    + "<div><div class=\"tag\" id=\"selname\">select a file</div>"
+    + "<div class=\"code\" id=\"code\"></div></div></div>")
+app.add(gui.div("tag", "forge log"))
+app.add("<div class=\"log\" id=\"log\" style=\"font-size:12px;color:#9fb6d6;background:#0c121d;border-radius:8px;padding:10px;min-height:40px\"></div>")
+
+// ---- JS: file loading, the project engine (mirrors lib/project.bada), zip --
+
+let js <- [
+    "var PROJECT={}, STATUS={};",
+    // --- CRC32 for zip writing ---
+    "var CRC=(function(){var t=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();",
+    "function crc32(b){var c=0xFFFFFFFF;for(var i=0;i<b.length;i++)c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}",
+    // --- read uploaded loose files / folder ---
+    "function loadFiles(list){ PROJECT={}; var arr=Array.from(list); var left=arr.length; if(!left)return;",
+    "  arr.forEach(function(f){ var r=new FileReader(); r.onload=function(){ var nm=f.webkitRelativePath||f.name; nm=nm.replace(/^[^/]+\\//,''); PROJECT[nm]=r.result; if(--left===0) loaded(); }; r.readAsText(f); }); }",
+    // --- read uploaded zip ---
+    "async function loadZip(f){ if(!f)return; var ab=await f.arrayBuffer(); PROJECT=await readZip(ab); loaded(); }",
+    "async function readZip(ab){ var dv=new DataView(ab),u8=new Uint8Array(ab),eo=-1;",
+    "  for(var i=u8.length-22;i>=0;i--){ if(dv.getUint32(i,true)===0x06054b50){eo=i;break;} } if(eo<0)throw 'bad zip';",
+    "  var cnt=dv.getUint16(eo+10,true), off=dv.getUint32(eo+16,true), files={}, dec=new TextDecoder();",
+    "  for(var n=0;n<cnt;n++){ if(dv.getUint32(off,true)!==0x02014b50)break;",
+    "    var method=dv.getUint16(off+10,true), csize=dv.getUint32(off+20,true);",
+    "    var nl=dv.getUint16(off+28,true), el=dv.getUint16(off+30,true), cl=dv.getUint16(off+32,true);",
+    "    var lho=dv.getUint32(off+42,true), name=dec.decode(u8.subarray(off+46,off+46+nl));",
+    "    var lnl=dv.getUint16(lho+26,true), lel=dv.getUint16(lho+28,true), ds=lho+30+lnl+lel;",
+    "    var comp=u8.subarray(ds,ds+csize), content='';",
+    "    if(method===0){ content=dec.decode(comp); }",
+    "    else if(method===8){ var s=new Blob([comp]).stream().pipeThrough(new DecompressionStream('deflate-raw')); content=dec.decode(await new Response(s).arrayBuffer()); }",
+    "    if(!name.endsWith('/')) files[name]=content;",
+    "    off+=46+nl+el+cl; } return files; }",
+    "function loaded(){ STATUS={}; for(var k in PROJECT) STATUS[k]='OK'; render(); setStat(Object.keys(PROJECT).length+' files loaded - click Complete & fix'); }",
+    // --- the project engine (mirror of lib/project.bada) ---
+    "function invariants(s){ var p=0,sq=0,br=0,inStr=false,q='';",
+    "  for(var i=0;i<s.length;i++){ var c=s[i];",
+    "   if(inStr){ if(c==='\\\\'){i++;} else if(c===q)inStr=false; }",
+    "   else if(c==='\"'||c===\"'\"){inStr=true;q=c;}",
+    "   else if(c==='('){p++;}else if(c===')'){p--;}else if(c==='['){sq++;}else if(c===']'){sq--;}else if(c==='{'){br++;}else if(c==='}'){br--;} }",
+    "  return {p:p,sq:sq,br:br,open:inStr}; }",
+    "function defect(s){var v=invariants(s);return Math.abs(v.p)+Math.abs(v.sq)+Math.abs(v.br)+(v.open?1:0);}",
+    "function fixBrackets(s){ var st=0; while(defect(s)>0&&st<12){ var v=invariants(s);",
+    "   if(v.open)s+='\"'; if(v.p>0)s+=')'.repeat(v.p); else if(v.p<0)s='('.repeat(-v.p)+s;",
+    "   if(v.sq>0)s+=']'.repeat(v.sq); else if(v.sq<0)s='['.repeat(-v.sq)+s;",
+    "   if(v.br>0)s+='}'.repeat(v.br); else if(v.br<0)s='{'.repeat(-v.br)+s; st++; } return s; }",
+    "function refs(html){ var out=[],re=/(?:href|src)\\s*=\\s*[\"']([^\"'#]+)[\"']/ig,m;",
+    "  while((m=re.exec(html))){ var p=m[1]; if(!/^(https?:|\\/\\/|data:)/.test(p)&&p) out.push(p); } return out; }",
+    "function genFor(n){ if(n.endsWith('.css'))return genCss(); if(n.endsWith('.js'))return genJs(n);",
+    "  if(n.endsWith('.html'))return genHtml(n); if(n.endsWith('.json'))return '{\\n  \"name\": \"'+n+'\"\\n}\\n';",
+    "  if(n.endsWith('.md'))return '# '+n+'\\n\\nGenerated by Bada Project Forge.\\n'; return '/* '+n+' */\\n'; }",
+    "function genCss(){return '/* generated stylesheet */\\n*{box-sizing:border-box}\\nbody{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#0a0e16;color:#e8eef7}\\nh1{color:#c8a44a}\\n';}",
+    "function genJs(n){return '// generated script: '+n+'\\ndocument.addEventListener(\"DOMContentLoaded\",function(){\\n  console.log(\"'+n+' loaded\");\\n});\\n';}",
+    "function genHtml(n){return '<!DOCTYPE html>\\n<html lang=\"en\">\\n<head>\\n<meta charset=\"utf-8\">\\n<title>'+n+'</title>\\n<link rel=\"stylesheet\" href=\"style.css\">\\n</head>\\n<body>\\n<h1>'+n+'</h1>\\n<script src=\"script.js\"></scr'+'ipt>\\n</body>\\n</html>\\n';}",
+    "function forge(){ var log=[];",
+    "  var hasIndex=Object.keys(PROJECT).some(function(k){return k.endsWith('index.html');});",
+    "  if(!hasIndex){ PROJECT['index.html']=genHtml('index.html'); STATUS['index.html']='NEW'; log.push('GENERATED index.html (entry point missing)'); }",
+    "  var required={};",
+    "  for(var k in PROJECT){ if(k.endsWith('.html')) refs(PROJECT[k]).forEach(function(a){required[a]=1;}); }",
+    "  for(var a in required){ if(!(a in PROJECT)){ PROJECT[a]=genFor(a); STATUS[a]='NEW'; log.push('GENERATED '+a+' (referenced but missing)'); } }",
+    "  [['style.css',genCss()],['script.js',genJs('script.js')],['README.md','# Project\\n\\nCompleted by Bada Project Forge.\\n']].forEach(function(p){ if(!(p[0] in PROJECT)){ PROJECT[p[0]]=p[1]; STATUS[p[0]]='NEW'; log.push('GENERATED '+p[0]); } });",
+    "  for(var k in PROJECT){ if(/\\.(html|css|js)$/.test(k)){ var b=defect(PROJECT[k]); if(b>0){ PROJECT[k]=fixBrackets(PROJECT[k]); if(STATUS[k]!=='NEW')STATUS[k]='FIXED'; log.push('FIXED '+k+' (defect '+b+' -> '+defect(PROJECT[k])+')'); } } }",
+    "  render(); var L=document.getElementById('log'); L.innerHTML=''; log.forEach(function(l){var d=document.createElement('div');d.textContent='\\u2192 '+l;L.appendChild(d);});",
+    "  if(!log.length){var d=document.createElement('div');d.textContent='\\u2192 project already complete and valid';L.appendChild(d);}",
+    "  document.getElementById('dl').disabled=false; setStat(Object.keys(PROJECT).length+' files - '+log.length+' actions'); }",
+    "function render(){ var t=document.getElementById('tree'); t.innerHTML='';",
+    "  Object.keys(PROJECT).sort().forEach(function(k){ var st=STATUS[k]||'OK';",
+    "   var row=document.createElement('div'); row.className='frow';",
+    "   row.innerHTML='<span class=\"badge '+st+'\">'+st+'</span><span class=\"fname\">'+k+'</span>';",
+    "   row.onclick=function(){ document.getElementById('selname').textContent=k; document.getElementById('code').textContent=PROJECT[k]; };",
+    "   t.appendChild(row); }); }",
+    "function setStat(s){ document.getElementById('stat').textContent=s; }",
+    // --- build & download a stored zip ---
+    "function makeZip(files){ var enc=new TextEncoder(),parts=[],central=[],off=0;",
+    "  for(var name in files){ var data=enc.encode(files[name]),crc=crc32(data),nb=enc.encode(name);",
+    "   var lh=new Uint8Array(30+nb.length),dv=new DataView(lh.buffer);",
+    "   dv.setUint32(0,0x04034b50,true);dv.setUint16(4,20,true);dv.setUint32(14,crc,true);",
+    "   dv.setUint32(18,data.length,true);dv.setUint32(22,data.length,true);dv.setUint16(26,nb.length,true);",
+    "   lh.set(nb,30); parts.push(lh,data);",
+    "   var ce=new Uint8Array(46+nb.length),cv=new DataView(ce.buffer);",
+    "   cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);",
+    "   cv.setUint32(16,crc,true);cv.setUint32(20,data.length,true);cv.setUint32(24,data.length,true);",
+    "   cv.setUint16(28,nb.length,true);cv.setUint32(42,off,true);ce.set(nb,46); central.push(ce);",
+    "   off+=lh.length+data.length; }",
+    "  var cd=central.reduce(function(a,b){return a+b.length;},0);",
+    "  var eo=new Uint8Array(22),ev=new DataView(eo.buffer); ev.setUint32(0,0x06054b50,true);",
+    "  ev.setUint16(8,central.length,true);ev.setUint16(10,central.length,true);ev.setUint32(12,cd,true);ev.setUint32(16,off,true);",
+    "  return new Blob(parts.concat(central,[eo]),{type:'application/zip'}); }",
+    "function download(){ var blob=makeZip(PROJECT),a=document.createElement('a');",
+    "  a.href=URL.createObjectURL(blob); a.download='forged_project.zip'; a.click(); }",
+    // --- drag & drop ---
+    "var dz=document.getElementById('drop');",
+    "dz.ondragover=function(e){e.preventDefault();dz.classList.add('over');};",
+    "dz.ondragleave=function(){dz.classList.remove('over');};",
+    "dz.ondrop=function(e){ e.preventDefault(); dz.classList.remove('over'); var f=e.dataTransfer.files;",
+    "  if(f.length===1&&f[0].name.endsWith('.zip')) loadZip(f[0]); else loadFiles(f); };"
+]
+app.script(join(js, "\n"))
+
+app.save("project_forge.html")
+print "wrote project_forge.html"

@@ -1,0 +1,226 @@
+// ============================================================================
+//  PSYCHOTROPIC BIOFEEDBACK — GUI application (Bada)
+//
+//  An interactive GUI for the psychotropic auditory-biofeedback engine.
+//  Bada computes the pharmacology model (each drug's target EEG band, carrier
+//  pitch and gamma-manifold entropy "relief") and emits a self-contained
+//  HTML5 app.  In the browser the Web Audio API synthesises the BINAURAL BEAT
+//  live, so moving a dose slider changes the sound in real time.
+//
+//  Outputs:
+//    psychotropic_gui.html   — the interactive GUI (open in a browser)
+//    psychotropic_gui_preview.png — a static preview of the GUI
+//
+//  Run:  ./bada run apps/psychotropic_gui.bada
+// ============================================================================
+
+import psychotropic as ps
+import audio
+import gui
+import imaging
+
+// ---- band colours ---------------------------------------------------------
+
+fun band_color(b) {
+    if b == "delta" { return "#6a5acd" }
+    if b == "theta" { return "#4a80d0" }
+    if b == "alpha" { return "#40b8c0" }
+    if b == "beta"  { return "#c8a44a" }
+    return "#d06a6a"
+}
+fun band_rgb(b) {
+    if b == "delta" { return [106, 90, 205] }
+    if b == "theta" { return [74, 128, 208] }
+    if b == "alpha" { return [64, 184, 192] }
+    if b == "beta"  { return [200, 164, 74] }
+    return [208, 106, 106]
+}
+
+let clinic <- ps.SoundClinic.new()
+let order <- ["risperidone", "olanzapine", "asenapine", "flunitrazepam",
+              "flunitrazepam_silece", "etizolam", "depas", "brotizolam",
+              "ssri", "snri"]
+
+print "=== Psychotropic Biofeedback GUI generator ==="
+
+// ---- build the HTML GUI ---------------------------------------------------
+
+let app <- gui.App.new("Psychotropic Biofeedback")
+app.style(gui.dark_theme())
+
+app.add(gui.h1("向精神薬 バイオフィードバック / Psychotropic Sound Biofeedback"))
+app.add(gui.h2("drug = EEG-band entrainment operator on the gamma manifold — "
+    + "live binaural beats via Web Audio"))
+
+// master volume + legend
+app.add(gui.div("master",
+    "<label>Master volume</label> "
+    + gui.slider("master", 0, 100, 1, 55, "")
+    + " &nbsp; <button class=\"stop\" onclick=\"stopAll()\">■ Stop all</button>"))
+
+let legend <- ""
+let bands <- ["delta", "theta", "alpha", "beta"]
+let bi <- 0
+while bi < len(bands) {
+    let bn <- bands[bi]
+    legend <- legend + "<span><span class=\"dot\" style=\"background:"
+        + band_color(bn) + "\"></span>" + upper(bn) + " "
+        + str(audio.band_beat(bn)) + "Hz</span>"
+    bi <- bi + 1
+}
+app.add(gui.div("legend", legend))
+
+// build the drug cards + the JS drug data array
+let cards <- ""
+let djson <- "["
+let i <- 0
+while i < len(order) {
+    let key <- order[i]
+    let d <- clinic.drugs[key]
+    let band <- d["band"]
+    let beat <- audio.band_beat(band)
+    let relief <- clinic.relief_of(d, 1.0)
+    let col <- band_color(band)
+    let si <- str(i)
+
+    let card <- gui.div("name", d["label"])
+        + gui.div("cls", d["class"])
+        + "<span class=\"band\" style=\"background:" + col + "\">"
+        + upper(band) + " " + str(beat) + "Hz</span>"
+        + "<div class=\"row\"><label>Dose</label>"
+        + gui.slider("dose" + si, 0, 100, 1, 100, "setDose(" + si + ")")
+        + "<span class=\"val\" id=\"rd" + si + "\">100%</span></div>"
+        + "<div class=\"row\"><label>Relief</label>"
+        + gui.meter("relief" + si, relief, col) + "</div>"
+        + gui.button("pb" + si, "&#9658; Play", "toggle(" + si + ")")
+    cards <- cards + gui.div("card", card)
+
+    if i > 0 { djson <- djson + "," }
+    djson <- djson + "{key:'" + key + "',band:'" + band + "',carrier:"
+        + str(d["carrier"]) + ",beat:" + str(beat) + ",relief:"
+        + str(round(relief, 3)) + "}"
+    i <- i + 1
+}
+djson <- djson + "]"
+app.add(gui.div("grid", cards))
+
+// ---- the Web Audio engine (JavaScript) -----------------------------------
+
+let js <- [
+    "var drugs = " + djson + ";",
+    "var ctx=null, nodes=[], playing=-1;",
+    "function ac(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); return ctx; }",
+    "function masterVol(){ return document.getElementById('master').value/100; }",
+    "function stopAll(){ nodes.forEach(function(n){try{n.stop()}catch(e){}}); nodes=[];",
+    "  for(var j=0;j<drugs.length;j++){var b=document.getElementById('pb'+j); if(b) b.innerHTML='&#9658; Play';}",
+    "  playing=-1; }",
+    "function toggle(i){ if(playing===i){ stopAll(); } else { play(i); } }",
+    "function play(i){",
+    "  stopAll();",
+    "  var c=ac(); var d=drugs[i];",
+    "  var dose=document.getElementById('dose'+i).value/100;",
+    "  var merger=c.createChannelMerger(2);",
+    "  var gL=c.createGain(), gR=c.createGain();",
+    "  gL.connect(merger,0,0); gR.connect(merger,0,1);",
+    "  var master=c.createGain(); master.gain.value=masterVol();",
+    "  merger.connect(master); master.connect(c.destination);",
+    "  var oL=c.createOscillator(), oR=c.createOscillator();",
+    "  oL.type='sine'; oR.type='sine';",
+    "  oL.frequency.value=d.carrier; oR.frequency.value=d.carrier+d.beat;",
+    "  oL.connect(gL); oR.connect(gR);",
+    "  var vol=0.28*dose; gL.gain.value=vol; gR.gain.value=vol;",
+    "  var w=c.createOscillator(); w.type='sine'; w.frequency.value=d.carrier/2;",
+    "  var wg=c.createGain(); wg.gain.value=0.18*d.relief*dose; w.connect(wg); wg.connect(master);",
+    "  var lfo=c.createOscillator(); lfo.frequency.value=d.beat/10;",
+    "  var lg=c.createGain(); lg.gain.value=0.4*master.gain.value; lfo.connect(lg); lg.connect(master.gain);",
+    "  oL.start(); oR.start(); w.start(); lfo.start();",
+    "  nodes=[oL,oR,w,lfo]; playing=i;",
+    "  document.getElementById('pb'+i).innerHTML='&#9632; Stop';",
+    "}",
+    "function setDose(i){",
+    "  var dose=document.getElementById('dose'+i).value/100;",
+    "  document.getElementById('rd'+i).textContent=Math.round(dose*100)+'%';",
+    "  document.getElementById('relief'+i).style.width=Math.round(drugs[i].relief*dose*100)+'%';",
+    "  if(playing===i){ play(i); }",
+    "}"
+]
+app.script(join(js, "\n"))
+
+let html_path <- app.save("psychotropic_gui.html")
+print "wrote", html_path, "(" + str(len(read_file(html_path))) + " bytes)"
+
+// ---- static PNG preview of the GUI (for quick viewing) -------------------
+
+print "rendering GUI preview image ..."
+let W <- 760
+let H <- 520
+let cv <- image(W, H, "RGB", 0)
+// background
+let yy <- 0
+while yy < H {
+    let xx <- 0
+    while xx < W {
+        cv.set_rgb(xx, yy, 10, 14, 22)
+        xx <- xx + 1
+    }
+    yy <- yy + 1
+}
+text_draw_rgb(cv, 20, 18, "PSYCHOTROPIC BIOFEEDBACK", 232, 238, 247, 3)
+text_draw_rgb(cv, 20, 48, "DRUG = EEG-BAND ENTRAINMENT ON THE GAMMA MANIFOLD", 138, 160, 189, 1)
+
+// draw a card grid (5 cols x 2 rows)
+fun fill_rect(img, x0, y0, x1, y1, r, g, b) {
+    let y <- y0
+    while y <= y1 {
+        let x <- x0
+        while x <= x1 {
+            img.set_rgb(x, y, r, g, b)
+            x <- x + 1
+        }
+        y <- y + 1
+    }
+}
+
+let cols <- 5
+let cw <- 140
+let chh <- 200
+let gap <- 8
+let ox <- 20
+let oy <- 72
+let k <- 0
+while k < len(order) {
+    let key <- order[k]
+    let d <- clinic.drugs[key]
+    let band <- d["band"]
+    let relief <- clinic.relief_of(d, 1.0)
+    let rc <- band_rgb(band)
+    let cxx <- ox + (k % cols) * (cw + gap)
+    let cyy <- oy + floor(k / cols) * (chh + gap)
+    // card bg
+    fill_rect(cv, cxx, cyy, cxx + cw - 1, cyy + chh - 1, 32, 43, 62)
+    // band colour header strip
+    fill_rect(cv, cxx, cyy, cxx + cw - 1, cyy + 10, rc[0], rc[1], rc[2])
+    // drug key (uppercased ascii)
+    text_draw_rgb(cv, cxx + 8, cyy + 22, key, 235, 241, 250, 1)
+    // band label
+    text_draw_rgb(cv, cxx + 8, cyy + 42, upper(band), rc[0], rc[1], rc[2], 2)
+    // relief meter
+    text_draw_rgb(cv, cxx + 8, cyy + 72, "RELIEF", 150, 172, 200, 1)
+    fill_rect(cv, cxx + 8, cyy + 86, cxx + cw - 10, cyy + 100, 16, 24, 38)
+    let mw <- floor((cw - 18) * relief)
+    fill_rect(cv, cxx + 8, cyy + 86, cxx + 8 + mw, cyy + 100, rc[0], rc[1], rc[2])
+    text_draw_rgb(cv, cxx + 8, cyy + 108, str(floor(relief * 100)) + "%", 235, 241, 250, 2)
+    // dose slider (drawn full)
+    text_draw_rgb(cv, cxx + 8, cyy + 138, "DOSE 100%", 150, 172, 200, 1)
+    fill_rect(cv, cxx + 8, cyy + 152, cxx + cw - 10, cyy + 158, 60, 74, 100)
+    fill_rect(cv, cxx + cw - 20, cyy + 148, cxx + cw - 12, cyy + 162, 120, 170, 240)
+    // play button
+    fill_rect(cv, cxx + 8, cyy + 170, cxx + cw - 10, cyy + 192, 74, 128, 208)
+    text_draw_rgb(cv, cxx + 42, cyy + 178, "PLAY", 255, 255, 255, 1)
+    k <- k + 1
+}
+cv.save("psychotropic_gui_preview.ppm")
+print "wrote psychotropic_gui_preview.ppm"
+print ""
+print "done. open psychotropic_gui.html in a browser and press Play"
+print "(use stereo headphones for the binaural-beat effect)."

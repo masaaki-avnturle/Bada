@@ -1,0 +1,89 @@
+// haptic — tactile (touch) feedback rendering for Bada biofeedback apps.
+//
+//   import haptic
+//   let a <- haptic.Actuator.new("chest", x, y)
+//   a.soothe(intensity)        // emit a calming touch pattern
+//
+// A haptic actuator turns a scalar "relief" signal into a TACTILE WAVEFORM —
+// the vibration amplitude envelope a body-worn actuator would play on the
+// target region.  "Soothing / relief" touch is rendered as a slow, smooth,
+// low-frequency swell (think a calm breathing pulse, ~0.2 Hz), in contrast to
+// an "alert" buzz (fast, sharp).  These envelopes can be plotted, saved, or
+// fed to real hardware.
+
+import imaging
+
+// soothing envelope: slow rise-and-fall swell at `relief` strength.
+// relief in [0,1]; returns a list of amplitude samples in [0,1].
+fun soothe_wave(relief, duration, rate) {
+    let n <- floor(duration * rate)
+    let out <- []
+    let i <- 0
+    let breaths <- 0.2          // calming pulse ~0.2 Hz (12 / min)
+    while i < n {
+        let t <- i / rate
+        // smooth raised-cosine swell, gently amplitude-modulated
+        let swell <- (1 - cos(2 * PI * breaths * t)) / 2
+        let carrier <- (1 + sin(2 * PI * 30 * t)) / 2   // 30 Hz gentle hum
+        push(out, relief * swell * (0.6 + 0.4 * carrier))
+        i <- i + 1
+    }
+    return out
+}
+
+// alerting envelope: fast sharp buzz (for contrast / warnings)
+fun alert_wave(intensity, duration, rate) {
+    let n <- floor(duration * rate)
+    let out <- []
+    let i <- 0
+    while i < n {
+        let t <- i / rate
+        let buzz <- (1 + sin(2 * PI * 120 * t)) / 2
+        let pulse <- 0
+        if (floor(t * 6) % 2) == 0 { pulse <- 1 }
+        push(out, intensity * buzz * pulse)
+        i <- i + 1
+    }
+    return out
+}
+
+// ---- a haptic actuator bound to a body region ----------------------------
+
+class Actuator {
+    field region          // body-part label, e.g. "chest", "left_temple"
+    field x               // location on a body map (for visualisation)
+    field y
+    field last <- []      // last rendered waveform
+    field last_intensity <- 0
+
+    method init(region, x, y) {
+        self.region <- region
+        self.x <- x
+        self.y <- y
+    }
+
+    // emit a soothing "relief" touch at the given intensity in [0,1]
+    method soothe(intensity, duration, rate) {
+        self.last_intensity <- intensity
+        self.last <- soothe_wave(intensity, duration, rate)
+        return self.last
+    }
+
+    method alert(intensity, duration, rate) {
+        self.last_intensity <- intensity
+        self.last <- alert_wave(intensity, duration, rate)
+        return self.last
+    }
+
+    // mean amplitude actually delivered (a simple dose-delivered readout)
+    method delivered() {
+        if len(self.last) == 0 { return 0 }
+        let s <- 0
+        for v in self.last { s <- s + v }
+        return s / len(self.last)
+    }
+
+    method describe() {
+        return "haptic[" + self.region + "] intensity=" + str(self.last_intensity)
+    }
+}

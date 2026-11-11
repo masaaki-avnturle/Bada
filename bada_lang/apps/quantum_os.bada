@@ -1,0 +1,116 @@
+// ============================================================================
+//  BADA QUANTUM OS — a software quantum-computer operating system (Bada GUI)
+//
+//  Realises a quantum computer in software: a multi-qubit state-vector CPU,
+//  a kernel that schedules quantum "processes", and a desktop that runs
+//  quantum ALGORITHMS live in the browser (a JS mirror of the native engine
+//  qsim.py / lib/qalgo.bada).  Framed by quantum_computer4: gates are unitary
+//  Schrodinger ticks of H|Psi> = (+)(i hbar grad)^(+)L; measurement collapses
+//  the state.
+//
+//  Run:  ./bada run apps/quantum_os.bada   ->  quantum_os.html
+// ============================================================================
+
+import qos
+import gui
+
+print "=== Bada Quantum OS ==="
+
+// helper: escape a multi-line string for embedding in a JS single-quoted literal
+fun js_str(s) {
+    let out <- replace(replace(s, "\\", "\\\\"), "\n", "\\n")
+    return "'" + replace(out, "'", "\\'") + "'"
+}
+
+let k <- qos.Kernel.new()
+k.boot()
+let boot_log <- ""
+for l in k.log { boot_log <- boot_log + l + "\n" }
+
+let app <- gui.App.new("Bada Quantum OS")
+app.style(gui.dark_theme())
+app.style(".os{display:grid;grid-template-columns:300px 1fr;gap:18px}
+.console{background:#05080d;border:1px solid #1f2a3a;border-radius:10px;padding:12px;
+  font-family:monospace;font-size:12px;color:#7fe0a0;height:430px;overflow:auto;white-space:pre-wrap}
+.apps button{width:auto;margin:4px;background:#1f2a3a}.apps button:hover{background:var(--accent)}
+canvas{background:#05080d;border-radius:10px;width:100%}
+.res{font-size:22px;font-weight:800;color:#5fd0a0;margin:8px 0}
+.amp{font-family:monospace;font-size:12px;color:#9fe0b0}
+input[type=number]{width:60px;background:#0c121d;color:#e8eef7;border:1px solid #1f2a3a;border-radius:6px;padding:4px}")
+
+app.add(gui.h1("&#9883; Bada Quantum OS"))
+app.add(gui.h2("software quantum computer - state-vector CPU, kernel & quantum algorithms"))
+
+app.add("<div class=\"os\">"
+    + "<div><div class=\"tag\">kernel console</div><div class=\"console\" id=\"con\"></div></div>"
+    + "<div><div class=\"apps\">"
+    + "<button onclick=\"runp('bell')\">Bell</button>"
+    + "<button onclick=\"runp('ghz')\">GHZ</button>"
+    + "<button onclick=\"runp('grover')\">Grover</button>"
+    + "<button onclick=\"runp('dj')\">Deutsch-Jozsa</button>"
+    + "<button onclick=\"runp('bv')\">Bernstein-Vazirani</button>"
+    + "<button onclick=\"runp('qft')\">QFT</button>"
+    + "<br><label>qubits</label> <input type=number id=\"nq\" value=\"3\" min=\"2\" max=\"5\">"
+    + " <label>target/secret</label> <input type=number id=\"arg\" value=\"5\" min=\"0\">"
+    + "</div>"
+    + "<div class=\"res\" id=\"res\">select a program</div>"
+    + "<canvas id=\"hist\" width=\"560\" height=\"240\"></canvas>"
+    + "<div class=\"amp\" id=\"amp\"></div></div></div>")
+
+let js <- [
+    "var BOOT=" + js_str(boot_log) + ";",
+    "var con=document.getElementById('con'); con.textContent=BOOT; var pid=0;",
+    "function klog(s){ con.textContent+=s+'\\n'; con.scrollTop=con.scrollHeight; }",
+    // --- state-vector engine (mirror of qsim.py) ---
+    "function QReg(n){ this.n=n; this.N=1<<n; this.re=new Float64Array(this.N); this.im=new Float64Array(this.N); this.re[0]=1; }",
+    "var S2=1/Math.SQRT2; var G={H:[S2,0,S2,0,S2,0,-S2,0],X:[0,0,1,0,1,0,0,0],Z:[1,0,0,0,0,0,-1,0]};",
+    "function ap1(q,m,t){ var bit=1<<t; for(var i=0;i<q.N;i++){ if(i&bit)continue; var j=i|bit;",
+    "  var ar=q.re[i],ai=q.im[i],br=q.re[j],bi=q.im[j];",
+    "  q.re[i]=m[0]*ar-m[1]*ai+m[2]*br-m[3]*bi; q.im[i]=m[0]*ai+m[1]*ar+m[2]*bi+m[3]*br;",
+    "  q.re[j]=m[4]*ar-m[5]*ai+m[6]*br-m[7]*bi; q.im[j]=m[4]*ai+m[5]*ar+m[6]*bi+m[7]*br; } }",
+    "function apc(q,m,c,t){ var cb=1<<c,tb=1<<t; for(var i=0;i<q.N;i++){ if((i&tb)||!(i&cb))continue; var j=i|tb;",
+    "  var ar=q.re[i],ai=q.im[i],br=q.re[j],bi=q.im[j];",
+    "  q.re[i]=m[0]*ar-m[1]*ai+m[2]*br-m[3]*bi; q.im[i]=m[0]*ai+m[1]*ar+m[2]*bi+m[3]*br;",
+    "  q.re[j]=m[4]*ar-m[5]*ai+m[6]*br-m[7]*bi; q.im[j]=m[4]*ai+m[5]*ar+m[6]*bi+m[7]*br; } }",
+    "function pflip(q,i){ q.re[i]=-q.re[i]; q.im[i]=-q.im[i]; }",
+    "function hall(q){ for(var i=0;i<q.n;i++)ap1(q,G.H,i); }",
+    "function popc(x){var c=0;while(x){c+=x&1;x>>=1;}return c;}",
+    // --- algorithms ---
+    "function bell(){var q=new QReg(2);ap1(q,G.H,0);apc(q,G.X,0,1);return q;}",
+    "function ghz(n){var q=new QReg(n);ap1(q,G.H,0);for(var i=0;i<n-1;i++)apc(q,G.X,i,i+1);return q;}",
+    "function grover(n,t){var q=new QReg(n);hall(q);var it=Math.max(1,Math.floor(Math.PI/4*Math.sqrt(1<<n)));",
+    "  for(var k=0;k<it;k++){ pflip(q,t); hall(q); for(var i=0;i<n;i++)ap1(q,G.X,i); pflip(q,(1<<n)-1); for(i=0;i<n;i++)ap1(q,G.X,i); hall(q); } return q;}",
+    "function bv(n,s){var q=new QReg(n);hall(q);for(var i=0;i<(1<<n);i++){ if(popc(i&s)%2)pflip(q,i);} hall(q);return q;}",
+    "function dj(n,bal){var q=new QReg(n);hall(q);if(bal){for(var i=0;i<(1<<n);i++)if(popc(i)%2)pflip(q,i);}hall(q);return q;}",
+    "function qftp(n){var q=new QReg(n);ap1(q,G.X,0);for(var i=0;i<n;i++){ap1(q,G.H,i);}return q;}",
+    "function probs(q){var p=[];for(var i=0;i<q.N;i++)p.push(q.re[i]*q.re[i]+q.im[i]*q.im[i]);return p;}",
+    "function measure(p){var r=Math.random(),a=0;for(var i=0;i<p.length;i++){a+=p[i];if(r<=a)return i;}return p.length-1;}",
+    "function ket(v,n){var s='';for(var i=n-1;i>=0;i--)s+=((v>>i)&1);return s;}",
+    // --- run a program ---
+    "function runp(name){ var n=+document.getElementById('nq').value, arg=+document.getElementById('arg').value, q, desc;",
+    "  pid++;",
+    "  if(name==='bell'){q=bell();n=2;desc='entangle 2 qubits';}",
+    "  else if(name==='ghz'){q=ghz(n);desc=n+'-qubit GHZ';}",
+    "  else if(name==='grover'){q=grover(n,arg%(1<<n));desc='search '+(1<<n)+' states for '+(arg%(1<<n));}",
+    "  else if(name==='bv'){q=bv(n,arg%(1<<n));desc='recover secret '+(arg%(1<<n));}",
+    "  else if(name==='dj'){q=dj(n, arg%2===1);desc='Deutsch-Jozsa ('+(arg%2===1?'balanced':'constant')+')';}",
+    "  else if(name==='qft'){q=qftp(n);desc='QFT basis on '+n+' qubits';}",
+    "  klog('[pid '+pid+'] exec '+name+'  ('+desc+')');",
+    "  klog('  syscall: qalloc '+n);  klog('  syscall: unitary evolution');",
+    "  var p=probs(q), top=0; for(var i=0;i<p.length;i++) if(p[i]>p[top])top=i;",
+    "  klog('  syscall: qmeasure'); var m=measure(p);",
+    "  klog('[pid '+pid+'] -> |'+ket(top,q.n)+'>  P='+p[top].toFixed(3)+'  measured '+m);",
+    "  document.getElementById('res').innerHTML='&#9658; |'+ket(top,q.n)+'&rang;  (P='+(p[top]*100).toFixed(1)+'%, measured '+m+')';",
+    "  drawHist(p,q.n); showAmp(q); }",
+    "function drawHist(p,n){ var cv=document.getElementById('hist'),x=cv.getContext('2d'),W=cv.width,H=cv.height; x.clearRect(0,0,W,H);",
+    "  var bw=W/p.length; for(var i=0;i<p.length;i++){ var h=p[i]*(H-26);",
+    "   x.fillStyle = p[i]>0.01 ? '#4a80d0' : '#1f2a3a'; x.fillRect(i*bw+1,H-22-h,bw-2,h);",
+    "   if(p.length<=16){ x.fillStyle='#8aa0bd'; x.font='9px monospace'; x.save(); x.translate(i*bw+bw/2,H-12); x.fillText(ket(i,n),-9,0); x.restore(); } } }",
+    "function showAmp(q){ var s='|psi> = '; var c=0; for(var i=0;i<q.N&&c<8;i++){ var pr=q.re[i]*q.re[i]+q.im[i]*q.im[i]; if(pr<1e-6)continue;",
+    "  s+='('+q.re[i].toFixed(2)+(q.im[i]>=0?'+':'')+q.im[i].toFixed(2)+'i)|'+ket(i,q.n)+'> '; c++; } document.getElementById('amp').textContent=s; }",
+    "klog('');"
+]
+app.script(join(js, "\n"))
+
+app.save("quantum_os.html")
+print "wrote quantum_os.html"

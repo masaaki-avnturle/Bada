@@ -1,0 +1,128 @@
+// ============================================================================
+//  YamaguchiHealth — MEDICATION BIOFEEDBACK  (a Bada application)
+//
+//  Each drug is an operator that lowers the THERMAL ENTROPY of its target
+//  region on the gamma-manifold brain model (the report's heat-entropy of the
+//  gamma operator's global integral manifold).  The entropy it removes is fed
+//  back to the patient through THREE channels:
+//
+//     * HAPTIC  — a soothing touch on the mapped body part
+//                 (降圧剤 -> calm pulse on the chest;
+//                  リスパダール -> relief routed from brain to the forehead)
+//     * AUDIO   — a relief soundscape (.wav), tense->calm as relief rises
+//     * VISUAL  — a body map showing where relief is delivered, and the
+//                 haptic / audio waveforms.
+//
+//  Formulary: リスパダール・ジプレキサ・シクレスト・ルーラン・センノサイド・
+//             ロヒプノール・降圧剤.
+//
+//  Run:  ./bada run apps/health_biofeedback.bada
+// ============================================================================
+
+import yamaguchi_health as yh
+import haptic
+import audio
+import plot
+import imaging
+
+print "=== YamaguchiHealth — Medication Biofeedback ==="
+print "drug = entropy-lowering operator on the gamma manifold"
+print "relief -> haptic touch + audio soundscape on the target site"
+print ""
+
+let app <- yh.Clinic.new(200, 200)
+
+// ---- patient presentation (symptoms = excess entropy) --------------------
+
+app.symptom("striatum", 1.0)        // psychosis: hyperdopaminergic striatum
+app.symptom("mesolimbic", 0.9)
+app.symptom("prefrontal", 0.6)
+app.symptom("vasomotor", 0.85)      // hypertension
+app.symptom("amygdala", 0.8)        // anxiety
+app.symptom("gut_myenteric", 0.7)   // constipation
+app.symptom("gaba_cortex", 0.9)     // insomnia
+app.symptom("histamine_tmn", 0.6)
+app.symptom("serotonin_raphe", 0.7)
+
+print "whole-patient tension before treatment:", round(app.total_tension(), 2)
+print ""
+
+// ---- administer the full regimen -----------------------------------------
+
+let regimen <- [
+    ["risperidone", 1.0],
+    ["olanzapine", 0.8],
+    ["asenapine", 0.7],
+    ["perospirone", 0.7],
+    ["sennoside", 1.0],
+    ["flunitrazepam", 0.8],
+    ["amlodipine", 1.0]
+]
+
+let r <- 0
+while r < len(regimen) {
+    let name <- regimen[r][0]
+    let dose <- regimen[r][1]
+    let e <- app.administer(name, dose)
+    print "administered", e["drug"]
+    print "    relief", round(e["relief"] * 100, 1), "% ->",
+          "haptic on", e["haptic_region"],
+          "(" + str(round(e["haptic_delivered"] * 100, 1)) + "% delivered),",
+          "sound", e["sound"]
+    r <- r + 1
+}
+
+print ""
+print "whole-patient tension after treatment:", round(app.total_tension(), 2)
+print ""
+
+// ---- visualise: haptic waveforms for each drug ---------------------------
+
+print "rendering haptic waveform chart ..."
+let waves <- []
+let i <- 0
+while i < len(app.log) {
+    let e <- app.log[i]
+    // re-synthesise the haptic envelope for plotting
+    let act <- haptic.Actuator.new(e["haptic_region"], 0, 0)
+    let w <- act.soothe(e["relief"], 1.5, 200)
+    push(waves, w)
+    i <- i + 1
+}
+plot.signals(waves, "haptic_waveforms.pgm", 520, 44)
+print "    wrote haptic_waveforms.pgm (one calming envelope per drug)"
+
+// ---- visualise: body relief map ------------------------------------------
+
+print "rendering body relief map ..."
+let body <- imaging.Canvas.new(160, 240)
+body.clear(15)
+// crude body outline: head, torso
+body.disc(80, 40, 28, 60)       // head
+body.rect(54, 70, 106, 180, 50) // torso
+body.rect(64, 180, 96, 230, 45) // legs base
+// mark each haptic site with relief intensity (brighter = more relief)
+let body_sites <- {
+    "forehead": [80, 26],
+    "temples": [80, 30],
+    "eyes": [80, 44],
+    "chest": [80, 100],
+    "abdomen": [80, 150]
+}
+let j <- 0
+while j < len(app.log) {
+    let e <- app.log[j]
+    let site <- e["haptic_region"]
+    if has(body_sites, site) {
+        let p <- body_sites[site]
+        let glow <- floor(120 + e["relief"] * 135)
+        body.disc(p[0], p[1], 8, glow)
+    }
+    j <- j + 1
+}
+body.save_color("body_relief_map.ppm")
+print "    wrote body_relief_map.ppm (relief sites on the body)"
+
+print ""
+print "done. biofeedback delivered through haptic + audio + visual channels."
+print "audio files: biofeedback_<drug>.wav (one per administration)"

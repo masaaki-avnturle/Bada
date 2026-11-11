@@ -1,0 +1,167 @@
+// forge — source-code auto-correction by integrable-system error correction.
+//
+//   import forge
+//   let result <- forge.autofix(broken_source)
+//   print result["fixed"], result["log"]
+//
+// PRINCIPLE.  A syntactically valid program lives on an invariant manifold,
+// just as an integrable spinning top moves on invariant tori fixed by its
+// conserved quantities (angular momenta, energy, the Kovalevskaya/Casimir
+// invariants).  Bracket/quote balance is exactly such a CONSERVED CHARGE: in
+// valid code the bracket "angular momentum" L = (paren, square, brace) and the
+// quote parity must all return to zero.  An error is a deviation off the
+// manifold (a complex rotation away from the code space, as in quantum error
+// correction).  Forge measures the invariant DEFECT and applies damped
+// "precession" corrections that drive the defect to zero, re-projecting the
+// source onto the valid manifold — verified each step by the bada_check oracle.
+
+// ---- conserved invariants (the top's angular momenta) ---------------------
+
+// bracket-balance vector L = [() , [] , {}] and string-quote parity, ignoring
+// brackets that occur inside string literals or comments.
+fun invariants(src) {
+    let paren <- 0
+    let square <- 0
+    let brace <- 0
+    let quote <- 0
+    let i <- 0
+    let n <- len(src)
+    let in_str <- false
+    let q <- ""
+    while i < n {
+        let c <- char_at(src, i)
+        if in_str {
+            if c == "\\" { i <- i + 1 }
+            else if c == q { in_str <- false }
+        } else if c == "\"" or c == "'" {
+            in_str <- true
+            q <- c
+            quote <- quote + 1
+        } else if c == "/" and i + 1 < n and char_at(src, i + 1) == "/" {
+            while i < n and char_at(src, i) != "\n" { i <- i + 1 }
+        } else if c == "(" { paren <- paren + 1 }
+        else if c == ")" { paren <- paren - 1 }
+        else if c == "[" { square <- square + 1 }
+        else if c == "]" { square <- square - 1 }
+        else if c == "{" { brace <- brace + 1 }
+        else if c == "}" { brace <- brace - 1 }
+        i <- i + 1
+    }
+    return {"paren": paren, "square": square, "brace": brace,
+            "quote_open": in_str, "quote_count": quote}
+}
+
+// the invariant DEFECT: distance of the state from the valid manifold (0 = on it)
+fun defect(src) {
+    let inv <- invariants(src)
+    let d <- abs(inv["paren"]) + abs(inv["square"]) + abs(inv["brace"])
+    if inv["quote_open"] { d <- d + 1 }
+    return d
+}
+
+// ---- correction rules (precession steps toward the manifold) --------------
+
+// close any open string by appending the matching quote
+fun fix_quotes(src, inv) {
+    if inv["quote_open"] {
+        return src + "\""
+    }
+    return src
+}
+
+// restore bracket balance: append closers, or prepend openers if negative
+fun balance(src, open_ch, close_ch, charge) {
+    let out <- src
+    if charge > 0 {
+        let k <- 0
+        while k < charge { out <- out + close_ch  k <- k + 1 }
+    } else if charge < 0 {
+        let k <- 0
+        while k < (0 - charge) { out <- open_ch + out  k <- k + 1 }
+    }
+    return out
+}
+
+// token-level repairs: the common deviations off the Bada grammar manifold
+fun fix_tokens(src) {
+    let out <- src
+    // '=' used for assignment should be the Bada arrow '<-'
+    out <- replace(out, " = ", " <- ")
+    // C-style equality kept intact: undo over-eager rewrite of '=='
+    out <- replace(out, "< -", "<-")
+    out <- replace(out, "<- <-", "<-")
+    return out
+}
+
+// ---- the error-correction loop --------------------------------------------
+
+class Forge {
+    field log <- []
+    field max_steps <- 12
+
+    method init() {}
+
+    method note(msg) { push(self.log, msg) }
+
+    // drive the invariant defect to zero, re-projecting onto the valid manifold
+    method autofix(src) {
+        self.log <- []
+        let cur <- src
+        let d0 <- defect(cur)
+        self.note("initial invariant defect: " + str(d0))
+
+        // token-level normalisation first
+        let toks <- fix_tokens(cur)
+        if toks != cur {
+            self.note("token repair: '=' assignment -> '<-'")
+            cur <- toks
+        }
+
+        let step <- 0
+        while defect(cur) > 0 and step < self.max_steps {
+            let inv <- invariants(cur)
+            if inv["quote_open"] {
+                cur <- fix_quotes(cur, inv)
+                self.note("closed an open string literal (quote parity)")
+            }
+            if inv["paren"] != 0 {
+                cur <- balance(cur, "(", ")", inv["paren"])
+                self.note("balanced () angular momentum: " + str(inv["paren"]))
+            }
+            if inv["square"] != 0 {
+                cur <- balance(cur, "[", "]", inv["square"])
+                self.note("balanced [] angular momentum: " + str(inv["square"]))
+            }
+            if inv["brace"] != 0 {
+                cur <- balance(cur, "{", "}", inv["brace"])
+                self.note("balanced {} angular momentum: " + str(inv["brace"]))
+            }
+            step <- step + 1
+        }
+
+        let d1 <- defect(cur)
+        self.note("final invariant defect: " + str(d1))
+
+        // verify against the compiler oracle (lands on the valid manifold?)
+        let err <- bada_check(cur)
+        let ok <- err == ""
+        if ok {
+            self.note("VERIFIED: source compiles (on the valid manifold)")
+        } else {
+            self.note("residual: " + err)
+        }
+        return {"fixed": cur, "ok": ok, "defect_before": d0,
+                "defect_after": d1, "log": self.log, "error": err}
+    }
+}
+
+// convenience: one-shot autofix
+fun autofix(src) {
+    let f <- Forge.new()
+    return f.autofix(src)
+}
+
+// check only: is this source already on the valid manifold?
+fun valid(src) {
+    return bada_check(src) == ""
+}

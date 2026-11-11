@@ -1,0 +1,114 @@
+// keymap — a key-binding registry (the heart of 窓使いの憂鬱 / Madotsukai no Yuuutsu).
+//
+//   import keymap
+//   let reg <- keymap.Registry.new()
+//   reg.load_emacs("Editor")
+//   print reg.lookup("Editor", "emacs", "C-a")   // -> "move-beginning-of-line"
+//
+// Bindings are registered per APPLICATION and per MODE, with a "global"
+// fallback - exactly the per-window remapping model of mayu.  A chord is a
+// string like "C-a", "M-f", "C-x C-s", "j", "ESC".  investigate() is mayu's
+// key-investigation: tell me what a key is bound to here.
+
+class Registry {
+    field maps        // {app: {mode: {chord: action}}}
+
+    method init() { self.maps <- {} }
+
+    method ensure(app, mode) {
+        if not has(self.maps, app) { self.maps[app] <- {} }
+        if not has(self.maps[app], mode) { self.maps[app][mode] <- {} }
+    }
+
+    // register a binding in the registry
+    method bind(app, mode, chord, action) {
+        self.ensure(app, mode)
+        self.maps[app][mode][chord] <- action
+        return self
+    }
+
+    // app-specific binding, else global fallback, else "" (unbound)
+    method lookup(app, mode, chord) {
+        if has(self.maps, app) and has(self.maps[app], mode)
+           and has(self.maps[app][mode], chord) {
+            return self.maps[app][mode][chord]
+        }
+        if has(self.maps, "global") and has(self.maps["global"], mode)
+           and has(self.maps["global"][mode], chord) {
+            return self.maps["global"][mode][chord]
+        }
+        return ""
+    }
+
+    // mayu's key investigation: where does this chord resolve?
+    method investigate(app, mode, chord) {
+        if has(self.maps, app) and has(self.maps[app], mode)
+           and has(self.maps[app][mode], chord) {
+            return chord + " -> " + self.maps[app][mode][chord] + "  [" + app + "/" + mode + "]"
+        }
+        if has(self.maps, "global") and has(self.maps["global"], mode)
+           and has(self.maps["global"][mode], chord) {
+            return chord + " -> " + self.maps["global"][mode][chord] + "  [global/" + mode + "]"
+        }
+        return chord + " -> (unbound)"
+    }
+
+    method bindings(app, mode) {
+        if has(self.maps, app) and has(self.maps[app], mode) {
+            return self.maps[app][mode]
+        }
+        return {}
+    }
+
+    // emit a mayu-style configuration for an app/mode
+    method config(app, mode) {
+        let out <- "window " + app + " : Global\n"
+        let m <- self.bindings(app, mode)
+        for chord in keys(m) {
+            out <- out + "  key " + chord + " = &" + m[chord] + "\n"
+        }
+        return out
+    }
+
+    // ---- presets ----
+
+    method load_emacs(app) {
+        let b <- emacs_keymap()
+        for pair in b { self.bind(app, "emacs", pair[0], pair[1]) }
+        return self
+    }
+    method load_vim(app) {
+        for pair in vim_normal() { self.bind(app, "vim-normal", pair[0], pair[1]) }
+        for pair in vim_insert() { self.bind(app, "vim-insert", pair[0], pair[1]) }
+        return self
+    }
+}
+
+// ---- the canonical Emacs key map -----------------------------------------
+
+fun emacs_keymap() {
+    return [
+        ["C-a", "move-beginning-of-line"], ["C-e", "move-end-of-line"],
+        ["C-f", "forward-char"], ["C-b", "backward-char"],
+        ["C-n", "next-line"], ["C-p", "previous-line"],
+        ["C-d", "delete-char"], ["C-k", "kill-line"], ["C-y", "yank"],
+        ["M-f", "forward-word"], ["M-b", "backward-word"],
+        ["M-d", "kill-word"], ["C-/", "undo"],
+        ["RET", "newline"], ["C-x C-s", "save-buffer"], ["C-g", "keyboard-quit"]
+    ]
+}
+
+// ---- the canonical vim key maps ------------------------------------------
+
+fun vim_normal() {
+    return [
+        ["h", "cursor-left"], ["j", "cursor-down"], ["k", "cursor-up"], ["l", "cursor-right"],
+        ["0", "line-start"], ["$", "line-end"],
+        ["x", "delete-char"], ["d d", "delete-line"], ["y y", "yank-line"], ["p", "paste"],
+        ["i", "insert-mode"], ["a", "append"], ["o", "open-line"],
+        ["w", "forward-word"], ["b", "backward-word"], ["G", "goto-end"], ["g g", "goto-start"]
+    ]
+}
+fun vim_insert() {
+    return [["ESC", "normal-mode"], ["RET", "newline"]]
+}

@@ -1,0 +1,33 @@
+// ============================================================================
+//  bada-sh — the interactive Bada OS command-line shell (CLI)
+//
+//  A real terminal shell for Bada OS.  Type commands at the prompt; the same
+//  shell engine (lib/shell.bada) powers the GUI Terminal window.
+//
+//  Run:  ./bada run apps/bada_shell.bada
+// ============================================================================
+
+import shell
+
+let sh <- shell.Shell.new()
+print "Bada OS shell (bada-sh) 1.0   -   type 'help', 'exit' to quit"
+print ""
+
+let running <- true
+while running {
+    let line <- input(sh.cwd + " $ ")
+    let t <- trim(line)
+    if t == "exit" or t == "quit" {
+        running <- false
+    } else {
+        let out <- sh.exec(line)
+        if out == "\\f" {
+            // clear screen
+            let i <- 0
+            while i < 40 { print ""  i <- i + 1 }
+        } else if out != "" {
+            print out
+        }
+    }
+}
+print "logout"

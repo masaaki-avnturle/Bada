@@ -1,0 +1,190 @@
+// editor — a text buffer driven by keymap actions (Emacs & vim).
+//
+//   import editor
+//   let buf <- editor.Buffer.new(["hello world"])
+//   buf.act("move-end-of-line", "")
+//   buf.act("kill-line", "")
+//   print buf.text()
+//
+// The Buffer applies the symbolic ACTIONS produced by the keymap registry,
+// so the same buffer responds to Emacs and vim bindings.  Cursor is (row,col);
+// `mode` is "emacs", "vim-normal" or "vim-insert".
+
+class Buffer {
+    field lines
+    field row <- 0
+    field col <- 0
+    field mode <- "emacs"
+    field kill <- ""          // kill-ring / clipboard
+    field killline <- false   // was the last kill a whole line?
+
+    method init(lines) {
+        if len(lines) == 0 { self.lines <- [""] } else { self.lines <- lines }
+    }
+
+    method line() { return self.lines[self.row] }
+    method nlines() { return len(self.lines) }
+
+    method clamp() {
+        if self.row < 0 { self.row <- 0 }
+        if self.row >= len(self.lines) { self.row <- len(self.lines) - 1 }
+        let ll <- len(self.lines[self.row])
+        if self.col < 0 { self.col <- 0 }
+        if self.col > ll { self.col <- ll }
+    }
+
+    // dispatch a symbolic action (optionally with a char argument for inserts)
+    method act(action, arg) {
+        // movement
+        if action == "move-beginning-of-line" or action == "line-start" { self.col <- 0 }
+        else if action == "move-end-of-line" or action == "line-end" { self.col <- len(self.line()) }
+        else if action == "forward-char" or action == "cursor-right" { self.col <- self.col + 1 }
+        else if action == "backward-char" or action == "cursor-left" { self.col <- self.col - 1 }
+        else if action == "next-line" or action == "cursor-down" { self.row <- self.row + 1 }
+        else if action == "previous-line" or action == "cursor-up" { self.row <- self.row - 1 }
+        else if action == "goto-start" { self.row <- 0  self.col <- 0 }
+        else if action == "goto-end" { self.row <- len(self.lines) - 1 }
+        else if action == "forward-word" { self.forward_word() }
+        else if action == "backward-word" { self.backward_word() }
+        // editing
+        else if action == "delete-char" { self.delete_char() }
+        else if action == "kill-line" { self.kill_line() }
+        else if action == "kill-word" { self.kill_word() }
+        else if action == "delete-line" { self.delete_line() }
+        else if action == "yank-line" { self.yank_line() }
+        else if action == "yank" or action == "paste" { self.yank() }
+        else if action == "newline" { self.newline() }
+        else if action == "insert" { self.insert(arg) }
+        // vim mode changes
+        else if action == "insert-mode" { self.mode <- "vim-insert" }
+        else if action == "normal-mode" { self.mode <- "vim-normal"  if self.col > 0 { self.col <- self.col - 1 } }
+        else if action == "append" { self.mode <- "vim-insert"  self.col <- self.col + 1 }
+        else if action == "open-line" { self.open_line() }
+        else if action == "save-buffer" { } // no-op marker
+        else if action == "keyboard-quit" { }
+        self.clamp()
+        return self
+    }
+
+    method insert(ch) {
+        let l <- self.line()
+        self.lines[self.row] <- substr_to(l, self.col) + ch + substr_from(l, self.col)
+        self.col <- self.col + len(ch)
+    }
+
+    method newline() {
+        let l <- self.line()
+        let left <- substr_to(l, self.col)
+        let right <- substr_from(l, self.col)
+        self.lines[self.row] <- left
+        let nl <- []
+        let i <- 0
+        while i <= self.row { push(nl, self.lines[i])  i <- i + 1 }
+        push(nl, right)
+        while i < len(self.lines) { push(nl, self.lines[i])  i <- i + 1 }
+        self.lines <- nl
+        self.row <- self.row + 1
+        self.col <- 0
+    }
+
+    method delete_char() {
+        let l <- self.line()
+        if self.col < len(l) {
+            self.lines[self.row] <- substr_to(l, self.col) + substr_from(l, self.col + 1)
+        }
+    }
+
+    method kill_line() {
+        let l <- self.line()
+        self.kill <- substr_from(l, self.col)
+        self.killline <- false
+        self.lines[self.row] <- substr_to(l, self.col)
+    }
+    method kill_word() {
+        let start <- self.col
+        self.forward_word()
+        let l <- self.line()
+        self.kill <- substr3(l, start, self.col)
+        self.lines[self.row] <- substr_to(l, start) + substr_from(l, self.col)
+        self.col <- start
+    }
+    method delete_line() {
+        self.kill <- self.line()
+        self.killline <- true
+        if len(self.lines) == 1 { self.lines[0] <- "" }
+        else {
+            let nl <- []
+            let i <- 0
+            while i < len(self.lines) { if i != self.row { push(nl, self.lines[i]) }  i <- i + 1 }
+            self.lines <- nl
+        }
+        self.col <- 0
+    }
+    method yank_line() { self.kill <- self.line()  self.killline <- true }
+
+    method yank() {
+        if self.killline {
+            let nl <- []
+            let i <- 0
+            while i <= self.row { push(nl, self.lines[i])  i <- i + 1 }
+            push(nl, self.kill)
+            while i < len(self.lines) { push(nl, self.lines[i])  i <- i + 1 }
+            self.lines <- nl
+            self.row <- self.row + 1
+            self.col <- 0
+        } else {
+            self.insert(self.kill)
+        }
+    }
+
+    method open_line() {
+        let nl <- []
+        let i <- 0
+        while i <= self.row { push(nl, self.lines[i])  i <- i + 1 }
+        push(nl, "")
+        while i < len(self.lines) { push(nl, self.lines[i])  i <- i + 1 }
+        self.lines <- nl
+        self.row <- self.row + 1
+        self.col <- 0
+        self.mode <- "vim-insert"
+    }
+
+    method forward_word() {
+        let l <- self.line()
+        let i <- self.col
+        while i < len(l) and l[i] == " " { i <- i + 1 }
+        while i < len(l) and l[i] != " " { i <- i + 1 }
+        self.col <- i
+    }
+    method backward_word() {
+        let l <- self.line()
+        let i <- self.col
+        if i > 0 { i <- i - 1 }
+        while i > 0 and l[i] == " " { i <- i - 1 }
+        while i > 0 and l[i - 1] != " " { i <- i - 1 }
+        self.col <- i
+    }
+
+    method text() { return join(self.lines, "\n") }
+}
+
+// ---- string slice helpers -------------------------------------------------
+
+fun substr_to(s, end) {
+    let out <- ""
+    let i <- 0
+    while i < end and i < len(s) { out <- out + s[i]  i <- i + 1 }
+    return out
+}
+fun substr_from(s, start) {
+    let out <- ""
+    let i <- start
+    while i < len(s) { out <- out + s[i]  i <- i + 1 }
+    return out
+}
+fun substr3(s, a, b) {
+    let out <- ""
+    let i <- a
+    while i < b and i < len(s) { out <- out + s[i]  i <- i + 1 }
+    return out
+}
