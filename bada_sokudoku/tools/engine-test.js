@@ -1,0 +1,1125 @@
+/*
+ * engine-test.js — Bada 瞬読 のエンジン単体テスト (Node で実行)
+ *
+ *   node bada_sokudoku/tools/engine-test.js
+ *
+ * index.html のインライン <script> を抜き出し、DOM をスタブした上で
+ * 画像側・文字側・時間側の純ロジックを合成頁で検証します:
+ *    1. 基盤 (決定論的乱数 / 直交射影 / softmax / LayerNorm)
+ *    2. 積分画像と Sauvola 適応二値化 (照明勾配に耐えるか)
+ *    3. 書字方向の判定 (横書き / 縦書き)
+ *    4. パッチ特徴
+ *    5. 窓分割と窓自己注意 (行和 1 / 相対位置バイアスの異方性)
+ *    6. 注意ロールアウト (区分対角の積 / 行和 1)
+ *    7. 連結成分 = 文字の固まり (二段組を二つに分ける)
+ *    8. 行分割と固まり分割 (投影プロファイル)
+ *    9. XY-cut の読み順 (縦書きは右から左)
+ *   10. analyzePage 総体 (横書き頁 / 縦書き頁)
+ *   11. 日本語チャンカ (切っても字は消えない)
+ *   12. LaTeX 剥がし / 語中シャッフル
+ *   13. 速読スケジューラ (目標 cpm の再現 / 二分探索)
+ *   14. 対象者プロファイルと視野負荷
+   15. 読み手の取り込み (肌色・顔・目・視線)
+   16. 視線の追跡 (停留 / サッカード / 逆行 / 瞬き)
+   17. 読み手の見え方 (解像力の落ち方 / 知覚スパンの非対称 / サッカード抑制)
+   18. 本文の組版 (頁に組んでから視野をかける)
+   19. 多行ブロック (複数行を一度に見る単位) と、その見え方
+   20. 取り込み — deflate / ZIP / docx・epub・odt・pptx・xlsx
+   21. 取り込み — 実物の PDF (本文 / 走査した頁の JPEG) と、そのほかの拡張子
+ */
+"use strict";
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
+
+/* ── index.html からインラインスクリプトを抽出 ── */
+const htmlPath = path.join(__dirname, "..", "index.html");
+const src = fs.readFileSync(htmlPath, "utf8");
+const m = src.match(/<script>([\s\S]*)<\/script>/);
+if (!m){ console.error("no inline <script> in index.html"); process.exit(1); }
+
+/* ── DOM スタブ (エンジン部は DOM に触れない。boot() は呼ばない) ── */
+function stubEl(){
+  return new Proxy({ style:{}, classList:{ add(){}, remove(){}, toggle(){} }, value:"", textContent:"",
+                     innerHTML:"", className:"", width:0, height:0, checked:false }, {
+    get(t, p){
+      if (p in t) return t[p];
+      if (p === "querySelectorAll") return function(){ return []; };
+      if (p === "getAttribute") return function(){ return ""; };
+      if (p === "getContext") return function(){ return new Proxy({}, { get(){ return function(){}; } }); };
+      return function(){ return stubEl(); };
+    },
+    set(t, p, v){ t[p] = v; return true; }
+  });
+}
+const sandbox = {
+  console, Math, Date, Object, Array, String, Number, JSON, Boolean, RegExp, Error, Promise,
+  Float64Array, Float32Array, Uint8Array, Uint8ClampedArray, Int32Array, Int8Array, Int16Array,
+  DataView, ArrayBuffer, Map, Set, Proxy, TextDecoder, TextEncoder,
+  escape, unescape, decodeURIComponent, encodeURIComponent,
+  DecompressionStream: typeof DecompressionStream !== "undefined" ? DecompressionStream : undefined,
+  ReadableStream: typeof ReadableStream !== "undefined" ? ReadableStream : undefined,
+  isNaN, parseInt, parseFloat, performance: { now: () => Date.now() },
+  setTimeout: fn => fn(), setInterval: () => 0, clearInterval(){},
+  requestAnimationFrame: null,
+  window: { addEventListener(){}, __SOKUDOKU_NO_BOOT: true },
+  document: {
+    readyState: "complete",
+    getElementById(){ return stubEl(); },
+    createElement(){ return stubEl(); },
+    querySelector(){ return stubEl(); },
+    querySelectorAll(){ return []; },
+    addEventListener(){},
+    body: { clientWidth: 900 }
+  }
+};
+sandbox.globalThis = sandbox;
+vm.createContext(sandbox);
+vm.runInContext(m[1], sandbox, { filename: "bada_sokudoku/index.html" });
+
+const {
+  srand, matOrtho, matVec, softmaxInto, layerNorm, gelu, median, mad,
+  integralImage, boxStats, sauvola, resizeGray, projection, detectDirection, rlsa, inkRatio,
+  patchFeatures, posEnc2D, embedPatches, windowPartition, windowAttention, swinEncode,
+  rolloutHat, attentionRollout, blocksFromAttention,
+  splitLines, splitChunks, xyCut, groupChunks, analyzePage,
+  textChunks, groupTextChunks, normalizeText, orpIndex, scrambleInner, stripLatex,
+  buildSchedule, stepAt, profileFrom, sessionStats, loadIndex, charClass,
+  inflateRawSync, inflateSync, inflateBytes, zipList, zipEntryData, zipFind,
+  bytesToText, latin1, looksBinary, stripMarkup, stripRtf, subsToText, csvToText, jsonToText,
+  sniffFormat, extractFile, pdfParseCMap, pdfGet, pdfRef, pdfScanObjects,
+  skinMask, motionMap, readerPatchFeatures, locateEyes, gazeFrom, analyzeReaderFrame,
+  trackerNew, trackerPush, trackerStats,
+  acuityModel, perceptualSpan, viewEcc, blurChars, viewBlurPx, viewContrast,
+  eccForBlur, saccadeVisibility, layoutTextPage, paginateText,
+  groupChunksMulti, isoEllipse
+} = sandbox;
+
+let failures = 0, checks = 0;
+function assert(cond, msg){
+  checks++;
+  if (cond) console.log("  ✓ " + msg);
+  else { failures++; console.log("  ✗ " + msg); }
+}
+function near(a, b, tol, msg){ assert(Math.abs(a - b) <= tol, msg + "  (" + a + " ≈ " + b + " ±" + tol + ")"); }
+
+/* ═════════ 合成頁 — 本物の画素を作ってから解析させる ═════════ */
+/* 紙は照明が傾いた白、字は黒い矩形。字の形は問わない (本アプリは字を読まない)。 */
+function blankPage(w, h){
+  const g = new Float64Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      g[y * w + x] = 0.98 - 0.30 * (x / w) - 0.12 * (y / h);   /* 右下ほど暗い照明 */
+  return g;
+}
+function putChar(g, w, h, x0, y0, cw, ch){
+  for (let y = y0; y < y0 + ch; y++)
+    for (let x = x0; x < x0 + cw; x++){
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      /* 字らしく内側に隙間を作る (一様な黒塗りにしない) */
+      const inner = (x - x0) > 3 && (x - x0) < cw - 3 && (y - y0) > 3 && (y - y0) < ch - 3;
+      g[y * w + x] = Math.max(0.02, g[y * w + x] - (inner ? 0.30 : 0.82));
+    }
+}
+/* 横書き頁: 1 段 or 2 段 */
+function makeHPage(opts){
+  opts = opts || {};
+  const w = opts.w || 480, h = opts.h || 640;
+  const g = blankPage(w, h);
+  const cw = 14, chh = 14, pitch = 18, lineH = 26;
+  const cols = opts.cols || 1;
+  const colW = cols === 1 ? (w - 80) : 170;
+  const gutter = 60;
+  const lines = opts.lines || 6;
+  const boxes = [];
+  for (let c = 0; c < cols; c++){
+    const x0 = 40 + c * (colW + gutter);
+    const nchars = Math.floor(colW / pitch);
+    for (let l = 0; l < lines; l++){
+      const y = 60 + l * lineH;
+      for (let i = 0; i < nchars; i++) putChar(g, w, h, x0 + i * pitch, y, cw, chh);
+    }
+    boxes.push({ x: x0, y: 60, w: nchars * pitch, h: lines * lineH });
+  }
+  return { gray: g, w: w, h: h, lines: lines, cols: cols, boxes: boxes, pitch: pitch, lineH: lineH };
+}
+/* 縦書き頁: 列が右から左へ */
+function makeVPage(opts){
+  opts = opts || {};
+  const w = opts.w || 480, h = opts.h || 640;
+  const g = blankPage(w, h);
+  const cw = 14, chh = 14, pitch = 18, colW = 26;
+  const ncols = opts.ncols || 6;
+  const nchars = Math.floor((h - 120) / pitch);
+  for (let c = 0; c < ncols; c++){
+    const x = w - 60 - c * colW;
+    for (let i = 0; i < nchars; i++) putChar(g, w, h, x, 60 + i * pitch, cw, chh);
+  }
+  return { gray: g, w: w, h: h, ncols: ncols, nchars: nchars };
+}
+
+/* ═══════════════ 1. 基盤 ═══════════════ */
+console.log("\n── 1. 基盤 (乱数・直交射影・softmax・LayerNorm) ──");
+{
+  const a = srand(42), b = srand(42);
+  let same = true;
+  for (let i = 0; i < 100; i++) if (a() !== b()) same = false;
+  assert(same, "同じ種からは同じ乱数列 (同じ頁は必ず同じ版面に分かれる)");
+  const r = srand(1);
+  let mn = 1, mx = 0;
+  for (let i = 0; i < 5000; i++){ const v = r(); if (v < mn) mn = v; if (v > mx) mx = v; }
+  assert(mn >= 0 && mx < 1, "乱数は [0,1)");
+
+  const M = matOrtho(8, 12, 99);
+  let ortho = true;
+  for (let i = 0; i < 8; i++){
+    let n = 0;
+    for (let k = 0; k < 12; k++) n += M[i][k] * M[i][k];
+    if (Math.abs(n - 1) > 1e-9) ortho = false;
+    for (let j = i + 1; j < 8; j++){
+      let d = 0;
+      for (let k = 0; k < 12; k++) d += M[i][k] * M[j][k];
+      if (Math.abs(d) > 1e-9) ortho = false;
+    }
+  }
+  assert(ortho, "固定射影の行ベクトルは正規直交 (無学習でも特徴を潰さない)");
+
+  const v = softmaxInto(Float64Array.from([1, 2, 3, 4]));
+  let s = 0;
+  for (let i = 0; i < v.length; i++) s += v[i];
+  near(s, 1, 1e-12, "softmax の和は 1");
+  assert(v[3] > v[0], "softmax は大きい要素に重みを寄せる");
+  const big = softmaxInto(Float64Array.from([1000, 1001]));
+  assert(isFinite(big[0]) && isFinite(big[1]), "softmax は大きな値でも溢れない (最大値を引いている)");
+
+  const ln = layerNorm(Float64Array.from([1, 2, 3, 4, 10]));
+  let mu = 0;
+  for (let i = 0; i < ln.length; i++) mu += ln[i];
+  near(mu / ln.length, 0, 1e-9, "LayerNorm の平均は 0");
+  let sd = 0;
+  for (let i = 0; i < ln.length; i++) sd += ln[i] * ln[i];
+  near(Math.sqrt(sd / ln.length), 1, 1e-4, "LayerNorm の分散は 1");
+  near(gelu(0), 0, 1e-12, "GELU(0)=0");
+  assert(gelu(3) > 2.9 && gelu(-3) < 0, "GELU は正で線形に近づき負で潰れる");
+  assert(median([3, 1, 2]) === 2 && mad([1, 1, 1, 10]) === 0, "中央値と MAD (外れ値に動じない)");
+}
+
+/* ═══════════════ 2. 積分画像と Sauvola ═══════════════ */
+console.log("\n── 2. 積分画像と Sauvola 適応二値化 ──");
+{
+  const w = 40, h = 30;
+  const g = new Float64Array(w * h);
+  const rng = srand(5);
+  for (let i = 0; i < g.length; i++) g[i] = rng();
+  const ii = integralImage(g, w, h);
+  let ok = true;
+  for (let t = 0; t < 20; t++){
+    const x0 = Math.floor(rng() * 20), y0 = Math.floor(rng() * 15);
+    const x1 = x0 + 1 + Math.floor(rng() * 15), y1 = y0 + 1 + Math.floor(rng() * 10);
+    let s = 0, n = 0;
+    for (let y = y0; y < Math.min(y1, h); y++)
+      for (let x = x0; x < Math.min(x1, w); x++){ s += g[y * w + x]; n++; }
+    const st = boxStats(ii, x0, y0, x1, y1);
+    if (Math.abs(st.mean - s / n) > 1e-9) ok = false;
+  }
+  assert(ok, "積分画像の窓平均が総当たりと一致する (O(1) で引ける)");
+
+  const pg = makeHPage({});
+  const ink = sauvola(pg.gray, pg.w, pg.h, {});
+  const ratio = inkRatio(ink);
+  assert(ratio > 0.02 && ratio < 0.45, "墨率が妥当な範囲 (" + (ratio * 100).toFixed(1) + "%) — 全黒でも白飛びでもない");
+  /* 照明がいちばん暗い右下の余白が墨と誤判定されていないこと */
+  let bgInk = 0, bgN = 0;
+  for (let y = pg.h - 40; y < pg.h - 5; y++)
+    for (let x = pg.w - 40; x < pg.w - 5; x++){ bgInk += ink[y * pg.w + x]; bgN++; }
+  assert(bgInk / bgN < 0.05, "照明が落ちた余白を墨と間違えない (適応二値化が効いている)");
+  /* 字のある所は墨と判定されること */
+  let fg = 0, fgN = 0;
+  for (let y = 62; y < 70; y++)
+    for (let x = 42; x < 200; x++){ fg += ink[y * pg.w + x]; fgN++; }
+  assert(fg / fgN > 0.3, "字のある行は墨として拾われる");
+
+  const sm = rlsa(Uint8Array.from([0,1,0,0,1,0, 0,0,0,0,0,0]), 6, 2, 3, 0);
+  assert(sm[2] === 1 && sm[3] === 1, "RLSA は閾値以下の空白を埋める");
+  const sm2 = rlsa(Uint8Array.from([0,1,0,0,1,0, 0,0,0,0,0,0]), 6, 2, 1, 0);
+  assert(sm2[2] === 0, "RLSA は閾値を超える空白は埋めない (段の間は繋がない)");
+}
+
+/* ═══════════════ 3. 書字方向 ═══════════════ */
+console.log("\n── 3. 書字方向の判定 ──");
+{
+  const hp = makeHPage({});
+  const hInk = sauvola(hp.gray, hp.w, hp.h, {});
+  const dh = detectDirection(hInk, hp.w, hp.h);
+  assert(dh.dir === "h", "横書きの頁を横書きと判定する");
+  const vp = makeVPage({});
+  const vInk = sauvola(vp.gray, vp.w, vp.h, {});
+  const dv = detectDirection(vInk, vp.w, vp.h);
+  assert(dv.dir === "v", "縦書きの頁を縦書きと判定する");
+  const rowp = projection(hInk, hp.w, hp.h, "row");
+  assert(rowp.length === hp.h, "行プロファイルの長さは頁の高さ");
+}
+
+/* ═══════════════ 4. パッチ特徴 ═══════════════ */
+console.log("\n── 4. パッチ埋め込み ──");
+{
+  const w = 64, h = 32;
+  const g = new Float64Array(w * h).fill(1);
+  const ink = new Uint8Array(w * h);
+  for (let y = 8; y < 16; y++) for (let x = 8; x < 16; x++) ink[y * w + x] = 1;
+  const grid = patchFeatures(g, ink, w, h, 8);
+  assert(grid.cols === 8 && grid.rows === 4 && grid.n === 32, "パッチ格子の大きさ");
+  near(grid.dens[1 * 8 + 1], 1, 1e-12, "墨で埋まったパッチの密度は 1");
+  near(grid.dens[0], 0, 1e-12, "白いパッチの密度は 0");
+  assert(grid.feat.length === grid.n * 12, "パッチあたり 12 次元の特徴");
+  const pe = posEnc2D(3, 5, 24);
+  let bounded = true;
+  for (let i = 0; i < pe.length; i++) if (Math.abs(pe[i]) > 1.0000001) bounded = false;
+  assert(bounded && pe.length === 24, "位置符号は有界で次元が合う");
+  const pe2 = posEnc2D(3, 6, 24);
+  let diff = 0;
+  for (let i = 0; i < 24; i++) diff += Math.abs(pe[i] - pe2[i]);
+  assert(diff > 1e-6, "違う位置には違う符号が付く");
+  const toks = embedPatches(grid, 24, 7);
+  assert(toks.length === grid.n && toks[0].length === 24, "トークン列の形");
+}
+
+/* ═══════════════ 5. 窓分割と窓自己注意 ═══════════════ */
+console.log("\n── 5. 窓自己注意 (Swin 型) ──");
+{
+  const cols = 16, rows = 12;
+  const wins = windowPartition(cols, rows, 8, 0);
+  const seen = new Set();
+  let dup = false;
+  wins.forEach(function(idx){ idx.forEach(function(i){ if (seen.has(i)) dup = true; seen.add(i); }); });
+  assert(!dup && seen.size === cols * rows, "窓分割はパッチを重複なく覆う");
+  const shifted = windowPartition(cols, rows, 8, 4);
+  const seen2 = new Set();
+  shifted.forEach(function(idx){ idx.forEach(function(i){ seen2.add(i); }); });
+  assert(seen2.size === cols * rows, "ずらした窓分割も全パッチを覆う");
+  assert(shifted.length !== wins.length || JSON.stringify(shifted[0]) !== JSON.stringify(wins[0]),
+         "ずらした窓は元の窓と境界が違う (窓を跨いで情報が流れる)");
+
+  const dim = 16, n = cols * rows;
+  const rng = srand(3);
+  const toks = [];
+  for (let i = 0; i < n; i++){
+    const t = new Float64Array(dim);
+    for (let k = 0; k < dim; k++) t[k] = rng() - 0.5;
+    toks.push(t);
+  }
+  const Wq = matOrtho(dim, dim, 1), Wk = matOrtho(dim, dim, 2),
+        Wv = matOrtho(dim, dim, 3), Wo = matOrtho(dim, dim, 4);
+  const idx = wins[0];
+  const r = windowAttention(toks, idx, cols, Wq, Wk, Wv, Wo, 4, 0.55, 0.12);
+  let rowsOk = true;
+  for (let i = 0; i < r.m; i++){
+    let s = 0;
+    for (let j = 0; j < r.m; j++) s += r.A[i * r.m + j];
+    if (Math.abs(s - 1) > 1e-9) rowsOk = false;
+  }
+  assert(rowsOk, "注意行列の行和は 1 (ヘッド平均をとっても確率のまま)");
+  /* 異方バイアス: 同じ行の 3 つ隣 vs 同じ列の 3 つ下 */
+  const i0 = idx.indexOf(0);
+  const sameRow = idx.indexOf(3), sameCol = idx.indexOf(3 * cols);
+  assert(sameRow >= 0 && sameCol >= 0, "比較用のパッチが同じ窓にある");
+  assert(r.A[i0 * r.m + sameRow] > r.A[i0 * r.m + sameCol],
+         "横書きでは同じ行の隣を、同じ距離の縦の隣より強く見る (相対位置バイアスの異方性)");
+  const rv = windowAttention(toks, idx, cols, Wq, Wk, Wv, Wo, 4, 0.12, 0.55);
+  assert(rv.A[i0 * rv.m + sameCol] > rv.A[i0 * rv.m + sameRow],
+         "縦書き設定では上下の隣を強く見る (α,β を入れ替えた効き)");
+}
+
+/* ═══════════════ 6. 注意ロールアウト ═══════════════ */
+console.log("\n── 6. 注意ロールアウト ──");
+{
+  const m = 4;
+  const A = new Float64Array(m * m);
+  for (let i = 0; i < m; i++){
+    let s = 0;
+    for (let j = 0; j < m; j++){ A[i * m + j] = (i + j + 1); s += (i + j + 1); }
+    for (let j = 0; j < m; j++) A[i * m + j] /= s;
+  }
+  const H = rolloutHat(A, m);
+  let ok = true;
+  for (let i = 0; i < m; i++){
+    let s = 0;
+    for (let j = 0; j < m; j++) s += H[i * m + j];
+    if (Math.abs(s - 1) > 1e-12) ok = false;
+    if (H[i * m + i] <= A[i * m + i]) ok = false;
+  }
+  assert(ok, "Â = 行正規化(½(A+I)) は確率行列で、対角 (残差経路) が強まる");
+
+  const pg = makeHPage({});
+  const ink = sauvola(pg.gray, pg.w, pg.h, {});
+  const grid = patchFeatures(pg.gray, ink, pg.w, pg.h, 8);
+  const enc = swinEncode(embedPatches(grid, 24, 11), grid.cols, grid.rows,
+                         { heads: 4, winW: 8, layers: 3, dir: "h", seed: 11 });
+  const rolls = attentionRollout(enc.attn);
+  assert(rolls.length > 0 && rolls.length < enc.attn.length,
+         "同じ窓分割を共有する層どうしが畳まれる (" + enc.attn.length + " 窓 → " + rolls.length + " 窓)");
+  let rok = true;
+  for (let r = 0; r < rolls.length; r++){
+    const R = rolls[r].R, mm = rolls[r].m;
+    for (let i = 0; i < mm; i++){
+      let s = 0;
+      for (let j = 0; j < mm; j++) s += R[i * mm + j];
+      if (Math.abs(s - 1) > 1e-8) rok = false;
+    }
+  }
+  assert(rok, "ロールアウト後も各行は確率分布のまま (区分対角行列の積)");
+  assert(enc.tokens.length === grid.n && enc.tokens[0].length === 24, "エンコーダはトークンの形を保つ");
+}
+
+/* ═══════════════ 7. 連結成分 = 文字の固まり ═══════════════ */
+console.log("\n── 7. 連結成分 (二段組を二つに分ける) ──");
+{
+  const pg = makeHPage({ cols: 2 });
+  const ink = sauvola(pg.gray, pg.w, pg.h, {});
+  const grid = patchFeatures(pg.gray, ink, pg.w, pg.h, 8);
+  const enc = swinEncode(embedPatches(grid, 24, 11), grid.cols, grid.rows,
+                         { heads: 4, winW: 8, layers: 3, dir: "h", seed: 11 });
+  const bl = blocksFromAttention(grid, attentionRollout(enc.attn), { tau: 1.3, dir: "h" });
+  assert(bl.attnEdges > 0, "注意が辺を張っている (" + bl.attnEdges + " 本)");
+  assert(bl.rlsaEdges > 0, "RLSA も辺を張っている (" + bl.rlsaEdges + " 本)");
+  const big = bl.comps.slice().sort(function(a, b){ return b.patches.length - a.patches.length; });
+  assert(big.length >= 2, "二段組から 2 つ以上の成分が出る (" + big.length + " 個)");
+  const c1 = big[0], c2 = big[1];
+  const sep = (c1.x0 > c2.x1) || (c2.x0 > c1.x1);
+  assert(sep, "上位 2 成分は横に離れている = ノドを跨いで繋いでいない");
+}
+
+/* ═══════════════ 8. 行分割と固まり分割 ═══════════════ */
+console.log("\n── 8. 行と文字の固まり ──");
+{
+  const pg = makeHPage({ lines: 5 });
+  const ink = sauvola(pg.gray, pg.w, pg.h, {});
+  const box = { x: 30, y: 50, w: pg.w - 60, h: 200 };
+  const sl = splitLines(ink, pg.w, pg.h, box, "h", {});
+  assert(sl.lines.length === 5, "5 行の版面から 5 行を切り出す (得られた行数 " + sl.lines.length + ")");
+  assert(sl.pitch > 8 && sl.pitch < 30, "行の太さ (字の大きさ) の推定が妥当: " + sl.pitch.toFixed(1));
+  const ch = splitChunks(ink, pg.w, pg.h, sl.lines[0], "h", sl.pitch, { spanChars: 4 });
+  assert(ch.length >= 3, "空白のない行も字送りで固まりに割る (" + ch.length + " 個)");
+  let monotone = true;
+  for (let i = 1; i < ch.length; i++) if (ch[i].x < ch[i - 1].x) monotone = false;
+  assert(monotone, "固まりは行に沿って左から右へ並ぶ");
+  const covered = ch[ch.length - 1].x + ch[ch.length - 1].w - ch[0].x;
+  assert(covered > 300, "行の端から端までが固まりで覆われる (" + Math.round(covered) + " px)");
+
+  /* 語間の空白がある版面 (欧文) では空白で切れること */
+  const w = 300, h = 40;
+  const g = new Float64Array(w * h).fill(1);
+  for (let word = 0; word < 4; word++)
+    for (let c = 0; c < 3; c++)
+      putChar(g, w, h, 10 + word * 70 + c * 16, 12, 12, 14);
+  const ink2 = sauvola(g, w, h, { win: 25 });
+  const l2 = { x: 0, y: 8, w: w, h: 24 };
+  const ch2 = splitChunks(ink2, w, h, l2, "h", 14, { spanChars: 8 });
+  assert(ch2.length === 4, "空白で分かれた 4 語を 4 つの固まりにする (" + ch2.length + " 個)");
+
+  /* 縦書きの行 (= 列) は右から左 */
+  const vp = makeVPage({ ncols: 4 });
+  const vink = sauvola(vp.gray, vp.w, vp.h, {});
+  const vbox = { x: 20, y: 40, w: vp.w - 40, h: vp.h - 80 };
+  const vl = splitLines(vink, vp.w, vp.h, vbox, "v", {});
+  assert(vl.lines.length === 4, "縦書き 4 列を 4 本の行として切る (" + vl.lines.length + ")");
+  assert(vl.lines[0].x > vl.lines[vl.lines.length - 1].x, "縦書きの行は右から左へ並ぶ");
+}
+
+/* ═══════════════ 9. XY-cut の読み順 ═══════════════ */
+console.log("\n── 9. 読み順 (XY-cut) ──");
+{
+  const items = [
+    { box: { x: 200, y: 0, w: 100, h: 100 }, id: "右上" },
+    { box: { x: 0, y: 0, w: 100, h: 100 }, id: "左上" },
+    { box: { x: 0, y: 200, w: 300, h: 80 }, id: "下段" }
+  ];
+  const h = xyCut(items, "h").map(function(o){ return o.id; });
+  assert(h[0] === "左上" && h[1] === "右上" && h[2] === "下段", "横書き: 左上 → 右上 → 下段 (" + h.join(" → ") + ")");
+  const v = xyCut(items, "v").map(function(o){ return o.id; });
+  assert(v[0] === "右上" && v[1] === "左上", "縦書き: 右の段が先 (" + v.join(" → ") + ")");
+  const one = xyCut([items[0]], "h");
+  assert(one.length === 1, "1 個でも落ちない");
+
+  const chunks = [];
+  for (let i = 0; i < 7; i++) chunks.push({ x: i * 10, y: 0, w: 8, h: 10, chars: 2, line: 0, block: 0 });
+  chunks.push({ x: 0, y: 20, w: 8, h: 10, chars: 2, line: 1, block: 0 });
+  const gs = groupChunks(chunks, 3);
+  assert(gs.length === 4, "7 個の固まりを 3 個ずつ束ねると 3+3+1、行が変われば別ブロック (" + gs.length + " 個)");
+  assert(gs[0].chars === 6 && gs[3].line === 1, "束ねたブロックの字数と行が引き継がれる");
+  assert(gs[0].w >= 28, "束ねたブロックは固まりを包む矩形になる");
+}
+
+/* ═══════════════ 10. analyzePage 総体 ═══════════════ */
+console.log("\n── 10. 版面解析の総体 ──");
+{
+  const pg = makeHPage({ lines: 6 });
+  const a = analyzePage(pg.gray, pg.w, pg.h, { patch: 8, winW: 8, layers: 3, heads: 4, tau: 1.3, perBlock: 3 });
+  assert(a.dir === "h", "横書きと判定");
+  assert(a.meta.blocks >= 1, "ブロックが取れる (" + a.meta.blocks + ")");
+  assert(a.meta.lines >= 5 && a.meta.lines <= 8, "行数が版面と合う (" + a.meta.lines + " 行 / 実際 6 行)");
+  assert(a.meta.chunks > a.meta.lines * 2, "行より多くの固まりに割れている (" + a.meta.chunks + ")");
+  assert(a.meta.readBlocks > 0 && a.meta.readBlocks <= a.meta.chunks, "速読ブロックは固まりを束ねたもの");
+  let inRange = true;
+  ["chunk", "line", "block"].forEach(function(k){
+    a.units[k].forEach(function(u){
+      if (!(u.x >= -1e-9 && u.y >= -1e-9 && u.x + u.w <= 1 + 1e-6 && u.y + u.h <= 1 + 1e-6)) inRange = false;
+      if (!(u.w > 0 && u.h > 0)) inRange = false;
+    });
+  });
+  assert(inRange, "全単位の座標が 0..1 の正規化座標に収まる (どの表示寸法にも載る)");
+  let downward = true;
+  const L = a.units.line;
+  for (let i = 1; i < L.length; i++) if (L[i].block === L[i - 1].block && L[i].y < L[i - 1].y - 1e-6) downward = false;
+  assert(downward, "横書きの行は上から下へ並ぶ");
+  assert(a.meta.chars > 50, "推定字数が取れる (" + a.meta.chars + " 字)");
+  assert(a.meta.ms >= 0 && a.meta.patches > 100, "解析の計量が返る (" + a.meta.patches + " パッチ / " + a.meta.ms + " ms)");
+
+  /* 同じ入力は同じ結果 (決定論) */
+  const a2 = analyzePage(pg.gray, pg.w, pg.h, { patch: 8, winW: 8, layers: 3, heads: 4, tau: 1.3, perBlock: 3 });
+  assert(a2.meta.chunks === a.meta.chunks && a2.meta.blocks === a.meta.blocks,
+         "同じ頁を二度解析しても同じ版面になる");
+
+  /* 縦書き頁 */
+  const vp = makeVPage({ ncols: 6 });
+  const av = analyzePage(vp.gray, vp.w, vp.h, { patch: 8, winW: 8, layers: 3, heads: 4, tau: 1.3, perBlock: 3 });
+  assert(av.dir === "v", "縦書きと判定");
+  const VL = av.units.line;
+  let rightFirst = true;
+  for (let i = 1; i < VL.length; i++) if (VL[i].block === VL[i - 1].block && VL[i].x > VL[i - 1].x + 1e-6) rightFirst = false;
+  assert(rightFirst, "縦書きの読み順は右の列から左へ");
+  let vTall = 0;
+  av.units.chunk.forEach(function(u){ if (u.h > u.w) vTall++; });
+  assert(vTall > av.units.chunk.length * 0.5, "縦書きの固まりは縦長 (" + vTall + "/" + av.units.chunk.length + ")");
+
+  /* 白紙 */
+  const blank = new Float64Array(200 * 200).fill(0.97);
+  const ab = analyzePage(blank, 200, 200, { patch: 8 });
+  assert(ab.units.chunk.length === 0 || ab.meta.inkRatio < 0.02, "白紙からは固まりが出ない (誤検出しない)");
+}
+
+/* ═══════════════ 11. 日本語チャンカ ═══════════════ */
+console.log("\n── 11. 日本語チャンカ ──");
+{
+  const t = "速読とは、字を速く見る技術ではない。視点を送る順番を先に知っている状態のことである。";
+  const cs = textChunks(t, {});
+  assert(cs.length > 5, "文が複数の固まりに割れる (" + cs.length + " 個)");
+  assert(cs.map(function(c){ return c.text; }).join("") === normalizeText(t), "切っても字は一字も消えない (連結すれば元に戻る)");
+  let noEmpty = true;
+  cs.forEach(function(c){ if (!c.text.length) noEmpty = false; });
+  assert(noEmpty, "空の固まりを作らない");
+  assert(cs[0].show === "速読とは、", "自立語+付属語+句読点で切れる: " + cs[0].show);
+  const en = textChunks("I propose with God pressure in Hotel levin.", {});
+  assert(en.length >= 6, "欧文は語境界で切れる (" + en.length + " 個)");
+  assert(en.map(function(c){ return c.text; }).join("") === "I propose with God pressure in Hotel levin.", "欧文も連結で元に戻る");
+  const longOne = textChunks("あああああああああああああああああああ", { maxLen: 6 });
+  assert(longOne.length === 4, "切れ目のない列も最大長で強制的に割る (" + longOne.length + " 個)");
+  assert(charClass("漢") === "kanji" && charClass("あ") === "hira" && charClass("ア") === "kata" &&
+         charClass("a") === "latin" && charClass("、") === "punct", "文字種の判定");
+
+  const gs = groupTextChunks(cs, 3);
+  assert(gs.length === Math.ceil(cs.length / 3) || gs.length <= cs.length, "固まりを 3 個ずつ束ねる (" + gs.length + " ブロック)");
+  let cover = 0;
+  gs.forEach(function(b){ cover += (b.to - b.from + 1); });
+  assert(cover === cs.length, "束ね直しても固まりは過不足なく全部使われる");
+  assert(orpIndex("あ") === 0 && orpIndex("速読とは") === 1 && orpIndex("速読とはこういうものだ") === 3,
+         "最適認識点は語長とともに右へずれる");
+}
+
+/* ═══════════════ 12. LaTeX 剥がしと語中シャッフル ═══════════════ */
+console.log("\n── 12. 論文 (.tex) の取り込みと耐性訓練 ──");
+{
+  const tex = [
+    "\\documentclass{jsarticle}", "\\usepackage{amsmath}", "% これはコメント",
+    "\\begin{document}", "\\title{瞬読の理論}",
+    "本文の一行目である。\\textbf{強調}も本文として残る。",
+    "\\begin{equation} E = mc^2 \\end{equation}",
+    "数式 $\\alpha + \\beta$ は記号に置き換わる。",
+    "\\end{document}", "この後ろは捨てられる。"
+  ].join("\n");
+  const out = stripLatex(tex);
+  assert(!/documentclass|usepackage/.test(out), "前文 (preamble) が落ちる");
+  assert(!/これはコメント/.test(out), "コメントが落ちる");
+  assert(!/この後ろは捨てられる/.test(out), "\\end{document} の後ろが落ちる");
+  assert(/本文の一行目である/.test(out), "本文は残る");
+  assert(/強調/.test(out), "\\textbf の中身は本文として残る");
+  assert(/〈式〉/.test(out) && !/mc\^2/.test(out), "数式環境は 〈式〉 に畳まれる");
+  assert(!/\\/.test(out), "命令の残骸がない");
+
+  const rng = srand(3);
+  const s = "abcdefgh";
+  const sc = scrambleInner(s, rng);
+  assert(sc[0] === "a" && sc[sc.length - 1] === "h" && sc.length === s.length, "語中シャッフルは先頭と末尾を動かさない");
+  assert(sc.split("").sort().join("") === s.split("").sort().join(""), "字は増えも減りもしない");
+  assert(scrambleInner("ab", rng) === "ab", "3 字以下はそのまま");
+}
+
+/* ═══════════════ 13. 速読スケジューラ ═══════════════ */
+console.log("\n── 13. 滞留時間のスケジュール ──");
+{
+  const units = [];
+  for (let i = 0; i < 40; i++) units.push({ chars: 6, show: "あいうえおか" });
+  const sc = buildSchedule(units, { cpm: 1200, minMs: 10, ramp: 0, punctExtra: 0 });
+  near(sc.effCpm, 1200, 1, "目標 1200 字/分 がそのまま実効速度になる");
+  near(sc.totalMs, 40 * 6 / 1200 * 60000, 1, "総所要時間 = 字数 / 速度");
+  let mono = true;
+  for (let i = 1; i < sc.steps.length; i++) if (sc.steps[i].t <= sc.steps[i - 1].t) mono = false;
+  assert(mono, "開始時刻は単調増加");
+
+  const fast = buildSchedule(units, { cpm: 100000, minMs: 90, ramp: 0, punctExtra: 0 });
+  let floored = true;
+  fast.steps.forEach(function(s){ if (Math.abs(s.ms - 90) > 1e-9) floored = false; });
+  assert(floored, "どれだけ速度を上げても最短滞留 (視覚の下限) を割らない");
+
+  const ramped = buildSchedule(units, { cpm: 1200, minMs: 10, ramp: 50, punctExtra: 0 });
+  assert(ramped.totalMs < sc.totalMs, "漸増を効かせると同じ量が短時間で終わる");
+  assert(ramped.steps[39].ms < ramped.steps[0].ms, "後半ほど滞留が短くなる (速度が上がっている)");
+
+  const punct = buildSchedule([{ chars: 4, show: "ですが、" }, { chars: 4, show: "つぎに" }],
+                              { cpm: 600, minMs: 1, ramp: 0, punctExtra: 0.2 });
+  assert(punct.steps[0].ms > punct.steps[1].ms, "句読点では少し長く留まる");
+
+  let ok = true;
+  for (let t = 0; t < sc.totalMs; t += 37){
+    let lin = 0;
+    for (let i = 0; i < sc.steps.length; i++) if (sc.steps[i].t <= t) lin = i;
+    if (stepAt(sc, t) !== lin) ok = false;
+  }
+  assert(ok, "経過時刻から現在の単位を引く二分探索が総当たりと一致する");
+  assert(stepAt(sc, -100) === 0 && stepAt(sc, 1e9) === sc.steps.length - 1, "範囲外でも端に張り付く");
+  assert(stepAt({ steps: [] }, 0) === -1, "空のスケジュールでも落ちない");
+}
+
+/* ═══════════════ 14. 対象者プロファイル ═══════════════ */
+console.log("\n── 14. 対象者プロファイル ──");
+{
+  const p = profileFrom({ cpm: 600, span: 6, reg: 15, goal: 3 });
+  assert(p.net === 510, "逆行 15% を差し引いた実効読速 (" + p.net + " 字/分)");
+  assert(p.target === 1530, "目標 3 倍 = " + p.target + " 字/分");
+  assert(p.perBlock >= 1 && p.perBlock <= 8, "1 ブロックの固まり数が範囲内 (" + p.perBlock + ")");
+  assert(p.minMs >= 40 && p.minMs <= 400, "最短滞留が生理的な範囲 (" + p.minMs + " ms)");
+  const slow = profileFrom({ cpm: 600, span: 6, reg: 40, goal: 3 });
+  assert(slow.target < p.target && /逆行/.test(slow.note), "逆行が多い対象者には目標を下げ、警告を出す");
+  const hard = profileFrom({ cpm: 600, span: 6, reg: 0, goal: 8 });
+  assert(hard.ramp === 20 && /漸増/.test(hard.note), "高い目標には漸増を勧める");
+  near(loadIndex(12, 6), 2, 1e-12, "視野負荷 = ブロックの字数 / 視野幅");
+
+  const st = sessionStats(buildSchedule([{ chars: 6 }, { chars: 6 }], { cpm: 600, minMs: 1, ramp: 0 }), 6);
+  assert(st.units === 2 && st.chars === 12 && st.cpm === 600, "セッション成績の集計");
+  assert(st.load === 1, "1 ブロック 6 字 / 視野幅 6 字 = 負荷 1.0 (ちょうど見切れる)");
+}
+
+/* ═════════ 合成した読み手のフレーム ═════════ */
+/* 明るい壁を背景に、肌色の楕円 (顔) と、その上半分に二つの暗い楕円 (目)。
+   瞳の左右のずれ・目の開き具合・顔の位置を引数で動かせる。 */
+function makeFaceFrame(w, h, o){
+  o = o || {};
+  const cx = o.cx === undefined ? w / 2 : o.cx;
+  const cy = o.cy === undefined ? h / 2 : o.cy;
+  const rx = o.rx || Math.round(w * 0.25), ry = o.ry || Math.round(h * 0.38);
+  const pupil = o.pupil || 0;              /* 瞳の水平ずれ (画素) */
+  const lid = o.lid === undefined ? 4 : o.lid;   /* 目の縦半径。小さいほど閉じている */
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < w; x++){
+      const p = (y * w + x) * 4;
+      let r = 200, g = 205, b = 215;                     /* 明るい壁 (肌色ではない) */
+      const dx = (x - cx) / rx, dy = (y - cy) / ry;
+      if (dx * dx + dy * dy <= 1){ r = 222; g = 178; b = 148; }   /* 肌 */
+      rgba[p] = r; rgba[p + 1] = g; rgba[p + 2] = b; rgba[p + 3] = 255;
+    }
+  }
+  if (!o.noEyes){
+    const ey = cy - ry * 0.25;
+    [-1, 1].forEach(function(sgn){
+      const ex = cx + sgn * rx * 0.45 + pupil;
+      for (let y = Math.round(ey - lid); y <= Math.round(ey + lid); y++){
+        for (let x = Math.round(ex - 7); x <= Math.round(ex + 7); x++){
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const u = (x - ex) / 7, v = (y - ey) / Math.max(1, lid);
+          if (u * u + v * v > 1) continue;
+          const p = (y * w + x) * 4;
+          rgba[p] = 25; rgba[p + 1] = 22; rgba[p + 2] = 20;
+        }
+      }
+    });
+  }
+  return rgba;
+}
+
+/* ═══════════════ 15. 読み手の取り込み ═══════════════ */
+console.log("\n── 15. 読み手 (対象者) の取り込み ──");
+{
+  const w = 160, h = 120;
+  const frame = makeFaceFrame(w, h, {});
+  const skin = skinMask(frame, w, h);
+  let sk = 0;
+  for (let i = 0; i < skin.length; i++) sk += skin[i];
+  assert(sk > w * h * 0.10 && sk < w * h * 0.45, "肌色規則が顔だけを拾う (" + (sk / (w * h) * 100).toFixed(1) + "%)");
+  assert(skin[2 * w + 2] === 0, "背景の壁は肌色ではない");
+  assert(skin[(h / 2 | 0) * w + (w / 2 | 0)] === 1, "顔の中心は肌色");
+
+  const r = analyzeReaderFrame(frame, w, h, {});
+  assert(r.face !== null, "顔が一つの連結成分として掴まれる");
+  const fcx = r.face.x + r.face.w / 2, fcy = r.face.y + r.face.h / 2;
+  assert(Math.abs(fcx - w / 2) < 14 && Math.abs(fcy - h / 2) < 14,
+         "顔の中心が合っている (" + Math.round(fcx) + "," + Math.round(fcy) + " / 期待 80,60)");
+  assert(r.face.w > 50 && r.face.w < 110, "顔の幅が妥当 (" + r.face.w + " px)");
+  assert(r.eyes !== null, "目が二つ見つかる");
+  assert(r.eyes.left.cx < fcx && r.eyes.right.cx > fcx, "目は顔の中心の左右に分かれている");
+  assert(r.eyes.left.cy < fcy && r.eyes.right.cy < fcy, "目は顔の上半分にある");
+  assert(r.meta.patches > 100 && r.meta.windows > 0, "パッチと窓が立っている (" + r.meta.patches + " パッチ / " + r.meta.windows + " 窓)");
+
+  /* 瞳を右へずらすと視線指標が右へ動く */
+  const right = analyzeReaderFrame(makeFaceFrame(w, h, { pupil: 9 }), w, h, {});
+  const left = analyzeReaderFrame(makeFaceFrame(w, h, { pupil: -9 }), w, h, {});
+  assert(right.gaze.pupilX > left.gaze.pupilX, "瞳のずれが視線指標に出る (" +
+         right.gaze.pupilX.toFixed(3) + " > " + left.gaze.pupilX.toFixed(3) + ")");
+  assert(right.gaze.x > left.gaze.x, "総合の視線指標も同じ向きに動く");
+
+  /* 顔ごと右へ寄せると頭の偏りが出る */
+  const moved = analyzeReaderFrame(makeFaceFrame(w, h, { cx: w / 2 + 22 }), w, h, {});
+  assert(moved.gaze.headX > r.gaze.headX + 0.1, "顔の位置が頭の偏りとして出る");
+
+  /* 前面カメラは左右が逆 — 読み進む向きに合わせて符号が反転する */
+  assert(Math.abs(right.gaze.readX + right.gaze.x) < 1e-12, "前面カメラでは readX = −x");
+  const back = gazeFrom(r.face, r.eyes, w, h, { front: false });
+  assert(Math.abs(back.readX - back.x) < 1e-12, "背面カメラでは readX = x");
+
+  /* 瞬き — 目が縦につぶれると開き具合が落ちる */
+  const blink = analyzeReaderFrame(makeFaceFrame(w, h, { lid: 1 }), w, h, {});
+  assert(blink.eyes !== null && blink.eyes.openness < r.eyes.openness,
+         "閉じた目は開き具合が下がる (" + blink.eyes.openness.toFixed(2) + " < " + r.eyes.openness.toFixed(2) + ")");
+  assert(r.eyes.openness > 0.45 && blink.eyes.openness < 0.45,
+         "開閉が瞬きの閾値 0.45 をまたぐ");
+
+  /* 顔がないフレーム */
+  const empty = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++){ empty[i * 4] = 200; empty[i * 4 + 1] = 205; empty[i * 4 + 2] = 215; empty[i * 4 + 3] = 255; }
+  const none = analyzeReaderFrame(empty, w, h, {});
+  assert(none.face === null && none.gaze === null, "顔のないフレームでは何も掴まず、落ちない");
+
+  /* 動き — 前フレームを渡すと差分が効く */
+  const g0 = analyzeReaderFrame(frame, w, h, {});
+  const g1 = analyzeReaderFrame(makeFaceFrame(w, h, { cx: w / 2 + 10 }), w, h, { prevGray: g0.gray });
+  assert(g1.motion > 0 && g0.motion === 0, "前フレームとの差が動きとして出る (" + g1.motion.toFixed(4) + ")");
+  const feats = readerPatchFeatures(g0.gray, skinMask(frame, w, h), motionMap(g0.gray, null), w, h, 8);
+  assert(feats.F === 10 && feats.feat.length === feats.n * 10, "読み手のパッチは 10 次元");
+  assert(feats.dens[Math.floor(feats.rows / 2) * feats.cols + Math.floor(feats.cols / 2)] > 0.9,
+         "顔の中心のパッチは肌色密度がほぼ 1");
+}
+
+/* ═══════════════ 16. 視線の追跡 ═══════════════ */
+console.log("\n── 16. 視線の追跡 (停留 / サッカード / 逆行 / 瞬き) ──");
+{
+  /* 横書き: 右へ 4 回進み、1 回だけ左へ戻る */
+  const tr = trackerNew({ dir: "h", sacThr: 0.10 });
+  const xs = [-0.6, -0.3, 0.0, 0.3, -0.2, 0.1];
+  for (let i = 0; i < xs.length; i++)
+    trackerPush(tr, { t: i * 250, x: xs[i], y: 0, open: 1, chars: 6, target: xs[i] });
+  const st = trackerStats(tr);
+  assert(st.saccades === 5, "跳んだ回数 = 5 (" + st.saccades + ")");
+  assert(st.regressions === 1, "左へ戻ったのは 1 回 = 逆行 1 (" + st.regressions + ")");
+  assert(st.regRate === 20, "逆行率 20% (" + st.regRate + "%)");
+  assert(st.fixations === 5 && st.meanFixMs === 250, "停留 5 回・中央値 250 ms");
+  assert(st.span === 7.2, "測れた視野幅 = 字数/停留 = 36/5 = 7.2 (" + st.span + ")");
+  assert(st.fixPerMin > 0, "1 分あたりの停留数が出る (" + st.fixPerMin + ")");
+
+  /* 微動だけなら跳んだことにしない */
+  const tr2 = trackerNew({ dir: "h" });
+  for (let i = 0; i < 10; i++) trackerPush(tr2, { t: i * 100, x: 0.01 * (i % 2), y: 0, open: 1 });
+  assert(trackerStats(tr2).saccades === 0, "閾値以下の揺れはサッカードに数えない");
+
+  /* 縦書き: 下へ進むのが順、上へ戻るか右の列へ跳ぶのが逆行 */
+  const tv = trackerNew({ dir: "v", sacThr: 0.10 });
+  const pts = [[0, -0.5], [0, -0.2], [0, 0.2], [0, -0.1], [0.4, 0.0]];
+  for (let i = 0; i < pts.length; i++)
+    trackerPush(tv, { t: i * 200, x: pts[i][0], y: pts[i][1], open: 1 });
+  const sv = trackerStats(tv);
+  assert(sv.regressions === 2, "縦書きでは上へ戻る跳びと右の列へ戻る跳びが逆行 (" + sv.regressions + ")");
+
+  /* 瞬き */
+  const tb = trackerNew({});
+  const opens = [1, 1, 0.2, 0.2, 1, 1, 0.1, 1];
+  for (let i = 0; i < opens.length; i++)
+    trackerPush(tb, { t: i * 120, x: 0, y: 0, open: opens[i] });
+  assert(trackerStats(tb).blinks === 2, "閉じている連続は 1 回と数える (" + trackerStats(tb).blinks + " 回)");
+
+  /* 追従率 — 照らしている所と視線が合っているか */
+  const tsame = trackerNew({});
+  const tfar = trackerNew({});
+  for (let i = 0; i < 5; i++){
+    trackerPush(tsame, { t: i * 200, x: -0.5 + i * 0.25, y: 0, open: 1, target: -0.5 + i * 0.25 });
+    trackerPush(tfar, { t: i * 200, x: -1, y: 0, open: 1, target: 1 });
+  }
+  assert(trackerStats(tsame).sync === 100, "視線が照らした所に乗っていれば追従率 100%");
+  assert(trackerStats(tfar).sync === 0, "正反対を見ていれば追従率 0%");
+
+  /* 顔を見失ったフレーム */
+  const tl = trackerNew({});
+  trackerPush(tl, { t: 0, x: 0, y: 0, open: 1 });
+  trackerPush(tl, { t: 100, x: null, y: null });
+  assert(trackerStats(tl).lost === 1, "顔を見失ったフレームは lost として数え、跳びには数えない");
+  assert(trackerStats(tl).saccades === 0, "見失いでサッカードを誤検出しない");
+}
+
+/* ═══════════════ 17. 読み手の見え方 ═══════════════ */
+console.log("\n── 17. 読み手の見え方 (解像力・知覚スパン・サッカード抑制) ──");
+{
+  const m6 = acuityModel(6), m14 = acuityModel(14);
+  assert(m14.f0 > m6.f0 && m14.E2 > m6.E2, "視野幅の広い読み手ほど中心窩の平地も E2 も大きい");
+  assert(acuityModel(6, 2).E2 > m6.E2, "誇張の倍率が効く");
+
+  const sp = perceptualSpan(6);
+  assert(sp.fwd === 6 && sp.bwd < sp.fwd, "知覚スパンは前に広く後ろに狭い (" + sp.fwd + " / " + sp.bwd.toFixed(1) + ")");
+
+  const geom = { dir: "h", pitch: 20, lineH: 34, span: sp };
+  near(viewEcc(0, 0, geom), 0, 1e-12, "注視点そのものの離心率は 0");
+  const fwd5 = viewEcc(5 * 20, 0, geom), bwd5 = viewEcc(-5 * 20, 0, geom);
+  assert(bwd5 > fwd5 * 2.5, "同じ距離でも後ろへ戻るほうがずっと見えにくい (" +
+         fwd5.toFixed(2) + " / " + bwd5.toFixed(2) + ")");
+  const oneLine = viewEcc(0, 34, geom);
+  assert(oneLine > fwd5, "1 行離れるのは 5 字先へ進むより見えにくい (" + oneLine.toFixed(2) + ")");
+  assert(Math.abs(viewEcc(0, 34, geom) - viewEcc(0, -34, geom)) < 1e-12, "行をまたぐ向きは上下で対称");
+
+  const gv = { dir: "v", pitch: 20, lineH: 34, span: sp };
+  assert(Math.abs(viewEcc(0, 5 * 20, gv) - fwd5) < 1e-9, "縦書きでは下へ進むのが「前」");
+  assert(viewEcc(0, -5 * 20, gv) > viewEcc(0, 5 * 20, gv), "縦書きで上へ戻るのは見えにくい");
+  assert(viewEcc(34, 0, gv) > viewEcc(0, 5 * 20, gv), "縦書きで隣の列は行またぎと同じ扱い");
+
+  assert(blurChars(0, m6) === 0 && blurChars(m6.f0, m6) === 0, "中心窩の平地ではぼけない");
+  assert(blurChars(m6.f0 + m6.E2, m6) > 0.9 && blurChars(m6.f0 + m6.E2, m6) < 1.1,
+         "E2 だけ離れると字 1 個ぶんぼける");
+  assert(blurChars(10, m14) < blurChars(10, m6), "視野幅の広い読み手は同じ距離でもぼけが小さい");
+  near(eccForBlur(blurChars(7, m6), m6), 7, 1e-9, "ぼけ→離心率の逆算が一致する (輪の半径)");
+
+  near(viewBlurPx(0, 0, geom, m6), 0, 1e-12, "注視点はぼけない");
+  assert(viewBlurPx(-5 * 20, 0, geom, m6) > viewBlurPx(5 * 20, 0, geom, m6),
+         "同じ距離なら後ろのほうが大きくぼける");
+  assert(viewContrast(0, m6) === 1 && viewContrast(20, m6) < 0.5, "周辺ほどコントラストも落ちる");
+
+  assert(saccadeVisibility(0, 0.12) < 0.2, "跳びはじめは見えていない (サッカード抑制)");
+  assert(saccadeVisibility(0.12, 0.12) === 1 && saccadeVisibility(0.6, 0.12) === 1, "着地したら見えている");
+  assert(saccadeVisibility(0.06, 0.12) > saccadeVisibility(0.01, 0.12), "抑制は着地に向けて解ける");
+  assert(saccadeVisibility(0, 0) === 1, "抑制を切れば常に見えている");
+}
+
+/* ═══════════════ 18. 本文の組版 ═══════════════ */
+console.log("\n── 18. 本文を頁に組む ──");
+{
+  const cs = textChunks(
+    "速読とは、字を速く見る技術ではない。視点を送る順番を先に知っている状態のことである。" +
+    "本の頁は、文字の海ではなく、固まりの列である。切れ目を目が先に知っていれば、視点は迷わず次へ渡る。", {});
+  const pg = layoutTextPage(cs, { dir: "h", fontSize: 30, perLine: 20, maxLines: 10 });
+  assert(pg.glyphs.length > 50, "字が頁に置かれる (" + pg.glyphs.length + " 字)");
+  assert(pg.units.length > 0 && pg.units.length <= cs.length, "固まりが単位として置かれる (" + pg.units.length + ")");
+  let inside = true;
+  pg.glyphs.forEach(function(g){ if (g.x < 0 || g.y < 0 || g.x + g.size > pg.w || g.y + g.size > pg.h) inside = false; });
+  assert(inside, "字がすべて頁の内側に収まる");
+  let unitsInside = true;
+  pg.units.forEach(function(u){ if (u.x < 0 || u.y < 0 || u.x + u.w > pg.w + 1 || u.y + u.h > pg.h + 1) unitsInside = false; });
+  assert(unitsInside, "単位の矩形も頁の内側");
+  assert(pg.pitch === 30, "字送りは字の大きさ");
+  let order = true;
+  for (let i = 1; i < pg.units.length; i++){
+    const a = pg.units[i - 1], b = pg.units[i];
+    if (b.line < a.line) order = false;
+    if (b.line === a.line && b.x < a.x - 1e-6) order = false;
+  }
+  assert(order, "単位は行の順・行内は左から右に並ぶ");
+  let sameLine = 0;
+  for (let i = 0; i < pg.units.length; i++) if (pg.units[i].h <= pg.lineH + 1) sameLine++;
+  assert(sameLine === pg.units.length, "固まりは行をまたがない (またぐと固まりとして見えなくなる)");
+
+  const vpg = layoutTextPage(cs, { dir: "v", fontSize: 30, perLine: 14, maxLines: 8 });
+  assert(vpg.glyphs.length > 30, "縦書きでも字が置かれる");
+  const l0 = vpg.glyphs.filter(function(g){ return g.line === 0; });
+  const l1 = vpg.glyphs.filter(function(g){ return g.line === 1; });
+  assert(l0.length && l1.length && l1[0].x < l0[0].x, "縦書きの二列目は一列目の左に来る");
+  assert(l0[1].y > l0[0].y, "縦書きは列の中を上から下へ進む");
+
+  const pages = paginateText(cs, { dir: "h", fontSize: 30, perLine: 12, maxLines: 4 });
+  assert(pages.length > 1, "収まらないぶんは次の頁へ (" + pages.length + " 頁)");
+  const total = pages.reduce(function(a, p){ return a + p.units.length; }, 0);
+  assert(total === cs.length, "全部の固まりがどこかの頁に載る (" + total + " / " + cs.length + ")");
+  let joined = "";
+  pages.forEach(function(p){ p.units.forEach(function(u){ joined += u.show; }); });
+  assert(joined === cs.map(function(c){ return c.show; }).join(""), "頁に組んでも本文は一字も落ちない");
+}
+
+/* ═══════════════ 19. 多行ブロックと、その見え方 ═══════════════ */
+console.log("\n── 19. 多行ブロック (複数行を一度に見る) ──");
+{
+  /* 4 行 × 6 固まりの版面を作る */
+  const lines = [];
+  for (let li = 0; li < 4; li++){
+    const chunks = [];
+    for (let ci = 0; ci < 6; ci++)
+      chunks.push({ x: 10 + ci * 30, y: 10 + li * 40, w: 26, h: 30, chars: 3, line: li, block: 0,
+                    show: "あ" + li + ci });
+    lines.push({ chunks: chunks });
+  }
+  const one = groupChunksMulti(lines, 3, 1, "h");
+  assert(one.length === 8, "1 行ブロックなら 4 行 × 2 = 8 ブロック (" + one.length + ")");
+  assert(one.every(function(b){ return b.h <= 31; }), "1 行ブロックは 1 行の高さに収まる");
+  const two = groupChunksMulti(lines, 3, 2, "h");
+  assert(two.length === 4, "2 行ずつ束ねると 2 帯 × 2 列 = 4 ブロック (" + two.length + ")");
+  assert(two.every(function(b){ return b.lines === 2 && b.h > 40; }), "多行ブロックは 2 行ぶんの高さを持つ");
+  assert(two.every(function(b){ return b.chars === 18; }), "1 ブロックの字数は 3 固まり × 2 行 = 18 字");
+  const all = groupChunksMulti(lines, 6, 4, "h");
+  assert(all.length === 1 && all[0].chars === 72 && all[0].lines === 4,
+         "頁ぜんぶを一度に見る指定もできる (1 ブロック 72 字 / 4 行)");
+  /* 取りこぼしと重複がない */
+  const seen = {};
+  let dup = false, total = 0;
+  [one, two, all].forEach(function(gs, k){
+    const count = {};
+    gs.forEach(function(b){ total += b.chars; });
+  });
+  assert(one.reduce(function(a, b){ return a + b.chars; }, 0) === 72 &&
+         two.reduce(function(a, b){ return a + b.chars; }, 0) === 72,
+         "どの束ね方でも字は一字も落ちず、重複もしない");
+  /* 読み順 */
+  assert(two[0].y < two[2].y, "帯は上から下へ");
+  assert(two[0].x < two[1].x, "帯の中は左から右へ");
+  const vlines = [];
+  for (let li = 0; li < 4; li++){
+    const chunks = [];
+    for (let ci = 0; ci < 6; ci++)
+      chunks.push({ x: 200 - li * 40, y: 10 + ci * 30, w: 30, h: 26, chars: 3, line: li, block: 0 });
+    vlines.push({ chunks: chunks });
+  }
+  const vtwo = groupChunksMulti(vlines, 3, 2, "v");
+  assert(vtwo.length === 4, "縦書きでも 2 列ずつ × 2 段 = 4 ブロック");
+  assert(vtwo[0].y < vtwo[1].y, "縦書きの帯の中は上から下へ");
+  assert(vtwo[0].x > vtwo[2].x, "縦書きの帯は右から左へ");
+
+  /* 多行を取れる読み手は、行をまたいでも見える */
+  const sp1 = perceptualSpan(6, 1), sp3 = perceptualSpan(6, 3);
+  assert(sp3.acrossPlateau > sp1.acrossPlateau, "取れる行数ぶんだけ平地が広がる");
+  const g1 = { dir: "h", pitch: 20, lineH: 34, span: sp1 };
+  const g3 = { dir: "h", pitch: 20, lineH: 34, span: sp3 };
+  assert(viewEcc(0, 34, g1) > 5 && viewEcc(0, 34, g3) === 0,
+         "1 行しか取れない読み手には隣の行が見えず、3 行取れる読み手には見えている");
+  assert(blurChars(viewEcc(0, 34, g3), acuityModel(6)) === 0, "3 行取れる読み手は隣の行もぼけない");
+
+  /* 等離心率の楕円は viewEcc の逆写像である (中心までぼける不具合を捕まえる検査) */
+  [1.5, 3, 6, 10].forEach(function(ecc){
+    [g1, g3].forEach(function(gm){
+      const el = isoEllipse(ecc, gm);
+      const fwd = viewEcc(el.ox + el.rx, 0, gm);
+      const bwd = viewEcc(el.ox - el.rx, 0, gm);
+      /* 等離心率の輪郭は前後で半径が違う「卵形」なので、楕円はその近似である。
+         前端・後端・(注視点を通る) 上端の三軸では厳密に一致していなければならない。 */
+      const acr = viewEcc(0, el.ry, gm);
+      near(fwd, ecc, 1e-6, "楕円の前端が離心率 " + ecc + " に一致");
+      near(bwd, ecc, 1e-6, "楕円の後端が離心率 " + ecc + " に一致");
+      near(acr, ecc, 1e-6, "楕円の上端 (行をまたぐ向き) が離心率 " + ecc + " に一致");
+    });
+  });
+
+  /* 対象者プロファイルにも行数が乗る */
+  const pr = profileFrom({ cpm: 600, span: 8, reg: 10, goal: 3, lines: 3 });
+  assert(pr.perLines === 3 && /面で読める/.test(pr.note), "面で読める対象者には多行ブロックを勧める");
+  const pr1 = profileFrom({ cpm: 600, span: 8, reg: 10, goal: 3 });
+  assert(pr1.perLines === 1, "行数を言われなければ 1 行のまま");
+}
+
+/* ═══════════ ここから非同期 (取り込みは展開を伴うため) ═══════════ */
+
+const zlib = require("zlib");
+/* 検査用に ZIP を組む (Node の zlib で deflate するので、読み側とは別実装) */
+function makeZip(files){
+  const parts = [], central = [];
+  let offset = 0;
+  files.forEach(function(f){
+    const raw = Buffer.from(f.data, "utf8");
+    const comp = f.store ? raw : zlib.deflateRawSync(raw);
+    const name = Buffer.from(f.name, "utf8");
+    const crc = zlib.crc32 ? zlib.crc32(raw) : 0;
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6);
+    lh.writeUInt16LE(f.store ? 0 : 8, 8); lh.writeUInt32LE(crc, 14);
+    lh.writeUInt32LE(comp.length, 18); lh.writeUInt32LE(raw.length, 22);
+    lh.writeUInt16LE(name.length, 26); lh.writeUInt16LE(0, 28);
+    parts.push(lh, name, comp);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6);
+    ch.writeUInt16LE(f.store ? 0 : 8, 10); ch.writeUInt32LE(crc, 16);
+    ch.writeUInt32LE(comp.length, 20); ch.writeUInt32LE(raw.length, 24);
+    ch.writeUInt16LE(name.length, 28); ch.writeUInt32LE(offset, 42);
+    central.push(ch, name);
+    offset += lh.length + name.length + comp.length;
+  });
+  const cd = Buffer.concat(central);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(files.length, 8); eocd.writeUInt16LE(files.length, 10);
+  eocd.writeUInt32LE(cd.length, 12); eocd.writeUInt32LE(offset, 16);
+  return new Uint8Array(Buffer.concat([Buffer.concat(parts), cd, eocd]));
+}
+const T1 = "速読とは、字を速く見る技術ではない。";
+const T2 = "視点を送る順番を先に知っている状態のことである。";
+
+async function asyncChecks(){
+  /* ═══════════════ 20. 取り込み (deflate / ZIP / 文書形式) ═══════════════ */
+  console.log("\n── 20. 取り込み: deflate と ZIP と文書形式 ──");
+  {
+    /* 内蔵 deflate — Node の zlib が作った本物の圧縮を開く */
+    const src = Buffer.from((T1 + T2).repeat(40) + "0123456789".repeat(30), "utf8");
+    const raw = new Uint8Array(zlib.deflateRawSync(src));
+    const wrapped = new Uint8Array(zlib.deflateSync(src));
+    const a = inflateRawSync(raw), b = inflateSync(wrapped);
+    assert(Buffer.compare(Buffer.from(a), src) === 0, "内蔵 deflate が生の圧縮を元に戻す (" + src.length + " 字節)");
+    assert(Buffer.compare(Buffer.from(b), src) === 0, "zlib 包みも元に戻す");
+    const stored = new Uint8Array(zlib.deflateRawSync(src, { level: 0 }));
+    assert(Buffer.compare(Buffer.from(inflateRawSync(stored)), src) === 0, "無圧縮ブロックも読める");
+    const big = Buffer.alloc(70000);
+    for (let i = 0; i < big.length; i++) big[i] = (i * 7 + (i >> 5)) & 0xff;
+    assert(Buffer.compare(Buffer.from(inflateRawSync(new Uint8Array(zlib.deflateRawSync(big)))), big) === 0,
+           "70 KB でも一致する (後方参照と動的ハフマン)");
+    const viaApi = await inflateBytes(raw, true);
+    assert(Buffer.compare(Buffer.from(viaApi), src) === 0,
+           "環境の DecompressionStream を使う経路も同じ結果になる");
+
+    /* ZIP */
+    const zip = makeZip([{ name: "a.txt", data: T1 }, { name: "b/c.txt", data: T2, store: true }]);
+    const list = zipList(zip);
+    assert(list.length === 2 && list[0].name === "a.txt" && list[1].name === "b/c.txt",
+           "ZIP の中身が一覧できる");
+    assert(bytesToText(await zipEntryData(zip, list[0])) === T1, "圧縮された項目を取り出せる");
+    assert(bytesToText(await zipEntryData(zip, list[1])) === T2, "無圧縮の項目も取り出せる");
+
+    /* docx */
+    const docx = makeZip([{ name: "[Content_Types].xml", data: "<Types/>" },
+      { name: "word/document.xml", data: "<w:document><w:body>" +
+        "<w:p><w:r><w:t>" + T1 + "</w:t></w:r></w:p>" +
+        "<w:p><w:r><w:t>" + T2 + "</w:t><w:t>&amp;続き</w:t></w:r></w:p></w:body></w:document>" }]);
+    const rdocx = await extractFile("本.docx", docx);
+    assert(rdocx.kind === "docx" && rdocx.text.indexOf(T1) === 0, "docx の本文が段落の順に出る");
+    assert(/続き$/.test(rdocx.text) && !/&amp;/.test(rdocx.text), "実体参照が戻り、同じ段落の断片が繋がる");
+
+    /* odt */
+    const odt = makeZip([{ name: "content.xml", data:
+      "<office><text:h>見出し</text:h><text:p>" + T1 + "</text:p><text:p>" + T2 + "</text:p></office>" }]);
+    const rodt = await extractFile("本.odt", odt);
+    assert(rodt.kind === "odf" && /^見出し\n/.test(rodt.text) && rodt.text.indexOf(T2) > 0, "odt の見出しと段落が出る");
+
+    /* pptx — 枚の順に */
+    const pptx = makeZip([
+      { name: "ppt/slides/slide10.xml", data: "<a:t>十枚目</a:t>" },
+      { name: "ppt/slides/slide2.xml", data: "<a:t>二枚目</a:t>" },
+      { name: "ppt/slides/slide1.xml", data: "<a:t>一枚目</a:t>" }]);
+    const rp = await extractFile("発表.pptx", pptx);
+    assert(rp.text.indexOf("一枚目") < rp.text.indexOf("二枚目") &&
+           rp.text.indexOf("二枚目") < rp.text.indexOf("十枚目"), "pptx は枚数の順に並ぶ (10 が 2 より後)");
+
+    /* xlsx — 共有文字列を解く */
+    const xlsx = makeZip([
+      { name: "xl/sharedStrings.xml", data: "<sst><si><t>" + T1 + "</t></si><si><t>" + T2 + "</t></si></sst>" },
+      { name: "xl/worksheets/sheet1.xml", data:
+        "<worksheet><sheetData><row><c t=\"s\"><v>0</v></c><c><v>42</v></c></row>" +
+        "<row><c t=\"s\"><v>1</v></c></row></sheetData></worksheet>" }]);
+    const rx = await extractFile("表.xlsx", xlsx);
+    assert(rx.text.indexOf(T1) >= 0 && rx.text.indexOf(T2) >= 0 && /42/.test(rx.text),
+           "xlsx は共有文字列を解いて値と一緒に出す");
+
+    /* epub — 背 (spine) の順に */
+    const epub = makeZip([
+      { name: "mimetype", data: "application/epub+zip", store: true },
+      { name: "OEBPS/book.opf", data:
+        "<package><manifest><item id='c2' href='ch2.xhtml'/><item id='c1' href='ch1.xhtml'/></manifest>" +
+        "<spine><itemref idref='c1'/><itemref idref='c2'/></spine></package>" },
+      { name: "OEBPS/ch2.xhtml", data: "<html><body><p>" + T2 + "</p></body></html>" },
+      { name: "OEBPS/ch1.xhtml", data: "<html><body><h1>第一章</h1><p>" + T1 + "</p></body></html>" }]);
+    const re = await extractFile("本.epub", epub);
+    assert(re.kind === "epub" && re.text.indexOf("第一章") >= 0, "epub の本文が出る");
+    assert(re.text.indexOf(T1) < re.text.indexOf(T2), "epub は綴じの順 (spine) に読む — 収録順ではない");
+
+    /* ただの zip — 中の読めるものを拾う */
+    const plain = makeZip([{ name: "note.txt", data: T1 }, { name: "readme.md", data: T2 }]);
+    const rz = await extractFile("まとめ.zip", plain);
+    assert(rz.text.indexOf(T1) >= 0 && rz.text.indexOf(T2) >= 0, "ただの ZIP は中の文書をすべて拾う");
+  }
+
+  /* ═══════════════ 21. 実物の PDF とそのほかの拡張子 ═══════════════ */
+  console.log("\n── 21. 実物の PDF と、そのほかの拡張子 ──");
+  {
+    const fxdir = path.join(__dirname, "fixtures");
+    const pdf = new Uint8Array(fs.readFileSync(path.join(fxdir, "real-chromium.pdf")));
+    const rp = await extractFile("real-chromium.pdf", pdf);
+    assert(rp.kind === "pdf", "PDF と判定される");
+    assert(rp.pages.length === 2, "頁の数が合う (" + rp.pages.length + " 頁)");
+    assert(/速読とは、視点を送る順番である。/.test(rp.text),
+           "和文が ToUnicode で正しく戻る: " + JSON.stringify(rp.text.split("\n")[0]));
+    assert(/The span is asymmetric\./.test(rp.text), "欧文は語間の空白を保つ");
+    assert(!/\s速読\s*とは/.test(rp.text), "和文に余分な空白を入れない (送りの空きは語の切れ目ではない)");
+    assert(rp.pages[0].text.indexOf("速読") >= 0 && rp.pages[1].text.indexOf("span") >= 0,
+           "頁ごとに本文が分かれている");
+
+    const scan = new Uint8Array(fs.readFileSync(path.join(fxdir, "scanned-jpeg.pdf")));
+    const rs = await extractFile("scanned-jpeg.pdf", scan);
+    assert(rs.images.length === 1, "走査した頁の PDF から埋め込み JPEG が出る");
+    assert(rs.images[0][0] === 0xFF && rs.images[0][1] === 0xD8, "取り出したものが JPEG そのもの");
+    assert(rs.text === "", "走査した頁には文字がない (画像として扱われる)");
+
+    /* ToUnicode CMap の解釈 */
+    const cm = pdfParseCMap(
+      "1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n" +
+      "1 beginbfchar\n<0041> <901F>\nendbfchar\n" +
+      "1 beginbfrange\n<0050> <0052> <3042>\nendbfrange\n");
+    assert(cm.width === 2, "codespacerange から符号の幅 (2 バイト) を読む");
+    assert(cm.map.get(0x41) === "速", "bfchar が写る");
+    assert(cm.map.get(0x50) === "あ" && cm.map.get(0x51) === "ぃ" && cm.map.get(0x52) === "い",
+           "bfrange が符号位置の連番で写る (あ ぃ い)");
+    assert(pdfRef("12 0 R") === 12 && pdfRef("<</F1 4 0 R>>") === null,
+           "間接参照は値そのものが参照のときだけ (辞書を参照と取り違えない)");
+    assert(pdfGet("<</A 1 /Font <</F1 4 0 R>> /B 2>>", "Font") === "<</F1 4 0 R>>",
+           "入れ子の辞書を正しく切り出す");
+
+    /* そのほかの拡張子 */
+    const enc = new TextEncoder();
+    const html = await extractFile("x.html", enc.encode(
+      "<html><head><style>p{}</style></head><body><h1>題</h1><p>" + T1 + "</p><p>" + T2 + "&amp;も</p></body></html>"));
+    assert(html.kind === "markup" && html.text.indexOf("p{}") < 0 && /も$/.test(html.text),
+           "html は style を捨て、実体参照を戻す");
+    const rtf = await extractFile("x.rtf", enc.encode("{\\rtf1\\ansi Hello\\par \\u36895 \\u35501 \\par}"));
+    assert(/Hello/.test(rtf.text) && /速読/.test(rtf.text), "rtf の \\u 表記が日本語に戻る");
+    const srt = await extractFile("x.srt", enc.encode("1\n00:00:01,000 --> 00:00:03,000\n" + T1 + "\n"));
+    assert(srt.kind === "subs" && srt.text === T1, "字幕は番号と時刻を落として台詞だけになる");
+    const csv = await extractFile("x.csv", enc.encode("見出し,値\n" + T1 + ",1\n"));
+    assert(csv.kind === "csv" && csv.text.indexOf(T1) >= 0, "csv は行ごとに繋がる");
+    const json = await extractFile("x.json", enc.encode(JSON.stringify({ a: T1, b: [T2], n: 3 })));
+    assert(json.text.indexOf(T1) >= 0 && json.text.indexOf(T2) >= 0, "json は文字列だけを拾う");
+    const tex = await extractFile("paper.tex", enc.encode("\\documentclass{article}\\begin{document}" + T1 + "\\end{document}"));
+    assert(tex.kind === "latex" && tex.text === T1, "tex は本文だけになる");
+    const unknown = await extractFile("memo.badaext", enc.encode(T1));
+    assert(unknown.kind === "text" && unknown.text === T1, "知らない拡張子でも、文字として読めれば本文になる");
+    const bin = new Uint8Array(512);
+    for (let i = 0; i < bin.length; i++) bin[i] = i & 0xff;
+    const rb = await extractFile("x.bin", bin);
+    assert(rb.text === "" && /読めない/.test(rb.note), "文字でないものは、そうと言って受け取らない");
+
+    /* 拡張子より中身を優先する */
+    assert(sniffFormat("book.txt", pdf).kind === "pdf", "拡張子が違っても中身が PDF なら PDF");
+    assert(sniffFormat("a.docx", makeZip([{ name: "word/document.xml", data: "<w:t>x</w:t>" }])).kind === "docx",
+           "ZIP の中身で docx を見分ける");
+    assert(sniffFormat("photo.png", new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0])).kind === "image", "PNG の魔法数");
+    assert(sniffFormat("photo.jpg", new Uint8Array([0xff, 0xd8, 0xff, 0xe0])).kind === "image", "JPEG の魔法数");
+    const bom = new Uint8Array([0xFF, 0xFE, 0x42, 0x00]);
+    assert(bytesToText(bom) === "B", "UTF-16 の BOM を見て読む");
+    assert(looksBinary(bin) && !looksBinary(enc.encode(T1)), "文字かどうかの判定");
+  }
+}
+
+function finish(){
+  console.log("");
+  console.log(checks + " 項目を検査。");
+  if (failures){ console.error("FAILURES: " + failures); process.exit(1); }
+  console.log("すべて通過 — Bada 瞬読 のエンジンは、どんなファイルからでも本文と版面を取り出し、");
+  console.log("固まりと読み順を復元し、読み手にどう見えているかまで描ける。");
+}
+asyncChecks().then(finish, function(e){
+  console.error("非同期の検査で例外: " + (e && e.stack ? e.stack : e));
+  process.exit(1);
+});
