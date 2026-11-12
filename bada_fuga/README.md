@@ -4618,10 +4618,21 @@ python3 compose_tablet241.py bank201.json src score_tablet241.json && python3 sy
 | III | 100〜150 | 月読様の声 (2 回目) + トラック 8 の続き (100 秒から) |
 | IV | 150〜176 | トラック 18 の後半、消える |
 
+- 測った音量 (4 秒 rms、モノ、10 小節ごと): −35.7 → −17.0 → −19.0 → −19.2 → −21.6 → −28.3 → −21.0 → −20.5 → −18.6 → −21.8 → −23.0 → −20.2 → −19.9 → −22.5 → −21.6 → −26.5 → −25.2 dB。全体 mean −18.0 dB、max 0.0 dB。26.5 MiB。
 - `compose_tablet242.py` (compose_tablet241 から; bank201.json、3 つの wav — 声は月読様の 20261112_144938.wav — で作れる)
 
 ```bash
 python3 compose_tablet242.py bank201.json src score_tablet242.json && python3 synth.py score_tablet242.json tablet242.wav && python3 video.py score_tablet242.json tablet242.wav tablet242.mp4
+```
+
+## 🌙📼📼 Requiem BADA — Tablet Sessions CCXLIII · Tsukuyomi in Sol♯, Re♭ e Fa♯ con le due tracce (11/12 14:49 の声を G♯3・D♭2・F♯3 の 3 声の月読様の 20 代の女性の声にして、トラック 18 とトラック 8 を重ねて, ヘ長調 / ニ短調, ♩=60, 11 分 44 秒)
+
+CCXLII と同じ録音・同じ作りで、3 声の高さと音階を変える: G♯3 = 207.7 Hz (10.69 半音上げ、変イ長調の音階、フォルマント 1.15 倍、1.0)、D♭2 = 69.3 Hz (8.31 半音下げ、変ニ長調、1.12 倍、38 ms 遅れ、0.85)、F♯3 = 185.0 Hz (8.69 半音上げ、嬰ヘ長調、1.14 倍、74 ms 遅れ、0.85)。測った中央値 211 / 70 / 187 Hz。D♭2 は女性の声域より 1 オクターヴ以上低いので、この声は女性のフォルマントのまま低い支え (ドローン) のように鳴る — 指定どおりに作ったが、D♭3 (138.6 Hz) に変えることもできる。低音を残すため低域の削りは 50 Hz 以下だけ (CCXLII は 120 Hz 以下)。他は同じ (9 kHz 以上を落とし、5〜9 kHz +1.5 dB、残響 2.2 秒・0.35、rms −24 dB)。曲は CCXLII と同じ組み立て (声 2 回 0.5、トラック 18 そのまま 3 回、トラック 8 を 4 度上げて)、楽器なし。声だけの音声も 1 ファイル
+
+- `compose_tablet243.py` (compose_tablet242 から; bank201.json、3 つの wav で作れる)
+
+```bash
+python3 compose_tablet243.py bank201.json src score_tablet243.json && python3 synth.py score_tablet243.json tablet243.wav && python3 video.py score_tablet243.json tablet243.wav tablet243.mp4
 ```
 
 ## 作り方 (再現)
