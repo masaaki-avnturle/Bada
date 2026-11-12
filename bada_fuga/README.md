@@ -4605,6 +4605,25 @@ python3 compose_tablet240.py bank240.json src score_tablet240.json && python3 sy
 python3 compose_tablet241.py bank201.json src score_tablet241.json && python3 synth.py score_tablet241.json tablet241.wav && python3 video.py score_tablet241.json tablet241.wav tablet241.mp4
 ```
 
+## 🌙📼📼 Requiem BADA — Tablet Sessions CCXLII · Tsukuyomi in Sol, Re e Fa con le due tracce (11/12 14:49 の声を G3・D3・F3 の 3 声の月読様の 20 代の女性の声にして、トラック 18 とトラック 8 を重ねて, ヘ長調 / ニ短調, ♩=60, 11 分 44 秒)
+
+**声**: 新しい録音 20261112_144938 (男声、基音 112 Hz、178 秒、rms −28.2 dB) を feminize_voice.py で 3 つの高さの 20 代の女性の声に — G3 = 196 Hz (9.69 半音上げ、ト長調の音階、フォルマント 1.15 倍、1.0)、D3 = 146.8 Hz (4.69 半音、ニ長調、1.12 倍、38 ms 遅れ、0.85)、F3 = 174.6 Hz (7.69 半音、ヘ長調、1.14 倍、74 ms 遅れ、0.85)。それぞれ 0.9 で音階に調律 (測った中央値 197 / 147 / 176 Hz)。月の澄んだ声: 9 kHz 以上を落とし、5〜9 kHz を +1.5 dB、120 Hz 以下を半分に、柔らかい圧縮、残響 2.2 秒・0.35、rms −24 dB。声だけの音声も 1 ファイル (mp3 192 kbps)
+
+**曲**: 3 つの音だけ、楽器は何も加えない。組み立ては CCIX / CCXLI と同じで、月読様の声を 2 回 (0.5)、トラック 18 (ニ短調) はそのまま 3 回 (0.5 / 0.45)、トラック 8 (ハ長調 / イ短調) は 4 度上げて全部と続き (0.5 / 0.4)
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜52 | 月読様の声 (G3・D3・F3、178 秒) + トラック 18 |
+| II | 52〜100 | トラック 8 (4 度上げて、全部) + トラック 18 (2 回目) |
+| III | 100〜150 | 月読様の声 (2 回目) + トラック 8 の続き (100 秒から) |
+| IV | 150〜176 | トラック 18 の後半、消える |
+
+- `compose_tablet242.py` (compose_tablet241 から; bank201.json、3 つの wav — 声は月読様の 20261112_144938.wav — で作れる)
+
+```bash
+python3 compose_tablet242.py bank201.json src score_tablet242.json && python3 synth.py score_tablet242.json tablet242.wav && python3 video.py score_tablet242.json tablet242.wav tablet242.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
