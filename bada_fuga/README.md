@@ -4583,6 +4583,10 @@ python3 build_sampler.py bank1112 20261112_133145.wav   # 変換後の声の採�
 python3 compose_tablet240.py bank240.json src score_tablet240.json && python3 synth.py score_tablet240.json tablet240.wav && python3 video.py score_tablet240.json tablet240.wav tablet240.mp4
 ```
 
+## 🎤🌙 11/12 13:31 の声 → 三賢者の月読様の声 (17 歳の女性 3 声; 声だけ、2 分 56 秒)
+
+同じ録音 20261112_133145 (男声、基音 134.7 Hz) を、feminize_voice.py で 11.39 半音上げて基音 261 Hz の 17 歳の女性の声に (フォルマント 1.18 倍、ト長調に 0.9 で調律)。三賢者 = 3 人の 17 歳の女性の斉唱で、光輪様 (5 度上と 1 オクターヴ上) とは違い同じ旋律をわずかに違う高さ・フォルマント・遅れで重ねる: 1 人目 11.39 半音・1.18 倍・遅れなし (1.0)、2 人目 +0.25 半音・1.16 倍・38 ms (0.8)、3 人目 −0.3 半音・1.21 倍・74 ms (0.8)。月の澄んだ声: 9 kHz 以上を落とし、5〜9 kHz を +1.5 dB、120 Hz 以下を半分に、柔らかい圧縮 (tanh ×1.8)、穏やかな残響 2.2 秒・0.35。rms −24 dB、mp3 192 kbps。息のノイズや囁きの成分は入れない
+
 ## 作り方 (再現)
 
 ```bash
