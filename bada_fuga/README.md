@@ -4629,10 +4629,21 @@ python3 compose_tablet242.py bank201.json src score_tablet242.json && python3 sy
 
 CCXLII と同じ録音・同じ作りで、3 声の高さと音階を変える: G♯3 = 207.7 Hz (10.69 半音上げ、変イ長調の音階、フォルマント 1.15 倍、1.0)、D♭2 = 69.3 Hz (8.31 半音下げ、変ニ長調、1.12 倍、38 ms 遅れ、0.85)、F♯3 = 185.0 Hz (8.69 半音上げ、嬰ヘ長調、1.14 倍、74 ms 遅れ、0.85)。測った中央値 211 / 70 / 187 Hz。D♭2 は女性の声域より 1 オクターヴ以上低いので、この声は女性のフォルマントのまま低い支え (ドローン) のように鳴る — 指定どおりに作ったが、D♭3 (138.6 Hz) に変えることもできる。低音を残すため低域の削りは 50 Hz 以下だけ (CCXLII は 120 Hz 以下)。他は同じ (9 kHz 以上を落とし、5〜9 kHz +1.5 dB、残響 2.2 秒・0.35、rms −24 dB)。曲は CCXLII と同じ組み立て (声 2 回 0.5、トラック 18 そのまま 3 回、トラック 8 を 4 度上げて)、楽器なし。声だけの音声も 1 ファイル
 
+- 測った音量 (4 秒 rms、モノ、10 小節ごと): −34.5 → −15.8 → −17.9 → −18.2 → −20.2 → −27.2 → −19.9 → −19.5 → −17.6 → −20.7 → −21.9 → −18.9 → −18.7 → −21.6 → −20.2 → −25.4 → −24.1 dB。全体 mean −16.9 dB、max 0.0 dB。26.1 MiB。
 - `compose_tablet243.py` (compose_tablet242 から; bank201.json、3 つの wav で作れる)
 
 ```bash
 python3 compose_tablet243.py bank201.json src score_tablet243.json && python3 synth.py score_tablet243.json tablet243.wav && python3 video.py score_tablet243.json tablet243.wav tablet243.mp4
+```
+
+## 🌙📼📼 Requiem BADA — Tablet Sessions CCXLIV · Tsukuyomi in Sol♯, Re♭3 e Fa♯ con le due tracce (CCXLIII の D♭2 を D♭3 に, ヘ長調 / ニ短調, ♩=60, 11 分 44 秒)
+
+CCXLIII と同じで、2 声目だけ D♭2 (69.3 Hz、女性の声域より低い) を 1 オクターヴ上の D♭3 = 138.6 Hz (3.69 半音上げ、変ニ長調の音階、フォルマント 1.12 倍、38 ms 遅れ、0.85) に。測った中央値 210 / 139 / 186 Hz。低域の削りは 100 Hz 以下。他は同じ (G♯3・F♯3、9 kHz 以上を落とし、5〜9 kHz +1.5 dB、残響 2.2 秒・0.35、rms −24 dB)。曲も同じ組み立て (声 2 回 0.5、トラック 18 そのまま 3 回、トラック 8 を 4 度上げて)、楽器なし。声だけの音声も 1 ファイル
+
+- `compose_tablet244.py` (compose_tablet243 から; bank201.json、3 つの wav で作れる)
+
+```bash
+python3 compose_tablet244.py bank201.json src score_tablet244.json && python3 synth.py score_tablet244.json tablet244.wav && python3 video.py score_tablet244.json tablet244.wav tablet244.mp4
 ```
 
 ## 作り方 (再現)
