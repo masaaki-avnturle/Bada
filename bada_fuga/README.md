@@ -4563,6 +4563,24 @@ python3 compose_tablet238.py bank201.json src score_tablet238.json && python3 sy
 python3 compose_tablet239.py bank201.json src score_tablet239.json && python3 synth.py score_tablet239.json tablet239.wav && python3 video.py score_tablet239.json tablet239.wav tablet239.mp4
 ```
 
+## 🎤📼🎹 Requiem BADA — Tablet Sessions CCXL · L'aureola della giovane sensuale (11/12) con le due tracce e il loro pianoforte (tablet239 に、元からある楽器も省かずに, ヘ長調 / ニ短調, ♩=60, 11 分 44 秒)
+
+テープは CCXXXIX のまま (11/12 13:31 の声の若くエロい光輪 — トーンと響きを抑えた — を 2 回 0.5、トラック 18 そのまま 3 回、トラック 8 を 4 度上げて全部と続き) に、元の楽器 = 録音の中にある楽器 (ピアノ) だけを加える: 声 (変換後の wav を build_sampler で採譜、449 区間 → 旋律 G4 E4 Bb4 F4 Bb4 C5 …)・トラック 18・トラック 8 の最上声の採譜から作った旋律 (各 8 小節) を 06:42 の実音のピアノの 1 音のサンプラーで (配置は CCX / CCXVI と同じ、282 音)、低いペダルの音 (2 小節ごと)。アルペジオ・パッド・ベース・ドラム・フックは付け加えない。和音は表の録音の採譜を優先しつつ旋律の音を含む和音を半小節ごとに (強拍の不協和 5)
+
+| 段落 | 小節 | 表 | 実音のピアノ |
+|---|---|---|---|
+| I | 0〜52 | 若くエロい光輪の声 + トラック 18 | 声の旋律 (アルト → テノール)、トラック 18 の旋律 (バス) |
+| II | 52〜100 | トラック 8 (全部) + トラック 18 (2 回目) | トラック 8 の旋律 (ソプラノ → テノール)、トラック 18 (アルト)、声の頭を 2 倍にバスで |
+| III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き | 声とトラック 18 を同時に、トラック 8 と声を同時に (3 つの旋律) |
+| IV | 150〜176 | トラック 18 の後半 | 頭を 2 倍に伸ばして、ペダルだけが残って消える |
+
+- `compose_tablet240.py` (compose_tablet216 から; bank240.json = bank201 + 11/12 の声の採譜、3 つの wav で作れる)
+
+```bash
+python3 build_sampler.py bank1112 20261112_133145.wav   # 変換後の声の採譜 → bank に加えて bank240.json
+python3 compose_tablet240.py bank240.json src score_tablet240.json && python3 synth.py score_tablet240.json tablet240.wav && python3 video.py score_tablet240.json tablet240.wav tablet240.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
