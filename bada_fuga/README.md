@@ -4542,6 +4542,10 @@ tablet228 (声・tablet89・トラック 16) の作り換え。声は CCXXXII〜
 python3 compose_tablet238.py bank201.json src score_tablet238.json && python3 synth.py score_tablet238.json tablet238.wav && python3 video.py score_tablet238.json tablet238.wav tablet238.mp4
 ```
 
+## 🎤🕊️ 11/12 13:31 の声 → 三賢者の光輪様の若くエロい女声 (トーンと響きを抑えて; 声だけ、2 分 56 秒)
+
+新しい録音 20261112_133145 (男声、基音の中央値 134.7 Hz、176 秒、rms −24.2 dB) を、feminize_voice.py (WORLD) で 8.88 半音上げて基音 226 Hz の若い女声に (フォルマント 1.12 倍、ト長調に 0.9 で調律)。エロさは控えめな息 (声の包絡で形作った 1.5〜6 kHz のノイズ、17 dB 下)、囁きの成分 (+2 dB)、近接の低音 (+3 dB)。トーンを抑える: 7 kHz 以上を落とし、4〜7 kHz を −2 dB、強めの柔らかい圧縮 (tanh ×2.2)。三賢者 = 5 度上 0.2 と 1 オクターヴ上 0.15 (30 / 55 ms 遅れ)。響きを抑制: 残響 1.5 秒・0.35。rms −25 dB、mp3 192 kbps。CCXXXII〜 の安心する声と同じ作りで、元の録音が違う (14:55 ではなく 11/12 13:31)
+
 ## 作り方 (再現)
 
 ```bash
