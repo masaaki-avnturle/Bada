@@ -4711,6 +4711,10 @@ python3 compose_tablet245.py bank201.json src score_tablet245.json && python3 sy
 python3 compose_tablet246.py bank201.json src score_tablet246.json && python3 synth.py score_tablet246.json tablet246.wav && python3 video.py score_tablet246.json tablet246.wav tablet246.mp4
 ```
 
+## 🎤✨ 11/12 14:49 の声 → 17 歳の女性のドエロの光輪様 3 声 (抑揚を抑え、威厳はありそうで無く、澄んで高くも低くも、明るくも暗くも; 声だけ、2 分 58 秒)
+
+二十歳の「抑揚を抑え、威厳のある」版の 17 歳の女性版。14.58 半音上げて基音 258 Hz (フォルマント 1.18 倍、9 kHz 以上を落とす = 17 歳の声の作り)、抑揚は flatten 0.6 (10〜90% の幅 237〜288 Hz ≈ 3.4 半音)。3 声 = 中の声に 1 オクターヴ上の澄んだ声 (×1.04、30 ms、0.3) と 1 オクターヴ下の低い声 (×0.98、55 ms、0.3)。威厳は「ありそうで無い」程度に: 圧縮は中くらい (tanh ×1.6、二十歳の威厳の版は ×1.8)。ドエロさは息 (19 dB 下) と近接の低音 (+2.5 dB)。5〜9 kHz +1.5 dB、70 Hz 以下を半分に、残響 1.8 秒・0.35。rms −24 dB、mp3 192 kbps
+
 ## 作り方 (再現)
 
 ```bash
