@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """取り出した歌声 (extract_voice.py) を、大げさにせず女性的な声にし、きれいに整える (WORLD ボコーダー = pyworld)。
+  - 抑揚: flatten (既定 1.0 = そのまま、0.5 で中央値からの揺れを半分に)
   - 音高: f0 を semis 半音上げる (既定 12 = 1 オクターヴ)。声の響き (フォルマント) は formant 倍だけ上げる (既定 1.12、控えめ)
   - 音程の補正: 伸ばした音だけ、音階の最も近い音へ 60% だけ寄せる (揺れや滑らかな移り変わりは残す)
   - 息・雑音: 歌っていない所を柔らかく閉じる (ゲート)。エコー (残響) は足さない
@@ -13,13 +14,15 @@ import numpy as np, soundfile as sf, pyworld as pw
 SR = 44100
 MAJOR = [0, 2, 4, 5, 7, 9, 11]
 
-def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6):
+def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=1.0):
     x = x.astype(np.float64)
     f0, t = pw.dio(x, sr, f0_floor=60, f0_ceil=900, frame_period=5.0)
     f0 = pw.stonemask(x, f0, t, sr)
     sp = pw.cheaptrick(x, f0, t, sr); ap = pw.d4c(x, f0, t, sr)
     v = f0 > 0
     m = np.where(v, 69 + 12 * np.log2(np.maximum(f0, 1) / 440.0), 0)
+    if flatten != 1.0 and v.any():                                                  # 抑揚を抑える: 中央値からの揺れを flatten 倍に (0.5 で半分)
+        med = np.median(m[v]); m = np.where(v, med + (m - med) * flatten, 0)
     # 伸ばした音 (前後 40 ms で 0.4 半音以内) だけ音階へ寄せる
     scale = np.array([(tonic_major + k) % 12 for k in MAJOR])
     target = np.round(m)
