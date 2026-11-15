@@ -4733,6 +4733,10 @@ python3 compose_tablet246.py bank201.json src score_tablet246.json && python3 sy
 python3 compose_tablet247.py bank201.json src score_tablet247.json && python3 synth.py score_tablet247.json tablet247.wav && python3 video.py score_tablet247.json tablet247.wav tablet247.mp4
 ```
 
+## 🎤🌸 11/15 11:59 の声 → 淑女の光輪様、三賢者の優しい女性の声 3 声 (声だけ、3 分 58 秒)
+
+新しい録音 20261115_115902 (男声、基音 123.5 Hz、238 秒、rms −25.6 dB) を feminize_voice.py で 9.60 半音上げて基音 219 Hz の落ち着いた女性の声に (フォルマント 1.12 倍、ト長調に 0.9 で調律、抑揚は flatten 0.85 で少し穏やかに)。三賢者の光輪 = 5 度上 (×1.03、30 ms、0.25) と 1 オクターヴ上 (×1.06、55 ms、0.2) を重ねる (CCVIII 系の光輪の作り、上声は控えめ)。淑女の優しさ: 息のノイズや近接の低音は入れず、200〜450 Hz の暖かさを +1.5 dB、5〜9 kHz は +1 dB と控えめ、柔らかい圧縮 (tanh ×1.5)、暖かい残響 2.0 秒・0.4 (4.5 kHz 以下)。rms −24 dB、mp3 192 kbps
+
 ## 作り方 (再現)
 
 ```bash
