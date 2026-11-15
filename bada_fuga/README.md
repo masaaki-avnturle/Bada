@@ -4693,6 +4693,23 @@ python3 compose_tablet244.py bank201.json src score_tablet244.json && python3 sy
 python3 compose_tablet245.py bank201.json src score_tablet245.json && python3 synth.py score_tablet245.json tablet245.wav && python3 video.py score_tablet245.json tablet245.wav tablet245.mp4
 ```
 
+## 🎤💛📼📼 Requiem BADA — Tablet Sessions CCXLVI · L'aureola dolce della ventenne con le due tracce (優しさに満ちた二十歳の女性のドエロの光輪様 3 声に、トラック 18 とトラック 8 を重ねて, ヘ長調 / ニ短調, ♩=60, 11 分 44 秒)
+
+3 つの音だけ、楽器は何も加えない (サンプラーのピアノも、ペダルも、鐘もなし)。組み立ては CCIX / CCXLV と同じで、声だけ優しさに満ちた光輪の声 (11/12 14:49 の声 → 236 Hz の二十歳の女声、抑揚 0.85、1 オクターヴ上 0.28 と 1 オクターヴ下 0.3、200〜450 Hz の暖かさ、息 −18 dB、近接の低音、暖かい残響 2.0 秒・0.4、rms −24 dB、178 秒) を 2 回 (0.5)。トラック 18 (ニ短調) はそのまま 3 回 (0.5 / 0.45)、トラック 8 (ハ長調 / イ短調) は 4 度上げて全部と続き (0.5 / 0.4)
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I | 0〜52 | 優しい光輪の声 (178 秒) + トラック 18 |
+| II | 52〜100 | トラック 8 (4 度上げて、全部) + トラック 18 (2 回目) |
+| III | 100〜150 | 光輪の声 (2 回目) + トラック 8 の続き (100 秒から) |
+| IV | 150〜176 | トラック 18 の後半、消える |
+
+- `compose_tablet246.py` (compose_tablet245 から; bank201.json、3 つの wav — 声は優しい光輪の 20261112_144938.wav — で作れる)
+
+```bash
+python3 compose_tablet246.py bank201.json src score_tablet246.json && python3 synth.py score_tablet246.json tablet246.wav && python3 video.py score_tablet246.json tablet246.wav tablet246.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
