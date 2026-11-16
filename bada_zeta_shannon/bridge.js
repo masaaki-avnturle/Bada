@@ -8,7 +8,7 @@
  *
  *   {"op":"ask","text":"…"}    -> {"ok":true,"status":"検証済","topic":"…","confidence":0.92,
  *                                  "entropy_bits":0.53,"grover":0.996,"abstained":false,"text":"…"}
- *   {"op":"learn","text":"…"}  -> {"ok":true,"facts":76}
+ *   {"op":"learn","text":"…"}  -> {"ok":true,"facts":76,"withheld":false}
  *   {"op":"ping"}              -> {"ok":true,"engine":"zeta-shannon","bada":"1.2.0","facts":75}
  *
  * 起動直後に {"ready":true,…} を 1 行出力する。
@@ -38,7 +38,8 @@ function handle(req) {
   if (typeof req.text !== "string" || !req.text.trim()) return { ok: false, error: "text required" };
   if (req.op === "learn") {
     evalBada("VERBOSE[0] = 0\nKB <- [" + lit(req.text) + ', len(TOPICS) - 1, "学習"]\nindex_fact(len(KB) - 1)\n' + lit(req.text) + " >> tuplespace");
-    return { ok: true, facts: factCount() };
+    /* withheld: 罪悪感の回路がこの文を口にしないと判定したか */
+    return { ok: true, facts: factCount(), withheld: evalBada("print(nogo(GUILT_F[len(KB) - 1]))") === "true" };
   }
   if (req.op === "ask") {
     const out = evalBada(

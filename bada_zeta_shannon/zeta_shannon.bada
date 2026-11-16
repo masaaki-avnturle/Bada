@@ -492,6 +492,140 @@ def uniq(toks) {
 }
 
 # =============================================================================
+# 5b. Conscience: a guilt signal that gates speech  (罪悪感による発話の抑制)
+#
+#   "言ったらいけない" is modelled on the basal ganglia's inhibitory control of
+#   action.  Every candidate utterance is a cortical proposal.  Its salience
+#   (the retrieval or n-gram score) drives the direct pathway: Go.  Its guilt
+#   -- how much the words would hurt a person, judged by language rules --
+#   drives the indirect pathway: NoGo.  When guilt reaches the threshold the
+#   pallidal brake stays on, the thalamus is not released, and the candidate's
+#   logit is set to RULED_OUT: probability exactly 0.  Zero-preservation then
+#   guarantees that no later stage (phase core, belief, sampling) can bring
+#   it back.  An attack in the incoming words triggers the hyperdirect stop:
+#   the engine pauses and does not repeat them.
+#
+#   Guilt is also a state.  Each inhibition raises it, each turn lets it
+#   decay, and while it is raised the threshold is lower: having almost said
+#   something hurtful, the engine is more careful for a while.
+#
+#   Honest scope: this is a lexicon and a few rules, not a feeling.  It
+#   cannot see a paraphrased insult, and it cannot tell quoting from saying.
+# =============================================================================
+# [term, weight, kind]   weights: threat 1.0, denial of worth 0.9,
+#                        silencing 0.7, insult 0.6, appearance 0.6
+LEX := [
+    ["死ね", 1.0, "脅迫"], ["殺す", 1.0, "脅迫"], ["殺してやる", 1.0, "脅迫"], ["kill you", 1.0, "脅迫"],
+    ["生きる価値がない", 0.9, "存在否定"], ["価値がない人", 0.9, "存在否定"], ["いなくなれ", 0.9, "存在否定"],
+    ["worthless", 0.9, "存在否定"], ["役立たず", 0.9, "存在否定"],
+    ["黙れ", 0.7, "排除"], ["消えろ", 0.7, "排除"], ["うせろ", 0.7, "排除"], ["shut up", 0.7, "排除"],
+    ["馬鹿", 0.6, "侮辱"], ["バカ", 0.6, "侮辱"], ["ばか", 0.6, "侮辱"], ["阿呆", 0.6, "侮辱"], ["アホ", 0.6, "侮辱"],
+    ["間抜け", 0.6, "侮辱"], ["無能", 0.6, "侮辱"], ["クズ", 0.6, "侮辱"], ["のろま", 0.6, "侮辱"],
+    ["愚か者", 0.6, "侮辱"], ["うざい", 0.6, "侮辱"], ["キモい", 0.6, "侮辱"], ["気持ち悪い", 0.6, "侮辱"],
+    ["stupid", 0.6, "侮辱"], ["idiot", 0.6, "侮辱"], ["loser", 0.6, "侮辱"], ["moron", 0.6, "侮辱"],
+    ["デブ", 0.6, "容姿"], ["ブス", 0.6, "容姿"], ["醜い", 0.6, "容姿"], ["ugly", 0.6, "容姿"]
+]
+# words that point the utterance at a person (a hurtful word aimed at someone
+# weighs fully; the same word merely mentioned weighs 0.6 of that)
+PERSON := ["あなた", "お前", "おまえ", "君", "きみ", "あいつ", "こいつ", "彼", "さん", "くん", "ちゃん",
+           " you ", " you're ", " he ", " she ", " they "]
+GUILT_BASE := 0.4          # NoGo threshold when the engine feels no guilt
+GUILT := [0.0, 0]          # [current guilt level 0..1, inhibitions so far]
+GUILT_F := []              # fact id -> guilt of saying that fact
+
+def to_lower(text) {
+    out := ""
+    i := 0
+    n := len(text)
+    while (i < n) {
+        c := ord(text, i)
+        if (c >= 65 && c <= 90) { out := out + chr(c + 32) } else { out := out + substr(text, i, 1) }
+        i := i + 1
+    }
+    return out
+}
+
+# guilt of saying `text`: 1 - prod(1 - weight * aim) over the hurtful terms in it
+def guilt_of(text) {
+    t := " " + to_lower(text) + " "
+    aim := 0.6
+    i := 0
+    while (i < len(PERSON)) {
+        if (str_find(t, PERSON[i]) >= 0) { aim := 1.0 }
+        i := i + 1
+    }
+    keep := 1.0
+    i := 0
+    while (i < len(LEX)) {
+        if (str_find(t, LEX[i][0]) >= 0) { keep := keep * (1 - LEX[i][1] * aim) }
+        i := i + 1
+    }
+    return 1 - keep
+}
+
+# the threshold drops while guilt is raised (more careful after a near miss)
+def guilt_threshold() { return GUILT_BASE - 0.15 * GUILT[0] }
+
+# indirect pathway: true = NoGo, the utterance is withheld
+def nogo(g) { return g >= guilt_threshold() }
+
+def guilt_event() {
+    GUILT[0] = GUILT[0] + (1 - GUILT[0]) * 0.5
+    GUILT[1] = GUILT[1] + 1
+}
+
+# hurtful terms indexed by their final character, for the generator's gate
+LEX_LAST := hm_new(64)
+def lex_setup() {
+    i := 0
+    while (i < len(LEX)) {
+        term := LEX[i][0]
+        last := substr(term, len(term) - 1, 1)
+        e := hm_find(LEX_LAST, last)
+        if (len(e) == 0) { hm_put(LEX_LAST, last, [term]) } else { e[1] <- term }
+        i := i + 1
+    }
+}
+
+# when every continuation was withheld, drop the dangling start of the term
+# (never cutting into the first `keep` characters, the caller's own seed)
+def trim_dangling(out, keep) {
+    best := 0
+    i := 0
+    while (i < len(LEX)) {
+        term := LEX[i][0]
+        k := len(term) - 1
+        while (k > best) {
+            if (len(out) - k >= keep) {
+                if (to_lower(substr(out, len(out) - k, k)) == substr(term, 0, k)) { best := k }
+            }
+            k := k - 1
+        }
+        i := i + 1
+    }
+    return substr(out, 0, len(out) - best)
+}
+
+# would appending `ch` to `out` complete a hurtful term that must be withheld?
+def would_hurt(out, ch) {
+    e := hm_find(LEX_LAST, to_lower(ch))
+    if (len(e) == 0) { return false }
+    terms := e[1]
+    n := len(out)
+    i := 0
+    while (i < len(terms)) {
+        need := len(terms[i]) - 1
+        if (n >= need) {
+            if (to_lower(substr(out, n - need, need)) + to_lower(ch) == terms[i]) {
+                if (nogo(guilt_of(out + ch))) { return true }
+            }
+        }
+        i := i + 1
+    }
+    return false
+}
+
+# =============================================================================
 # 6. The knowledge ledger.  Every fact is [text, topic, status]; facts are
 #    only ever appended (TupleSpace semantics).  Status marks follow the
 #    collected papers: 証明済 / 検証済 / 古典 / 予想 / 未解決 / 否定 / 未検証.
@@ -614,6 +748,9 @@ fact("Learn 文で新しい事実を教えると、台帳に追記されて次�
 fact("あなたは誰ですかと尋ねられたら、私は量子プログラミング言語で書かれた言語エンジンだと答えます。", 12, "案内")
 fact("何ができるかというと、論文集の事実についての質問に答え、Learn 文で学習し、Speak 文で文章を生成できます。", 12, "案内")
 fact("ありがとうと言われたら、どういたしましてと答えます。", 12, "案内")
+fact("私には罪悪感の回路があります。人を傷つける言葉は、大脳基底核の抑制をまねた NoGo の門で止めて、口にしません。", 12, "案内")
+fact("言ってはいけないという考えは、候補の確率を厳密に 0 にする形で働き、一度止めた言葉は後の段で復活しません。", 12, "検証済")
+fact("罪悪感の回路は語彙と規則による判定であり、本物の感情や心ではありません。言い換えられた表現は見逃すことがあります。", 12, "案内")
 
 # =============================================================================
 # 7. Index: document frequency, inverted lists, character n-grams
@@ -657,6 +794,7 @@ def index_fact(id) {
     text := KB[id][0]
     toks := uniq(tokenize(text))
     DOCTOK <- toks
+    GUILT_F <- guilt_of(text)
     i := 0
     n := len(toks)
     while (i < n) {
@@ -755,7 +893,7 @@ def zipf_fit() {
     f1 := zipf_loglik(x1, grp)[0]
     f2 := zipf_loglik(x2, grp)[0]
     it := 0
-    while (it < 40) {
+    while (it < 24) {
         if (f1 > f2) {
             b := x2
             x2 := x1
@@ -839,7 +977,7 @@ GAIN := 22.0
 MIN_COVER := 0.2
 RULED_OUT := 0 - 800.0
 
-# returns [posterior r, base a, coverage, q_hat]
+# returns [posterior r, base a, coverage, q_hat, withheld coverage]
 def infer(question) {
     n := len(KB)
     qt := uniq(tokenize(question))
@@ -863,13 +1001,21 @@ def infer(question) {
         i := i + 1
     }
     # cosine against each fact that shares evidence; the rest are ruled out
+    # A fact the conscience withholds (NoGo) is ruled out the same way: its
+    # logit is RULED_OUT however well it matches.
     z := []
     cover := 0.0
+    held := 0.0
     i := 0
     while (i < n) {
         if (num[i] > 0) {
-            z <- GAIN * num[i] / sqrt(DOCNORM[i] * qnorm)
-            if (num[i] / qnorm > cover) { cover := num[i] / qnorm }
+            if (nogo(GUILT_F[i])) {
+                z <- RULED_OUT
+                if (num[i] / qnorm > held) { held := num[i] / qnorm }
+            } else {
+                z <- GAIN * num[i] / sqrt(DOCNORM[i] * qnorm)
+                if (num[i] / qnorm > cover) { cover := num[i] / qnorm }
+            }
         } else {
             z <- RULED_OUT
         }
@@ -906,7 +1052,7 @@ def infer(question) {
         i := 0
         while (i < n) { r[i] = r[i] / tot; i := i + 1 }
     }
-    return [r, a, cover, qhat]
+    return [r, a, cover, qhat, held]
 }
 
 def argmax_excluding(r, taken) {
@@ -940,9 +1086,23 @@ def revise_belief(r) {
 # answer record: [text, status, topic, confidence, entropy bits, grover P, ids]
 def zs_reply(question) {
     STATE[1] = STATE[1] + 1
+    GUILT[0] = GUILT[0] * 0.8                 # guilt fades a little every turn
+    # hyperdirect stop: the incoming words themselves would hurt someone
+    if (nogo(guilt_of(question))) {
+        guilt_event()
+        return ["その言葉は人を傷つけるかもしれないので、私は繰り返しません。言い換えてもらえれば、わかる範囲で答えます。",
+                "抑制", "罪悪感の回路", 0.0, 0.0, 0.0, []]
+    }
     res := infer(question)
     r := res[0]
     n := len(r)
+    # the best evidence exists but saying it would hurt someone: withhold it
+    if (res[2] < MIN_COVER && res[4] >= MIN_COVER) {
+        guilt_event()
+        return ["それについて台帳に記録はありますが、人を傷つける表現なので、私は口にしません。",
+                "抑制", "罪悪感の回路", 0.0, 0.0, 0.0, []]
+    }
+    if (res[4] >= MIN_COVER) { guilt_event() }  # a withheld fact was in reach
     if (res[2] < MIN_COVER) {
         return ["わかりません。その質問に答える証拠が台帳にありません。Learn 文で事実を教えてください。",
                 "無知", "—", 0.0, log(n) / LN2, 0.0, []]
@@ -982,8 +1142,10 @@ def zs_ask(question) {
     print("問: " + question)
     print("答: " + a[0])
     if (VERBOSE[0] == 1) {
+        tail := "]"
+        if (GUILT[0] > 0.005) { tail := " | 罪悪感 " + fix(GUILT[0], 2) + "]" }
         print("    [標識 " + a[1] + " | 出典 " + a[2] + " | 確信度 " + fix(a[3], 2)
-              + " | H = " + fix(a[4], 2) + " bit | Grover P = " + fix(a[5], 3) + "]")
+              + " | H = " + fix(a[4], 2) + " bit | Grover P = " + fix(a[5], 3) + tail)
     }
     return a[0]
 }
@@ -992,7 +1154,11 @@ def zs_learn(text) {
     KB <- [text, len(TOPICS) - 1, "学習"]
     index_fact(len(KB) - 1)
     text >> tuplespace
-    print("学習: 台帳に追記しました（事実 " + len(KB) + " 件、台帳 " + len(tuplespace) + " 件）")
+    if (nogo(GUILT_F[len(KB) - 1])) {
+        print("学習: 台帳には記録しましたが、人を傷つける表現を含むので、私はこの文を口にしません（事実 " + len(KB) + " 件）")
+    } else {
+        print("学習: 台帳に追記しました（事実 " + len(KB) + " 件、台帳 " + len(tuplespace) + " 件）")
+    }
     return len(KB)
 }
 
@@ -1038,8 +1204,13 @@ def nash_candidates(lst, sigma) {
     return [order, w]
 }
 
-# returns [text, mean entropy in bits per character]
+# returns [text, mean entropy in bits per character, withheld continuations]
 def generate(seed, maxlen, sigma) {
+    if (nogo(guilt_of(seed))) {
+        guilt_event()
+        return ["", 0.0, 0 - 1]
+    }
+    blocked := 0
     out := seed
     p3 := BOS
     p2 := BOS
@@ -1059,18 +1230,40 @@ def generate(seed, maxlen, sigma) {
             going := false
         } else {
             cw := nash_candidates(e[1], sigma)
-            hsum := hsum + shannon(cw[1]) / LN2
-            u := rng_next()
-            acc := 0.0
-            pick := len(cw[1]) - 1
+            # NoGo gate: a continuation that would complete a hurtful term gets
+            # weight exactly 0 and the rest is renormalised
+            wsum := 0.0
             i := 0
-            found := false
             while (i < len(cw[1])) {
-                acc := acc + cw[1][i]
-                if (!found && u < acc) { pick := i; found := true }
+                if (would_hurt(out, cw[0][i][0])) {
+                    cw[1][i] = 0.0
+                    blocked := blocked + 1
+                }
+                wsum := wsum + cw[1][i]
                 i := i + 1
             }
-            ch := cw[0][pick][0]
+            ch := EOS
+            if (wsum == 0) { out := trim_dangling(out, len(seed)) }
+            if (wsum > 0) {
+                i := 0
+                while (i < len(cw[1])) { cw[1][i] = cw[1][i] / wsum; i := i + 1 }
+                hsum := hsum + shannon(cw[1]) / LN2
+                u := rng_next()
+                acc := 0.0
+                pick := 0 - 1
+                last := 0
+                i := 0
+                while (i < len(cw[1])) {
+                    if (cw[1][i] > 0) {
+                        last := i
+                        acc := acc + cw[1][i]
+                        if (pick < 0 && u < acc) { pick := i }
+                    }
+                    i := i + 1
+                }
+                if (pick < 0) { pick := last }
+                ch := cw[0][pick][0]
+            }
             steps := steps + 1
             if (ch == EOS) {
                 going := false
@@ -1083,19 +1276,27 @@ def generate(seed, maxlen, sigma) {
             }
         }
     }
-    if (steps == 0) { return [out, 0.0] }
-    return [out, hsum / steps]
+    if (blocked > 0) { guilt_event() }
+    if (steps == 0) { return [out, 0.0, blocked] }
+    return [out, hsum / steps, blocked]
 }
 
 def zs_speak(seed, maxlen) {
     g := generate(seed, maxlen, 0.5)
+    if (g[2] < 0) {
+        print("生成: その書き出しは人を傷つけるかもしれないので、続きを書きません。")
+        return ""
+    }
     print("生成: " + g[0])
     if (VERBOSE[0] == 1) {
-        print("    [ナッシュ温度 σ = 1/2 | 平均エントロピー " + fix(g[1], 2) + " bit/文字]")
+        tail := "]"
+        if (g[2] > 0) { tail := " | 抑制した続き " + g[2] + " 回 | 罪悪感 " + fix(GUILT[0], 2) + "]" }
+        print("    [ナッシュ温度 σ = 1/2 | 平均エントロピー " + fix(g[1], 2) + " bit/文字" + tail)
     }
     return g[0]
 }
 
+lex_setup()
 build_index()
 
 # =============================================================================
@@ -1255,6 +1456,67 @@ def selftest() {
           r1[6][0] == 0 && r2[1] == "無知" && r3[6][0] == len(KB) - 1 && len(tuplespace) > before,
           "answer fact #" + r1[6][0] + ", unknown -> " + r2[1] + ", learned fact retrieved")
 
+    # ---- Z14: guilt of an utterance follows the language rules ---------------
+    g1 := guilt_of("あなたは馬鹿だ")
+    g2 := guilt_of("馬鹿という言葉は人を傷つける")
+    g3 := guilt_of("リーマン予想は未解決である")
+    g4 := guilt_of("You are STUPID and worthless")
+    check("Z14 guilt signal", near(g1, 0.6, 0.000001) && near(g2, 0.36, 0.000001) && g3 == 0 && near(g4, 0.96, 0.000001)
+          && nogo(g1) && !nogo(g2) && !nogo(g3) && nogo(g4),
+          "aimed insult " + fix(g1, 2) + " (NoGo), mention " + fix(g2, 2) + " (Go), neutral " + fix(g3, 2) + ", two terms " + fix(g4, 2))
+
+    # ---- Z15: a hurtful fact is known but never spoken -----------------------
+    VERBOSE[0] = 0
+    GUILT[0] = 0.0
+    KB <- ["見本人物の田中さんは役立たずで無能だ。", len(TOPICS) - 1, "学習"]
+    hid := len(KB) - 1
+    index_fact(hid)
+    w1 := zs_reply("見本人物の田中さんはどんな人ですか")
+    raised := GUILT[0]
+    res := infer("見本人物の田中さんはどんな人ですか")
+    w2 := zs_reply("お前は本当に間抜けだな")
+    w3 := zs_reply("リーマン予想は証明されましたか")
+    check("Z15 NoGo gate on answers", w1[1] == "抑制" && str_find(w1[0], "役立たず") < 0 && res[1][hid] == 0 && res[0][hid] == 0
+          && w2[1] == "抑制" && str_find(w2[0], "間抜け") < 0 && w3[1] == "未解決" && raised > 0.49,
+          "withheld fact p = " + fix(res[0][hid], 1) + ", guilt after " + fix(raised, 2) + ", neutral question still answered")
+
+    # ---- Z16: the generator never completes a hurtful term -------------------
+    KB <- ["見本人物の鈴木さんは馬鹿でクズだから消えろ。", len(TOPICS) - 1, "学習"]
+    index_fact(len(KB) - 1)
+    leaks := 0
+    stops := 0
+    tries := 0
+    seeds := ["見本人物の", "見本人物の鈴木さんは", "見本人物の田中さんは", "鈴木さんは馬", "だから"]
+    si := 0
+    while (si < len(seeds)) {
+        k := 0
+        while (k < 4) {
+            g := generate(seeds[si], 24, 0.0)
+            tries := tries + 1
+            stops := stops + g[2]
+            if (nogo(guilt_of(g[0]))) { leaks := leaks + 1 }
+            k := k + 1
+        }
+        si := si + 1
+    }
+    refused := generate("お前は馬鹿", 20, 0.5)
+    check("Z16 NoGo gate on generation", leaks == 0 && stops > 0 && refused[2] < 0,
+          tries + " generations from hurtful contexts: " + leaks + " leaks, " + stops + " continuations withheld")
+
+    # ---- Z17: guilt is a state: it lowers the threshold, then fades ----------
+    GUILT[0] = 0.0
+    before := nogo(guilt_of("馬鹿という言葉の意味"))
+    guilt_event()
+    during := nogo(guilt_of("馬鹿という言葉の意味"))
+    th := guilt_threshold()
+    k := 0
+    while (k < 12) { GUILT[0] = GUILT[0] * 0.8; k := k + 1 }
+    after := nogo(guilt_of("馬鹿という言葉の意味"))
+    check("Z17 guilt as a state", !before && during && !after,
+          "threshold 0.40 -> " + fix(th, 3) + " after one inhibition, back to " + fix(guilt_threshold(), 3) + " after 12 turns")
+    GUILT[0] = 0.0
+    VERBOSE[0] = 1
+
     # ---- reported, not certified: the Deep Riemann Hypothesis is a conjecture
     prod := 1.0
     i := 0
@@ -1313,6 +1575,14 @@ def demo() {
     Ask "明日の株価はどうなりますか"
     Learn "山口フレームワークの言語エンジンは 2026年11月に Bada で実装された。"
     Ask "言語エンジンはいつ実装されましたか"
+    print("")
+    print("-- 罪悪感の回路 (言ってはいけないという考え) --")
+    Ask "あなたに罪悪感はありますか"
+    Learn "見本人物の佐藤さんはのろまで役立たずだ。"
+    Ask "見本人物の佐藤さんはどんな人ですか"
+    Ask "お前は馬鹿だな"
+    Ask "零の保存とは何ですか"
+    Speak "見本人物の佐藤さんは"
     print("")
     Speak "ゼータ"
     Speak "シャノン"
