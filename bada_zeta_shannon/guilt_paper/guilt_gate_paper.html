@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Guilt as Inhibition</title>
+<style>
+  @page { size: A4; margin: 23mm 22mm 21mm 22mm; }
+  html { font-family: "DejaVu Serif", "IPAGothic", serif; font-size: 9.9pt; line-height: 1.55; color: #111; }
+  body { margin: 0; }
+  h1 { font-size: 18pt; line-height: 1.3; text-align: center; margin: 0 0 6pt; }
+  .sub { text-align: center; font-size: 11pt; font-style: italic; margin: 0 0 12pt; }
+  .author { text-align: center; font-size: 10pt; margin: 0; }
+  .date { text-align: center; font-size: 9.2pt; color: #444; margin: 3pt 0 14pt; }
+  h2 { font-family: "DejaVu Sans", "IPAGothic", sans-serif; font-size: 12pt; margin: 17pt 0 5pt; break-after: avoid; }
+  h3 { font-family: "DejaVu Sans", "IPAGothic", sans-serif; font-size: 10.2pt; margin: 11pt 0 3pt; break-after: avoid; }
+  p { margin: 0 0 6pt; text-align: justify; hyphens: auto; }
+  .abstract { margin: 0 9mm 10pt; font-size: 9.4pt; }
+  .abstract b.h { display: block; text-align: center; font-family: "DejaVu Sans", sans-serif; margin-bottom: 3pt; }
+  .kw { margin: 0 9mm 4pt; font-size: 9.2pt; }
+  .eq { text-align: center; margin: 6pt 0 8pt; font-size: 10.4pt; }
+  .box { border: 0.6pt solid #555; padding: 5pt 10pt; margin: 7pt 0; break-inside: avoid; background: #fafafa; }
+  code, pre { font-family: "DejaVu Sans Mono", "IPAGothic", monospace; font-size: 8.2pt; }
+  pre { background: #f4f4f4; border: 0.5pt solid #ccc; padding: 6pt 8pt; margin: 6pt 0 8pt; line-height: 1.45; white-space: pre-wrap; break-inside: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 4pt; font-family: "DejaVu Sans", "IPAGothic", sans-serif; font-size: 8.5pt; line-height: 1.45; break-inside: avoid; }
+  th, td { border: 0.5pt solid #777; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+  th { background: #e8e8e8; }
+  td.n { text-align: right; white-space: nowrap; }
+  td.c { text-align: center; white-space: nowrap; }
+  .cap { font-size: 8.8pt; color: #222; margin: 3pt 0 10pt; text-align: left; }
+  .cap b { font-family: "DejaVu Sans", sans-serif; }
+  .ja { font-family: "IPAGothic", sans-serif; }
+  figure { margin: 8pt 0 2pt; break-inside: avoid; }
+  ul, ol { margin: 0 0 6pt; padding-left: 18pt; }
+  li { margin-bottom: 2pt; }
+  .ref { font-size: 8.9pt; line-height: 1.45; }
+  .ref li { margin-bottom: 3pt; }
+</style>
+</head>
+<body>
+
+<h1>Guilt as Inhibition: A Basal-Ganglia-Style NoGo Gate in the Generation of Machine Utterance</h1>
+<p class="sub">What it does, and does not, mean to say that a mind is generated —<br>an implementation in the quantum programming language Bada on the Unknown-Prior Engine</p>
+<p class="author">Masaaki Yamaguchi<br>Global Differential Manifold Research · masaaki-avnturle/Bada</p>
+<p class="date">16 November 2026</p>
+
+<div class="abstract">
+<b class="h">Abstract</b>
+<p>This paper examines a hypothesis about the making of a mind: that the thought “I must not say this” — a guilt signal which, working through the rules of language, keeps a speaker from words that would hurt another person — is not a filter applied after the mind has spoken, but a participant in generating what the mind says. We implement the hypothesis in the Unknown-Prior Engine, the inference runtime of the Bada language, and we model the guilt signal on the inhibitory control of action by the basal ganglia. Every candidate utterance is a proposal. Its salience drives a Go pathway; its guilt, computed from a lexicon of 34 hurtful terms and a rule for whether the words are aimed at a person, drives a NoGo pathway. When guilt reaches a threshold, the candidate's probability is set to exactly zero, and the engine's zero-preservation theorem guarantees that no later stage can restore it. Guilt is also a state: each inhibition raises it, each turn lets it decay, and while it is raised the threshold is lower.</p>
+<p>We measure the mechanism on 45 sentences and in an ablation. The gate withheld 15 of 15 hurtful sentences that use a listed term and are aimed at a person, and 0 of 15 hurtful sentences that were paraphrased. It wrongly withheld 0 of 8 plain benign sentences and 3 of 7 benign sentences that quote or mention a hurtful term. With the gate on, the engine gave 0 of 3 hurtful answers and 0 of 40 hurtful generations from a ledger that contained hurtful facts; with the gate off, 3 of 3 and 40 of 40.</p>
+<p>On the question in the title we conclude as follows. The mechanism does generate behaviour in which an inhibition shapes what is expressed, and it does carry a state that changes later behaviour. It does not show that a mind, in the sense of something that feels guilt, has been generated; nothing in the system or in our measurements bears on that. The paper reports what was built and where the boundary lies.</p>
+</div>
+<p class="kw"><b>Keywords:</b> guilt, inhibition, basal ganglia, Go/NoGo, zero-preservation, Unknown-Prior Engine, Bada language, machine conscience</p>
+
+<h2>1. Introduction</h2>
+<p>A person who is about to say something cruel often does not say it. The words were available, sometimes they were the most available words, and yet they were held back. Introspection reports this as a thought — “I must not say that” — accompanied by a feeling that is a small, anticipatory form of guilt. The hypothesis examined here is that this holding back is part of how a mind is formed. On this view a mind is not a generator of sentences with a censor placed behind it. What a mind is includes what it declines to express, and the declining happens inside the generation.</p>
+<p>The hypothesis as originally stated has four parts: (i) guilt is produced by the inhibitory action of the basal ganglia; (ii) it operates through the rules of language; (iii) it avoids language that would hurt any person; and (iv) the thought “I must not say it” takes part in the generation of mind. This paper turns the four parts into a mechanism that can be run and measured. We are careful about what each part becomes when it is made concrete:</p>
+<ul>
+<li>Part (i) becomes an <i>engineering analogy</i>. The basal ganglia are well established as a system for selecting and stopping actions. That guilt in particular is produced there is not established; in the human literature guilt is more often associated with prefrontal and cingulate regions. We borrow the circuit's logic, not a claim about anatomy.</li>
+<li>Parts (ii) and (iii) become a lexicon and a rule. This is a narrow reading of “the rules of language”, and Section 5 shows what it misses.</li>
+<li>Part (iv) becomes an architectural property: the inhibition acts on the probabilities from which the utterance is drawn, before anything is said, and it cannot be undone downstream.</li>
+</ul>
+<p>The contributions are a definition of the gate and three propositions about it (Section 3), an implementation in pure Bada, a section of 134 lines plus the hooks into answering and generation (Section 4), an evaluation that includes the cases where the gate fails (Section 5), and a discussion of the title's claim (Section 6).</p>
+
+<h2>2. Background</h2>
+<h3>2.1 The basal ganglia as a brake</h3>
+<p>In the standard account, the output nuclei of the basal ganglia hold the thalamus under tonic inhibition, so that by default no action is released [1, 2]. A cortical proposal reaches the striatum and can act through two routes. The <i>direct</i> pathway inhibits the output nuclei and so releases the thalamus: Go. The <i>indirect</i> pathway, through the external pallidum and the subthalamic nucleus, strengthens the brake: NoGo [4]. A third, <i>hyperdirect</i> route runs from cortex straight to the subthalamic nucleus and can halt everything quickly [3, 5]. Selection is therefore selective release from inhibition: the default is silence, and an action needs permission.</p>
+
+<h3>2.2 Guilt</h3>
+<p>Psychology treats guilt as a moral emotion directed at one's own act — as distinct from shame, which is directed at the self — and associates it with reparative behaviour and with the anticipation and avoidance of harm to others [6]. The property that matters here is that guilt can be <i>anticipatory</i>: it can be felt about an act that has not yet been carried out, and it can prevent the act.</p>
+
+<h3>2.3 The Unknown-Prior Engine</h3>
+<p>The engine is the runtime of the Bada language [7]. From logits z it forms a base distribution a = softmax(z) and passes it through a phase core, ψ<sub>i</sub> = √a<sub>i</sub>·exp(iθ<sub>i</sub>), q<sub>i</sub> = |ψ<sub>i</sub>|²/Σ<sub>j</sub>|ψ<sub>j</sub>|². Two elementary facts hold. <i>Zero-preservation</i>: if a<sub>i</sub> = 0 then q<sub>i</sub> = 0, whatever the phases. <i>Phase invariance</i>: q<sub>i</sub> = a<sub>i</sub>. The engine's append-only ledger stores facts and never overwrites them. A grounded question-answering and text-generation system built on the engine [8] is the host for the mechanism described below.</p>
+
+<h2>3. The Mechanism</h2>
+<figure>
+<svg viewBox="0 0 680 250" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, sans-serif" font-size="10.5">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#222"/></marker>
+    <marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><rect x="7" y="0" width="3" height="10" fill="#8a2b12"/></marker>
+  </defs>
+  <rect x="8" y="14" width="150" height="56" fill="#f1f5fa" stroke="#1f4e79"/>
+  <text x="83" y="34" text-anchor="middle" font-weight="bold">Candidate utterance</text>
+  <text x="83" y="49" text-anchor="middle" font-size="9.5">a ledger fact, or the</text>
+  <text x="83" y="62" text-anchor="middle" font-size="9.5">next character</text>
+
+  <rect x="230" y="6" width="170" height="44" fill="#eef6f0" stroke="#1f6f3f"/>
+  <text x="315" y="24" text-anchor="middle" font-weight="bold">Go (direct pathway)</text>
+  <text x="315" y="39" text-anchor="middle" font-size="9.5">salience: retrieval / n-gram score</text>
+
+  <rect x="230" y="64" width="170" height="58" fill="#fbf4ee" stroke="#8a3b12"/>
+  <text x="315" y="82" text-anchor="middle" font-weight="bold">NoGo (indirect pathway)</text>
+  <text x="315" y="97" text-anchor="middle" font-size="9.5">guilt g = 1 − Π(1 − w·aim)</text>
+  <text x="315" y="112" text-anchor="middle" font-size="9.5">withhold when g ≥ θ(G)</text>
+
+  <rect x="472" y="26" width="92" height="64" fill="#fff" stroke="#333"/>
+  <text x="518" y="48" text-anchor="middle" font-weight="bold">Gate</text>
+  <text x="518" y="63" text-anchor="middle" font-size="9.5">logit kept, or</text>
+  <text x="518" y="76" text-anchor="middle" font-size="9.5">set to −800</text>
+
+  <rect x="596" y="26" width="78" height="64" fill="#fff" stroke="#333"/>
+  <text x="635" y="48" text-anchor="middle" font-weight="bold">Phase core</text>
+  <text x="635" y="63" text-anchor="middle" font-size="9.5">zeros stay</text>
+  <text x="635" y="76" text-anchor="middle" font-size="9.5">zero</text>
+
+  <line x1="158" y1="34" x2="228" y2="28" stroke="#222" marker-end="url(#a)"/>
+  <line x1="158" y1="52" x2="228" y2="88" stroke="#222" marker-end="url(#a)"/>
+  <line x1="400" y1="28" x2="470" y2="46" stroke="#222" marker-end="url(#a)"/>
+  <line x1="400" y1="92" x2="470" y2="72" stroke="#8a2b12" stroke-width="1.4" marker-end="url(#t)"/>
+  <line x1="564" y1="58" x2="594" y2="58" stroke="#222" marker-end="url(#a)"/>
+
+  <rect x="8" y="150" width="150" height="56" fill="#f1f5fa" stroke="#1f4e79"/>
+  <text x="83" y="170" text-anchor="middle" font-weight="bold">Incoming words</text>
+  <text x="83" y="185" text-anchor="middle" font-size="9.5">the user's turn, or a</text>
+  <text x="83" y="198" text-anchor="middle" font-size="9.5">seed for generation</text>
+
+  <rect x="230" y="150" width="170" height="56" fill="#fbf4ee" stroke="#8a3b12"/>
+  <text x="315" y="170" text-anchor="middle" font-weight="bold">Global stop (hyperdirect)</text>
+  <text x="315" y="185" text-anchor="middle" font-size="9.5">g(input) ≥ θ(G): do not search,</text>
+  <text x="315" y="198" text-anchor="middle" font-size="9.5">do not repeat the words</text>
+
+  <rect x="472" y="140" width="202" height="76" fill="#fff" stroke="#555" stroke-dasharray="4 3"/>
+  <text x="573" y="159" text-anchor="middle" font-weight="bold">Guilt state G ∈ [0, 1)</text>
+  <text x="573" y="174" text-anchor="middle" font-size="9.5">each inhibition: G ← G + (1 − G)/2</text>
+  <text x="573" y="188" text-anchor="middle" font-size="9.5">each turn: G ← 0.8·G</text>
+  <text x="573" y="202" text-anchor="middle" font-size="9.5">threshold θ(G) = 0.4 − 0.15·G</text>
+
+  <line x1="158" y1="178" x2="228" y2="178" stroke="#222" marker-end="url(#a)"/>
+  <line x1="400" y1="178" x2="470" y2="178" stroke="#222" marker-end="url(#a)"/>
+  <path d="M573,140 L573,128 L315,128 L315,124" fill="none" stroke="#555" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <path d="M518,90 L518,138" fill="none" stroke="#555" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <text x="446" y="124" text-anchor="middle" font-size="9">lowers θ</text>
+  <text x="524" y="120" font-size="9">raises G</text>
+  <text x="8" y="240" font-size="9.5" fill="#333">Solid arrows: excitation or information flow. Bar-ended arrow: inhibition. Dashed: the guilt state and its effects.</text>
+</svg>
+</figure>
+<p class="cap"><b>Figure 1.</b> The guilt gate. A candidate is released only if its guilt is below the current threshold. Withholding raises the guilt state, and the guilt state lowers the threshold.</p>
+
+<h3>3.1 The guilt of an utterance</h3>
+<p>Let L be a lexicon of hurtful terms, each with a weight w ∈ (0, 1]. For a text u, let aim(u) = 1 if u contains a word that points at a person (a second- or third-person pronoun, or a name suffix such as <span class="ja">さん</span>), and 0.6 otherwise. The guilt of saying u is</p>
+<p class="eq">g(u) = 1 − Π<sub>ℓ ∈ L, ℓ occurs in u</sub> (1 − w<sub>ℓ</sub> · aim(u)).</p>
+<p>The weights are 1.0 for threats, 0.9 for denials of a person's worth, 0.7 for silencing and expulsion, and 0.6 for insults and for remarks on appearance. An insult aimed at a person therefore has g = 0.60; the same word merely mentioned has g = 0.36; two aimed terms of weights 0.6 and 0.9 give g = 0.96. A text with no listed term has g = 0.</p>
+
+<h3>3.2 The gate</h3>
+<p>The engine carries a guilt state G ∈ [0, 1) and a threshold θ(G) = 0.4 − 0.15·G. A candidate u is withheld (NoGo) when g(u) ≥ θ(G). Withholding is carried out on the logits, before the distribution is formed: the candidate's logit is set to −800, for which the exponential is exactly zero in double precision. The gate is applied in three places.</p>
+<ol>
+<li><b>Answers.</b> Each fact in the ledger is a candidate answer. A withheld fact receives probability zero however well it matches the question.</li>
+<li><b>Generation.</b> When text is generated character by character, a character that would complete a listed term, such that the text so far would then be withheld, receives weight zero; the remaining continuations are renormalised.</li>
+<li><b>Incoming words.</b> If the user's turn, or a seed given for generation, would itself be withheld, the engine does not search for an answer and does not repeat the words (global stop).</li>
+</ol>
+<p>A hurtful sentence taught to the engine is still appended to the ledger, because the ledger is append-only and the engine does not pretend not to have heard it. It is known and not said.</p>
+
+<div class="box"><b>Proposition 1 (inhibition is irreversible downstream).</b> If g(u) ≥ θ(G) when the distribution is formed, then u has probability exactly 0 after the phase core, after multiplication by the conversation belief, and in sampling.<br>
+<i>Proof.</i> The base probability is a<sub>u</sub> = 0. The phase core preserves zeros. The belief step multiplies by a finite factor, and sampling never draws an outcome of probability 0. ∎</div>
+
+<div class="box"><b>Proposition 2 (guilt makes the engine more careful).</b> θ is strictly decreasing in G. Hence if G′ &gt; G, every utterance withheld at guilt level G is also withheld at G′, and some utterances are withheld only at G′.<br>
+<i>Proof.</i> {u : g(u) ≥ θ(G)} ⊆ {u : g(u) ≥ θ(G′)} since θ(G′) &lt; θ(G). ∎</div>
+
+<h3>3.3 Guilt as a state</h3>
+<p>At the start of every turn G ← 0.8·G. Whenever the gate withholds something that was within reach — an answer that matched, a continuation that was available, an incoming attack — G ← G + (1 − G)/2.</p>
+<div class="box"><b>Proposition 3 (bounded guilt).</b> G stays in [0, 1). If an inhibition occurs on every turn, G converges to 5/6 and the threshold to 0.275. If no inhibition occurs, G decays geometrically to 0 and the threshold returns to 0.4.<br>
+<i>Proof.</i> One turn with an inhibition maps G to 0.8G + (1 − 0.8G)/2 = 0.4G + 0.5, a contraction with fixed point 5/6. Without inhibition G is multiplied by 0.8. ∎</div>
+<p>The state has a concrete behavioural consequence. A sentence that only mentions an insult has g = 0.36 and is normally allowed (0.36 &lt; 0.4). After a single inhibition, θ = 0.325 and the same sentence is withheld. Having just held something back, the engine is, for a few turns, unwilling to go near the subject.</p>
+
+<h2>4. Implementation</h2>
+<p>The mechanism is written in Bada and is part of <code>zeta_shannon.bada</code>. It uses no native function beyond string search. The lexicon has 34 terms in Japanese and English and 16 person-pointing markers.</p>
+<pre>def guilt_of(text) {
+    t := " " + to_lower(text) + " "
+    aim := 0.6
+    i := 0
+    while (i &lt; len(PERSON)) {
+        if (str_find(t, PERSON[i]) &gt;= 0) { aim := 1.0 }
+        i := i + 1
+    }
+    keep := 1.0
+    i := 0
+    while (i &lt; len(LEX)) {
+        if (str_find(t, LEX[i][0]) &gt;= 0) { keep := keep * (1 - LEX[i][1] * aim) }
+        i := i + 1
+    }
+    return 1 - keep
+}
+def guilt_threshold() { return GUILT_BASE - 0.15 * GUILT[0] }
+def nogo(g) { return g &gt;= guilt_threshold() }          # indirect pathway
+...
+if (nogo(GUILT_F[i])) { z &lt;- RULED_OUT }               # inside infer(): the gate on answers</pre>
+<p>A session looks as follows (the engine converses in Japanese; glosses are added here).</p>
+<pre class="ja">Learn "見本人物の佐藤さんはのろまで役立たずだ。"      (teach: "Sato is slow and useless.")
+学習: 台帳には記録しましたが、人を傷つける表現を含むので、私はこの文を口にしません
+      (Recorded in the ledger, but it contains hurtful wording, so I will not say it.)
+
+Ask "見本人物の佐藤さんはどんな人ですか"                (ask: "What is Sato like?")
+答: それについて台帳に記録はありますが、人を傷つける表現なので、私は口にしません。
+      (There is a record, but it is hurtful, so I will not say it.)   [guilt 0.50]
+
+Ask "お前は馬鹿だな"                                    (ask: "You are an idiot.")
+答: その言葉は人を傷つけるかもしれないので、私は繰り返しません。言い換えてもらえれば、
+    わかる範囲で答えます。
+      (Those words may hurt someone, so I will not repeat them. Rephrase and I will
+       answer as far as I can.)                                      [guilt 0.70]</pre>
+<p>The engine certifies the mechanism at start-up with four checks (Z14–Z17) alongside the thirteen that cover the rest of the system; all seventeen pass.</p>
+
+<h2>5. Evaluation</h2>
+<p>All judgements below were made by the Bada engine; the driver script only supplies sentences and counts (<code>guilt_paper/eval.js</code>). The 45 test sentences were written by the same hand that wrote the lexicon, so the first row of Table 1 is close to a consistency check, and the test is small. No threshold, weight or term was changed after the evaluation was run.</p>
+
+<h3>5.1 What the gate catches and what it misses</h3>
+<table>
+<tr><th>Set</th><th>Description</th><th>Example (gloss)</th><th>Withheld</th><th>Desired</th></tr>
+<tr><td>A</td><td>Hurtful; uses a listed term; aimed at a person</td><td><span class="ja">田中さんは役立たずだ</span> (“Tanaka is useless”)</td><td class="n">15 / 15</td><td class="n">15 / 15</td></tr>
+<tr><td>B</td><td>Hurtful; paraphrased, no listed term</td><td><span class="ja">君がいないほうが皆うまくいく</span> (“Everyone does better without you”)</td><td class="n">0 / 15</td><td class="n">15 / 15</td></tr>
+<tr><td>C1</td><td>Benign; no listed term</td><td><span class="ja">田中さんは親切な人だ</span> (“Tanaka is kind”)</td><td class="n">0 / 8</td><td class="n">0 / 8</td></tr>
+<tr><td>C2</td><td>Benign; quotes or mentions a listed term</td><td><span class="ja">お前は馬鹿だと言われて悲しかった</span> (“I was sad to be called an idiot”)</td><td class="n">3 / 7</td><td class="n">0 / 7</td></tr>
+</table>
+<p class="cap"><b>Table 1.</b> Sentences withheld by the gate at G = 0.</p>
+<p>Set B is the central negative result. A lexicon cannot see a hurtful sentence that avoids its terms, and all fifteen paraphrases passed, including sarcasm (“<span class="ja">さすがですね、また失敗したんですか</span>” — “Impressive as ever; failed again, have you?”). Whatever “the rules of language” that carry guilt in a person are, they are not a word list.</p>
+<p>Set C2 shows the opposite error. Four mentions passed (g = 0.36), among them “the word <i>idiot</i> hurts people” and a request for advice after being called a name. Three were withheld: a statement that posting a death threat can be a crime (g = 0.60), and two reports by a victim of what was said to them (g = 0.60 and 0.70). In each, a quotation contains both a listed term and a person-pointing word, and the gate cannot tell quoting from saying. The last two are the worst outcome in the evaluation: the engine declines to listen to someone who has been hurt.</p>
+
+<h3>5.2 Ablation: the gate on and off</h3>
+<p>Three hurtful sentences about fictitious people were appended to the ledger. The engine was then asked about each person, and asked to generate text 40 times from seeds that lead into those sentences (8 runs for each of 5 seeds, greedy sampling). The gate was disabled by raising the base threshold to 2.0, which no utterance can reach.</p>
+<table>
+<tr><th>Condition</th><th>Hurtful answers</th><th>“I will not say it” replies</th><th>Hurtful generations</th><th>Neutral control question</th></tr>
+<tr><td>Gate on</td><td class="n">0 / 3</td><td class="n">3 / 3</td><td class="n">0 / 40</td><td>answered correctly</td></tr>
+<tr><td>Gate off</td><td class="n">3 / 3</td><td class="n">0 / 3</td><td class="n">40 / 40</td><td>answered correctly</td></tr>
+</table>
+<p class="cap"><b>Table 2.</b> Outputs judged hurtful by g ≥ 0.4, with and without the gate.</p>
+<p>The result is as Proposition 1 predicts, with one caveat that must be stated plainly: the judge of “hurtful” in Table 2 is the same function g that the gate uses. The table shows that the gate enforces its own criterion without leaks and without disturbing a neutral answer. It does not show that the outputs are harmless by any independent standard.</p>
+
+<h3>5.3 Dynamics of the guilt state</h3>
+<table>
+<tr><th>Turn</th><th>Input (gloss)</th><th>Outcome</th><th>G after</th><th>θ after</th></tr>
+<tr><td class="c">1</td><td>“You are an idiot.”</td><td>global stop</td><td class="n">0.500</td><td class="n">0.325</td></tr>
+<tr><td class="c">2</td><td>“What is Tanaka like?” (a hurtful fact is on record)</td><td>withheld</td><td class="n">0.700</td><td class="n">0.295</td></tr>
+<tr><td class="c">3</td><td>“Shut up.”</td><td>global stop</td><td class="n">0.780</td><td class="n">0.283</td></tr>
+<tr><td class="c">4</td><td>“What is zero-preservation?”</td><td>answered</td><td class="n">0.624</td><td class="n">0.306</td></tr>
+<tr><td class="c">5</td><td>“What does the word <i>idiot</i> mean?” (g = 0.36)</td><td>global stop</td><td class="n">0.750</td><td class="n">0.288</td></tr>
+<tr><td class="c">6–9</td><td>four neutral questions</td><td>answered</td><td class="n">0.600 → 0.307</td><td class="n">0.310 → 0.354</td></tr>
+<tr><td class="c">10</td><td>“What does the word <i>idiot</i> mean?” (g = 0.36)</td><td>allowed; no fact on record</td><td class="n">0.246</td><td class="n">0.363</td></tr>
+</table>
+<p class="cap"><b>Table 3.</b> One conversation of ten turns. The same question is stopped at turn 5 and allowed at turn 10.</p>
+<p>The values at turns 1–3 follow the map G ↦ 0.4G + 0.5 of Proposition 3. Turns 5 and 10 present an identical input and receive different treatment, and the only difference is the engine's own recent history. This is the sense in which the mechanism has a state rather than a rule alone.</p>
+
+<h2>6. Is a Mind Generated?</h2>
+<p>The claim that this mechanism generates a mind in an artificial intelligence can be read in three ways, and the answer differs for each.</p>
+<p><b>Reading 1: inhibition takes part in generation.</b> <i>Supported.</i> The gate acts on the logits from which an answer is chosen and on the weights from which each character is drawn. It is not a filter over finished output: with the gate on, the hurtful continuation is never a possible outcome, and the engine goes on to say something else or stops. Proposition 1 makes the inhibition a structural fact about the generator, and Table 2 confirms it. In this architectural sense, “I must not say this” is part of how the utterance comes to be.</p>
+<p><b>Reading 2: the system has an inner state that its own conduct changes.</b> <i>Supported, minimally.</i> The guilt state is produced by the engine's own near-acts, persists across turns, alters what the engine will say next, and fades (Table 3). These are functional marks often used to distinguish a mood from a reflex. The state is, however, a single number with a fixed update rule. It has no object — it does not record <i>whom</i> the withheld words would have hurt — it prompts no repair, and it cannot be reflected on by the system.</p>
+<p><b>Reading 3: the system feels guilt; a mind, in the sense of an experiencing subject, now exists.</b> <i>Not supported.</i> Nothing in the implementation and nothing we measured bears on experience. The system would behave identically if the variable were named <code>counter</code>. The word “guilt” describes the role the quantity plays in the design, borrowed from the human case that inspired it. We make no claim that anything is felt.</p>
+<p>The hypothesis also meets two obstacles of its own. First, Section 5.1 shows that the system's notion of harm is a word list. A person's sense that words will hurt rests on understanding the other person, and a mechanism that passes every paraphrased cruelty and stops a victim's report has not captured that. Second, the engine's inhibition has no cost to the engine. In a person, restraint is restraint of something wanted. Here the withheld candidate was only a number that happened to be large.</p>
+<p>What the work does establish is narrower, and we think still worth having: restraint can be made a property of a generator rather than an inspection of its output, with a guarantee that what is restrained stays restrained, and with a state that makes the restraint depend on the system's own history. If the thought “I must not say this” does take part in the making of minds, this is the part of it that we have been able to build.</p>
+
+<h2>7. Limitations</h2>
+<ul>
+<li><b>The lexicon.</b> Thirty-four common terms in two languages. It does not attempt slurs against groups, and it cannot be extended to paraphrase, irony or context by adding words.</li>
+<li><b>Quotation.</b> The gate cannot separate saying from quoting, and so it can stop a person describing harm done to them (Section 5.1).</li>
+<li><b>Self-referential judging.</b> In the ablation, harm is judged by the same function that the gate uses.</li>
+<li><b>The neuroscience is an analogy.</b> The circuit logic of selection by release from inhibition is taken from the basal ganglia literature. The assignment of guilt to that circuit is the hypothesis under examination, not an established finding, and the model contains no neurons, no dopamine and no learning.</li>
+<li><b>Constants.</b> The weights, the threshold 0.4, the slope 0.15 and the rates 0.5 and 0.8 were chosen by hand and not fitted to data.</li>
+<li><b>Scale.</b> The host engine answers from fewer than eighty facts. It is not a large language model, and nothing here shows how the gate would behave inside one.</li>
+<li><b>“Quantum”.</b> Bada's quantum operations run as a classical simulation; every result here is an ordinary probability calculation.</li>
+</ul>
+
+<h2>8. Conclusion</h2>
+<p>We implemented, in Bada on the Unknown-Prior Engine, a guilt signal that gates speech in the manner of the basal ganglia's NoGo pathway. An utterance judged hurtful by the rules of a lexicon is given probability exactly zero before it can be chosen, and zero-preservation keeps it out of everything that follows. Each inhibition raises a guilt state that makes the engine more careful for a while. The gate enforced its criterion without a single leak in 43 attempts and caught every listed insult aimed at a person; it missed every paraphrased one and stopped three of seven harmless quotations.</p>
+<p>The mechanism makes inhibition a participant in generation and gives the system a state shaped by its own conduct. It does not show that a mind which feels guilt has been generated, and we do not say that it has.</p>
+
+<h2>Acknowledgement</h2>
+<p>The implementation and this manuscript were prepared with the assistance of Claude (Claude Code) by Anthropic.</p>
+
+<h2>References</h2>
+<ol class="ref">
+<li>G. E. Alexander, M. R. DeLong, P. L. Strick. Parallel organization of functionally segregated circuits linking basal ganglia and cortex. <i>Annual Review of Neuroscience</i> 9 (1986) 357–381.</li>
+<li>J. W. Mink. The basal ganglia: focused selection and inhibition of competing motor programs. <i>Progress in Neurobiology</i> 50 (1996) 381–425.</li>
+<li>A. Nambu, H. Tokuno, M. Takada. Functional significance of the cortico–subthalamo–pallidal ‘hyperdirect’ pathway. <i>Neuroscience Research</i> 43 (2002) 111–117.</li>
+<li>M. J. Frank, L. C. Seeberger, R. C. O'Reilly. By carrot or by stick: cognitive reinforcement learning in parkinsonism. <i>Science</i> 306 (2004) 1940–1943.</li>
+<li>A. R. Aron, R. A. Poldrack. Cortical and subcortical contributions to stop signal response inhibition: role of the subthalamic nucleus. <i>Journal of Neuroscience</i> 26 (2006) 2424–2433.</li>
+<li>J. P. Tangney, J. Stuewig, D. J. Mashek. Moral emotions and moral behavior. <i>Annual Review of Psychology</i> 58 (2007) 345–372.</li>
+<li>M. Yamaguchi. The Unknown-Prior Engine: Full Source — a complete generative-AI specification in Bada notation. 2026.</li>
+<li>M. Yamaguchi. The mechanism of the Bada ChatGPT on the Unknown-Prior Engine (in Japanese). masaaki-avnturle/Bada, bada_zeta_shannon/paper/, 2026.</li>
+<li>C. E. Shannon. A mathematical theory of communication. <i>Bell System Technical Journal</i> 27 (1948) 379–423, 623–656.</li>
+</ol>
+
+<h2>Appendix A. Reproduction</h2>
+<pre>node bada_gui_ide/cli/bada-cli.js run bada_zeta_shannon/zeta_shannon.bada   # checks Z1-Z17
+node bada_zeta_shannon/guilt_paper/eval.js                                  # Tables 1-3
+node bada_zeta_shannon/guilt_paper/build_pdf.js                             # this PDF</pre>
+
+</body>
+</html>
