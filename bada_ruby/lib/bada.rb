@@ -51,6 +51,7 @@ require_relative "bada/chat"
 require_relative "bada/nn"
 require_relative "bada/basal"
 require_relative "bada/lang"
+require_relative "bada/zeta_shannon"
 
 module Bada
 end

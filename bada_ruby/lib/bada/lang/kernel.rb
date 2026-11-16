@@ -71,6 +71,16 @@ module Bada
       def install_engine_modules(interp)
         # the ChatGPT branch (分派), reachable from Bada as Chat.ask / Chat.line
         chat = nil # lazily created, shared across calls
+        # The ladder's `local` rung: the Bada-written Zeta-Shannon engine answers
+        # first, from its ledger; when it abstains (or is switched off / not
+        # installed) the question goes on to OmegaChat. See Bada::ZetaShannon.
+        local_answer = lambda { |q|
+          grounded = Bada::ZetaShannon.answer(q.to_s)
+          next grounded if grounded
+          chat ||= Bada::OmegaChat.new
+          r = chat.reply(q.to_s)
+          "#{r[:theory][:theory]} (Ξ=#{format('%.4f', r[:question_invariant])})"
+        }
         interp.register_module("Chat",
           "ask" => lambda { |q|
             chat ||= Bada::OmegaChat.new
@@ -91,14 +101,20 @@ module Bada
           },
           # llm(q): reach a *real* LLM API when one is configured in the
           # environment (ANTHROPIC_API_KEY / OPENAI_API_KEY); otherwise fall
-          # back gracefully to the local OmegaChat 分派. Always returns text.
+          # back gracefully to the local rung (Zeta-Shannon engine, then the
+          # OmegaChat 分派). Always returns text.
           "llm" => lambda { |q|
             answer = Bada::Lang::LLM.ask(q.to_s)
             next answer if answer
-            chat ||= Bada::OmegaChat.new
-            r = chat.reply(q.to_s)
-            "#{r[:theory][:theory]} (Ξ=#{format('%.4f', r[:question_invariant])})"
+            local_answer.call(q)
           },
+          # local(q): answer on the local rung directly, whatever the version.
+          "local" => local_answer,
+          # local_engine(): which engine answers first there — "zeta-shannon"/"omega".
+          "local_engine" => lambda { Bada::ZetaShannon.engine },
+          # teach(text): append a fact to the Zeta-Shannon ledger; returns the
+          # new fact count, or 0 when that engine is not running.
+          "teach" => lambda { |t| Bada::ZetaShannon.learn(t.to_s) || 0 },
           # backend(): which engine answers llm() — "anthropic"/"openai"/"local".
           "backend" => lambda { Bada::Lang::LLM.backend&.to_s || "local" },
           "live" => lambda { Bada::Lang::LLM.live? },

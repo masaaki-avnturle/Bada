@@ -41,7 +41,7 @@
 <h1>未知事前エンジン上の Bada ChatGPT の仕組み</h1>
 <p class="sub">位相コア・ゼータ＝シャノン言語化・バージョン台帳 — そして Claude Fable との距離</p>
 <p class="author">山口 正明（Masaaki Yamaguchi）／ Yamaguchi Framework<br>実装・数値検証・文書化補助：Claude (Anthropic)</p>
-<p class="date">2026年11月16日</p>
+<p class="date">2026年11月16日（同日改訂：ローカル段の接続を反映）</p>
 
 <div class="abstract">
 <h3>要旨</h3>
@@ -61,9 +61,9 @@
 <ol>
 <li><b>未知事前エンジン</b>（位相コアと台帳）。処理系 <code>bada_gui_ide/www/bada.js</code> のネイティブ関数 <code>softmax</code>、<code>cognitive_system</code>、<code>update</code>、<code>unknown_prior</code> として提供される。</li>
 <li><b>ゼータ＝シャノン言語エンジン</b>（<code>bada_zeta_shannon/zeta_shannon.bada</code>、純 Bada、約 1,300 行）。質問に根拠つきで答え、会話から学習し、文章を生成する。</li>
-<li><b>バージョン台帳とブリッジ</b>（<code>bada_ruby/lib/bada/lang/llm.rb</code>）。外部の言語モデル API に問い合わせ、失敗時はローカル分派 <code>Bada::OmegaChat</code> に落ちる。</li>
+<li><b>バージョン台帳とブリッジ</b>（<code>bada_ruby/lib/bada/lang/llm.rb</code>）。外部の言語モデル API に問い合わせ、失敗時はローカル段に落ちる。</li>
 </ol>
-<p>2 と 3 は別々に作られており、現時点では接続されていない。3 のローカル分派は Ruby 製の OmegaChat であり、2 の Bada 製エンジンではない。この点は第 7 節で改めて述べる。</p>
+<p>2 と 3 は別々に作られたが、本改訂で接続した。台帳のローカル段では、まず 2 の Bada 製エンジンが答え、証拠がなく棄権したときだけ Ruby 製の OmegaChat に渡る。接続の方法は第 6 節と第 7 節で述べる。</p>
 
 <h2>2　全体構成</h2>
 <figure>
@@ -80,8 +80,8 @@
     <rect x="480" y="36" width="76" height="40" fill="#fff" stroke="#8a3b12"/><text x="518" y="60" text-anchor="middle">Haiku 4.5</text>
     <rect x="566" y="36" width="98" height="40" fill="#fde9d9" stroke="#8a3b12" stroke-width="1.6"/><text x="615" y="54" text-anchor="middle">local</text><text x="615" y="68" text-anchor="middle" fill="#666">ローカル分派</text>
   </g>
-  <line x1="615" y1="92" x2="615" y2="112" stroke="#333" marker-end="url(#ar)"/>
-  <text x="604" y="106" text-anchor="end" font-size="9.5" fill="#444">鍵なし・通信失敗・拒否 → nil → ローカルへ</text>
+  <path d="M615,92 L615,108 L220,108 L220,140" fill="none" stroke="#333" marker-end="url(#ar)"/>
+  <text x="604" y="103" text-anchor="end" font-size="9" fill="#444">鍵なし・通信失敗・拒否 → nil → ローカル段へ</text>
 
   <rect x="6" y="114" width="668" height="104" fill="#f1f5fa" stroke="#1f4e79"/>
   <text x="16" y="132" font-weight="bold" fill="#1f4e79">中層　ローカルの言語エンジン</text>
@@ -90,14 +90,15 @@
   <text x="26" y="174" font-size="10">トークン化 → ゼータ則の自己情報量 → コサイン → ロジット z</text>
   <text x="26" y="189" font-size="10">→ 位相コア → 信念との積 → 棄権判定 → Grover → 答え</text>
   <text x="26" y="203" font-size="10" fill="#555">ζ_NS・零点計算・4-gram 生成・複素振幅レジスタ</text>
-  <rect x="436" y="142" width="228" height="66" fill="#fff" stroke="#1f4e79" stroke-dasharray="4 3"/>
-  <text x="446" y="158" font-weight="bold">OmegaChat（Ruby）</text>
-  <text x="446" y="174" font-size="10">計測 → 誤差修正 → 検索</text>
-  <text x="446" y="189" font-size="10">→ 生成 → 記録</text>
-  <text x="446" y="203" font-size="10" fill="#555">台帳の local 段が呼ぶ分派</text>
+  <rect x="466" y="142" width="198" height="66" fill="#fff" stroke="#1f4e79" stroke-dasharray="4 3"/>
+  <text x="476" y="158" font-weight="bold">OmegaChat（Ruby）</text>
+  <text x="476" y="174" font-size="10">計測 → 誤差修正 → 検索</text>
+  <text x="476" y="189" font-size="10">→ 生成 → 記録</text>
+  <text x="476" y="203" font-size="10" fill="#555">棄権時の受け皿</text>
+  <line x1="424" y1="175" x2="464" y2="175" stroke="#333" marker-end="url(#ar)"/>
+  <text x="445" y="168" text-anchor="middle" font-size="9" fill="#444">棄権</text>
 
   <line x1="220" y1="218" x2="220" y2="238" stroke="#333" marker-end="url(#ar)"/>
-  <line x1="550" y1="218" x2="550" y2="238" stroke="#333" marker-end="url(#ar)"/>
 
   <rect x="6" y="240" width="668" height="72" fill="#eef6f0" stroke="#1f6f3f"/>
   <text x="16" y="258" font-weight="bold" fill="#1f6f3f">下層　未知事前エンジン</text>
@@ -108,7 +109,7 @@
   <text x="505" y="282" text-anchor="middle">追記専用台帳（TupleSpace）と未知事前分布</text>
   <text x="505" y="297" text-anchor="middle" font-size="10" fill="#555">一様分布から出発し、証拠で更新</text>
 </svg>
-<p class="cap">図 1　Bada ChatGPT の三層構成。破線の OmegaChat は Ruby 実装で、Bada 製エンジンとは別系統である。</p>
+<p class="cap">図 1　Bada ChatGPT の三層構成。ローカル段では Bada 製エンジンが先に答え、棄権したときだけ破線の OmegaChat（Ruby 実装）に渡る。</p>
 </figure>
 
 <h2>3　未知事前エンジン</h2>
@@ -179,7 +180,9 @@
 <h2>6　バージョン台帳とブリッジ</h2>
 <p>Ruby 側の <code>Bada::Lang::LLM</code> は、外部の言語モデル API への橋である。環境変数に API 鍵があれば Anthropic Messages API または OpenAI 互換 API を呼び、なければ <code>nil</code> を返す。呼び出し側は <code>nil</code> を受けるとローカル分派に落ちる。通信エラー、JSON の解析失敗、安全分類器による拒否も同じく <code>nil</code> に丸める。鍵は環境変数からのみ読み、保存も出力もしない。</p>
 <p>モデルは台帳から選ぶ（図 1 上段）。既定はムートスで、<code>Chat.downgrade(n)</code>、<code>Chat.upgrade(n)</code>、<code>Chat.use(id)</code> で段を移る。最下段 <code>local</code> に固定すると、鍵があってもローカル分派だけで動く。</p>
-<p>ローカル分派 OmegaChat は五段の処理を行う。質問のシャノンエントロピーと多様体エントロピー不変量を測り、回転体上で誤差修正し、キーワードと不変量でコーパスを検索し、目標エントロピーで文章を生成し、やり取りを台帳に記録する。</p>
+<p><b>ローカル段。</b>ローカル段は二つのエンジンを順に呼ぶ。最初に第 4 節の Bada 製エンジンが答える。台帳に証拠があれば、その答えに標識・出典・確信度を付けて返す。棄権した場合の扱いは環境変数 <code>BADA_LOCAL_ENGINE</code> で決まる。既定の <code>auto</code> では OmegaChat に渡し、<code>zeta</code> では「わかりません」をそのまま返し、<code>omega</code> では Bada 製エンジンを使わない。</p>
+<p>注意すべき点がある。<code>auto</code> では、棄権という性質がシステム全体としては失われる。OmegaChat は証拠の有無に関係なく文章を生成するからである。根拠のある答えだけを通したい場合は <code>zeta</code> を選ぶ必要がある。</p>
+<p>OmegaChat は五段の処理を行う。質問のシャノンエントロピーと多様体エントロピー不変量を測り、回転体上で誤差修正し、キーワードと不変量でコーパスを検索し、目標エントロピーで文章を生成し、やり取りを台帳に記録する。</p>
 <p>台帳最上段のモデル ID は <code>claude-fable-5</code> と書かれている。本稿の作業環境には API 鍵がなく、この ID で実際に応答が得られるかは確かめていない <span class="tag t-u">未検証</span>。</p>
 
 <h2>7　実装</h2>
@@ -188,8 +191,9 @@
 <tr><td>位相コア・台帳</td><td><code>bada_gui_ide/www/bada.js</code></td><td>処理系</td><td><code>softmax</code> <code>cognitive_system</code> <code>update</code> <code>unknown_prior</code>、<code>@reviser</code> 文法拡張</td></tr>
 <tr><td>言語エンジン</td><td><code>bada_zeta_shannon/zeta_shannon.bada</code></td><td>Bada</td><td>複素数、ζ、ζ<sub>NS</sub>、ジップ＝ゼータ則、索引、生成、量子レジスタ、認証</td></tr>
 <tr><td>対話ドライバ</td><td><code>bada_zeta_shannon/chat.js</code></td><td>JavaScript</td><td>入出力のみ。1 行を Bada の文に変換</td></tr>
-<tr><td>ブリッジ</td><td><code>bada_ruby/lib/bada/lang/llm.rb</code></td><td>Ruby</td><td>バージョン台帳、API 呼び出し、フォールバック</td></tr>
-<tr><td>ローカル分派</td><td><code>bada_ruby/lib/bada/chat.rb</code></td><td>Ruby</td><td>OmegaChat</td></tr>
+<tr><td>外部ブリッジ</td><td><code>bada_ruby/lib/bada/lang/llm.rb</code></td><td>Ruby</td><td>バージョン台帳、API 呼び出し、フォールバック</td></tr>
+<tr><td>ローカル段の接続</td><td><code>bada_zeta_shannon/bridge.js</code><br><code>bada_ruby/lib/bada/zeta_shannon.rb</code></td><td>JavaScript<br>Ruby</td><td>JSON Lines の橋と、その Ruby 側クライアント</td></tr>
+<tr><td>棄権時の受け皿</td><td><code>bada_ruby/lib/bada/chat.rb</code></td><td>Ruby</td><td>OmegaChat</td></tr>
 </table>
 <p><code>Ask</code>、<code>Learn</code>、<code>Speak</code> は予約語ではなく、<code>@reviser : grammar</code> が台帳に commit した生成規則である。</p>
 <pre>@reviser : grammar {
@@ -202,7 +206,13 @@ Ask "リーマン予想は証明されましたか"</pre>
 答: リーマン予想は未解決である。論文集でも、証明できたことと証明できていないことを分けて記している。
     [標識 未解決 | 出典 リーマン予想 | 確信度 0.92 | H = 0.53 bit | Grover P = 0.996]</pre>
 <p>認証とデモの全体は約 1,200 万インタープリタ・ステップで、1 秒未満で終わる。Bada から C へのコンパイラはこのプログラムの配列・文字列操作を変換できず、ネイティブ実行はできない <span class="tag t-n">否定</span>。</p>
-<p><b>未接続の点。</b>Bada 製の言語エンジンはバージョン台帳につながっていない。台帳の <code>local</code> 段が呼ぶのは Ruby の OmegaChat である。両者を一本にするには、Ruby 側から Bada 処理系を呼ぶ経路が要る。</p>
+<p><b>ローカル段の接続。</b>Bada 製エンジンは JavaScript 製の処理系で動き、台帳は Ruby で書かれている。両者を <code>bridge.js</code> でつないだ。Ruby は <code>node bridge.js</code> を一つ起動したままにし、1 行 1 件の JSON で質問と答えをやり取りする。プロセスが続く限り、<code>Chat.teach</code> で教えた事実と会話の信念は保持される。node やエンジンがない場合、子プロセスが落ちた場合、20 秒以内に応答がない場合は、例外を出さずに OmegaChat に落ちる <span class="tag t-v">検証済</span>。</p>
+<pre>$ bin/bada llm "リーマン予想は証明されましたか"
+リーマン予想は未解決である。論文集でも、証明できたことと証明できていないことを分けて記している。
+    [zeta-shannon | 標識 未解決 | 出典 リーマン予想 | 確信度 0.90]
+$ BADA_LOCAL_ENGINE=zeta bin/bada llm "意識とは何か"
+わかりません。その質問に答える証拠が台帳にありません。… [zeta-shannon: 棄権]</pre>
+<p>接続のテストは 11 件を追加し、Ruby 側の全 231 件が通った。対象は、根拠つきの答え、棄権、学習の持続、<code>local</code> 固定時の動作、三つのモード、node やエンジンが欠けたときのフォールバックである。</p>
 
 <h2>8　検証</h2>
 <h3>8.1　自己認証</h3>
@@ -261,14 +271,15 @@ Ask "リーマン予想は証明されましたか"</pre>
 <li><b>棄権は保証でない。</b>一般的なバイグラムの一致で閾値を越えることがある（8.2 節）。</li>
 <li><b>位相は答えに寄与しない。</b>ナッシュ・シャノン位相は記録されるだけである（定理 2）。</li>
 <li><b>量子部分はシミュレーションである。</b>第 5 節のとおり。</li>
-<li><b>二つの系統が未接続である。</b>第 7 節のとおり。</li>
+<li><b>既定のモードでは棄権が通らない。</b><code>auto</code> では棄権した質問を OmegaChat が引き取り、証拠なしに文章を生成する（第 6 節）。</li>
+<li><b>接続には node が要る。</b>Bada 製エンジンは JavaScript 製の処理系で動くので、Ruby だけの環境では OmegaChat だけになる。</li>
 <li><b>評価が小さい。</b>30 問、作成者自身による出題である。</li>
 </ul>
 
 <h2>11　結論</h2>
 <p>Bada ChatGPT は、位相コアと追記専用台帳の上に、ゼータ＝シャノン則で重みを付けた検索応答と、外部モデルへのバージョン台帳を重ねたものである。仕組みは三つの初等的な事実に支えられている。絶対値 1 の因子は零を保存する。ジップの法則はゼータ分布であり、その自己情報量が単語の重みになる。未知のトークンは重いので、知らない話題は被覆率で検出できる。</p>
 <p>ローカルのエンジンは Claude Fable に匹敵しない。持っているのは、小さな範囲で根拠を示して答え、範囲の外では黙るという性質である。システムが Fable の水準の答えを返すのは、台帳が Fable を呼ぶときに限られる。</p>
-<p>次の一手は三つある。Bada 製エンジンをバージョン台帳の <code>local</code> 段に接続すること。台帳最上段の到達性を鍵のある環境で確かめること。第三者が作った質問で 8.2 節の評価をやり直すことである。</p>
+<p>本改訂で、Bada 製エンジンをバージョン台帳の <code>local</code> 段に接続した。次の一手は二つある。台帳最上段の到達性を鍵のある環境で確かめること。第三者が作った質問で 8.2 節の評価をやり直すことである。</p>
 
 <h2>参考文献</h2>
 <ol class="ref">

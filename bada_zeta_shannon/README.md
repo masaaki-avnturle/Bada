@@ -37,6 +37,18 @@ node chat.js                                                  # 対話
 答: わかりません。その質問に答える証拠が台帳にありません。Learn 文で事実を教えてください。
 ```
 
+## バージョン台帳（Bada XP）の local 段として
+
+`../bada_ruby` の ChatGPT バージョン台帳は、最下段 `local`（鍵なし・通信失敗時の
+フォールバック先でもある）でこのエンジンを最初に呼びます。棄権したときだけ従来の
+OmegaChat に渡ります。切り替えは `BADA_LOCAL_ENGINE=auto|zeta|omega`
+（詳細は `../bada_ruby/README.md`）。
+
+```sh
+cd ../bada_ruby && bin/bada llm "リーマン予想は証明されましたか"
+echo '{"op":"ask","text":"零の保存とは"}' | node bridge.js     # ブリッジを直接使う
+```
+
 ## シャノンの公式をゼータ関数に使う 3 か所
 
 1. **ナッシュ・シャノンゼータ** `ζ_NS(s) = ζ(s)·exp(iβH(Re s))`
@@ -131,4 +143,6 @@ certified 13 / 13  ALL PASS
 |:--|:--|
 | `zeta_shannon.bada` | エンジン本体・知識ベース・認証・デモ |
 | `chat.js` | 対話ドライバ（入出力のみ） |
+| `bridge.js` | JSON Lines ブリッジ（Ruby のバージョン台帳 local 段が使う） |
+| `paper/` | 仕組みの論文（PDF・原稿・評価スクリプト） |
 | `test.sh` | 認証と対話のテスト |

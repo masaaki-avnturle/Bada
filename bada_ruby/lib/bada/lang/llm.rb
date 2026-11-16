@@ -9,9 +9,10 @@ module Bada
     # standard library (Net::HTTP, JSON). No external gems.
     #
     # This is the honest answer to "is the Bada ChatGPT a real LLM?": by itself
-    # the repo's `Chat` is the local `Bada::OmegaChat` engine. When an API key is
-    # present in the environment, `LLM.ask` reaches a real model; otherwise it
-    # returns nil so callers gracefully fall back to the local engine.
+    # the repo's `Chat` is a local engine. When an API key is present in the
+    # environment, `LLM.ask` reaches a real model; otherwise it returns nil so
+    # callers gracefully fall back to the local rung: the Bada-written
+    # Zeta-Shannon engine (`Bada::ZetaShannon`) first, then `Bada::OmegaChat`.
     #
     # The model used is chosen from a *version ladder* (most → least capable,
     # ending in the local 分派). You can DOWNGRADE to a previous version, upgrade
@@ -53,7 +54,7 @@ module Bada
         { id: "claude-opus-4-6",   label: "Opus 4.6",       model: "claude-opus-4-6",   note: "前々世代" },
         { id: "claude-sonnet-4-6", label: "Sonnet 4.6",     model: "claude-sonnet-4-6", note: "軽量・高速" },
         { id: "claude-haiku-4-5",  label: "Haiku 4.5",      model: "claude-haiku-4-5",  note: "最小・最速" },
-        { id: LOCAL,               label: "OmegaChat 分派", model: nil,                 note: "ローカル（鍵不要）" }
+        { id: LOCAL,               label: "OmegaChat 分派", model: nil,                 note: "ローカル（鍵不要）: ゼータ・シャノン言語エンジン → OmegaChat" }
       ].freeze
 
       def codename

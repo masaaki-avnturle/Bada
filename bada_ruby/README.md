@@ -428,6 +428,40 @@ ruby bin/bada lang bada/app/llm_versions.bada  # ダウングルード/復帰の
 | `Chat.use(id)` | 特定の版へ固定（例 `Chat.use("local")`） |
 | `Chat.reset()` / `Chat.history()` | 既定へ復帰 / 変更履歴 |
 
+### local 段: Bada 製ゼータ・シャノン言語エンジン → OmegaChat
+
+台帳の最下段 `local`（および鍵なし・通信失敗時のフォールバック先）では、まず **Bada 製の
+ゼータ・シャノン言語エンジン**（`../bada_zeta_shannon/zeta_shannon.bada`）が台帳の事実から
+根拠つきで答えます。証拠がなく棄権した場合だけ、従来の `Bada::OmegaChat` に渡します。
+
+```bash
+bin/bada llm "リーマン予想は証明されましたか"
+# リーマン予想は未解決である。… [zeta-shannon | 標識 未解決 | 出典 リーマン予想 | 確信度 0.90]
+bin/bada llm "意識とは何か"          # 台帳に証拠なし → OmegaChat が答える（Ξ= 付き）
+```
+
+| 環境変数 | 値 | 動作 |
+|:--|:--|:--|
+| `BADA_LOCAL_ENGINE` | `auto`（既定） | 根拠があれば Bada 製エンジン、棄権時は OmegaChat |
+| | `zeta` | Bada 製エンジンのみ。棄権は「わかりません」のまま返す |
+| | `omega` | Bada 製エンジンを使わない（従来どおり OmegaChat） |
+| `BADA_ZETA_HOME` | ディレクトリ | `bridge.js` の場所（既定 `../bada_zeta_shannon`） |
+| `BADA_NODE` | 実行ファイル | node の場所（既定 `node`） |
+
+| Bada API | 動作 |
+|:--|:--|
+| `Chat.local(q)` | 版に関係なく local 段で答える |
+| `Chat.local_engine()` | local 段で最初に答えるエンジン（`"zeta-shannon"` / `"omega"`） |
+| `Chat.teach(text)` | Bada 製エンジンの台帳に事実を追記（事実数を返す。未起動なら 0） |
+
+Bada 製エンジンは JavaScript 製の量子 Bada 処理系で動くので **node が必要**です。Ruby は
+`node bridge.js` を 1 つ起動したまま JSON Lines で会話するため、`Chat.teach` で教えた事実と
+会話の信念はプロセスが終わるまで保持されます。node やエンジンが無い場合、子プロセスが落ちた
+場合、20 秒以内に応答が無い場合は、例外を出さずに OmegaChat に落ちます。
+
+注意: `auto` では棄権した質問が OmegaChat に渡り、OmegaChat は証拠の有無に関係なく文章を
+生成します。根拠のある答えだけが欲しい場合は `BADA_LOCAL_ENGINE=zeta` を使ってください。
+
 `MultiGPT.version()` / `MultiGPT.downgrade()` / `MultiGPT.upgrade()` からも操作できます。
 版の選択はプロセス内で保持され、`Chat.llm` が現在の版で応答します（鍵なし時はローカル分派）。
 
