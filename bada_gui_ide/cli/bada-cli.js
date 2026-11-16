@@ -156,6 +156,7 @@ else if (cmd === "examples") {
   } else if (cmd === "run") {
     const r = Bada.run(src, { out: (s) => console.log(s), ffi });
     if (r.parseErrors.length) console.error(r.parseErrors.join("\n"));
+    if (r.error) console.error("[runtime error] " + r.error);
     process.exit(r.ok ? 0 : 1);
   } else if (cmd === "emit") {
     const r = Bada.emitC(src);

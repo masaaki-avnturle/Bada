@@ -53,3 +53,15 @@ make test                                             # ALL PASS
 ## 開発ブランチ
 
 `claude/bada-ruby-conversion-7DMUQ`
+
+## `bada_zeta_shannon/` — ゼータ・シャノン言語エンジン（量子 Bada 製）
+
+シャノンの公式をゼータ関数に利用した言語化。ナッシュ・シャノンゼータ
+`ζ_NS = ζ·exp(iβH)`、ジップ＝ゼータ則の自己情報量による検索、ナッシュ温度つき生成、
+干渉する量子レジスタ（グローバー探索）を純 Bada で実装し、13 項目を自己認証します。
+台帳にない質問には「わかりません」と答えます。詳細と正直な範囲は
+[`bada_zeta_shannon/README.md`](bada_zeta_shannon/README.md)。
+
+```sh
+cd bada_zeta_shannon && ./test.sh && node chat.js
+```

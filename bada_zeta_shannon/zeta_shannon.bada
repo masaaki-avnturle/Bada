@@ -1,0 +1,1327 @@
+# =============================================================================
+# zeta_shannon.bada -- the Zeta-Shannon language engine, written in Bada
+#
+#   "シャノンの公式をゼータ関数に利用した言語化"
+#
+# A grounded question-answering + text-generation engine that runs on the
+# Unknown-Prior Engine's phase core (psi = sqrt(a) * exp(i*theta)).  Everything
+# below the natives softmax / cognitive_system / update / unknown_prior is
+# written in Bada itself: complex arithmetic, the Riemann zeta function, the
+# Nash-Shannon zeta, the Zipf-zeta language law, the retrieval index, the
+# n-gram generator and a complex-amplitude quantum register with interference.
+#
+# How Shannon's formula is applied to the zeta function (three places):
+#
+#   (1) Nash-Shannon zeta      zeta_NS(s) = zeta(s) * exp(i*beta*H(Re s))
+#       H(sigma) = -sum q_k log q_k ,  q_k = p_k^-sigma / Z(sigma)  (prime game)
+#       |exp(i beta H)| = 1  =>  zeros and |zeta| are preserved exactly.
+#
+#   (2) Zipf-zeta law of language   P(rank r) = r^-s / Z_V(s)
+#       Shannon self-information of a token under that law
+#           I(r) = s*log r + log Z_V(s)
+#       and its excess over the commonest token, I(r) - I(1) = s*log r, is
+#       the weight every token carries in retrieval ("verbalization").
+#
+#   (3) Nash temperature of generation   w_k = count_k * p_k^-sigma
+#       the k-th ranked continuation is reweighted by the prime-game
+#       equilibrium; a non-zero factor, so impossible continuations stay
+#       impossible (zero-preservation).
+#
+# Honest scope: this is a small, auditable engine with a few dozen facts, not
+# a large language model.  It proves nothing about the Riemann Hypothesis; it
+# answers "unknown" when it has no evidence.  See README.md.
+# =============================================================================
+
+@reviser : grammar {
+    rule "ask"   stmt [ 'Ask' expr ]   => zs_ask(_1)
+    rule "learn" stmt [ 'Learn' expr ] => zs_learn(_1)
+    rule "speak" stmt [ 'Speak' expr ] => zs_speak(_1, 48)
+}
+
+# =============================================================================
+# 1. Numeric core in pure Bada: floor, sin/cos, complex numbers as [re, im]
+# =============================================================================
+PI := 3.141592653589793
+LN2 := 0.6931471805599453
+
+def m_floor(x) {
+    r := x - x % 1
+    if (r > x) { r := r - 1 }
+    return r
+}
+
+def m_pow(b, e) { return exp(e * log(b)) }
+
+# [cos x, sin x]: range reduction to [-pi/2, pi/2], then the Taylor series
+# to order 20/21 written as one Horner expression each (error < 1e-15)
+def m_cossin(x) {
+    y := x % (2 * PI)
+    if (y > PI) { y := y - 2 * PI }
+    if (y < 0 - PI) { y := y + 2 * PI }
+    flip := 1
+    if (y > PI / 2) { y := PI - y; flip := 0 - 1 }
+    if (y < 0 - PI / 2) { y := 0 - PI - y; flip := 0 - 1 }
+    y2 := y * y
+    c := 1 - y2 / 2 * (1 - y2 / 12 * (1 - y2 / 30 * (1 - y2 / 56 * (1 - y2 / 90 * (1 - y2 / 132 * (1 - y2 / 182 * (1 - y2 / 240 * (1 - y2 / 306 * (1 - y2 / 380 * (1))))))))))
+    s := y * (1 - y2 / 6 * (1 - y2 / 20 * (1 - y2 / 42 * (1 - y2 / 72 * (1 - y2 / 110 * (1 - y2 / 156 * (1 - y2 / 210 * (1 - y2 / 272 * (1 - y2 / 342 * (1 - y2 / 420 * (1)))))))))))
+    return [flip * c, s]
+}
+
+def c_mul(a, b) { return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]] }
+def c_div(a, b) {
+    d := b[0] * b[0] + b[1] * b[1]
+    return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]
+}
+def c_abs(a) { return sqrt(a[0] * a[0] + a[1] * a[1]) }
+
+# fixed-point formatting with d decimals (print's own format stops at 5)
+def fix(x, d) {
+    sign := ""
+    v := x
+    if (v < 0) { sign := "-"; v := 0 - v }
+    scale := 1
+    i := 0
+    while (i < d) { scale := scale * 10; i := i + 1 }
+    n := m_floor(v * scale + 0.5)
+    ip := m_floor(n / scale)
+    fp := n - ip * scale
+    out := sign + ip
+    if (d > 0) {
+        digits := ""
+        i := 0
+        while (i < d) {
+            dg := fp % 10
+            digits := chr(48 + dg) + digits
+            fp := m_floor(fp / 10)
+            i := i + 1
+        }
+        out := out + "." + digits
+    }
+    return out
+}
+
+def shannon(q) {
+    h := 0.0
+    i := 0
+    n := len(q)
+    while (i < n) {
+        if (q[i] > 0) { h := h - q[i] * log(q[i]) }
+        i := i + 1
+    }
+    return h
+}
+
+# =============================================================================
+# 2. Primes and the prime game (Nash equilibrium = Boltzmann form p^-sigma)
+# =============================================================================
+def sieve(limit) {
+    flags := []
+    i := 0
+    while (i <= limit) { flags <- 1; i := i + 1 }
+    out := []
+    i := 2
+    while (i <= limit) {
+        if (flags[i] == 1) {
+            out <- i
+            j := i * i
+            while (j <= limit) { flags[j] = 0; j := j + i }
+        }
+        i := i + 1
+    }
+    return out
+}
+PRIMES := sieve(4000)
+
+# q_k(sigma) = p_k^-sigma / Z(sigma) over the first n primes
+def nash_q(sigma, n) {
+    w := []
+    z := 0.0
+    k := 0
+    while (k < n) {
+        v := exp(0 - sigma * log(PRIMES[k]))
+        w <- v
+        z := z + v
+        k := k + 1
+    }
+    k := 0
+    while (k < n) { w[k] = w[k] / z; k := k + 1 }
+    return w
+}
+NASH_N := 40
+def nash_entropy(sigma) { return shannon(nash_q(sigma, NASH_N)) }
+
+# =============================================================================
+# 3. Riemann zeta on the critical strip (Borwein's eta algorithm, n = 50)
+#    eta(s) = -1/d_n * sum_{k<n} (-1)^k (d_k - d_n) / (k+1)^s
+#    zeta(s) = eta(s) / (1 - 2^(1-s))
+# =============================================================================
+BW_N := 50
+BW_C := []
+BW_LN := []
+def bw_setup() {
+    d := []
+    term := 1.0
+    acc := 1.0
+    d <- acc
+    i := 1
+    while (i <= BW_N) {
+        term := term * 4 * (BW_N + i - 1) * (BW_N - i + 1) / ((2 * i) * (2 * i - 1))
+        acc := acc + term
+        d <- acc
+        i := i + 1
+    }
+    dn := d[BW_N]
+    k := 0
+    sgn := 1
+    while (k < BW_N) {
+        BW_C <- sgn * (d[k] - dn) / dn
+        BW_LN <- log(k + 1)
+        sgn := 0 - sgn
+        k := k + 1
+    }
+}
+bw_setup()
+
+def eta(sig, t) {
+    re := 0.0
+    im := 0.0
+    k := 0
+    while (k < BW_N) {
+        mag := BW_C[k] * exp(0 - sig * BW_LN[k])
+        cs := m_cossin(t * BW_LN[k])
+        re := re + mag * cs[0]
+        im := im - mag * cs[1]
+        k := k + 1
+    }
+    return [0 - re, 0 - im]
+}
+
+def zeta(sig, t) {
+    e := eta(sig, t)
+    m := exp((1 - sig) * LN2)
+    cs := m_cossin(t * LN2)
+    return c_div(e, [1 - m * cs[0], m * cs[1]])
+}
+
+# the Nash-Shannon zeta: a unit-modulus entropy phase multiplied onto zeta
+def zeta_ns(sig, t, beta) {
+    cs := m_cossin(beta * nash_entropy(sig))
+    return c_mul(zeta(sig, t), cs)
+}
+
+def zabs_half(t) { return c_abs(zeta(0.5, t)) }
+
+# golden-section refinement of a local minimum of |zeta(1/2 + it)|
+def refine_zero(lo, hi) {
+    g := 0.6180339887498949
+    a := lo
+    b := hi
+    x1 := b - g * (b - a)
+    x2 := a + g * (b - a)
+    f1 := zabs_half(x1)
+    f2 := zabs_half(x2)
+    it := 0
+    while (it < 34) {
+        if (f1 < f2) {
+            b := x2
+            x2 := x1
+            f2 := f1
+            x1 := b - g * (b - a)
+            f1 := zabs_half(x1)
+        } else {
+            a := x1
+            x1 := x2
+            f1 := f2
+            x2 := a + g * (b - a)
+            f2 := zabs_half(x2)
+        }
+        it := it + 1
+    }
+    return (a + b) / 2
+}
+
+# scan [t0, t1]; returns [zeros, grid_t, grid_abs]
+def scan_zeros(t0, t1, step) {
+    ts := []
+    vs := []
+    t := t0
+    while (t <= t1 + 0.000001) {
+        ts <- t
+        vs <- zabs_half(t)
+        t := t + step
+    }
+    zs := []
+    i := 1
+    n := len(ts)
+    while (i < n - 1) {
+        if (vs[i] < vs[i - 1] && vs[i] <= vs[i + 1]) {
+            z := refine_zero(ts[i - 1], ts[i + 1])
+            if (zabs_half(z) < 0.0001) { zs <- z }
+        }
+        i := i + 1
+    }
+    return [zs, ts, vs]
+}
+
+# =============================================================================
+# 4. A complex-amplitude quantum register with real interference (pure Bada).
+#    The collected papers note (Part VI, 6.3) that the phase-core gate layer
+#    carries probabilities only, so H(H(q)) != q.  Here the register is a
+#    complex state vector and H is the 2x2 linear map, so H*H = I holds and
+#    Grover amplitude amplification works.  (A classical simulation.)
+# =============================================================================
+def qv_new(nq) {
+    n := 1
+    i := 0
+    while (i < nq) { n := n * 2; i := i + 1 }
+    re := []
+    im := []
+    i := 0
+    while (i < n) { re <- 0.0; im <- 0.0; i := i + 1 }
+    re[0] = 1.0
+    return [re, im, nq]
+}
+
+def qv_h(st, q) {
+    re := st[0]
+    im := st[1]
+    n := len(re)
+    bit := 1
+    i := 0
+    while (i < q) { bit := bit * 2; i := i + 1 }
+    r := 0.7071067811865476
+    i := 0
+    while (i < n) {
+        if (m_floor(i / bit) % 2 == 0) {
+            j := i + bit
+            ar := re[i]
+            ai := im[i]
+            br := re[j]
+            bi := im[j]
+            re[i] = (ar + br) * r
+            im[i] = (ai + bi) * r
+            re[j] = (ar - br) * r
+            im[j] = (ai - bi) * r
+        }
+        i := i + 1
+    }
+    return st
+}
+
+def qv_h_all(st) {
+    q := 0
+    while (q < st[2]) { qv_h(st, q); q := q + 1 }
+    return st
+}
+
+# phase oracle: flip the sign of every marked basis state
+def qv_oracle(st, marks) {
+    i := 0
+    n := len(marks)
+    while (i < n) {
+        if (marks[i] == 1) {
+            st[0][i] = 0 - st[0][i]
+            st[1][i] = 0 - st[1][i]
+        }
+        i := i + 1
+    }
+    return st
+}
+
+# Grover diffusion = inversion about the mean amplitude
+def qv_diffuse(st) {
+    n := len(st[0])
+    mr := 0.0
+    mi := 0.0
+    i := 0
+    while (i < n) { mr := mr + st[0][i]; mi := mi + st[1][i]; i := i + 1 }
+    mr := mr / n
+    mi := mi / n
+    i := 0
+    while (i < n) {
+        st[0][i] = 2 * mr - st[0][i]
+        st[1][i] = 2 * mi - st[1][i]
+        i := i + 1
+    }
+    return st
+}
+
+def qv_probs(st) {
+    out := []
+    i := 0
+    n := len(st[0])
+    while (i < n) {
+        out <- st[0][i] * st[0][i] + st[1][i] * st[1][i]
+        i := i + 1
+    }
+    return out
+}
+
+# Grover search over `size` slots; marks[i] == 1 marks slot i.
+# Returns [P(marked), iterations, qubits, argmax slot].
+def grover(marks, size) {
+    nq := 1
+    cap := 2
+    while (cap < size) { cap := cap * 2; nq := nq + 1 }
+    full := []
+    m := 0
+    i := 0
+    while (i < cap) {
+        if (i < size && marks[i] == 1) { full <- 1; m := m + 1 } else { full <- 0 }
+        i := i + 1
+    }
+    if (m == 0) { return [0.0, 0, nq, 0 - 1] }
+    st := qv_h_all(qv_new(nq))
+    # optimal count: round(pi / (4 asin(sqrt(m/cap))) - 1/2), small-angle form
+    iters := m_floor(PI / 4 * sqrt(cap / m))
+    if (2 * m > cap) { iters := 0 }
+    k := 0
+    while (k < iters) {
+        qv_oracle(st, full)
+        qv_diffuse(st)
+        k := k + 1
+    }
+    pr := qv_probs(st)
+    pm := 0.0
+    best := 0
+    i := 0
+    while (i < cap) {
+        if (full[i] == 1) { pm := pm + pr[i] }
+        if (pr[i] > pr[best]) { best := i }
+        i := i + 1
+    }
+    return [pm, iters, nq, best]
+}
+
+# =============================================================================
+# 5. String hash maps (buckets of [key, value]) and the tokenizer
+# =============================================================================
+def hm_new(n) {
+    b := []
+    i := 0
+    while (i < n) { b <- []; i := i + 1 }
+    return b
+}
+# hash of the first three characters and the length (keys are short tokens
+# and n-gram contexts; equal-prefix keys just share a bucket)
+def hm_slot(m, key) {
+    return (ord(key, 0) * 31 + ord(key, 1) * 7 + ord(key, 2) + len(key)) % len(m)
+}
+def hm_find(m, key) {
+    b := m[hm_slot(m, key)]
+    i := 0
+    n := len(b)
+    while (i < n) {
+        if (b[i][0] == key) { return b[i] }
+        i := i + 1
+    }
+    return []
+}
+def hm_has(m, key) { return len(hm_find(m, key)) > 0 }
+def hm_put(m, key, val) {
+    e := hm_find(m, key)
+    if (len(e) > 0) { e[1] = val } else { m[hm_slot(m, key)] <- [key, val] }
+}
+
+def is_alnum(c) {
+    if (c >= 48 && c <= 57) { return true }
+    if (c >= 65 && c <= 90) { return true }
+    if (c >= 97 && c <= 122) { return true }
+    return false
+}
+# wide characters that separate words (CJK punctuation, full-width signs)
+def is_wide_punct(c) {
+    if (c >= 8192 && c <= 8303) { return true }
+    if (c >= 12288 && c <= 12319) { return true }
+    if (c == 12539) { return true }
+    if (c >= 65281 && c <= 65295) { return true }
+    if (c >= 65306 && c <= 65312) { return true }
+    return false
+}
+
+# tokens = lower-cased ASCII words + bigrams of adjacent wide characters
+# (a wide character standing alone, like a lone Greek letter, is a unigram)
+def tokenize(s) {
+    toks := []
+    n := len(s)
+    i := 0
+    word := ""
+    prev := ""
+    run := 0
+    while (i < n) {
+        c := ord(s, i)
+        if (is_alnum(c)) {
+            if (run == 1) { toks <- prev }
+            prev := ""
+            run := 0
+            if (c >= 65 && c <= 90) { c := c + 32 }
+            word := word + chr(c)
+        } else {
+            if (word != "") { toks <- word; word := "" }
+            if (c > 127 && !is_wide_punct(c)) {
+                ch := substr(s, i, 1)
+                if (run > 0) { toks <- prev + ch }
+                prev := ch
+                run := run + 1
+            } else {
+                if (run == 1) { toks <- prev }
+                prev := ""
+                run := 0
+            }
+        }
+        i := i + 1
+    }
+    if (word != "") { toks <- word }
+    if (run == 1) { toks <- prev }
+    return toks
+}
+
+def uniq(toks) {
+    seen := hm_new(64)
+    out := []
+    i := 0
+    n := len(toks)
+    while (i < n) {
+        if (!hm_has(seen, toks[i])) {
+            hm_put(seen, toks[i], 1)
+            out <- toks[i]
+        }
+        i := i + 1
+    }
+    return out
+}
+
+# =============================================================================
+# 6. The knowledge ledger.  Every fact is [text, topic, status]; facts are
+#    only ever appended (TupleSpace semantics).  Status marks follow the
+#    collected papers: 証明済 / 検証済 / 古典 / 予想 / 未解決 / 否定 / 未検証.
+# =============================================================================
+TOPICS := [
+    "ナッシュ・シャノンゼータ",
+    "Unknown-Prior Engine と Bada",
+    "リバイザと量子 Bada",
+    "リーマン予想",
+    "深リーマン予想",
+    "量子力学とスペクトル",
+    "一般相対性理論と Ricci フロー",
+    "ホッジ予想",
+    "量子脳理論",
+    "ミレニアム問題",
+    "微分積分の定理",
+    "言語とシャノンの公式",
+    "このエンジン",
+    "会話で学習"
+]
+
+KB := []
+def fact(text, topic, status) { KB <- [text, topic, status] }
+
+# ---- 0: Nash-Shannon zeta (nash_shannon_paper) ------------------------------
+fact("ナッシュ・シャノンゼータは ζ_NS(s) = ζ(s)·exp(iβH(Re s)) と定義される。", 0, "検証済")
+fact("素数ゲームでは素数 p_k に確率 q_k = p_k^(-σ)/Z(σ) を割り当て、そのシャノンエントロピーは H(σ) = -Σ q_k log q_k である。", 0, "検証済")
+fact("平均 log 素数の制約のもとで最大エントロピーとなる分布がナッシュ均衡であり、ボルツマン形 q_k ∝ p_k^(-σ) に一致する。", 0, "検証済")
+fact("位相因子 exp(iβH) は絶対値 1 の非零因子なので、ζ_NS はゼータの零点と絶対値を厳密に保存し、零点相関は 1.00 になる。", 0, "検証済")
+fact("臨界線 Re(s) = 1/2 ではシャノンエントロピーは H = 3.4568 の定数で、σ = 1 では 2.6986 になる。", 0, "検証済")
+fact("加法版 ζ + H は零点を動かしてしまう。ゼータの零点を保存するのは非零因子による乗算だけである。", 0, "検証済")
+fact("ナッシュ・シャノンゼータの完全相関は位相が臨界線上で定数になることに由来し、リーマン予想の証明とは無関係である。", 0, "検証済")
+
+# ---- 1: Unknown-Prior Engine and Bada ---------------------------------------
+fact("Unknown-Prior Engine の中核は a = softmax(z)、θ = Σ β_m H_m φ_m、ψ = √a·exp(iθ) という位相コアである。", 1, "証明済")
+fact("零の保存とは、a_i = 0 のトークンが位相ステップで決して復活しないという性質で、0 に非零因子を掛けても 0 であることから従う。", 1, "証明済")
+fact("位相コアは |ψ|² = a を機械精度で満たす。位相は記録されるが、振幅を足し合わせない限り確率には現れない。", 1, "証明済")
+fact("未知事前分布は最大エントロピーの一様分布から始まり、証拠が台帳に追記されるたびにエントロピーが減少する。", 1, "検証済")
+fact("TupleSpace は追記専用の不変な台帳であり、事実は上書きされず、推論の履歴がそのまま監査可能な記録になる。", 1, "検証済")
+fact("Bada とは、Unknown-Prior Engine をランタイムとする小さな量子プログラミング言語である。", 1, "検証済")
+fact("Bada の処理系は字句解析器・パーサ・インタプリタと、Bada から C へのコンパイラを持つ。", 1, "検証済")
+fact("asperal は漸進的型付けであり、静的な型・動的な star・篩型のあいだの整合性 ~ が合成を支配する。", 1, "検証済")
+
+# ---- 2: reviser, QuantumBada, PrecogBada ------------------------------------
+fact("リバイザ @reviser は生成規則を追記専用台帳の事実として commit する文法拡張トランザクションで、構文の成長は単調で監査可能である。", 2, "検証済")
+fact("量子副言語ではゲートは位相の commit、測定は台帳への commit であり、零の保存は禁制状態の非復活、|ψ|² = a は位相層のユニタリ性に対応する。", 2, "検証済")
+fact("QuantumBada は位相コアをカーネルとする OS で、公平スケジューリング・プロセス隔離・メモリ安全・監査可能な syscall を保証する。", 2, "検証済")
+fact("PrecogBada は未来状態の分布を保つ予測エンジンで、除外された未来は確率 0 のまま予測されず、幻覚を起こさない。", 2, "検証済")
+fact("位相コアの量子ゲート層は置換と対角位相と一様化であり、干渉を表現しないので量子計算のシミュレータではない。", 2, "検証済")
+fact("零の保存と万能量子計算は両立しない。本物のアダマール変換は H|0> に |1> 成分を生むからである。", 2, "証明済")
+fact("このエンジンの量子レジスタは複素振幅ベクトルで、アダマールを 2×2 の線形写像として実装するので H·H = I が成り立ち、グローバー探索の干渉が起きる。", 2, "検証済")
+fact("グローバー探索は N 個の候補から印の付いた答えを約 (π/4)√N 回の反復で増幅する。ここでは古典計算機上のシミュレーションである。", 2, "古典")
+
+# ---- 3: Riemann hypothesis --------------------------------------------------
+fact("リーマン予想は未解決である。論文集でも、証明できたことと証明できていないことを分けて記している。", 3, "未解決")
+fact("2026年5月の『Proof of the Riemann Hypothesis』は、後続の稿によって否定されており、証明として成立しない。", 3, "否定")
+fact("β(p,q)·ζ(s) ≅ x log x を独立変数の逐点等式として読むと偽であり、素数引数の検証点すべてで差は O(1) になる。", 3, "否定")
+fact("x = T/2π と置くと、Riemann–von Mangoldt の公式 N(T) = x log x − x + 7/8 + S(T) により、x log x は高さ T までの零点の個数を数える。", 3, "古典")
+fact("エントロピー関数 x log x は零点の個数を数えるだけであり、零点が臨界線上にあるかどうかは Euler 積の側にある。", 3, "古典")
+fact("ゼータ関数の最初の非自明な零点の虚部は 14.134725、続いて 21.022040、25.010858、30.424876、32.935062 である。", 3, "古典")
+fact("リーマンゼータは円 S¹ のスペクトルゼータとして ζ_S¹(s) = 2ζ(2s) と同定でき、臨界線は対称軸である。", 3, "検証済")
+fact("対称性だけでは零点の位置は決まらない。Davenport–Heilbronn の関数は同じ型の関数等式を満たすが臨界線の外に零点を持つ。", 3, "古典")
+fact("New Riemann Hypothesis の三重固定点、広中の四重帰納法、Jones 多様体は定義が与えられておらず未検証である。", 3, "未検証")
+fact("リバイザ規則 prove_rh は refuse_rh に展開されて REFUSED を返す。証明していないものを証明と呼ばないことが言語の水準で実装されている。", 3, "検証済")
+
+# ---- 4: Deep Riemann hypothesis ---------------------------------------------
+fact("深リーマン予想は、極を持たない L 関数の Euler 積が臨界線 Re s = 1/2 の上でも収束するという予想で、未証明である。", 4, "予想")
+fact("mod 4 の非主指標 χ₄ では L(1/2, χ₄) = 0.667691457、√2·L = 0.944258314 で、部分 Euler 積との比は 0.94 から 1.04 を振動する。", 4, "検証済")
+fact("深リーマン予想の √2 現象の √2 は Euler 積の p² 項の算術から出るもので、重力枝と反重力枝の幾何平均からは出ない。", 4, "古典")
+fact("『Proof of the Deep Riemann Hypothesis』は前提が偽で中心補題が成立せず、証明として否定されている。", 4, "否定")
+
+# ---- 5: quantum mechanics / spectral ----------------------------------------
+fact("HΨ = ⊕(iℏ∇)^⊕L は重複度つきスペクトル分解として厳密に読め、L は固有空間の次元、等質空間では既約表現の次元である。", 5, "検証済")
+fact("大域的積分はトレース、すなわちスペクトルゼータ Σ L(λ) λ^(-s) である。積の規則は半群性 A^(-s)A^(-t) = A^(-(s+t)) である。", 5, "検証済")
+fact("球面 S^n の重複度は ν = ℓ + (n−1)/2 の n−1 次多項式になり、ζ = B·Λ の分解は S² から S⁶ のすべてで成立した。", 5, "検証済")
+fact("Hilbert–Pólya の構想や Berry–Keating の H = xp は、スペクトルが零点になる作用素を探す予想であり、まだ確立していない。", 5, "予想")
+fact("重力の量子化は未解決である。計量はスペクトルの入力であって力学変数ではなく、統一場は達成ではなく研究計画の名前である。", 5, "未解決")
+
+# ---- 6: general relativity / Ricci flow -------------------------------------
+fact("閉連結 3 次元多様体では ζ_Δ(0) = −1 が位相によらず常に成り立ち、ζ(0) は 3 次元では位相情報を持たない。", 6, "検証済")
+fact("ペレルマン (Perelman) の λ 汎関数は作用素 −4Δ + R の最小固有値であり、Ricci フローの単調量は固有値である。", 6, "検証済")
+fact("サーストンの 8 幾何のうち Einstein なのは E³、S³、H³ の 3 個だけで、これが正規化 Ricci フローの不動点の全体である。", 6, "検証済")
+fact("熱跡は Riemann 積について厳密な準同型 θ_M×N(t) = θ_M(t)·θ_N(t) だが、ゼータは準同型ではない。", 6, "検証済")
+fact("第二熱核係数は ∫R dV に比例し、Einstein–Hilbert 作用そのものである。一般相対性理論が現れるのは熱跡の展開係数である。", 6, "検証済")
+
+# ---- 7: Hodge ---------------------------------------------------------------
+fact("ホッジ予想は未解決である。ベッチ数は p 形式のラプラシアン Δ_p のゼロモードの数であり、これはホッジの定理である。", 7, "未解決")
+fact("スペクトルは複素構造を見ない。同一の計量と同一のスペクトルの平坦トーラス上で、ホッジ類の階数は 4 と 3 のあいだを跳ぶ。", 7, "検証済")
+fact("Lefschetz の (1,1) 定理により p = 1 の場合のホッジ予想は証明済みである。Kähler 多様体一般では偽である。", 7, "古典")
+
+# ---- 8: quantum brain -------------------------------------------------------
+fact("フェルミ=ディラック積分はポリログ関数であり、真性フェルミ準位では F_j(0) = η(j+1) = (1 − 2^(-j))ζ(j+1) となる。", 8, "証明済")
+fact("F_1(0) = π²/12 = ζ(2)/2 = 0.822467 であり、P 層と N 層の対称点でゼータ関数が現れる。", 8, "証明済")
+fact("脳を P 型と N 型の半導体になぞらえる量子脳理論は模型にとどまり、Orch-OR を含めて科学的に未確立の仮説である。", 8, "未検証")
+
+# ---- 9: Millennium problems -------------------------------------------------
+fact("ミレニアム問題は P 対 NP、ホッジ予想、ポアンカレ予想、リーマン予想、ヤン–ミルズ、ナビエ–ストークス、BSD 予想の七つである。", 9, "古典")
+fact("七つのうち解決済みなのはペレルマンが Ricci フローで証明したポアンカレ予想だけである。", 9, "古典")
+fact("2026年5月の七つのミレニアム問題の解決を主張する文書は、論文集では証明として認められていない。五つの大予想は未解決のままである。", 9, "否定")
+fact("量子ライブラリが理想的に実装されても Grover 型探索が上限であり、BBBV 下界により NP を多項式時間には落とせない。", 9, "古典")
+
+# ---- 10: calculus theorems --------------------------------------------------
+fact("生成関数 f に関する f-微分は D_f F = F'/f'、f-積分は J_f F = ∫ F df であり、連鎖律とライプニッツ則が定理になる。", 10, "証明済")
+fact("ポテンシャル L = x log x − x は log x の原始関数であり、ルジャンドル変換を通じて微分と積分の体系をエントロピー式で統一する。", 10, "証明済")
+fact("レポートの十本の式のうち、二階微分・部分積分の境界項・商の分母の三本は文字どおりには成り立たず、反例と修正形が示されている。", 10, "否定")
+fact("ガウス積分 ∫∫ exp(−x²−y²) dx dy = π は、円の要素とネイピア数を結ぶ基本の式である。", 10, "古典")
+
+# ---- 11: language and Shannon's formula -------------------------------------
+fact("シャノンの公式 H = −Σ p log p はシャノンエントロピーと呼ばれ、確率分布の平均情報量を与える。1 つの記号の自己情報量は −log p である。", 11, "古典")
+fact("ジップの法則では順位 r の単語の確率は r^(-s)/ζ(s) に比例する。これはゼータ分布であり、言語とゼータ関数を直接結ぶ。", 11, "古典")
+fact("ゼータ分布のもとで順位 r の単語の自己情報量は I(r) = s·log r + log ζ(s) である。珍しい単語ほど多くの情報を運ぶ。", 11, "古典")
+fact("言語化とは、質問の単語にゼータ分布の自己情報量で重みを付け、証拠のある事実だけを位相コアで選んで言葉にすることである。", 11, "検証済")
+fact("生成の温度はナッシュ均衡の σ で決まる。順位 k の候補に p_k^(-σ) を掛けるので、σ が大きいほど確実な続きを選ぶ。", 11, "検証済")
+
+# ---- 12: this engine --------------------------------------------------------
+fact("こんにちは。私はゼータ関数とシャノンの公式で言語化を行う、ゼータ・シャノン言語エンジンです。", 12, "案内")
+fact("私は論文集の事実を台帳から検索し、標識と出典を付けて答えます。証拠がない質問には「わかりません」と答えます。", 12, "案内")
+fact("私は ChatGPT のような大規模言語モデルではありません。数十個の事実を持つ小さく監査可能なエンジンです。", 12, "案内")
+fact("Learn 文で新しい事実を教えると、台帳に追記されて次の質問から使えるようになります。Speak 文は文章を生成します。", 12, "案内")
+fact("あなたは誰ですかと尋ねられたら、私は量子プログラミング言語で書かれた言語エンジンだと答えます。", 12, "案内")
+fact("何ができるかというと、論文集の事実についての質問に答え、Learn 文で学習し、Speak 文で文章を生成できます。", 12, "案内")
+fact("ありがとうと言われたら、どういたしましてと答えます。", 12, "案内")
+
+# =============================================================================
+# 7. Index: document frequency, inverted lists, character n-grams
+# =============================================================================
+DF := hm_new(1024)        # token -> [document frequency, cached weight]
+INV := hm_new(1024)       # token -> list of fact ids
+VOCAB := []               # every distinct token, in first-seen order
+DOCTOK := []              # fact id -> its distinct tokens
+DOCNORM := []             # fact id -> sum of squared token weights (cached)
+QUAD := hm_new(4096)      # 3-char context -> list of [next char, count]
+TRI := hm_new(2048)       # 2-char context -> list of [next char, count]
+BOS := chr(2)
+EOS := chr(3)
+ZIPF := [1.0, 0.0, 0, [], 0.0] # [s, log Z, vocabulary, rank by df, E log r] (lazy)
+DIRTY := [1]
+STATE := [20260618, 0]    # [rng state, turn counter]
+BELIEF := [unknown_prior(len(TOPICS))]
+VERBOSE := [1]
+
+def ngram_add(m, ctx, ch) {
+    e := hm_find(m, ctx)
+    if (len(e) == 0) {
+        hm_put(m, ctx, [[ch, 1]])
+        return 0
+    }
+    lst := e[1]
+    i := 0
+    n := len(lst)
+    while (i < n) {
+        if (lst[i][0] == ch) {
+            lst[i][1] = lst[i][1] + 1
+            return 0
+        }
+        i := i + 1
+    }
+    lst <- [ch, 1]
+    return 0
+}
+
+def index_fact(id) {
+    text := KB[id][0]
+    toks := uniq(tokenize(text))
+    DOCTOK <- toks
+    i := 0
+    n := len(toks)
+    while (i < n) {
+        e := hm_find(DF, toks[i])
+        if (len(e) == 0) {
+            hm_put(DF, toks[i], [1, 0.0])
+            hm_put(INV, toks[i], [id])
+            VOCAB <- toks[i]
+        } else {
+            e[1][0] = e[1][0] + 1
+            hm_find(INV, toks[i])[1] <- id
+        }
+        i := i + 1
+    }
+    # character 4-gram / trigram counts for the generator
+    p3 := BOS
+    p2 := BOS
+    p1 := BOS
+    i := 0
+    n := len(text)
+    while (i <= n) {
+        ch := EOS
+        if (i < n) { ch := substr(text, i, 1) }
+        ngram_add(QUAD, p3 + p2 + p1, ch)
+        ngram_add(TRI, p2 + p1, ch)
+        p3 := p2
+        p2 := p1
+        p1 := ch
+        i := i + 1
+    }
+    DIRTY[0] = 1
+}
+
+def build_index() {
+    i := len(DOCTOK)
+    while (i < len(KB)) { index_fact(i); i := i + 1 }
+}
+
+# -----------------------------------------------------------------------------
+# The Zipf-zeta law.  Tokens are ranked by document frequency (ties share the
+# middle rank); the exponent s maximises the zeta-law likelihood
+#     L(s) = -s * E[log r] - log Z_V(s),   Z_V(s) = sum_r r^-s
+# and the Shannon self-information of a rank-r token is s*log r + log Z_V(s).
+# -----------------------------------------------------------------------------
+def zipf_loglik(s, grp) {
+    z := 0.0
+    num := 0.0
+    mass := 0.0
+    i := 0
+    n := len(grp)
+    while (i < n) {
+        # grp[i] = [mid rank, token count, df]
+        lr := log(grp[i][0])
+        z := z + grp[i][1] * exp(0 - s * lr)
+        num := num + grp[i][1] * grp[i][2] * lr
+        mass := mass + grp[i][1] * grp[i][2]
+        i := i + 1
+    }
+    return [0 - s * num / mass - log(z), log(z), num / mass]
+}
+
+def zipf_fit() {
+    if (DIRTY[0] == 0) { return ZIPF }
+    nd := len(KB)
+    hist := []
+    i := 0
+    while (i <= nd) { hist <- 0; i := i + 1 }
+    v := len(VOCAB)
+    i := 0
+    while (i < v) {
+        d := hm_find(DF, VOCAB[i])[1][0]
+        hist[d] = hist[d] + 1
+        i := i + 1
+    }
+    rank := []
+    i := 0
+    while (i <= nd) { rank <- 0; i := i + 1 }
+    grp := []
+    above := 0
+    d := nd
+    while (d >= 1) {
+        if (hist[d] > 0) {
+            mid := above + (hist[d] + 1) / 2
+            rank[d] = mid
+            grp <- [mid, hist[d], d]
+            above := above + hist[d]
+        }
+        d := d - 1
+    }
+    # golden-section maximisation of the likelihood over s in [0.05, 4]
+    g := 0.6180339887498949
+    a := 0.05
+    b := 4.0
+    x1 := b - g * (b - a)
+    x2 := a + g * (b - a)
+    f1 := zipf_loglik(x1, grp)[0]
+    f2 := zipf_loglik(x2, grp)[0]
+    it := 0
+    while (it < 40) {
+        if (f1 > f2) {
+            b := x2
+            x2 := x1
+            f2 := f1
+            x1 := b - g * (b - a)
+            f1 := zipf_loglik(x1, grp)[0]
+        } else {
+            a := x1
+            x1 := x2
+            f1 := f2
+            x2 := a + g * (b - a)
+            f2 := zipf_loglik(x2, grp)[0]
+        }
+        it := it + 1
+    }
+    s := (a + b) / 2
+    r := zipf_loglik(s, grp)
+    ZIPF[0] = s
+    ZIPF[1] = r[1]
+    ZIPF[2] = v
+    ZIPF[3] = rank
+    ZIPF[4] = r[2]
+    # cache every token's weight and every fact's squared norm
+    i := 0
+    while (i < v) {
+        cell := hm_find(DF, VOCAB[i])[1]
+        cell[1] = s * log(rank[cell[0]]) * script_factor(VOCAB[i])
+        i := i + 1
+    }
+    while (len(DOCNORM) < nd) { DOCNORM <- 0.0 }
+    i := 0
+    while (i < nd) {
+        toks := DOCTOK[i]
+        dn := 0.0
+        j := 0
+        while (j < len(toks)) {
+            w := hm_find(DF, toks[j])[1][1]
+            dn := dn + w * w
+            j := j + 1
+        }
+        DOCNORM[i] = dn
+        i := i + 1
+    }
+    DIRTY[0] = 0
+    return ZIPF
+}
+
+# Shannon self-information of a token under the fitted zeta law, measured
+# relative to the commonest token:  I(r) - I(1) = s * log r   (nats).
+# log Z_V(s) cancels, so a function word weighs ~0 and a rare word the most;
+# a token the ledger has never seen sits at rank V + 1.
+#
+# Japanese script factor: content words are written in kanji / katakana and
+# grammar in hiragana, so a bigram that is all hiragana counts 0.2 and one
+# that straddles a hiragana boundary counts 0.5.
+def script_factor(tok) {
+    n := len(tok)
+    hira := 0
+    i := 0
+    while (i < n) {
+        c := ord(tok, i)
+        if (c >= 12353 && c <= 12447) { hira := hira + 1 }
+        i := i + 1
+    }
+    if (hira == 0) { return 1.0 }
+    if (hira == n) { return 0.2 }
+    return 0.5
+}
+
+def token_info(tok) {
+    zf := zipf_fit()
+    e := hm_find(DF, tok)
+    if (len(e) > 0) { return e[1][1] }
+    return zf[0] * log(zf[2] + 1) * script_factor(tok)
+}
+
+# =============================================================================
+# 8. Verbalization: question -> evidence -> phase core -> grounded answer
+# =============================================================================
+GAIN := 22.0
+MIN_COVER := 0.2
+RULED_OUT := 0 - 800.0
+
+# returns [posterior r, base a, coverage, q_hat]
+def infer(question) {
+    n := len(KB)
+    qt := uniq(tokenize(question))
+    num := []
+    i := 0
+    while (i < n) { num <- 0.0; i := i + 1 }
+    qnorm := 0.0
+    i := 0
+    while (i < len(qt)) {
+        w := token_info(qt[i])
+        qnorm := qnorm + w * w
+        e := hm_find(INV, qt[i])
+        if (len(e) > 0) {
+            ids := e[1]
+            j := 0
+            while (j < len(ids)) {
+                num[ids[j]] = num[ids[j]] + w * w
+                j := j + 1
+            }
+        }
+        i := i + 1
+    }
+    # cosine against each fact that shares evidence; the rest are ruled out
+    z := []
+    cover := 0.0
+    i := 0
+    while (i < n) {
+        if (num[i] > 0) {
+            z <- GAIN * num[i] / sqrt(DOCNORM[i] * qnorm)
+            if (num[i] / qnorm > cover) { cover := num[i] / qnorm }
+        } else {
+            z <- RULED_OUT
+        }
+        i := i + 1
+    }
+    a := softmax(z)
+
+    # entropy-phase modules: the Nash-Shannon phase exp(i*beta*H(1/2)) and the
+    # conversation belief.  |psi|^2 = a: they are recorded, never destructive.
+    ones := []
+    bel := []
+    i := 0
+    while (i < n) {
+        ones <- 1.0
+        bel <- BELIEF[0][KB[i][1]]
+        i := i + 1
+    }
+    nashmod := [nash_q(0.5, n), ones]
+    belmod := [bel, bel]
+    qhat := cognitive_system(a, [nashmod, belmod], [0.7, 0.5])
+
+    # Bayes step with the earned topic belief: a non-zero multiplicative
+    # factor, so a ruled-out fact (q_hat = 0) can never be resurrected.
+    r := []
+    tot := 0.0
+    i := 0
+    while (i < n) {
+        v := qhat[i] * sqrt(sqrt(BELIEF[0][KB[i][1]]))
+        r <- v
+        tot := tot + v
+        i := i + 1
+    }
+    if (tot > 0) {
+        i := 0
+        while (i < n) { r[i] = r[i] / tot; i := i + 1 }
+    }
+    return [r, a, cover, qhat]
+}
+
+def argmax_excluding(r, taken) {
+    best := 0 - 1
+    i := 0
+    while (i < len(r)) {
+        if (taken[i] == 0 && r[i] > 0) {
+            if (best < 0) { best := i } else if (r[i] > r[best]) { best := i }
+        }
+        i := i + 1
+    }
+    return best
+}
+
+# the @reviser learning loop: the topic belief sharpens with each grounded turn
+def revise_belief(r) {
+    ev := []
+    i := 0
+    while (i < len(TOPICS)) { ev <- 0.0001; i := i + 1 }
+    i := 0
+    while (i < len(r)) {
+        ev[KB[i][1]] = ev[KB[i][1]] + r[i]
+        i := i + 1
+    }
+    @reviser {
+        BELIEF[0] = update(BELIEF[0], dist(ev), 0.3)
+        BELIEF[0] >> tuplespace
+    }
+}
+
+# answer record: [text, status, topic, confidence, entropy bits, grover P, ids]
+def zs_reply(question) {
+    STATE[1] = STATE[1] + 1
+    res := infer(question)
+    r := res[0]
+    n := len(r)
+    if (res[2] < MIN_COVER) {
+        return ["わかりません。その質問に答える証拠が台帳にありません。Learn 文で事実を教えてください。",
+                "無知", "—", 0.0, log(n) / LN2, 0.0, []]
+    }
+    taken := []
+    i := 0
+    while (i < n) { taken <- 0; i := i + 1 }
+    first := argmax_excluding(r, taken)
+    taken[first] = 1
+    ids := [first]
+    text := KB[first][0]
+    k := 1
+    while (k < 2) {
+        nxt := argmax_excluding(r, taken)
+        if (nxt >= 0) {
+            if (r[nxt] >= 0.6 * r[first]) {
+                taken[nxt] = 1
+                ids <- nxt
+                text := text + " " + KB[nxt][0]
+            }
+        }
+        k := k + 1
+    }
+    # quantum step: Grover amplitude amplification over the fact register,
+    # the oracle marking the chosen evidence.  A measured slot that the phase
+    # core ruled out would be rejected (zero-preservation outranks the search).
+    gv := grover(taken, n)
+    conf := 0.0
+    i := 0
+    while (i < len(ids)) { conf := conf + r[ids[i]]; i := i + 1 }
+    revise_belief(r)
+    return [text, KB[first][2], TOPICS[KB[first][1]], conf, shannon(r) / LN2, gv[0], ids]
+}
+
+def zs_ask(question) {
+    a := zs_reply(question)
+    print("問: " + question)
+    print("答: " + a[0])
+    if (VERBOSE[0] == 1) {
+        print("    [標識 " + a[1] + " | 出典 " + a[2] + " | 確信度 " + fix(a[3], 2)
+              + " | H = " + fix(a[4], 2) + " bit | Grover P = " + fix(a[5], 3) + "]")
+    }
+    return a[0]
+}
+
+def zs_learn(text) {
+    KB <- [text, len(TOPICS) - 1, "学習"]
+    index_fact(len(KB) - 1)
+    text >> tuplespace
+    print("学習: 台帳に追記しました（事実 " + len(KB) + " 件、台帳 " + len(tuplespace) + " 件）")
+    return len(KB)
+}
+
+# =============================================================================
+# 9. Generation: character 4-gram model (with back-off) and the Nash temperature
+# =============================================================================
+def rng_next() {
+    STATE[0] = (STATE[0] * 48271) % 2147483647
+    return STATE[0] / 2147483647
+}
+
+# candidates sorted by count (descending), reweighted by p_k^-sigma
+def nash_candidates(lst, sigma) {
+    n := len(lst)
+    order := []
+    i := 0
+    while (i < n) { order <- lst[i]; i := i + 1 }
+    i := 1
+    while (i < n) {
+        cur := order[i]
+        j := i - 1
+        moving := true
+        while (moving) {
+            if (j < 0) { moving := false } else if (order[j][1] >= cur[1]) { moving := false } else {
+                order[j + 1] = order[j]
+                j := j - 1
+            }
+        }
+        order[j + 1] = cur
+        i := i + 1
+    }
+    w := []
+    tot := 0.0
+    i := 0
+    while (i < n) {
+        v := order[i][1] * exp(0 - sigma * log(PRIMES[i]))
+        w <- v
+        tot := tot + v
+        i := i + 1
+    }
+    i := 0
+    while (i < n) { w[i] = w[i] / tot; i := i + 1 }
+    return [order, w]
+}
+
+# returns [text, mean entropy in bits per character]
+def generate(seed, maxlen, sigma) {
+    out := seed
+    p3 := BOS
+    p2 := BOS
+    p1 := BOS
+    n := len(seed)
+    if (n >= 1) { p1 := substr(seed, n - 1, 1) }
+    if (n >= 2) { p2 := substr(seed, n - 2, 1) }
+    if (n >= 3) { p3 := substr(seed, n - 3, 1) }
+    hsum := 0.0
+    steps := 0
+    going := true
+    while (going) {
+        # back off from the 3-character context to the 2-character one
+        e := hm_find(QUAD, p3 + p2 + p1)
+        if (len(e) == 0) { e := hm_find(TRI, p2 + p1) }
+        if (len(e) == 0) {
+            going := false
+        } else {
+            cw := nash_candidates(e[1], sigma)
+            hsum := hsum + shannon(cw[1]) / LN2
+            u := rng_next()
+            acc := 0.0
+            pick := len(cw[1]) - 1
+            i := 0
+            found := false
+            while (i < len(cw[1])) {
+                acc := acc + cw[1][i]
+                if (!found && u < acc) { pick := i; found := true }
+                i := i + 1
+            }
+            ch := cw[0][pick][0]
+            steps := steps + 1
+            if (ch == EOS) {
+                going := false
+            } else {
+                out := out + ch
+                p3 := p2
+                p2 := p1
+                p1 := ch
+                if (steps >= maxlen) { going := false }
+            }
+        }
+    }
+    if (steps == 0) { return [out, 0.0] }
+    return [out, hsum / steps]
+}
+
+def zs_speak(seed, maxlen) {
+    g := generate(seed, maxlen, 0.5)
+    print("生成: " + g[0])
+    if (VERBOSE[0] == 1) {
+        print("    [ナッシュ温度 σ = 1/2 | 平均エントロピー " + fix(g[1], 2) + " bit/文字]")
+    }
+    return g[0]
+}
+
+build_index()
+
+# =============================================================================
+# 10. Certification: every claim the engine relies on is re-derived here.
+# =============================================================================
+CERT := [0, 0]
+def check(name, ok, detail) {
+    CERT[1] = CERT[1] + 1
+    mark := "FAIL"
+    if (ok) { mark := "PASS"; CERT[0] = CERT[0] + 1 }
+    print("  " + mark + "  " + name + "  " + detail)
+}
+
+def near(x, y, tol) { return abs(x - y) <= tol }
+
+def selftest() {
+    print("================================================================")
+    print("ZETA-SHANNON ENGINE -- certification (all computed in Bada)")
+    print("================================================================")
+
+    # ---- Z1: prime-game Shannon entropy (nash_shannon_paper, fig. 1) --------
+    h05 := nash_entropy(0.5)
+    h10 := nash_entropy(1.0)
+    check("Z1 Nash-Shannon entropy", near(h05, 3.4568, 0.00005) && near(h10, 2.6986, 0.00005),
+          "H(1/2) = " + fix(h05, 4) + ", H(1) = " + fix(h10, 4))
+
+    # ---- Z2: zeros of zeta on the critical line -----------------------------
+    sc := scan_zeros(10.0, 35.0, 1.0)
+    zs := sc[0]
+    known := [14.134725, 21.022040, 25.010858, 30.424876, 32.935062]
+    ok := len(zs) == 5
+    err := 0.0
+    i := 0
+    while (i < len(zs) && i < 5) {
+        if (abs(zs[i] - known[i]) > err) { err := abs(zs[i] - known[i]) }
+        i := i + 1
+    }
+    line := ""
+    i := 0
+    while (i < len(zs)) { line := line + fix(zs[i], 6) + " "; i := i + 1 }
+    check("Z2 zeta zeros, 10 < t < 35", ok && err < 0.00001, line)
+
+    # ---- Z3: zeta_NS preserves |zeta| and the zeros; zeta + H does not ------
+    beta := 0.7
+    dmax := 0.0
+    sxy := 0.0
+    sx := 0.0
+    sy := 0.0
+    sxx := 0.0
+    syy := 0.0
+    m := 0
+    i := 0
+    while (i < len(sc[1])) {
+        t := sc[1][i]
+        za := sc[2][i]
+        zn := c_abs(zeta_ns(0.5, t, beta))
+        if (abs(za - zn) > dmax) { dmax := abs(za - zn) }
+        sx := sx + za
+        sy := sy + zn
+        sxx := sxx + za * za
+        syy := syy + zn * zn
+        sxy := sxy + za * zn
+        m := m + 1
+        i := i + 1
+    }
+    corr := (m * sxy - sx * sy) / sqrt((m * sxx - sx * sx) * (m * syy - sy * sy))
+    z1 := zeta(0.5, zs[0])
+    addv := c_abs([z1[0] + h05, z1[1]])
+    check("Z3 zeta_NS = zeta * exp(i beta H)", dmax < 0.000000000001 && corr > 0.999999999,
+          "max ||zeta_NS| - |zeta|| = " + sci(dmax) + ", correlation = " + fix(corr, 6))
+    check("Z4 additive control zeta + H fails", addv > 3.0,
+          "|zeta(rho_1) + H| = " + fix(addv, 4) + " (the zero moved)")
+
+    # ---- Z5: x log x counts the zeros (Riemann-von Mangoldt) ----------------
+    x := 35.0 / (2 * PI)
+    nt := x * log(x) - x + 0.875
+    check("Z5 N(T) = x log x - x + 7/8", abs(nt - len(zs)) < 1.0,
+          "T = 35: formula " + fix(nt, 3) + ", counted " + len(zs))
+
+    # ---- Z6: Fermi-Dirac at the intrinsic level (quantum_brain) -------------
+    e2 := eta(2.0, 0.0)[0]
+    z2 := zeta(2.0, 0.0)[0]
+    check("Z6 F_1(0) = eta(2) = zeta(2)/2 = pi^2/12",
+          near(e2, PI * PI / 12, 0.0000000001) && near(e2, z2 / 2, 0.0000000001),
+          "eta(2) = " + fix(e2, 10))
+
+    # ---- Z7: zeta is not a homomorphism; operator powers are a semigroup ----
+    z4 := zeta(4.0, 0.0)[0]
+    lam := 6.0
+    semi := abs(m_pow(lam, 0 - 1.3) * m_pow(lam, 0 - 0.9) - m_pow(lam, 0 - 2.2))
+    check("Z7 zeta(2)zeta(2) != zeta(4), A^-s A^-t = A^-(s+t)", abs(z2 * z2 - z4) > 1.0 && semi < 0.000000000000001,
+          "zeta(2)^2 = " + fix(z2 * z2, 4) + ", zeta(4) = " + fix(z4, 4) + ", semigroup error " + sci(semi))
+
+    # ---- Z8: Legendre potential L = x log x - x, L' = log x -----------------
+    x0 := 2.5
+    hh := 0.0001
+    lp := ((x0 + hh) * log(x0 + hh) - (x0 + hh) - ((x0 - hh) * log(x0 - hh) - (x0 - hh))) / (2 * hh)
+    check("Z8 d/dx (x log x - x) = log x", near(lp, log(x0), 0.00000001),
+          "L'(2.5) = " + fix(lp, 8) + ", log 2.5 = " + fix(log(x0), 8))
+
+    # ---- Z9: Gaussian integral = pi (Simpson's rule) ------------------------
+    nseg := 400
+    a := 0 - 8.0
+    w := 16.0 / nseg
+    acc := 0.0
+    i := 0
+    while (i <= nseg) {
+        xv := a + i * w
+        c := 2
+        if (i % 2 == 1) { c := 4 }
+        if (i == 0) { c := 1 }
+        if (i == nseg) { c := 1 }
+        acc := acc + c * exp(0 - xv * xv)
+        i := i + 1
+    }
+    gi := acc * w / 3
+    check("Z9 Gaussian integral = pi", near(gi * gi, PI, 0.0000000001), "(int e^-x^2)^2 = " + fix(gi * gi, 10))
+
+    # ---- Z10: the phase core's two theorems on a language distribution ------
+    zlog := [1.6, 0.6, RULED_OUT, 0.1, RULED_OUT, 1.1]
+    base := softmax(zlog)
+    post := cognitive_system(base, [[nash_q(0.5, 6), [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]], [0.7])
+    check("Z10 zero preservation and |psi|^2 = a",
+          post[2] == 0 && post[4] == 0 && maxdiff(post, base) < 0.000000000000001,
+          "zeros " + len(zeros_of(post)) + ", max deviation " + sci(maxdiff(post, base)))
+
+    # ---- Z11: real interference: H H = I, and Grover amplification ----------
+    st := qv_new(3)
+    qv_h(st, 1)
+    qv_h(st, 1)
+    back := qv_probs(st)[0]
+    marks := []
+    i := 0
+    while (i < 64) { marks <- 0; i := i + 1 }
+    marks[37] = 1
+    gv := grover(marks, 64)
+    check("Z11 H*H = I and Grover search", near(back, 1.0, 0.000000000001) && gv[0] > 0.99 && gv[3] == 37,
+          "P(|000>) = " + fix(back, 6) + ", Grover P(marked) = " + fix(gv[0], 4) + " in " + gv[1] + " iterations on " + gv[2] + " qubits")
+
+    # ---- Z12: the Zipf-zeta law of the ledger -------------------------------
+    zf := zipf_fit()
+    hz := (zf[0] * zf[4] + zf[1]) / LN2
+    check("Z12 Zipf-zeta fit of the ledger", zf[0] > 0.1 && zf[0] < 3.0,
+          "s = " + fix(zf[0], 3) + ", vocabulary " + zf[2] + ", cross-entropy " + fix(hz, 2) + " bit/token")
+
+    # ---- Z13: grounded answer, honest ignorance, learning -------------------
+    VERBOSE[0] = 0
+    r1 := zs_reply("ナッシュ・シャノンゼータの定義は何ですか")
+    r2 := zs_reply("明日の東京の天気を教えて")
+    before := len(tuplespace)
+    KB <- ["月の裏側の基地は架空のテスト用事実である。", len(TOPICS) - 1, "学習"]
+    index_fact(len(KB) - 1)
+    "test fact" >> tuplespace
+    r3 := zs_reply("月の裏側の基地について")
+    VERBOSE[0] = 1
+    check("Z13 grounded answer / honest ignorance / learning",
+          r1[6][0] == 0 && r2[1] == "無知" && r3[6][0] == len(KB) - 1 && len(tuplespace) > before,
+          "answer fact #" + r1[6][0] + ", unknown -> " + r2[1] + ", learned fact retrieved")
+
+    # ---- reported, not certified: the Deep Riemann Hypothesis is a conjecture
+    prod := 1.0
+    i := 0
+    while (PRIMES[i] <= 2000) {
+        p := PRIMES[i]
+        chi := 0
+        if (p % 4 == 1) { chi := 1 }
+        if (p % 4 == 3) { chi := 0 - 1 }
+        prod := prod / (1 - chi / sqrt(p))
+        i := i + 1
+    }
+    part := []
+    sgn := 1
+    sum := 0.0
+    i := 0
+    while (i < 60) {
+        sum := sum + sgn / sqrt(2 * i + 1)
+        part <- sum
+        sgn := 0 - sgn
+        i := i + 1
+    }
+    pass := 0
+    while (pass < 30) {
+        nxt := []
+        i := 0
+        while (i < len(part) - 1) { nxt <- (part[i] + part[i + 1]) / 2; i := i + 1 }
+        part := nxt
+        pass := pass + 1
+    }
+    lhalf := part[len(part) - 1]
+    print("  NOTE  DRH (予想, 未証明): partial Euler product (chi_4, X = 2000) = " + fix(prod, 4)
+          + ", sqrt2 * L(1/2, chi_4) = " + fix(lhalf * sqrt(2), 6) + " -- 振動しており収束の観測ではない")
+
+    print("----------------------------------------------------------------")
+    verdict := "SOME CHECKS FAILED"
+    if (CERT[0] == CERT[1]) { verdict := "ALL PASS" }
+    print("certified " + CERT[0] + " / " + CERT[1] + "  " + verdict)
+    return CERT[0] == CERT[1]
+}
+
+def demo() {
+    print("")
+    print("================================================================")
+    print("言語化デモ -- Ask / Learn / Speak は @reviser が台帳に commit した構文")
+    print("================================================================")
+    Ask "こんにちは、あなたは誰ですか"
+    Ask "ナッシュ・シャノンゼータとは何ですか"
+    Ask "なぜ零点が保存されるのですか"
+    Ask "リーマン予想は証明されましたか"
+    Ask "x log x は何を数えるのですか"
+    Ask "深リーマン予想の √2 はどこから来ますか"
+    Ask "ジップの法則とゼータ関数の関係は"
+    Ask "量子脳理論は確立していますか"
+    Ask "ホッジ予想とスペクトルの関係を教えて"
+    Ask "グローバー探索とは何ですか"
+    Ask "明日の株価はどうなりますか"
+    Learn "山口フレームワークの言語エンジンは 2026年11月に Bada で実装された。"
+    Ask "言語エンジンはいつ実装されましたか"
+    print("")
+    Speak "ゼータ"
+    Speak "シャノン"
+    Speak "量子"
+    print("")
+    print("会話の信念エントロピー: " + fix(entropy(BELIEF[0]), 4) + " nat（一様分布 "
+          + fix(log(len(TOPICS)), 4) + " から減少）、台帳 " + len(tuplespace) + " 件")
+}
+
+# ==== MAIN ====
+selftest()
+demo()
