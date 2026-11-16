@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>未知事前エンジン：最大エントロピーの無知から始める生成 AI の推論核</title>
+<style>
+  @page { size: A4; margin: 22mm 21mm 20mm 21mm; }
+  html { font-family: "IPAGothic", "IPAPGothic", "DejaVu Sans", sans-serif; font-size: 10pt; line-height: 1.78; color: #111; }
+  body { margin: 0; }
+  h1 { font-size: 17.5pt; line-height: 1.4; text-align: center; margin: 0 0 6pt; }
+  .sub { text-align: center; font-size: 10.5pt; font-weight: bold; margin: 0 0 8pt; }
+  .meta { font-size: 9.6pt; margin: 0 0 2pt; }
+  hr { border: 0; border-top: 0.6pt solid #999; margin: 10pt 0; }
+  h2 { font-size: 13.5pt; margin: 18pt 0 6pt; break-after: avoid; }
+  h3 { font-size: 11pt; margin: 12pt 0 4pt; break-after: avoid; }
+  p { margin: 0 0 7pt; text-align: justify; }
+  code, pre { font-family: "DejaVu Sans Mono", "IPAGothic", monospace; font-size: 8.5pt; }
+  code { background: #f1f1f1; padding: 0 2pt; }
+  pre { background: #f5f5f5; border: 0.5pt solid #ccc; padding: 6pt 9pt; margin: 6pt 0 8pt; line-height: 1.5; white-space: pre-wrap; break-inside: avoid; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 9pt; font-size: 9pt; line-height: 1.55; break-inside: avoid; }
+  th, td { border: 0.5pt solid #888; padding: 3pt 6pt; vertical-align: top; text-align: left; }
+  th { background: #ececec; text-align: center; }
+  td.n { text-align: right; white-space: nowrap; }
+  td.c { text-align: center; white-space: nowrap; }
+  .eq { text-align: center; margin: 6pt 0 8pt; font-family: "DejaVu Serif", "IPAGothic", serif; font-size: 10.5pt; }
+  .box { border: 0.6pt solid #666; padding: 6pt 10pt; margin: 8pt 0; break-inside: avoid; }
+  .gen { border-left: 3pt solid #555; background: #f7f7f4; padding: 6pt 10pt; margin: 6pt 0 9pt; }
+  .gen p { margin: 0 0 4pt; }
+  .id { color: #666; font-size: 8.4pt; font-family: "DejaVu Sans Mono", monospace; }
+  ul, ol { margin: 0 0 7pt; padding-left: 20pt; }
+  li { margin-bottom: 2pt; }
+  .ref li { margin-bottom: 3pt; font-size: 9.3pt; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>未知事前エンジン：最大エントロピーの無知から始める<br>生成 AI の推論核</h1>
+<p class="sub">— BadaGPT電信のパイプラインによる Bada 上での構成・生成・評価 —</p>
+<p class="meta">山口 雅旭 (Masaaki Yamaguchi) Global Differential Manifold Research · masaaki-avnturle/Bada</p>
+<p class="meta">2026 年 11 月 16 日 · 未知事前エンジン / Bada 1.2.0</p>
+<hr>
+
+<h2>要旨</h2>
+<p>本稿は、量子プログラミング言語 Bada のランタイムである「未知事前エンジン」(Unknown-Prior Engine) を報告する。エンジンは、何も知らない状態を最大エントロピーの一様分布で表し、証拠を追記専用の台帳に積むことで確信を得る。推論の中心は位相コア ψ<sub>i</sub> = √a<sub>i</sub>·exp(iθ<sub>i</sub>) であり、<b>確実な零は復活しない</b>ことと、<b>位相は確率を変えない</b>ことが定理として成り立つ。</p>
+<p>本稿の作成には、Telegraph のレポート (BadaGPT電信) の「全体把握 → 設計 → 生成 → 検証 → 論文」のパイプラインを用いた。依頼文を節に分け、節ごとにエンジンの推論で台帳の事実へ対応付け、章を決め、文を選んで並べる処理を、すべて Bada のプログラムとして実行した。ひな形の穴埋めは行わず、文の選択は事後確率で、並べ方は隣接する文の類似度で決める。これを抽出的生成と呼ぶ。第 6 章はその出力をそのまま載せたものである。</p>
+<p>評価では三つの実験を行った。手稿の参照実行 (語彙 8、除外 2) を再現し、零の保存と最大偏差 5.55×10<sup>−17</sup> を確認した。乱数による 200 試行で、加法型の結合は<b>全 200 試行</b>で除外済みのトークンに確率を戻し (平均 5.79%)、位相コアは 0 試行であった。学習則の比較では、処理系の既定の学習率 0.5 は真の分布から離れ (KL 3.44)、学習率 1/(t+1) は近づいた (KL 0.021)。エントロピーは 36〜45% の更新で増加し、単調には減らなかった。生成では節の網羅率 100% を得たが、4 節のうち 1 節は誤った事実へ対応付けられていた。</p>
+<p><b>キーワード</b>: 未知事前分布, 最大エントロピー, 位相コア, 零の保存, 追記専用台帳, 節網羅率, 抽出的生成, Bada 言語</p>
+<hr>
+
+<h2>1. 序論</h2>
+<h3>1.1 背景</h3>
+<p>Bada は、追記専用の台帳 (TupleSpace)、確率ベクトルの型 <code>dist</code>、位相の型、文法を書き換える <code>@reviser</code> を持つプログラミング言語である。量子ゲートに倣った演算 (<code>qubit</code>・<code>H</code>・<code>CNOT</code>・<code>Measure</code>) を備えるため、本リポジトリでは量子プログラミング言語と呼んでいる。その実行時の中核が未知事前エンジンであり、次トークンの分布のような確率ベクトルを受け取り、複数の情報源を重ねて出力する。</p>
+<p>一方、Telegraph のレポートが報告する BadaGPT電信は、利用者の依頼文からアプリケーションを生成し、生成の過程を論文にまとめるシステムである。その中心は、依頼文のすべての節を仕様の要素へ対応付け、対応付けられなかった節を捨てずに残す「全体把握」にある。</p>
+
+<h3>1.2 課題</h3>
+<p>生成系には二つの失敗がある。一つは、根拠のない内容を確信を持って出すことである。もう一つは、依頼の一部を黙って落とすことである。前者はエンジンの側の問題で、後者はパイプラインの側の問題である。未知事前エンジンは前者に、BadaGPT電信の全体把握は後者に、それぞれ答えを与えている。本稿はこの二つを一つの Bada プログラムの中で組み合わせ、どこまでが保証で、どこからが保証でないかを測る。</p>
+<p>加えて、BadaGPT電信の論文の段は章立てのひな形に数値を埋める方式であり、文章の段は潜在表現に駆動されたひな形の展開である。本稿ではひな形を使わず、エンジンの推論そのもので文を選ぶ方式を試みる。</p>
+
+<h3>1.3 本研究の貢献</h3>
+<ol>
+<li>未知事前エンジンの定義と、その二つの定理 (零の保存、位相の不変性)、および学習則についての二つの命題 (第 4 章)。</li>
+<li>BadaGPT電信の五段のパイプラインを Bada の文法拡張として実装し、節の対応付け・章の設計・文の選択と配列をエンジンの推論で行う抽出的生成 (第 5 章)。</li>
+<li>その出力 (節の対応表、章の設計、生成された本文) の無修正の掲載 (第 6 章)。</li>
+<li>参照実行の再現、乗算と加法の対照、学習率の比較という三つの実験と、生成結果の誤りの分析 (第 7 章)。</li>
+</ol>
+
+<h2>2. 関連する取り組み</h2>
+<p><b>未知事前エンジンの手稿</b> — エンジンを Bada の記法と Python の参照実装の二つで与え、語彙 8・除外 2 の実行で二つの性質を確かめた。手稿は、利点の広い主張は加法型の残差ヘッドとの比較で評価する必要があると述べている。本稿の実験 E2 はその比較である。</p>
+<p><b>Bada の処理系</b> (<code>bada_gui_ide/</code>) — 字句解析器・パーサ・インタプリタ・Bada から C へのコンパイラを持つ。位相コアは組み込み関数 <code>cognitive_system</code> として提供される。</p>
+<p><b>BadaGPT電信</b> (Telegraph のレポート) — 全体把握・設計・生成・検証・論文の五段を持つ。節の網羅率を定義し、未見の依頼 10 件で網羅率 100%・モジュール選択 F1 81.5% を報告した。網羅率は取りこぼしがないことを示すが、正しく解釈したことは示さない、という知見が本稿の出発点の一つである。</p>
+<p><b>ゼータ・シャノン言語エンジン</b> (<code>bada_zeta_shannon/</code>) — 未知事前エンジンの上に作った検索応答エンジンである。台帳の事実を、ジップの法則 (ゼータ分布) のもとでの自己情報量で重み付けして選ぶ。本稿のパイプラインは、この検索を節の対応付けと文の選択に用いる。</p>
+<p><b>最大エントロピー原理</b> — 制約のもとでエントロピーを最大にする分布を事前分布に採るという考え方は Jaynes による。一様分布から始めることは、その最も単純な場合である。</p>
+
+<h2>3. システム構成</h2>
+<h3>3.1 パイプライン</h3>
+<p>本稿の作成の過程は、Bada プログラム <code>unknown_prior_paper.bada</code> の実行として表される。五段の動詞は予約語ではなく、<code>@reviser : grammar</code> が台帳に登録した文法規則である。</p>
+<pre><code>@reviser : grammar {
+    rule "comprehend" stmt [ 'Comprehend' expr ] =&gt; gp_comprehend(_1)
+    rule "plan"       stmt [ 'Plan' expr ]       =&gt; gp_plan(_1)
+    rule "generate"   stmt [ 'Generate' expr ]   =&gt; gp_generate(_1)
+    rule "verify"     stmt [ 'Verify' expr ]     =&gt; gp_verify(_1)
+}
+REQUEST := "Telegraphのレポートを利用して、独自のテンプレートではない生成AIの
+            量子プログラミング言語のBadaで、未知事前エンジンの論文を書いてください。
+            pdfでお願いします"
+Comprehend REQUEST      # 全体把握: 節に分け、節ごとに台帳の事実へ対応付ける
+Plan 3                  # 設計    : 事後分布を話題に集約し、上位 3 話題を章にする
+Generate 5              # 生成    : 章ごとに証拠のある事実を 5 文まで選び、並べる
+Verify 50               # 検証    : 追跡可能性・零の保存・位相コア・網羅率 (50% 以上)</code></pre>
+<p>依頼文は、本稿の作成を求めた利用者の文をそのまま用いた。五段目の「論文」は、実行の出力を <code>run_output.txt</code> に保存し、本稿の第 6 章と第 7 章に載せる段である。地の文は著者が Claude の支援を受けて書いた。</p>
+
+<h3>3.2 エンジンの部品</h3>
+<table>
+<tr><th style="width:21%">部品</th><th style="width:24%">Bada での形</th><th>役割</th></tr>
+<tr><td>追記専用台帳</td><td><code>x &gt;&gt; tuplespace</code></td><td>事実・測定・文法規則を追記する。上書きはない</td></tr>
+<tr><td>未知事前分布</td><td><code>unknown_prior(V)</code></td><td>一様分布 (1/V, …, 1/V)。最大エントロピーの出発点</td></tr>
+<tr><td>基底分布</td><td><code>softmax(z)</code></td><td>ロジットから確率へ。−800 のロジットは倍精度で厳密に 0 になる</td></tr>
+<tr><td>位相コア</td><td><code>cognitive_system(a, mods, betas)</code></td><td>情報源を絶対値 1 の位相として重ねる</td></tr>
+<tr><td>更新</td><td><code>update(prior, e, lr)</code></td><td>証拠 e との凸結合で事前分布を動かす</td></tr>
+<tr><td>リバイザ</td><td><code>@reviser { … }</code></td><td>更新の繰り返しと、文法の拡張</td></tr>
+</table>
+
+<h3>3.3 実装の構成</h3>
+<table>
+<tr><th>ファイル</th><th>行数</th><th>役割</th></tr>
+<tr><td><code>bada_gui_ide/www/bada.js</code></td><td class="n">2,038</td><td>Bada の処理系。位相コア・台帳・リバイザ</td></tr>
+<tr><td><code>bada_zeta_shannon/zeta_shannon.bada</code></td><td class="n">1,327</td><td>事実の台帳、ゼータ則の重み、推論 <code>infer</code> (純 Bada)</td></tr>
+<tr><td><code>telegraph_paper/unknown_prior_paper.bada</code></td><td class="n">474</td><td>五段のパイプラインと実験 E1〜E3 (純 Bada)</td></tr>
+<tr><td><code>telegraph_paper/run.js</code></td><td class="n">14</td><td>二つの Bada ファイルを連結して実行し、出力を保存</td></tr>
+<tr><td><code>telegraph_paper/run_output.txt</code></td><td class="n">49</td><td>実行の出力 (第 6 章・第 7 章の元)</td></tr>
+</table>
+<p>Bada にはモジュールを読み込む仕組みがないので、実行時に二つのファイルを連結する。全体は 1 秒未満で終わる。</p>
+
+<h2>4. 未知事前エンジンの理論</h2>
+<h3>4.1 位相コア</h3>
+<p>候補の数を V とする。ロジット z から基底分布 a = softmax(z) を作る。情報源 (モジュール) m は確率分布 q<sup>(m)</sup> と位相ベクトル φ<sup>(m)</sup> の組であり、利得を β<sub>m</sub>、エントロピーを H<sub>m</sub> = −Σ<sub>j</sub> q<sub>j</sub><sup>(m)</sup> log q<sub>j</sub><sup>(m)</sup> とする。</p>
+<p class="eq">θ<sub>i</sub> = Σ<sub>m</sub> β<sub>m</sub> H<sub>m</sub> φ<sub>i</sub><sup>(m)</sup>,　ψ<sub>i</sub> = √a<sub>i</sub> · exp(iθ<sub>i</sub>),　q̂<sub>i</sub> = |ψ<sub>i</sub>|² / Σ<sub>j</sub> |ψ<sub>j</sub>|²</p>
+<div class="box"><b>定理 1 (零の保存)</b>　a<sub>i</sub> = 0 ならば、情報源と利得をどう選んでも q̂<sub>i</sub> = 0 である。<br>
+証明: ψ<sub>i</sub> = 0·exp(iθ<sub>i</sub>) = 0。∎</div>
+<div class="box"><b>定理 2 (位相の不変性)</b>　すべての i について q̂<sub>i</sub> = a<sub>i</sub> である。<br>
+証明: |exp(iθ<sub>i</sub>)| = 1 より |ψ<sub>i</sub>|² = a<sub>i</sub>、Σ<sub>j</sub> a<sub>j</sub> = 1。∎</div>
+<p>定理 1 は、除外したものが後の段で戻ってこないことを意味する。定理 2 は、位相がどれだけ重なっても分布は元のままであることを意味する。したがって位相コアは、情報源を壊さずに記録するための仕組みであり、分布を良くする仕組みではない。位相が確率に現れるのは、振幅どうしを足し合わせる操作 (干渉) を加えたときに限られる。</p>
+
+<h3>4.2 未知事前分布と学習則</h3>
+<p>事前分布は p<sub>0</sub> = u = (1/V, …, 1/V) から始める。t 回目の証拠 e<sub>t</sub> (確率ベクトル) と学習率 λ<sub>t</sub> ∈ (0, 1) に対し、更新は</p>
+<p class="eq">p<sub>t</sub> = (1 − λ<sub>t</sub>)·p<sub>t−1</sub> + λ<sub>t</sub>·e<sub>t</sub></p>
+<p>である。処理系の既定は λ<sub>t</sub> = 0.5 である。</p>
+<div class="box"><b>命題 3 (無知は零にならない)</b>　すべての t とすべての i について p<sub>t</sub>(i) ≥ (1/V)·Π<sub>k≤t</sub>(1 − λ<sub>k</sub>) &gt; 0 である。<br>
+証明: e<sub>t</sub>(i) ≥ 0 より p<sub>t</sub>(i) ≥ (1 − λ<sub>t</sub>)·p<sub>t−1</sub>(i)。帰納法による。∎</div>
+<p>命題 3 は定理 1 と対になる。確実な零は、ロジットで明示的に除外したときにだけ生じる。証拠が来なかったというだけでは、事前分布は零にならない。「見ていない」と「ありえない」が区別される。</p>
+<div class="box"><b>命題 4 (学習率と収束)</b>　証拠 e<sub>t</sub> が、隠れた分布 p* から独立に引いた 1 標本の one-hot ベクトルであるとする。<br>
+(i) λ<sub>t</sub> = 1/(t+1) のとき p<sub>t</sub> = (u + e<sub>1</sub> + … + e<sub>t</sub>)/(t+1) であり、t → ∞ で p<sub>t</sub> → p* (確率 1)。<br>
+(ii) λ<sub>t</sub> = λ (定数) のとき p<sub>t</sub> は収束せず、定常状態での各成分の分散は λ/(2 − λ)·p*(i)(1 − p*(i)) である。<br>
+証明: (i) は漸化式を解いて大数の強法則を用いる。(ii) は p<sub>t</sub> が独立な項の指数加重和であることから、分散 λ²·Σ<sub>k≥0</sub>(1 − λ)<sup>2k</sup>·p*(i)(1 − p*(i)) を計算する。∎</div>
+<p>λ = 0.5 では分散の係数が 1/3 になり、事前分布は直近の数標本をほぼそのまま写す。エントロピーが更新のたびに減るという性質は一般には成り立たない。証拠が現在の事前分布より平らなとき、あるいは別のトークンを指すとき、エントロピーは増える。</p>
+
+<h3>4.3 乗算と加法</h3>
+<p>情報源 m を加法で重ねる残差ヘッド q = normalize(a + λ·m) を考える。a<sub>i</sub> = 0 かつ m<sub>i</sub> &gt; 0 のとき q<sub>i</sub> = λ·m<sub>i</sub>/(1 + λ) &gt; 0 となり、除外したトークンに確率が戻る。乗算 (位相) ではこれが起きない。零を保存するのは非零の因子による乗算であり、加法ではない。実験 E2 はこの差を数える。</p>
+
+<h2>5. 全体把握・設計・生成・検証</h2>
+<h3>5.1 全体把握</h3>
+<p>依頼文を句点で文に、読点で節に分ける。各節 c について、台帳のすべての事実 D<sub>i</sub> との重み付きコサインをロジットにし、位相コアを通して事後分布 r<sup>(c)</sup> を得る。節と証拠を共有しない事実のロジットは −800 であり、確率は厳密に 0 である。</p>
+<p>節の対応付けは次の順に行う。</p>
+<ol>
+<li>被覆率 (節の重みのうち、最もよく合う事実と共有する割合) が 0.2 以上なら、その節を「台帳の事実」へ対応付ける。仕様の要素は、最上位の事実が属する話題である。</li>
+<li>そうでなく、節が <code>pdf</code> を含むなら「出力形式」、「ください」を含むなら「作成依頼の意図」へ規則で対応付ける。</li>
+<li>どちらでもなければ、未解釈の節として残す。</li>
+</ol>
+<p>網羅率は、1 か 2 で対応付けられた節の数を全節の数で割った値である。</p>
+
+<h3>5.2 設計</h3>
+<p>事実 i の得点を、台帳へ対応付けられた節の事後確率の和 s<sub>i</sub> = Σ<sub>c</sub> r<sub>i</sub><sup>(c)</sup> とする。これを話題ごとに合計し、節の数で割ったものを話題の質量とする。質量が 0.05 以上の話題を、大きい順に 3 つまで章にする。章立ては固定されておらず、依頼文が変われば変わる。</p>
+
+<h3>5.3 抽出的生成</h3>
+<p>章ごとに、その話題に属し、かつ s<sub>i</sub> &gt; 0 である事実を候補とする。s<sub>i</sub> = 0 の事実、すなわちどの節とも証拠を共有しなかった事実は、候補に入らない (定理 1 の利用)。候補から得点の上位 5 文を選ぶ。先頭は得点が最大の文とし、以降は直前の文とのコサインが最大の文を順に置く。</p>
+<p>この方式には、あらかじめ書かれた文章の骨組みも、穴も、穴に入れる語の表もない。どの文がどの順で現れるかは、依頼文と台帳から推論で決まる。ただし、現れる文は台帳に書かれた事実そのものであり、新しい文を作り出しているわけではない。</p>
+
+<h3>5.4 検証</h3>
+<p>生成のあとで次を機械的に確かめる。(1) 生成したすべての文が台帳の事実番号を持ち、重複がない。(2) 除外された事実が 1 文も現れていない。(3) 全節を通じて位相コアの偏差 max|q̂ − a| が 10<sup>−15</sup> 未満である。(4) 網羅率が 50% 以上である。(5) 各文の標識 (証明済・検証済・学習など) が保持されている。</p>
+
+<h2>6. Bada が生成した本文</h2>
+<p>この章は <code>run_output.txt</code> の内容である。文には手を加えていない。各文の先頭の番号は台帳の事実番号である。</p>
+
+<h3>6.1 節の対応表 (全体把握)</h3>
+<table>
+<tr><th>#</th><th>節</th><th>対応</th><th>仕様の要素</th><th>被覆率</th><th>最上位の事実</th></tr>
+<tr><td class="c">1</td><td>Telegraphのレポートを利用して</td><td>台帳の事実</td><td>会話で学習</td><td class="n">0.55</td><td>#78 Telegraph のレポートでは、未見の依頼 10…</td></tr>
+<tr><td class="c">2</td><td>独自のテンプレートではない生成AIの量子プログラミング言語のBadaで</td><td>台帳の事実</td><td>このエンジン</td><td class="n">0.47</td><td>#70 あなたは誰ですかと尋ねられたら、私は量子プログラミン…</td></tr>
+<tr><td class="c">3</td><td>未知事前エンジンの論文を書いてください</td><td>台帳の事実</td><td>Unknown-Prior Engine と Bada</td><td class="n">0.46</td><td>#10 未知事前分布は最大エントロピーの一様分布から始まり、…</td></tr>
+<tr><td class="c">4</td><td>pdfでお願いします</td><td>規則</td><td>出力形式 (PDF)</td><td class="n">0.02</td><td>—</td></tr>
+</table>
+<p>網羅率は 4 / 4 = 100.0%、未解釈の節は 0 である。</p>
+
+<h3>6.2 章の設計</h3>
+<table>
+<tr><th>順位</th><th>話題</th><th>質量</th></tr>
+<tr><td class="c">1</td><td>Unknown-Prior Engine と Bada</td><td class="n">0.470</td></tr>
+<tr><td class="c">2</td><td>会話で学習 (Telegraph のレポートから学習した事実)</td><td class="n">0.318</td></tr>
+<tr><td class="c">3</td><td>このエンジン</td><td class="n">0.183</td></tr>
+</table>
+
+<h3>6.3 生成された本文</h3>
+<p><b>第 1 章　Unknown-Prior Engine と Bada</b></p>
+<div class="gen">
+<p><span class="id">#10 検証済</span>　未知事前分布は最大エントロピーの一様分布から始まり、証拠が台帳に追記されるたびにエントロピーが減少する。</p>
+<p><span class="id">#9 証明済</span>　位相コアは |ψ|² = a を機械精度で満たす。位相は記録されるが、振幅を足し合わせない限り確率には現れない。</p>
+<p><span class="id">#8 証明済</span>　零の保存とは、a_i = 0 のトークンが位相ステップで決して復活しないという性質で、0 に非零因子を掛けても 0 であることから従う。</p>
+<p><span class="id">#12 検証済</span>　Bada とは、Unknown-Prior Engine をランタイムとする小さな量子プログラミング言語である。</p>
+<p><span class="id">#13 検証済</span>　Bada の処理系は字句解析器・パーサ・インタプリタと、Bada から C へのコンパイラを持つ。</p>
+</div>
+<p><b>第 2 章　会話で学習</b></p>
+<div class="gen">
+<p><span class="id">#78 学習</span>　Telegraph のレポートでは、未見の依頼 10 件でモジュール選択の F1 が 81.5%、網羅率が 100% であった。</p>
+<p><span class="id">#73 学習</span>　Telegraph のレポートが報告する BadaGPT電信は、依頼の全体把握・設計・生成・検証・論文という五段のパイプラインで成果物を作る。</p>
+<p><span class="id">#74 学習</span>　全体把握とは、依頼文を節に分け、すべての節を仕様のいずれかの要素へ対応付けることである。</p>
+<p><span class="id">#76 学習</span>　対応付けられなかった節は、未解釈の節として捨てずに成果物と論文の両方へ明記する。</p>
+<p><span class="id">#79 学習</span>　テンプレートの穴埋めではなく、台帳の事実を推論で選んで並べる方式を、抽出的生成と呼ぶ。</p>
+</div>
+<p><b>第 3 章　このエンジン</b></p>
+<div class="gen">
+<p><span class="id">#70 案内</span>　あなたは誰ですかと尋ねられたら、私は量子プログラミング言語で書かれた言語エンジンだと答えます。</p>
+<p><span class="id">#66 案内</span>　こんにちは。私はゼータ関数とシャノンの公式で言語化を行う、ゼータ・シャノン言語エンジンです。</p>
+<p><span class="id">#68 案内</span>　私は ChatGPT のような大規模言語モデルではありません。数十個の事実を持つ小さく監査可能なエンジンです。</p>
+<p><span class="id">#67 案内</span>　私は論文集の事実を台帳から検索し、標識と出典を付けて答えます。証拠がない質問には「わかりません」と答えます。</p>
+<p><span class="id">#71 案内</span>　何ができるかというと、論文集の事実についての質問に答え、Learn 文で学習し、Speak 文で文章を生成できます。</p>
+</div>
+
+<h3>6.4 検証の結果</h3>
+<table>
+<tr><th>検査</th><th>結果</th><th>内容</th></tr>
+<tr><td>追跡可能性</td><td class="c">合格</td><td>生成 15 文、すべて台帳の事実番号つき、重複 0</td></tr>
+<tr><td>零の保存</td><td class="c">合格</td><td>除外された事実 17 / 81 件、うち生成に現れたもの 0</td></tr>
+<tr><td>位相コア |ψ|² = a</td><td class="c">合格</td><td>全節での最大偏差 1.11×10<sup>−16</sup></td></tr>
+<tr><td>節の網羅率</td><td class="c">合格</td><td>100.0% (未解釈 0 節)</td></tr>
+<tr><td>標識の保持</td><td class="c">合格</td><td>標識つき 15 文 (否定 0、学習 5)</td></tr>
+</table>
+<p>台帳の事実は 73 件から 81 件に増えた。増えた 8 件は Telegraph のレポートから学習させた事実である。</p>
+
+<h2>7. 評価</h2>
+<h3>7.1 実験 E1：手稿の参照実行の再現</h3>
+<p>語彙 8、ロジット (1.6, 0.6, 0.1, 除外, −0.4, 1.1, 除外, 0.4)、情報源 3 つ (検索・構文・無情報)、利得 (0.7, 0.5, 0.9) で位相コアを実行した。</p>
+<table>
+<tr><th>トークン</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr>
+<tr><td>基底 a</td><td class="n">0.37964</td><td class="n">0.13966</td><td class="n">0.08471</td><td class="n">0.00000</td><td class="n">0.05138</td><td class="n">0.23026</td><td class="n">0.00000</td><td class="n">0.11435</td></tr>
+<tr><td>出力 q̂</td><td class="n">0.37964</td><td class="n">0.13966</td><td class="n">0.08471</td><td class="n">0.00000</td><td class="n">0.05138</td><td class="n">0.23026</td><td class="n">0.00000</td><td class="n">0.11435</td></tr>
+</table>
+<p>基底の零は 2 個、出力の零も 2 個で、位置は一致した。最大偏差は 5.55×10<sup>−17</sup> であり、手稿の値と同じである。一様な事前分布 (エントロピー 2.0794) を出力 q̂ (エントロピー 1.5904) で 2 回更新すると、エントロピーは 1.9733、1.8364 と下がった。この場合に下がるのは、証拠が事前分布より鋭いからである。</p>
+
+<h3>7.2 実験 E2：乗算と加法の対照</h3>
+<p>乱数で 200 通りの設定を作った。各設定は語彙 8 で、無作為に選んだ 2 トークンを除外し、情報源 m は全トークンに正の確率を持つ。加法は q = normalize(a + 0.3·m)、乗算は位相コア (利得 0.8) である。</p>
+<table>
+<tr><th>結合の方式</th><th>除外トークンに確率が戻った試行</th><th>戻った確率の平均</th><th>基底からの最大偏差</th></tr>
+<tr><td>加法 (残差ヘッド、λ = 0.3)</td><td class="n">200 / 200</td><td class="n">5.79%</td><td class="n">0.1228</td></tr>
+<tr><td>乗算 (位相コア)</td><td class="n">0 / 200</td><td class="n">0%</td><td class="n">1.67×10<sup>−16</sup></td></tr>
+</table>
+<p>この結果は 4.3 節の計算から予想されるとおりであり、新しい発見ではない。手稿が求めていた対照を実際に数えたものである。加法は情報源の内容を分布に反映させるが、除外を守らない。乗算は除外を守るが、情報源の内容を分布に反映させない (定理 2)。両方を満たす結合は、この二つの中にはない。</p>
+
+<h3>7.3 実験 E3：学習率の比較</h3>
+<p>隠れた分布を p* = (0.40, 0.25, 0.15, 0, 0.10, 0.06, 0.03, 0.01) とする。エントロピーは 1.5480、トークン 3 は真に起こらない。1 回の更新で 1 標本を引き、one-hot の証拠で事前分布を更新する。200 回の更新を 20 系列行い、平均を取った。</p>
+<table>
+<tr><th rowspan="2">学習率</th><th colspan="3">KL(p* ‖ p<sub>t</sub>)</th><th rowspan="2">エントロピーが<br>増えた更新</th><th rowspan="2">最終の<br>エントロピー</th><th rowspan="2">トークン 3 の<br>最終確率</th></tr>
+<tr><th>t = 10</th><th>t = 50</th><th>t = 200</th></tr>
+<tr><td>0.5 (処理系の既定)</td><td class="n">1.3791</td><td class="n">2.6598</td><td class="n">3.4352</td><td class="n">45.3%</td><td class="n">0.9024</td><td class="n">7.78×10<sup>−62</sup></td></tr>
+<tr><td>0.1</td><td class="n">0.1795</td><td class="n">0.1920</td><td class="n">0.3066</td><td class="n">37.9%</td><td class="n">1.4092</td><td class="n">8.82×10<sup>−11</sup></td></tr>
+<tr><td>1/(t+1)</td><td class="n">0.3635</td><td class="n">0.0550</td><td class="n">0.0210</td><td class="n">36.1%</td><td class="n">1.5285</td><td class="n">6.22×10<sup>−4</sup></td></tr>
+</table>
+<p>三つのことがわかる。</p>
+<p>第一に、既定の学習率 0.5 は、1 標本ずつの証拠に対しては学習にならない。KL は更新を重ねるほど大きくなった。しばらく引かれなかったトークンの確率が更新のたびに半分になり、まれなトークンがほとんど零になるためである。最終のエントロピー 0.90 は真の値 1.55 より小さく、事前分布は過度に確信している。命題 4 (ii) のとおりである。</p>
+<p>第二に、学習率 1/(t+1) は真の分布に近づいた (KL 0.021、エントロピー 1.5285)。命題 4 (i) のとおりである。</p>
+<p>第三に、どの学習率でも、エントロピーは 36〜45% の更新で増えた。「証拠が届くたびにエントロピーが減る」という説明は、E1 のように同じ鋭い証拠を繰り返す場合には正しいが、標本から学ぶ場合には正しくない。</p>
+<p>トークン 3 の確率は、どの学習率でも正のままであった (命題 3)。学習率 1/(t+1) では 1/(8·201) = 6.22×10<sup>−4</sup> で、理論値と一致する。エンジンは、200 回見なかったことから「ありえない」とは結論しない。</p>
+
+<h3>7.4 生成結果の誤りの分析</h3>
+<p>6.4 節の検査は 5 つとも合格し、網羅率は 100% であった。しかし、対応付けが正しかったのは 4 節のうち 3 節である。</p>
+<p><b>節 2 の誤り。</b>「独自のテンプレートではない生成AIの量子プログラミング言語のBadaで」は、話題「このエンジン」の事実 #70 (「あなたは誰ですかと尋ねられたら、私は量子プログラミング言語で書かれた言語エンジンだと答えます」) に対応付けられた。「量子プログラミング言語」という語の一致が決め手になっている。この節が実際に求めているのは、ひな形によらない生成という方式の指定と、Bada という言語の指定である。前者に当たる事実 #79 は台帳にあったが、選ばれなかった。その結果、第 3 章には挨拶と自己紹介の文が並び、論文の章として意味をなしていない。</p>
+<p><b>第 1 章の先頭の文。</b>事実 #10 は「証拠が台帳に追記されるたびにエントロピーが減少する」と述べる。実験 E3 は、これが一般には成り立たないことを示した。エンジンは台帳の文をそのまま出すので、台帳の文が言い過ぎていれば、生成された本文も言い過ぎる。標識「検証済」は、その文が正しいことの保証ではなかった。</p>
+<p><b>網羅率についての知見。</b>Telegraph のレポートは、網羅率は取りこぼしがないことを示すが、正しく解釈したことは示さない、と述べた。本稿の結果はこれを再現した。節 2 は「対応付けられた」ので網羅率に数えられ、未解釈の節としても残らなかった。誤った対応付けは、取りこぼしよりも見つけにくい。6.1 節の対応表を必ず載せるのは、このためである。</p>
+
+<h2>8. 考察と限界</h2>
+<p><b>抽出的生成の限界。</b>第 6 章の本文は、台帳の事実を選んで並べたものである。ひな形は使っていないが、文と文をつなぐ言葉も、段落としての論の運びもない。これは文章の生成というより、根拠の一覧に近い。ひな形を使わないことと、良い文章が書けることは別である。本稿の地の文 (第 6 章以外) は、著者が Claude の支援を受けて書いた。エンジンだけで論文を書いたわけではない。</p>
+<p><b>保証されることと、されないこと。</b>エンジンが保証するのは、除外したものが戻らないこと (定理 1)、位相が分布を壊さないこと (定理 2)、見ていないものを零にしないこと (命題 3) である。保証しないのは、対応付けが正しいこと、台帳の文が正しいこと、学習が収束すること (既定の学習率では収束しない) である。</p>
+<p><b>既定の学習率。</b>実験 E3 から、処理系の既定値 0.5 は、同じ分布を繰り返し与える用途には使えるが、標本から学ぶ用途には向かないことがわかった。標本から学ぶ場合は 1/(t+1) を明示的に渡すべきである。既定値そのものは変更していない。</p>
+<p><b>量子という語。</b>Bada の量子演算は古典計算機上の計算であり、量子計算機を駆動しない。位相コアのゲートは確率ベクトルと対角位相を扱い、干渉を表さない。本稿の結果はすべて古典的な確率の計算である。</p>
+<p><b>評価の規模。</b>生成の評価は依頼文 1 件である。実験 E2 と E3 は語彙 8 の小さな設定であり、実際の言語モデルの語彙での挙動は測っていない。</p>
+
+<h2>9. 結論</h2>
+<p>未知事前エンジンは、一様分布から始まり、追記専用の台帳に証拠を積み、位相コアで情報源を重ねる推論の核である。除外の不可逆性と、無知が零にならないことが、初等的な定理として成り立つ。BadaGPT電信の五段のパイプラインをこのエンジンの上で動かすと、ひな形によらずに、依頼文から章と文を選ぶことができた。</p>
+<p>同時に、三つの限界が数値として現れた。位相は分布を変えないので、位相コアだけでは情報源の内容は出力に届かない。既定の学習率は標本からの学習に向かず、エントロピーは単調に減らない。網羅率 100% のもとで、4 節のうち 1 節は誤って対応付けられていた。未解釈の節と対応表を捨てずに残すという Telegraph の設計は、ここでも誤りを見つける手段として働いた。</p>
+
+<h2>謝辞</h2>
+<p>本システムの実装と本稿の作成には、Anthropic の Claude (Claude Code) の支援を受けた。</p>
+
+<h2>参考文献</h2>
+<ol class="ref">
+<li>山口 雅旭. The Unknown-Prior Engine: Full Source — A complete generative-AI specification in Bada notation. 2026.</li>
+<li>山口 雅旭. BadaGPT電信：思考入力の全体把握に基づくクロスプラットフォーム・アプリケーション生成. masaaki-avnturle/Bada, 2026.</li>
+<li>山口 雅旭. Reviser-Extensible Grammars: A Q#-Targeted Quantum Front End for the Unknown-Prior Engine. 2026.</li>
+<li>山口 雅旭. 未知事前エンジン上の Bada ChatGPT の仕組み. masaaki-avnturle/Bada (bada_zeta_shannon/paper/), 2026.</li>
+<li>山口 雅旭. Bada UltraNetwork — 全ソースコード. masaaki-avnturle/Bada, 2026.</li>
+<li>E. T. Jaynes. Information Theory and Statistical Mechanics. Physical Review 106 (1957) 620–630.</li>
+<li>C. E. Shannon. A Mathematical Theory of Communication. Bell System Technical Journal 27 (1948) 379–423, 623–656.</li>
+<li>O. C. Z. Gotel, A. C. W. Finkelstein. An Analysis of the Requirements Traceability Problem. Proc. IEEE ICRE (1994) 94–101.</li>
+</ol>
+
+<h2>付録 A. 再現方法</h2>
+<pre><code># 五段のパイプラインと実験 E1〜E3 → run_output.txt (第 6 章・第 7 章)
+node bada_zeta_shannon/telegraph_paper/run.js
+# 本稿の PDF
+node bada_zeta_shannon/telegraph_paper/build_pdf.js</code></pre>
+<p>乱数は固定の種による線形合同法であり、同じ出力が得られる。</p>
+
+</body>
+</html>

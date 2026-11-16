@@ -145,4 +145,5 @@ certified 13 / 13  ALL PASS
 | `chat.js` | 対話ドライバ（入出力のみ） |
 | `bridge.js` | JSON Lines ブリッジ（Ruby のバージョン台帳 local 段が使う） |
 | `paper/` | 仕組みの論文（PDF・原稿・評価スクリプト） |
+| `telegraph_paper/` | 未知事前エンジンの論文（Telegraph の五段パイプラインを Bada で実行して作成。PDF・原稿・Bada プログラム・実行出力） |
 | `test.sh` | 認証と対話のテスト |
