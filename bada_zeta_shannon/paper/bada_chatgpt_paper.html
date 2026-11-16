@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>未知事前エンジン上の Bada ChatGPT の仕組み</title>
+<style>
+  @page { size: A4; margin: 22mm 20mm 20mm 20mm; }
+  html { font-family: "IPAPGothic", "IPAGothic", "DejaVu Sans", sans-serif; font-size: 10.2pt; line-height: 1.72; color: #111; }
+  body { margin: 0; }
+  h1 { font-size: 19pt; line-height: 1.35; text-align: center; margin: 0 0 4pt; }
+  .sub { text-align: center; font-size: 11.5pt; margin: 0 0 10pt; }
+  .author { text-align: center; font-size: 10pt; margin: 0; }
+  .date { text-align: center; font-size: 9.5pt; color: #444; margin: 2pt 0 14pt; }
+  h2 { font-size: 13pt; margin: 18pt 0 6pt; padding-bottom: 2pt; border-bottom: 0.8pt solid #333; break-after: avoid; }
+  h3 { font-size: 10.8pt; margin: 12pt 0 4pt; break-after: avoid; }
+  p { margin: 0 0 6pt; text-align: justify; }
+  .abstract { border: 0.8pt solid #555; padding: 8pt 11pt; margin: 0 0 8pt; background: #f6f6f3; }
+  .abstract h3 { margin: 0 0 3pt; text-align: center; }
+  .pos { border-left: 3pt solid #8a3b12; padding: 5pt 10pt; margin: 8pt 0; background: #fbf4ee; font-size: 9.8pt; }
+  .thm { border-left: 3pt solid #1f4e79; padding: 5pt 10pt; margin: 8pt 0; background: #f1f5fa; break-inside: avoid; }
+  .thm b { color: #1f4e79; }
+  .eq { text-align: center; margin: 6pt 0; font-size: 10.8pt; font-family: "DejaVu Serif", "IPAPGothic", serif; }
+  code, pre { font-family: "DejaVu Sans Mono", "IPAGothic", monospace; font-size: 8.6pt; }
+  pre { background: #f4f4f4; border: 0.5pt solid #ccc; padding: 6pt 8pt; margin: 6pt 0; line-height: 1.45; white-space: pre-wrap; break-inside: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 8pt; font-size: 9.1pt; line-height: 1.5; break-inside: avoid; }
+  th, td { border: 0.5pt solid #777; padding: 3pt 6pt; vertical-align: top; text-align: left; }
+  th { background: #e6e9ee; }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  .cap { font-size: 9pt; color: #333; text-align: center; margin: 2pt 0 8pt; }
+  .tag { display: inline-block; font-size: 8.2pt; padding: 0 4pt; border-radius: 2pt; color: #fff; line-height: 1.5; }
+  .t-p { background: #1f6f3f; } .t-v { background: #1f4e79; } .t-u { background: #8a6d12; } .t-n { background: #8a2b12; }
+  ul, ol { margin: 0 0 6pt; padding-left: 18pt; }
+  li { margin-bottom: 2pt; }
+  figure { margin: 8pt 0; break-inside: avoid; }
+  .ref { font-size: 9.1pt; line-height: 1.55; }
+  .ref li { margin-bottom: 3pt; }
+</style>
+</head>
+<body>
+
+<h1>未知事前エンジン上の Bada ChatGPT の仕組み</h1>
+<p class="sub">位相コア・ゼータ＝シャノン言語化・バージョン台帳 — そして Claude Fable との距離</p>
+<p class="author">山口 正明（Masaaki Yamaguchi）／ Yamaguchi Framework<br>実装・数値検証・文書化補助：Claude (Anthropic)</p>
+<p class="date">2026年11月16日</p>
+
+<div class="abstract">
+<h3>要旨</h3>
+<p>本稿は、未知事前エンジン（Unknown-Prior Engine）の上に作られた対話システム「Bada ChatGPT」（コードネーム Bada XP）の仕組みを記述する。システムは三層からなる。最下層は位相コア ψ<sub>i</sub> = √a<sub>i</sub>·exp(iθ<sub>i</sub>) と追記専用台帳であり、零の保存と |ψ|² = a という二つの初等的な定理を持つ。中間層は、シャノンの公式をゼータ関数に三通りに用いる言語化エンジンで、量子プログラミング言語 Bada だけで書かれている。最上層は、外部の大規模言語モデルへ問い合わせるバージョン台帳（Fable 5 からローカル分派まで）である。</p>
+<p>ローカルのエンジンについて、13 項目の自己認証がすべて通ること、台帳内の質問 20 問のうち 16 問で期待した事実を第一位に返すこと、台帳外の質問 10 問のうち 9 問で「わかりません」と棄権することを実測した。</p>
+<p>題に掲げた「Claude Fable に匹敵する」については、結論を先に述べる。ローカルのエンジンは Fable に匹敵しない。約 75 個の事実を検索して答える仕組みであり、推論・作文・翻訳・プログラム生成はできない。システムが Fable と同じ水準の答えを返すのは、バージョン台帳の最上段が Fable 自身を呼び出す場合だけである。ローカルのエンジンが持つのは能力ではなく、根拠の追跡可能性、証拠がないときの棄権、決定的な再現性という別種の性質である。</p>
+</div>
+
+<div class="pos"><b>本稿の位置づけ。</b>本稿は仕組みの記述であって、性能の主張ではない。標識は従来の巻と同じく
+<span class="tag t-p">証明済</span>（証明があり数値でも確認）、
+<span class="tag t-v">検証済</span>（実装を実行して確認）、
+<span class="tag t-u">未検証</span>（本稿では確かめていない）、
+<span class="tag t-n">否定</span>（成り立たないことを確認）を用いる。リーマン予想について本稿は何も証明しない。</div>
+
+<h2>1　はじめに</h2>
+<p>先行する手稿群は、Bada を「未知事前エンジンをランタイムとする言語」として定めた。エンジンは最大エントロピーの無知から出発し、証拠を追記専用の台帳に積むことで確信を得る。本稿が扱うのは、その上に作った対話システムである。構成要素は次の三つで、いずれもリポジトリに実装がある。</p>
+<ol>
+<li><b>未知事前エンジン</b>（位相コアと台帳）。処理系 <code>bada_gui_ide/www/bada.js</code> のネイティブ関数 <code>softmax</code>、<code>cognitive_system</code>、<code>update</code>、<code>unknown_prior</code> として提供される。</li>
+<li><b>ゼータ＝シャノン言語エンジン</b>（<code>bada_zeta_shannon/zeta_shannon.bada</code>、純 Bada、約 1,300 行）。質問に根拠つきで答え、会話から学習し、文章を生成する。</li>
+<li><b>バージョン台帳とブリッジ</b>（<code>bada_ruby/lib/bada/lang/llm.rb</code>）。外部の言語モデル API に問い合わせ、失敗時はローカル分派 <code>Bada::OmegaChat</code> に落ちる。</li>
+</ol>
+<p>2 と 3 は別々に作られており、現時点では接続されていない。3 のローカル分派は Ruby 製の OmegaChat であり、2 の Bada 製エンジンではない。この点は第 7 節で改めて述べる。</p>
+
+<h2>2　全体構成</h2>
+<figure>
+<svg viewBox="0 0 680 318" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="IPAPGothic, IPAGothic, sans-serif" font-size="11">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker></defs>
+  <rect x="6" y="6" width="668" height="86" fill="#fbf4ee" stroke="#8a3b12"/>
+  <text x="16" y="24" font-weight="bold" fill="#8a3b12">上層　バージョン台帳（Bada XP）— 外部モデルへのブリッジ</text>
+  <g font-size="10">
+    <rect x="16" y="36" width="84" height="40" fill="#fff" stroke="#8a3b12"/><text x="58" y="54" text-anchor="middle">Fable 5</text><text x="58" y="68" text-anchor="middle" fill="#666">最上段</text>
+    <rect x="110" y="36" width="96" height="40" fill="#fff" stroke="#8a3b12"/><text x="158" y="54" text-anchor="middle">ムートス</text><text x="158" y="68" text-anchor="middle" fill="#666">既定</text>
+    <rect x="216" y="36" width="76" height="40" fill="#fff" stroke="#8a3b12"/><text x="254" y="60" text-anchor="middle">Opus 4.7</text>
+    <rect x="302" y="36" width="76" height="40" fill="#fff" stroke="#8a3b12"/><text x="340" y="60" text-anchor="middle">Opus 4.6</text>
+    <rect x="388" y="36" width="82" height="40" fill="#fff" stroke="#8a3b12"/><text x="429" y="60" text-anchor="middle">Sonnet 4.6</text>
+    <rect x="480" y="36" width="76" height="40" fill="#fff" stroke="#8a3b12"/><text x="518" y="60" text-anchor="middle">Haiku 4.5</text>
+    <rect x="566" y="36" width="98" height="40" fill="#fde9d9" stroke="#8a3b12" stroke-width="1.6"/><text x="615" y="54" text-anchor="middle">local</text><text x="615" y="68" text-anchor="middle" fill="#666">ローカル分派</text>
+  </g>
+  <line x1="615" y1="92" x2="615" y2="112" stroke="#333" marker-end="url(#ar)"/>
+  <text x="604" y="106" text-anchor="end" font-size="9.5" fill="#444">鍵なし・通信失敗・拒否 → nil → ローカルへ</text>
+
+  <rect x="6" y="114" width="668" height="104" fill="#f1f5fa" stroke="#1f4e79"/>
+  <text x="16" y="132" font-weight="bold" fill="#1f4e79">中層　ローカルの言語エンジン</text>
+  <rect x="16" y="142" width="408" height="66" fill="#fff" stroke="#1f4e79"/>
+  <text x="26" y="158" font-weight="bold">ゼータ＝シャノン言語エンジン（純 Bada）</text>
+  <text x="26" y="174" font-size="10">トークン化 → ゼータ則の自己情報量 → コサイン → ロジット z</text>
+  <text x="26" y="189" font-size="10">→ 位相コア → 信念との積 → 棄権判定 → Grover → 答え</text>
+  <text x="26" y="203" font-size="10" fill="#555">ζ_NS・零点計算・4-gram 生成・複素振幅レジスタ</text>
+  <rect x="436" y="142" width="228" height="66" fill="#fff" stroke="#1f4e79" stroke-dasharray="4 3"/>
+  <text x="446" y="158" font-weight="bold">OmegaChat（Ruby）</text>
+  <text x="446" y="174" font-size="10">計測 → 誤差修正 → 検索</text>
+  <text x="446" y="189" font-size="10">→ 生成 → 記録</text>
+  <text x="446" y="203" font-size="10" fill="#555">台帳の local 段が呼ぶ分派</text>
+
+  <line x1="220" y1="218" x2="220" y2="238" stroke="#333" marker-end="url(#ar)"/>
+  <line x1="550" y1="218" x2="550" y2="238" stroke="#333" marker-end="url(#ar)"/>
+
+  <rect x="6" y="240" width="668" height="72" fill="#eef6f0" stroke="#1f6f3f"/>
+  <text x="16" y="258" font-weight="bold" fill="#1f6f3f">下層　未知事前エンジン</text>
+  <rect x="16" y="266" width="318" height="38" fill="#fff" stroke="#1f6f3f"/>
+  <text x="175" y="282" text-anchor="middle">位相コア　ψ = √a · exp(iθ)</text>
+  <text x="175" y="297" text-anchor="middle" font-size="10" fill="#555">零の保存　／　|ψ|² = a</text>
+  <rect x="346" y="266" width="318" height="38" fill="#fff" stroke="#1f6f3f"/>
+  <text x="505" y="282" text-anchor="middle">追記専用台帳（TupleSpace）と未知事前分布</text>
+  <text x="505" y="297" text-anchor="middle" font-size="10" fill="#555">一様分布から出発し、証拠で更新</text>
+</svg>
+<p class="cap">図 1　Bada ChatGPT の三層構成。破線の OmegaChat は Ruby 実装で、Bada 製エンジンとは別系統である。</p>
+</figure>
+
+<h2>3　未知事前エンジン</h2>
+<h3>3.1　位相コア</h3>
+<p>語彙（あるいは候補の集合）の大きさを V とする。ロジット z ∈ R<sup>V</sup> から基底分布 a = softmax(z) を作る。モジュール m は確率分布 q<sup>(m)</sup> と位相ベクトル φ<sup>(m)</sup> の組であり、そのシャノンエントロピーを H<sub>m</sub> = −Σ<sub>j</sub> q<sub>j</sub><sup>(m)</sup> log q<sub>j</sub><sup>(m)</sup>、利得を β<sub>m</sub> と書く。位相コアは次で定義される。</p>
+<p class="eq">θ<sub>i</sub> = Σ<sub>m</sub> β<sub>m</sub> H<sub>m</sub> φ<sub>i</sub><sup>(m)</sup>,　　ψ<sub>i</sub> = √a<sub>i</sub> · exp(iθ<sub>i</sub>),　　q̂<sub>i</sub> = |ψ<sub>i</sub>|² / Σ<sub>j</sub> |ψ<sub>j</sub>|²</p>
+
+<div class="thm"><b>定理 1（零の保存）</b> <span class="tag t-p">証明済</span>　a<sub>i</sub> = 0 ならば、モジュールと利得の選び方によらず q̂<sub>i</sub> = 0 である。<br>
+<i>証明。</i>ψ<sub>i</sub> = √0 · exp(iθ<sub>i</sub>) = 0 であり、0 に何を掛けても 0 である。∎</div>
+
+<div class="thm"><b>定理 2（位相は確率を変えない）</b> <span class="tag t-p">証明済</span>　すべての i で q̂<sub>i</sub> = a<sub>i</sub> である。<br>
+<i>証明。</i>|exp(iθ<sub>i</sub>)| = 1 より |ψ<sub>i</sub>|² = a<sub>i</sub>。Σ<sub>j</sub> a<sub>j</sub> = 1 なので正規化は恒等である。∎</div>
+
+<p>実測では、6 候補のうち 2 つを除外した分布で零が 2 つとも保存され、|ψ|² と a の最大偏差は 5.55×10<sup>−17</sup> であった（第 8 節 Z10）。</p>
+<p>定理 2 には裏の意味がある。位相 θ は出力分布にまったく影響しない。エントロピー位相は台帳に記録されるが、振幅を足し合わせる操作がない限り確率には現れない。したがって位相コアは、モジュールを「壊さずに重ねる」ための安全装置であって、答えを良くする装置ではない。本システムで答えの順位を決めているのは、第 4 節の重みと信念である。</p>
+
+<h3>3.2　未知事前分布と台帳</h3>
+<p>事前分布は一様分布 u = (1/V, …, 1/V) から始める。これは制約のない場合の最大エントロピー分布である。証拠 e が届くと、学習率 λ で</p>
+<p class="eq">prior ← normalize( (1 − λ)·prior + λ·e )</p>
+<p>と更新し、結果を台帳に追記する。台帳（TupleSpace）は追記専用で、事実は上書きされない。推論の履歴がそのまま監査の記録になる。</p>
+<p>更新のたびにエントロピーが下がることは定理ではない。証拠が事前分布より平らであれば上がる。本稿のデモでは、話題の信念のエントロピーが 2.6391 nat（一様）から 13 回の対話で 2.1662 nat に下がった <span class="tag t-v">検証済</span>。</p>
+
+<h2>4　ゼータ＝シャノン言語化</h2>
+<p>シャノンの公式 H = −Σ p log p を、ゼータ関数に関わる三つの場所で用いる。</p>
+
+<h3>4.1　ナッシュ・シャノンゼータ</h3>
+<p>最初の N 個の素数 p<sub>1</sub>, …, p<sub>N</sub> に確率 q<sub>k</sub>(σ) = p<sub>k</sub><sup>−σ</sup> / Z(σ)、Z(σ) = Σ<sub>k</sub> p<sub>k</sub><sup>−σ</sup> を割り当てる。これは平均 log p を固定したときの最大エントロピー分布であり、エントロピー正則化ゲームの均衡である。そのエントロピーを H(σ) とし、</p>
+<p class="eq">ζ<sub>NS</sub>(s) = ζ(s) · exp( iβ H(Re s) )</p>
+<p>と定める。</p>
+<div class="thm"><b>命題 3</b> <span class="tag t-p">証明済</span>　すべての s で |ζ<sub>NS</sub>(s)| = |ζ(s)| であり、ζ<sub>NS</sub> と ζ の零点は一致する。加法版 ζ(s) + H(Re s) は ζ の零点で値 H ≠ 0 を取るので、零点を保存しない。<br>
+<i>証明。</i>H は実数なので |exp(iβH)| = 1。後半は代入による。∎</div>
+<p>これは定理 1・2 と同じ事実（絶対値 1 の因子は零も絶対値も変えない）の言い換えである。N = 40 で H(1/2) = 3.4568、H(1) = 2.6986 となり、先行稿の値を再現した。ζ は Borwein の η 級数（n = 50）で計算し、10 &lt; t &lt; 35 の零点 5 個を小数 6 桁まで得た。命題 3 はリーマン予想と無関係である。</p>
+
+<h3>4.2　ジップ＝ゼータ則による単語の重み</h3>
+<p>ジップの法則は、頻度順位 r の単語の確率が r<sup>−s</sup> に比例すると述べる。有限の語彙 V では</p>
+<p class="eq">P(r) = r<sup>−s</sup> / Z<sub>V</sub>(s),　　Z<sub>V</sub>(s) = Σ<sub>r=1</sub><sup>V</sup> r<sup>−s</sup></p>
+<p>であり、V → ∞、s &gt; 1 で Z<sub>V</sub>(s) → ζ(s) となる。この分布のもとで順位 r のトークンの自己情報量は</p>
+<p class="eq">I(r) = −log P(r) = s·log r + log Z<sub>V</sub>(s)</p>
+<p>である。エンジンは、台帳のトークンを文書頻度で順位づけし（同順位は中央順位で代表）、指数 s を最尤法で求める。検索の重みには、最頻トークンに対する超過分</p>
+<p class="eq">w(r) = I(r) − I(1) = s·log r</p>
+<p>を使う。log Z<sub>V</sub>(s) が消えるので、機能語の重みはほぼ 0、珍しい語の重みが最大になる。台帳にないトークンは順位 V + 1 に置く。現在の台帳では s ≈ 0.55、V = 1,653 であった。</p>
+<p>トークンは、ASCII の単語と、隣り合う全角文字のバイグラムである。日本語では内容語が漢字・片仮名、文法要素が平仮名で書かれるので、すべて平仮名のバイグラムには係数 0.2、平仮名を一つ含むものには 0.5 を掛ける。これは経験則であり、形態素解析の代用である。</p>
+
+<h3>4.3　質問から答えまで</h3>
+<p>質問 Q と事実 D<sub>i</sub> のトークン集合に対し、</p>
+<p class="eq">c<sub>i</sub> = Σ<sub>t∈Q∩D<sub>i</sub></sub> w(t)² / √( Σ<sub>t∈D<sub>i</sub></sub> w(t)² · Σ<sub>t∈Q</sub> w(t)² )</p>
+<p class="eq">z<sub>i</sub> = G·c<sub>i</sub>（共有トークンがあるとき）、　z<sub>i</sub> = −800（ないとき）</p>
+<p>とする（G = 22）。exp(−800) は倍精度で厳密に 0 になるので、証拠を共有しない事実は a = softmax(z) で確実な零になり、定理 1 によって以後どの段でも復活しない。</p>
+<p>次に位相コアを通し（q̂ = a）、会話の信念 b（話題上の分布）との積を取る。</p>
+<p class="eq">r<sub>i</sub> ∝ q̂<sub>i</sub> · b(topic(i))<sup>1/4</sup></p>
+<p>b は一様分布との混合で更新されるので常に正であり、この積も零を保存する。r の第一位と、その 0.6 倍以上の第二位までを答えとして出力し、標識と出典を付ける。</p>
+<p><b>棄権。</b>被覆率 κ = max<sub>i</sub> Σ<sub>t∈Q∩D<sub>i</sub></sub> w(t)² / Σ<sub>t∈Q</sub> w(t)² が 0.2 未満なら、答えを出さずに「わかりません」と返す。未知のトークンは最大の重みを持つので、台帳にない話題の質問は κ が小さくなる。</p>
+
+<h3>4.4　生成とナッシュ温度</h3>
+<p>文章生成は文字 4-gram（3 文字の文脈、なければ 2 文字に後退）である。文脈に続く候補を出現回数の降順に並べ、順位 k の候補に素数ゲームの均衡重みを掛ける。</p>
+<p class="eq">w<sub>k</sub> ∝ count<sub>k</sub> · p<sub>k</sub><sup>−σ</sup></p>
+<p>σ = 0 で元の頻度、σ が大きいほど第一候補に集中する。非零の因子なので、その文脈で一度も現れなかった文字は確率 0 のままである。既定は σ = 1/2 とした。</p>
+
+<h2>5　量子層</h2>
+<p>先行の論文集は、位相コアのゲート層が確率ベクトルだけを受け渡し、干渉を表現しないことを指摘した。本エンジンはその修正を含む。レジスタを複素振幅ベクトルとして保持し、アダマールを 2×2 の線形写像として作用させる。H·H = I が成り立ち（P(|000⟩) = 1.000000）、Grover の振幅増幅が動く。64 状態・印 1 個で 6 反復後の成功確率は 0.9966 であった <span class="tag t-v">検証済</span>。</p>
+<p>答えの選択では、位相コアが選んだ事実に印を付けてオラクルとし、増幅後の確率を表示する。これには三つの限界がある。</p>
+<ul>
+<li>古典計算機上のシミュレーションであり、量子計算機を駆動しない。</li>
+<li>オラクルは答えが決まった後に作られる。探索は答えを見つけておらず、増幅を示しているだけである。</li>
+<li>本物のアダマールは H|0⟩ に |1⟩ 成分を生むので、零の保存と万能量子計算は両立しない。エンジンは答えの決定には零を保存する位相コアを使い、量子レジスタは別に扱う。</li>
+</ul>
+
+<h2>6　バージョン台帳とブリッジ</h2>
+<p>Ruby 側の <code>Bada::Lang::LLM</code> は、外部の言語モデル API への橋である。環境変数に API 鍵があれば Anthropic Messages API または OpenAI 互換 API を呼び、なければ <code>nil</code> を返す。呼び出し側は <code>nil</code> を受けるとローカル分派に落ちる。通信エラー、JSON の解析失敗、安全分類器による拒否も同じく <code>nil</code> に丸める。鍵は環境変数からのみ読み、保存も出力もしない。</p>
+<p>モデルは台帳から選ぶ（図 1 上段）。既定はムートスで、<code>Chat.downgrade(n)</code>、<code>Chat.upgrade(n)</code>、<code>Chat.use(id)</code> で段を移る。最下段 <code>local</code> に固定すると、鍵があってもローカル分派だけで動く。</p>
+<p>ローカル分派 OmegaChat は五段の処理を行う。質問のシャノンエントロピーと多様体エントロピー不変量を測り、回転体上で誤差修正し、キーワードと不変量でコーパスを検索し、目標エントロピーで文章を生成し、やり取りを台帳に記録する。</p>
+<p>台帳最上段のモデル ID は <code>claude-fable-5</code> と書かれている。本稿の作業環境には API 鍵がなく、この ID で実際に応答が得られるかは確かめていない <span class="tag t-u">未検証</span>。</p>
+
+<h2>7　実装</h2>
+<table>
+<tr><th>部品</th><th>場所</th><th>言語</th><th>内容</th></tr>
+<tr><td>位相コア・台帳</td><td><code>bada_gui_ide/www/bada.js</code></td><td>処理系</td><td><code>softmax</code> <code>cognitive_system</code> <code>update</code> <code>unknown_prior</code>、<code>@reviser</code> 文法拡張</td></tr>
+<tr><td>言語エンジン</td><td><code>bada_zeta_shannon/zeta_shannon.bada</code></td><td>Bada</td><td>複素数、ζ、ζ<sub>NS</sub>、ジップ＝ゼータ則、索引、生成、量子レジスタ、認証</td></tr>
+<tr><td>対話ドライバ</td><td><code>bada_zeta_shannon/chat.js</code></td><td>JavaScript</td><td>入出力のみ。1 行を Bada の文に変換</td></tr>
+<tr><td>ブリッジ</td><td><code>bada_ruby/lib/bada/lang/llm.rb</code></td><td>Ruby</td><td>バージョン台帳、API 呼び出し、フォールバック</td></tr>
+<tr><td>ローカル分派</td><td><code>bada_ruby/lib/bada/chat.rb</code></td><td>Ruby</td><td>OmegaChat</td></tr>
+</table>
+<p><code>Ask</code>、<code>Learn</code>、<code>Speak</code> は予約語ではなく、<code>@reviser : grammar</code> が台帳に commit した生成規則である。</p>
+<pre>@reviser : grammar {
+    rule "ask"   stmt [ 'Ask' expr ]   =&gt; zs_ask(_1)
+    rule "learn" stmt [ 'Learn' expr ] =&gt; zs_learn(_1)
+    rule "speak" stmt [ 'Speak' expr ] =&gt; zs_speak(_1, 48)
+}
+Ask "リーマン予想は証明されましたか"</pre>
+<pre>問: リーマン予想は証明されましたか
+答: リーマン予想は未解決である。論文集でも、証明できたことと証明できていないことを分けて記している。
+    [標識 未解決 | 出典 リーマン予想 | 確信度 0.92 | H = 0.53 bit | Grover P = 0.996]</pre>
+<p>認証とデモの全体は約 1,200 万インタープリタ・ステップで、1 秒未満で終わる。Bada から C へのコンパイラはこのプログラムの配列・文字列操作を変換できず、ネイティブ実行はできない <span class="tag t-n">否定</span>。</p>
+<p><b>未接続の点。</b>Bada 製の言語エンジンはバージョン台帳につながっていない。台帳の <code>local</code> 段が呼ぶのは Ruby の OmegaChat である。両者を一本にするには、Ruby 側から Bada 処理系を呼ぶ経路が要る。</p>
+
+<h2>8　検証</h2>
+<h3>8.1　自己認証</h3>
+<p>エンジンが依拠する事実は、起動時に Bada 自身で再計算できる。13 項目すべてが通った。</p>
+<table>
+<tr><th>#</th><th>内容</th><th>実測</th><th>由来</th></tr>
+<tr><td>Z1</td><td>素数ゲームのエントロピー</td><td>H(1/2) = 3.4568、H(1) = 2.6986</td><td>ナッシュ・シャノン稿</td></tr>
+<tr><td>Z2</td><td>ζ の零点（10 &lt; t &lt; 35）</td><td>14.134725、21.022040、25.010858、30.424876、32.935062</td><td>古典</td></tr>
+<tr><td>Z3</td><td>|ζ<sub>NS</sub>| = |ζ|</td><td>最大差 4.44×10<sup>−16</sup>、相関 1.000000</td><td>命題 3</td></tr>
+<tr><td>Z4</td><td>加法版は零点を動かす</td><td>|ζ(ρ<sub>1</sub>) + H| = 3.4568</td><td>命題 3</td></tr>
+<tr><td>Z5</td><td>N(T) = x log x − x + 7/8</td><td>T = 35：公式 4.872、実測 5</td><td>Riemann–von Mangoldt</td></tr>
+<tr><td>Z6</td><td>F<sub>1</sub>(0) = η(2) = ζ(2)/2</td><td>0.8224670334</td><td>量子脳稿</td></tr>
+<tr><td>Z7</td><td>ζ は準同型でない</td><td>ζ(2)² = 2.7058、ζ(4) = 1.0823</td><td>Ricci フロー稿</td></tr>
+<tr><td>Z8</td><td>(x log x − x)′ = log x</td><td>0.91629073 で一致</td><td>微分積分稿</td></tr>
+<tr><td>Z9</td><td>ガウス積分 = π</td><td>3.1415926536</td><td>caostics</td></tr>
+<tr><td>Z10</td><td>零の保存、|ψ|² = a</td><td>偏差 5.55×10<sup>−17</sup></td><td>定理 1・2</td></tr>
+<tr><td>Z11</td><td>H·H = I、Grover</td><td>P = 0.9966（6 量子ビット、6 反復）</td><td>第 5 節</td></tr>
+<tr><td>Z12</td><td>ジップ＝ゼータ則の当てはめ</td><td>s ≈ 0.55、語彙 1,653</td><td>4.2 節</td></tr>
+<tr><td>Z13</td><td>根拠つき応答・棄権・学習</td><td>3 つとも成立</td><td>4.3 節</td></tr>
+</table>
+<p>深リーマン予想については、χ<sub>4</sub> の部分 Euler 積（X = 2000）が 0.9223、√2·L(1/2, χ<sub>4</sub>) が 0.944258 であることを報告するにとどめる。値は振動しており、収束の観測ではない。</p>
+
+<h3>8.2　質問応答の評価</h3>
+<p>台帳内の質問 20 問と台帳外の質問 10 問を用意し、質問ごとに新しいセッションで評価した（<code>paper/eval.js</code>）。台帳内は、答えの中に期待した事実の一部が含まれるかで判定した。</p>
+<table>
+<tr><th>質問の種類</th><th class="n">問数</th><th class="n">期待どおり</th><th class="n">誤り</th></tr>
+<tr><td>台帳内（期待する事実を返す）</td><td class="n">20</td><td class="n">16（80%）</td><td class="n">4（別の事実を返した）</td></tr>
+<tr><td>台帳外（棄権する）</td><td class="n">10</td><td class="n">9（90%）</td><td class="n">1（無関係な事実を答えた）</td></tr>
+</table>
+<p>台帳内の誤り 4 問は、いずれも同じ話題の別の事実を返したものである。たとえば「ホッジ予想は解けていますか」に対し、「ホッジ予想は未解決である」ではなく「p = 1 の場合は証明済みである」を返した。問いの意図を読んでいないことがわかる。台帳外の誤りは「カレーの作り方を教えて」で、「作り」「方を」といった一般的なバイグラムの一致が被覆率の閾値を越え、ポアンカレ予想の事実を答えた。</p>
+<p>この評価の限界は大きい。質問は台帳を書いた者が作っており、言い回しが台帳に近い。問数も 30 と少ない。数値は仕組みが動くことの確認であって、一般の質問に対する性能の推定ではない。評価後に閾値や台帳を調整することはしていない。</p>
+
+<h2>9　Claude Fable との距離</h2>
+<p>「Fable に匹敵する」という言い方には三つの読み方がある。それぞれについて、成り立つかどうかを分ける。</p>
+<table>
+<tr><th style="width:23%">読み方</th><th style="width:12%">判定</th><th>内容</th></tr>
+<tr><td>(a) ローカルのエンジンが能力で並ぶ</td><td><span class="tag t-n">否定</span></td><td>ローカルのエンジンは約 75 個の事実から一つか二つを選んで返す。学習されたパラメータはなく、文の意味を扱わない。推論、要約、翻訳、作文、プログラム生成はできない。台帳にない話題には答えられない。Fable は大規模に学習された言語モデルであり、同じ尺度には乗らない。</td></tr>
+<tr><td>(b) システム全体が Fable の水準で答える</td><td><span class="tag t-u">未検証</span></td><td>バージョン台帳を最上段にして API 鍵を与えれば、答えるのは Fable 自身である。これは「匹敵」ではなく「同一」であり、Bada 側の寄与は経路の選択とフォールバックである。本稿では鍵がなく実行していない。</td></tr>
+<tr><td>(c) ローカルのエンジンに固有の性質がある</td><td><span class="tag t-v">検証済</span></td><td>下の表の性質は仕組みから従う。能力の比較ではなく、設計の違いである。</td></tr>
+</table>
+<table>
+<tr><th style="width:26%">性質</th><th>ローカルのエンジン</th><th style="width:30%">成り立つ理由</th></tr>
+<tr><td>根拠の追跡</td><td>すべての答えが台帳の事実 ID、標識、出典に対応する</td><td>答えは台帳の文そのもの</td></tr>
+<tr><td>除外の不可逆性</td><td>証拠を共有しない事実は以後のどの段でも選ばれない</td><td>定理 1</td></tr>
+<tr><td>棄権</td><td>被覆率が閾値未満なら「わかりません」（実測 9/10）</td><td>4.3 節。保証ではなく閾値</td></tr>
+<tr><td>再現性</td><td>同じ台帳と同じ質問列に同じ答えを返す</td><td>乱数は固定シードの線形合同法</td></tr>
+<tr><td>動作環境</td><td>ネットワークも鍵も要らず、1 秒未満</td><td>純 Bada とインタープリタ</td></tr>
+</table>
+<p>これらは小ささの裏返しでもある。根拠が追跡できるのは、答えが台帳の文の写しだからである。同じ理由で、台帳にない正しい答えは決して出てこない。</p>
+<p>ローカルのエンジンを Fable の水準に近づける道は、本稿の仕組みの延長にはない。事実を増やせば答えられる範囲は広がるが、検索であることは変わらない。位相コアの二つの定理は安全の性質であり、能力を生まない（定理 2）。能力に必要なのは大規模な学習であり、それはソースコードの工夫で代えられない。</p>
+
+<h2>10　限界</h2>
+<ul>
+<li><b>理解しない。</b>言い換え、否定、問いの意図を扱えない。8.2 節の誤りはすべてこれに由来する。</li>
+<li><b>生成は継ぎ合わせである。</b>4-gram の出力は台帳の文の断片であり、継ぎ方によって事実と違う文になる。実際に「ゼータは準同型ではなく、統一場は達成ではない。」という文が出た。生成の出力には標識を付けていない。</li>
+<li><b>棄権は保証でない。</b>一般的なバイグラムの一致で閾値を越えることがある（8.2 節）。</li>
+<li><b>位相は答えに寄与しない。</b>ナッシュ・シャノン位相は記録されるだけである（定理 2）。</li>
+<li><b>量子部分はシミュレーションである。</b>第 5 節のとおり。</li>
+<li><b>二つの系統が未接続である。</b>第 7 節のとおり。</li>
+<li><b>評価が小さい。</b>30 問、作成者自身による出題である。</li>
+</ul>
+
+<h2>11　結論</h2>
+<p>Bada ChatGPT は、位相コアと追記専用台帳の上に、ゼータ＝シャノン則で重みを付けた検索応答と、外部モデルへのバージョン台帳を重ねたものである。仕組みは三つの初等的な事実に支えられている。絶対値 1 の因子は零を保存する。ジップの法則はゼータ分布であり、その自己情報量が単語の重みになる。未知のトークンは重いので、知らない話題は被覆率で検出できる。</p>
+<p>ローカルのエンジンは Claude Fable に匹敵しない。持っているのは、小さな範囲で根拠を示して答え、範囲の外では黙るという性質である。システムが Fable の水準の答えを返すのは、台帳が Fable を呼ぶときに限られる。</p>
+<p>次の一手は三つある。Bada 製エンジンをバージョン台帳の <code>local</code> 段に接続すること。台帳最上段の到達性を鍵のある環境で確かめること。第三者が作った質問で 8.2 節の評価をやり直すことである。</p>
+
+<h2>参考文献</h2>
+<ol class="ref">
+<li>山口 正明「ナッシュ・シャノン公式に基づくゼータ関数と本物のゼータの相関」2026年6月。</li>
+<li>M. Yamaguchi, “The Unknown-Prior Engine: Full Source,” June 2026.</li>
+<li>M. Yamaguchi, “Reviser-Extensible Grammars: A Q#-Targeted Quantum Front End for the Unknown-Prior Engine, Compiled and Interpreted in Bada,” 2026.</li>
+<li>M. Yamaguchi, “QuantumBada: A generative-AI Operating System for a gate-model quantum computer, written in Bada” および “PrecogBada: An Unknown-Prior Precognition Engine”（ソース一覧）, 2026.</li>
+<li>山口 正明「山口フレームワーク論文集：リーマン予想・深リーマン予想・量子力学・一般相対性理論の統一場」2026年9月。</li>
+<li>山口 正明「P層・N層半導体機構による量子脳理論」2026年7月。</li>
+<li>山口 正明「ガウスからサーストン・ペレルマンへ」「HΨ = ⊕(iℏ∇)<sup>⊕L</sup> の同定と、球面族への拡張」「調和形式のゼロモードとホッジ予想」2026年9月。</li>
+<li>山口 正明「微分・積分の計算体系に関する定理の構成」2026年11月。</li>
+<li>C. E. Shannon, “A Mathematical Theory of Communication,” <i>Bell System Technical Journal</i> 27 (1948).</li>
+<li>J. F. Nash, “Equilibrium Points in n-Person Games,” <i>Proc. Natl. Acad. Sci. USA</i> 36 (1950).</li>
+<li>E. T. Jaynes, “Information Theory and Statistical Mechanics,” <i>Physical Review</i> 106 (1957).</li>
+<li>G. K. Zipf, <i>Human Behavior and the Principle of Least Effort</i>, Addison-Wesley, 1949.</li>
+<li>P. Borwein, “An Efficient Algorithm for the Riemann Zeta Function,” <i>CMS Conference Proceedings</i> 27 (2000).</li>
+<li>L. K. Grover, “A Fast Quantum Mechanical Algorithm for Database Search,” <i>Proc. 28th ACM STOC</i> (1996).</li>
+<li>C. H. Bennett, E. Bernstein, G. Brassard, U. Vazirani, “Strengths and Weaknesses of Quantum Computing,” <i>SIAM J. Comput.</i> 26 (1997).</li>
+</ol>
+
+</body>
+</html>
