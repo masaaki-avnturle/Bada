@@ -6,7 +6,7 @@
   - 倍音の声: harm (既定 1 = そのまま、2 / 3 で、抑揚も音程の補正も同じまま基音のちょうど 2 倍 / 3 倍の高さの声に — 基音の声と重ねると、どの瞬間も整数比のまま)
   - 囁き: whisper=True で、同じ言葉を声帯を鳴らさない囁きにする (WORLD の無声の合成: 声の響きの形を息の音で鳴らす。雑音を別に足すのではない)
   - 音高: f0 を semis 半音上げる (既定 12 = 1 オクターヴ)。声の響き (フォルマント) は formant 倍だけ上げる (既定 1.12、控えめ)
-  - 音程の補正: 伸ばした音だけ、音階の最も近い音へ 60% だけ寄せる (揺れや滑らかな移り変わりは残す)
+  - 音程の補正: 伸ばした音だけ、音階の最も近い音へ 60% だけ寄せる (揺れや滑らかな移り変わりは残す)。音階は主音の長音階、または scale に音の一覧 (0=C … 11=B; 移調した後の高さで) を渡す
   - 息・雑音: 歌っていない所を柔らかく閉じる (ゲート)。エコー (残響) は足さない
   使い方: python feminize_voice.py <voice.json> <出力フォルダ> <音階の主音 (0=C … 9=A)> [semis] [formant] -- <録音 id ...>
   出力: <出力フォルダ>/<id>_fem.wav と <出力フォルダ>/voice.json (extract_voice.py と同じ形 → voice_bank.py にそのまま渡せる)
@@ -17,9 +17,9 @@ import numpy as np, soundfile as sf, pyworld as pw
 SR = 44100
 MAJOR = [0, 2, 4, 5, 7, 9, 11]
 
-def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=1.0, breath=0.0, harm=1.0, whisper=False):
+def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=1.0, breath=0.0, harm=1.0, whisper=False, scale=None, f0_floor=60, f0_ceil=900):
     x = x.astype(np.float64)
-    f0, t = pw.dio(x, sr, f0_floor=60, f0_ceil=900, frame_period=5.0)
+    f0, t = pw.dio(x, sr, f0_floor=f0_floor, f0_ceil=f0_ceil, frame_period=5.0)        # 声の音域が分かっているときは f0_floor / f0_ceil を狭めると、息や伴奏の残りを声の高さと読み違えない
     f0 = pw.stonemask(x, f0, t, sr)
     sp = pw.cheaptrick(x, f0, t, sr); ap = pw.d4c(x, f0, t, sr)
     v = f0 > 0
@@ -27,11 +27,13 @@ def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=
     if flatten != 1.0 and v.any():                                                  # 抑揚を抑える: 中央値からの揺れを flatten 倍に (0.5 で半分)
         med = np.median(m[v]); m = np.where(v, med + (m - med) * flatten, 0)
     # 伸ばした音 (前後 40 ms で 0.4 半音以内) だけ音階へ寄せる
-    scale = np.array([(tonic_major + k) % 12 for k in MAJOR])
+    custom = scale is not None                                                      # scale: 移調した後の高さでの音の一覧 (歌を曲の調に合わせるとき)。半音数が整数でないときも、移調後の高さで寄せる
+    scale = np.array([k % 12 for k in scale]) if custom else np.array([(tonic_major + k) % 12 for k in MAJOR])
+    sh = semis if custom else 0.0
     target = np.round(m)
     for i in np.where(v)[0]:
-        c = int(round(m[i])); cand = [c + d for d in (-1, 0, 1) if (c + d) % 12 in scale]
-        target[i] = min(cand, key=lambda q: abs(q - m[i])) if cand else m[i]
+        c = int(round(m[i] + sh)); cand = [c + d for d in (-2, -1, 0, 1, 2) if (c + d) % 12 in scale]
+        target[i] = (min(cand, key=lambda q: abs(q - (m[i] + sh))) - sh) if cand else m[i]
     steady = np.zeros_like(v)
     for i in np.where(v)[0]:
         a, b = max(0, i - 8), min(len(m), i + 9)
