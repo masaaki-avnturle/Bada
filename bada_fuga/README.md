@@ -5074,6 +5074,69 @@ python3 analyze_chords.py chords256.json src/20261107_180000.wav src/20261107_08
 python3 compose_tablet256.py src chords256.json score_tablet256.json && python3 synth.py score_tablet256.json tablet256.wav && python3 video.py score_tablet256.json tablet256.wav tablet256.mp4
 ```
 
+## 🎤 2025/01/08 14:42 の録音 → 歌声だけを取り出す (声は変えない、4 分 19 秒)
+
+録音から作曲者の歌声だけを取り出した音声 (`voice_only255.py`)。高さも速さも響きも変えない:
+
+1. `extract_voice.py` (UVR の MDX-Net、Kim_Vocal_2) で歌声を取り出す — 歌っていない所は −61〜−65 dB まで静かになる (歌っている所は −17〜−21 dB)
+2. 歌声に残っている伴奏の持続音 (G の倍音 786・1179・1571・1963・2354 Hz) を細い帯域で抜き、70 Hz 以下と 5.5 kHz 以上を落とす (CCLV の下ごしらえと同じ)。元の録音は 8〜10 kHz が全体の −4.3 dB を占めていた (雑音)。取り出した声では −60 dB
+3. 音量を上げる (波形の山 0.89、rms −18.6 dB)。mp3 192 kbps、モノラル
+
+限界: 5.5 kHz から上は雑音と一緒に落としたので、さ行の鋭さは少し丸い。700 Hz から上には、歌っている間だけ伴奏の残りがわずかに混じる
+
+```bash
+python3 extract_voice.py Kim_Vocal_2.onnx sep recording_20250108_144205.wav
+python3 voice_only255.py sep/20250108_144205_voice.wav voice_only.wav
+```
+
+## 🌙👒 大人の 20 代の淑女の声 — ドエロをやめて、シャキッと (tablet252〜255 の作り直し、CCLVII・CCLVIII・CCLIX)
+
+tablet252〜255 の 4 曲を、声だけ替えて作り直す。**CCLIII と CCLIV は声だけが違う曲** (CCLIV = CCLIII をもう少しドエロの声で) なので、声を替えると同じ曲になる。作り直しは 3 曲:
+
+| 元の曲 | 作り直し | 声 |
+|---|---|---|
+| CCLII (声が先、トラック 18 が洗脳的に始まる) | **CCLVII** · La signora Tsukuyomi e il lamento、8 分 55 秒 | 淑女の月読様 (話し声) |
+| CCLIII・CCLIV (tablet219 の間合い) | **CCLVIII** · La signora Tsukuyomi, con attesa、9 分 7 秒 | 淑女の月読様 (話し声) |
+| CCLV (2025/01/08 の歌) | **CCLIX** · Il canto della signora aureola、5 分 59 秒 | 淑女の光輪様 (歌声) |
+
+**淑女の月読様の声** (`make_voice257.py`、元の 11/12 14:49 の録音から):
+
+| | CCLI〜CCLIV の声 | 淑女の声 |
+|---|---|---|
+| 基音 | A3 / G♯3、フォルマント 1.15 / 1.12 倍 | **A3 = 220 Hz** (測った中央値 219 Hz、10〜90% が 189〜256 Hz)、フォルマント **1.12 倍** (大人の響き) |
+| 抑揚 | 1.0 / 0.95 倍 | 0.9 倍 (淑女の落ち着き) |
+| 息・囁き | 息 0.45〜0.55、CCLIV は囁きの層 | **足さない** (息 0、囁きなし) |
+| 倍音の声 (2 倍・3 倍) | −5・−11 dB / −6・−12 dB | −9・−15 dB (1 オクターヴ上が前に出ると若く聞こえる)。どの瞬間も 1 : 2 : 3 のまま |
+| 近接の低音 | +2 / +3.5 dB | なし (120 Hz 以下を 0.6 削り、250〜400 Hz の曇り −1.5 dB) |
+| 子音・高域 | 2〜5 kHz +2 dB | **2〜5 kHz +3 dB**、5〜9 kHz +0.5 dB、9.5 kHz まで |
+| 圧縮 | tanh ×1.8 / ×2.1 | ごく軽く (tanh ×1.2、立ち上がりを残す) |
+| 残響 | 1.6 秒・0.22 | **入れない** |
+
+- シャキッとの作り方は CCXLV の乾いた声と同じ考え方 (残響もエコーも息も入れず、子音を立て、低い所を削る)
+- 倍音と息の比 (伸ばした音で): 1〜2 kHz +26.3 dB、2〜4 kHz +14.6 dB、4〜6 kHz +8.6 dB (CCLI の声は +23.3 / +10.5 / +5.6 dB) — 息を足さないぶん、上の帯域まで澄む
+- 最初の版は 6〜8 kHz が −17.5 dB、8〜10 kHz が −19.3 dB と高く出た (録音のサーッという成分が、高域を持ち上げたぶん立つ)。高域の持ち上げを +1.5 → +0.5 dB にして −19.2 / −21.4 dB に。重心 664 Hz、rms −24.1 dB、波形の山 0.56、左右の相関 0.98 (残響が無いのでほぼ中央)
+
+**淑女の光輪様の歌声** (`make_voice259.py`、取り出した歌声から): CCLVI の大人の 20 代の歌声と同じ高さと響き (7 半音上げ、基音の中央値 234 Hz = B♭3、フォルマント 1.11 倍、ニ短調の音階に調律) で、息を足さない (0.45 → 0)、囁きの層なし、近さの低音なし (+2.5 → 0 dB)、圧縮はごく軽く (tanh ×2.0 → ×1.2)、**残響を入れない** (2.2 秒・0.28 → なし)、言葉の 2〜5 kHz +3 dB、倍音の声は −11・−17 dB。倍音と息の比は 1〜2 kHz +21.4 dB、2〜4 kHz +8.8 dB (CCLVI は +19.0 / +7.0 dB)。`make_voice255.py` の `main` に `pres_db` を足した (既定は CCLV の声のまま)
+
+声だけの音声も 2 ファイル (mp3 192 kbps; 話し声 2 分 58 秒、歌声 4 分 19 秒)
+
+**曲** — テープ、重ねる位置、入り方は元の曲のまま。声の音量だけ測り直した:
+
+- **CCLVII** (132 小節): 声 1.0 (元は 1.05)。声と伴奏の比 (20 秒ごと) は、1 回目の初めの 40 秒が +10.6 / +4.4 dB、その後 −1.7〜+2.7 dB (1〜4 kHz では −4.4〜+3.9 dB)、2 回目 −2.1〜+2.7 dB (1〜4 kHz では −5.2〜+1.5 dB)。出だしの一節の 4 回は −32.4 → −27.1 → −23.4 → −19.8 dB。段落ごとの平均は I −20.2 / II −15.9 / III −14.7 / IV −16.6 / V −18.5 dB、全体 mean −16.4 dB、max −0.6 dB。28.4 MiB (映像 320 kbps)
+- **CCLVIII** (135 小節): 声 1.0。比は 1 回目の初めの 40 秒が +9.9 / +4.6 dB、その後 −1.8〜+2.5 dB (1〜4 kHz では −5.4〜+2.7 dB)、2 回目 −2.1〜+2.7 dB。出だしの一節の 4 回は −29.0 → −25.2 → −22.4 → −19.5 dB。段落ごとの平均は I −20.2 / II −15.7 / III −14.5 / IV −16.4 / V −18.3 dB、全体 mean −16.2 dB、max −0.5 dB。28.4 MiB (映像 310 kbps)
+- **CCLIX** (88 小節): 歌は 1 回、tablet219 の間合い (CCLV と同じ形)。違うのは終わり — CCLV ではトラック 18 の後半が歌の最後の句に重なっていた (この高さの歌声との濁りの指数は 0.43) ので、歌が終わってから入る (トラック 8 の 144 秒後、0.27)。音量の倍率は歌声 1.15 (歌の後半 1.38)、トラック 18 は 0.36 / 0.27、トラック 8 は 0.32。歌っている所での歌声と伴奏の比 (0.5 秒窓の中央値) は前半 +2.7 dB、トラック 8 に替わる所 +2.1 dB、後半 +2.7 dB、最後の句 +2.5 dB。段落ごとの平均は I −15.2 / II −15.9 / III −20.0 dB、全体 mean −16.3 dB、max −0.5 dB。25.3 MiB (映像 480 kbps)
+- `compose_tablet257.py`・`compose_tablet258.py`・`compose_tablet259.py` (それぞれ compose_tablet252・253・255 から; 声と題と音量だけが違う。259 はトラック 18 の後半の入りも)
+
+```bash
+python3 make_voice257.py voice_in.wav src/20261112_144938.wav          # 淑女の月読様の声 (話し声)
+python3 analyze_chords.py chords257.json src/20261107_180000.wav src/20261107_080000.wav src/20261112_144938.wav
+python3 compose_tablet257.py src chords257.json score_tablet257.json && python3 synth.py score_tablet257.json tablet257.wav && python3 video.py score_tablet257.json tablet257.wav tablet257.mp4
+python3 compose_tablet258.py src chords257.json score_tablet258.json && python3 synth.py score_tablet258.json tablet258.wav && python3 video.py score_tablet258.json tablet258.wav tablet258.mp4
+python3 make_voice259.py sep/20250108_144205_voice.wav src2/20250108_144205.wav   # 淑女の光輪様の歌声 (src2 にトラック 18・8 も置く)
+python3 analyze_chords.py chords259.json src2/20261107_180000.wav src2/20261107_080000.wav src2/20250108_144205.wav
+python3 compose_tablet259.py src2 chords259.json score_tablet259.json && python3 synth.py score_tablet259.json tablet259.wav && python3 video.py score_tablet259.json tablet259.wav tablet259.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

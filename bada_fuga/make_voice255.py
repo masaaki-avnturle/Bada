@@ -32,7 +32,7 @@ def clean(x, sr):
     x = sosfiltfilt(butter(4, 70, 'high', fs=sr, output='sos'), x); x = sosfiltfilt(butter(6, 5500, 'low', fs=sr, output='sos'), x)
     return x / (np.sqrt((x ** 2).mean()) + 1e-12) * 10 ** (-26.0 / 20)
 
-def main(src, out, stems=None, semis=SEMIS, voices=VOICES, scale=SCALE, warm_db=2.5, comp=2.0, rev=0.30, seed=255):
+def main(src, out, stems=None, semis=SEMIS, voices=VOICES, scale=SCALE, warm_db=2.5, comp=2.0, rev=0.30, seed=255, pres_db=2.0):
     """semis 以降は、同じ作り方で別の声を作るときに変える所 (make_voice256.py)。既定は CCLV の声"""
     x, sr = sf.read(src); x = clean((x.mean(axis=1) if x.ndim > 1 else x).astype(np.float64), sr)
     if stems: os.makedirs(stems, exist_ok=True); sf.write(os.path.join(stems, 'clean.wav'), x.astype(np.float32), sr)
@@ -49,7 +49,7 @@ def main(src, out, stems=None, semis=SEMIS, voices=VOICES, scale=SCALE, warm_db=
     def finish(v, seed):
         v = sosfiltfilt(butter(2, 7500, 'low', fs=sr, output='sos'), v)
         v = v + sosfiltfilt(butter(2, 500, 'low', fs=sr, output='sos'), v) * (10 ** (warm_db / 20) - 1)      # 近さ: 基音のあたり +2.5 dB
-        v = v + bp(v, 2000, 5000) * (10 ** (2.0 / 20) - 1)                                                   # 言葉のはっきりさ +2 dB
+        v = v + bp(v, 2000, 5000) * (10 ** (pres_db / 20) - 1)                                               # 言葉のはっきりさ +2 dB
         v = v - sosfiltfilt(butter(2, 70, 'low', fs=sr, output='sos'), v) * 0.5                              # 70 Hz 以下のこもりを半分に
         rng = np.random.default_rng(seed); K = int(sr * 2.2); t = np.arange(K) / sr
         ir = rng.standard_normal(K) * np.exp(-t / 0.7); ir = sosfiltfilt(butter(2, 5500, 'low', fs=sr, output='sos'), ir); ir[0] = 0; ir /= np.sqrt((ir ** 2).sum())
