@@ -813,6 +813,24 @@ def sample_clip(path, off, dur, sr=SR, fin=0.03, fout=None):
     y[:fi] *= np.linspace(0, 1, fi); y[-fo:] *= np.linspace(1, 0, fo)
     return y
 
+def sample_clip_faithful(path, off, dur, sr=SR, fin=0.03, fout=None):
+    """録音の抜粋を忠実に: 帯域を削らず (60 Hz〜8 kHz の帯域通過をしない)、ステレオはステレオのまま (モノラルは左右同じ)。
+    音量は録音全体の rms を 0.1 に揃えるだけ、入りと終わりのフェードだけ。返り値は (n, 2)"""
+    key = ('faithful', path)
+    if key not in _SAMPLES:
+        y, fs = sf.read(path, dtype='float32', always_2d=True)
+        if y.shape[1] == 1: y = np.repeat(y, 2, axis=1)
+        elif y.shape[1] > 2: y = y[:, :2]
+        if fs != sr:
+            from scipy.signal import resample_poly
+            y = resample_poly(y, sr, fs, axis=0).astype(np.float32)
+        _SAMPLES[key] = y / (np.sqrt((y ** 2).mean()) + 1e-9) * 0.1
+    y = _SAMPLES[key][int(off * sr):int((off + dur) * sr)].copy()
+    fi, fo = int(min(fin, dur / 3) * sr), int((min(1.5, dur / 4) if fout is None else min(fout, dur / 2)) * sr)
+    if fi > 0: y[:fi] *= np.linspace(0, 1, fi, dtype=np.float32)[:, None]
+    if fo > 0: y[-fo:] *= np.linspace(1, 0, fo, dtype=np.float32)[:, None]
+    return y
+
 def drone_tone(freq, dur, sr=SR):
     a, r = 2.5, 3.0
     nsamp = int((dur + r) * sr)
@@ -1130,6 +1148,11 @@ def main(score='score.json', out='fuga.wav'):
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
         if ex['v'] == 'TB': continue                  # 採譜した録音の音 (表示用・無音)
+        if ex['v'] == 'REC' and ex.get('faithful'):         # 音を忠実に: 移調も帯域制限もせず、ステレオのまま、残響も左右の遅れも足さない
+            y2 = sample_clip_faithful(os.path.join(base_dir, ex['src']), ex['off'], ex['d'], fin=ex.get('fin', 0.03), fout=ex.get('fout')) * (ex.get('gain', 1.0) * 0.707)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y2), N)
+            HL[i0:i1] += y2[:i1 - i0, 0]; HR[i0:i1] += y2[:i1 - i0, 1]
+            continue
         if ex['v'] == 'REC':
             ratio = 2 ** (ex.get('semis', 0) / 12.0)            # 移調はテープのように速さごと変える
             y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d'] * ratio, fin=ex.get('fin', 0.03), fout=ex.get('fout')) * ex.get('gain', 1.0)

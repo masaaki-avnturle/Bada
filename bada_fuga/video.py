@@ -177,7 +177,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         k = y / H
         bd.line([(0, y), (W, y)], fill=tuple(int(th['bg'][i] + (th['bg2'][i] - th['bg'][i]) * k) for i in range(3)))
     bd.rectangle([0, ROLL_Y0 - 6, W, ROLL_Y1 + 6], fill=th['roll'])
-    for m in range(M_LO, M_HI + 1):
+    for m in ([] if (meta.get('rec_lanes') and not d['notes']) else range(M_LO, M_HI + 1)):     # テープだけの段の画面では、音の高さの線は描かない
         y = y_of(m)
         if m % 12 == 0:
             bd.line([(0, y), (W, y)], fill=(40, 46, 66))
@@ -255,7 +255,26 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
                 if b + 1 <= d['nbars']:
                     dr.text((x + 3, ROLL_Y0 - 4), str(b + 1 + BOFF), font=f_small, fill=(70, 76, 98))
         # 録音の実音が流れる区間
-        for e in recs:
+        if meta.get('rec_lanes'):                           # テープごとに段を分け、名前と音量の波形を描く (テープだけの曲: 重なっても読める)
+            nl = max(e.get('lane', 0) for e in recs) + 1; LH = min(100, (ROLL_Y1 - ROLL_Y0 - 50) // nl)
+            for e in recs:
+                x0 = NOW_X + (e['t'] - now) * PPS; x1 = NOW_X + (e['t'] + e['d'] - now) * PPS
+                if x1 < 0 or x0 > W: continue
+                on = e['t'] <= now < e['t'] + e['d']; c = tuple(e.get('color', COL.get('TB', (110, 210, 250))))
+                yt = ROLL_Y0 + 8 + e.get('lane', 0) * LH; yc = yt + 18 + (LH - 24) // 2; hh = (LH - 26) // 2
+                dr.rectangle([max(x0, 0), yt + 16, min(x1, W), yt + LH - 4], fill=dim(c, 0.16 if on else 0.09))
+                env, dt = e.get('env'), e.get('env_dt', 0.05)
+                if env:
+                    ta, tb = max(e['t'], now - back), min(e['t'] + e['d'], now + ahead); ka, kb = int((ta - e['t'] + e.get('off', 0.0)) / dt), int((tb - e['t'] + e.get('off', 0.0)) / dt) + 1
+                    fi_, fo_ = max(e.get('fin') or 0.0, 1e-3), max(e.get('fout') or 0.0, 1e-3); te = e['t'] + e['d']       # 入りと終わりのフェードも波形に映す
+                    up = [(tt, env[k] * min(1.0, max(0.0, (tt - e['t']) / fi_), max(0.0, (te - tt) / fo_))) for k in range(max(ka, 0), min(kb, len(env))) for tt in (e['t'] - e.get('off', 0.0) + k * dt,)]
+                    up = [(NOW_X + (tt - now) * PPS, v) for tt, v in up]
+                    if len(up) > 1:
+                        past = [(x, v) for x, v in up if x <= NOW_X]; fut = [(x, v) for x, v in up if x >= NOW_X - PPS * dt]
+                        for pts, k in ((past, 0.95), (fut, 0.5)):                       # 鳴り終えた所は明るく、これから鳴る所は暗く
+                            if len(pts) > 1: dr.polygon([(x, yc - 1 - v * hh) for x, v in pts] + [(x, yc + 1 + v * hh) for x, v in reversed(pts)], fill=dim(c, k))
+                if e.get('tag'): dr.text((max(x0, 0) + 6, yt), '♪ ' + e['tag'], font=f_small, fill=(230, 240, 250) if on else (150, 160, 170))
+        for e in ([] if meta.get('rec_lanes') else recs):
             x0 = NOW_X + (e['t'] - now) * PPS; x1 = NOW_X + (e['t'] + e['d'] - now) * PPS
             if x1 < 0 or x0 > W: continue
             on = e['t'] <= now < e['t'] + e['d']
