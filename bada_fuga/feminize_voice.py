@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """取り出した歌声 (extract_voice.py) を、大げさにせず女性的な声にし、きれいに整える (WORLD ボコーダー = pyworld)。
   - 抑揚: flatten (既定 1.0 = そのまま、0.5 で中央値からの揺れを半分に)
+  - 息: breath (既定 0 = そのまま、0.5 で 4 kHz 以上の倍音の半分を息に — 後から雑音を足すのではなく、声そのものを息の多い発声に)
   - 音高: f0 を semis 半音上げる (既定 12 = 1 オクターヴ)。声の響き (フォルマント) は formant 倍だけ上げる (既定 1.12、控えめ)
   - 音程の補正: 伸ばした音だけ、音階の最も近い音へ 60% だけ寄せる (揺れや滑らかな移り変わりは残す)
   - 息・雑音: 歌っていない所を柔らかく閉じる (ゲート)。エコー (残響) は足さない
@@ -14,7 +15,7 @@ import numpy as np, soundfile as sf, pyworld as pw
 SR = 44100
 MAJOR = [0, 2, 4, 5, 7, 9, 11]
 
-def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=1.0):
+def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=1.0, breath=0.0):
     x = x.astype(np.float64)
     f0, t = pw.dio(x, sr, f0_floor=60, f0_ceil=900, frame_period=5.0)
     f0 = pw.stonemask(x, f0, t, sr)
@@ -41,7 +42,10 @@ def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=
     nb = sp.shape[1]; fr = np.arange(nb); src = np.clip(fr / formant, 0, nb - 1)
     lo = np.floor(src).astype(int); hi = np.minimum(lo + 1, nb - 1); w = src - lo
     spn = sp[:, lo] * (1 - w) + sp[:, hi] * w
-    y = pw.synthesize(f0n, np.ascontiguousarray(spn), ap, sr, frame_period=5.0)
+    if breath > 0:                                                                  # 息の多い声: 1 kHz から 4 kHz に向けて、倍音を息 (声門の雑音) に置き換える割合を増やす
+        fhz = np.arange(nb) * (sr / 2.0) / (nb - 1)
+        ap = ap + (1.0 - ap) * (breath * np.clip((fhz - 1000.0) / 3000.0, 0.0, 1.0))[None, :]
+    y = pw.synthesize(f0n, np.ascontiguousarray(spn), np.ascontiguousarray(ap), sr, frame_period=5.0)
     # ゲート: 50 ms の RMS が強い所の 8% を下回る所を柔らかく閉じる
     hop = int(0.05 * sr); n = len(y) // hop
     rms = np.array([np.sqrt((y[i * hop:(i + 1) * hop] ** 2).mean()) for i in range(n)])
