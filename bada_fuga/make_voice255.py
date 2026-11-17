@@ -32,12 +32,13 @@ def clean(x, sr):
     x = sosfiltfilt(butter(4, 70, 'high', fs=sr, output='sos'), x); x = sosfiltfilt(butter(6, 5500, 'low', fs=sr, output='sos'), x)
     return x / (np.sqrt((x ** 2).mean()) + 1e-12) * 10 ** (-26.0 / 20)
 
-def main(src, out, stems=None):
+def main(src, out, stems=None, semis=SEMIS, voices=VOICES, scale=SCALE, warm_db=2.5, comp=2.0, rev=0.30, seed=255):
+    """semis 以降は、同じ作り方で別の声を作るときに変える所 (make_voice256.py)。既定は CCLV の声"""
     x, sr = sf.read(src); x = clean((x.mean(axis=1) if x.ndim > 1 else x).astype(np.float64), sr)
     if stems: os.makedirs(stems, exist_ok=True); sf.write(os.path.join(stems, 'clean.wav'), x.astype(np.float32), sr)
     L = R = 0.0; r1 = None
-    for name, harm, formant, breath, lev, pan, lo, hi in VOICES:
-        v = feminize(x, sr, 0, semis=SEMIS, formant=formant, correct=0.8, flatten=1.0, breath=breath, harm=harm or 1.0, whisper=(harm == 0), scale=SCALE, f0_floor=100, f0_ceil=420).astype(np.float64)
+    for name, harm, formant, breath, lev, pan, lo, hi in voices:
+        v = feminize(x, sr, 0, semis=semis, formant=formant, correct=0.8, flatten=1.0, breath=breath, harm=harm or 1.0, whisper=(harm == 0), scale=scale, f0_floor=100, f0_ceil=420).astype(np.float64)
         if harm == 0:                                                                                        # 囁きは先に帯域を決めてから音量を合わせる
             v = sosfiltfilt(butter(2, lo, 'high', fs=sr, output='sos'), v); v = sosfiltfilt(butter(2, hi, 'low', fs=sr, output='sos'), v)
         rms = np.sqrt((v ** 2).mean()); r1 = r1 or rms; v = v / rms * r1 * 10 ** (lev / 20.0)                # 層の音量を基音の声に対して決める
@@ -47,19 +48,19 @@ def main(src, out, stems=None):
     n = len(L); bp = lambda v, lo, hi: sosfiltfilt(butter(2, [lo, hi], 'band', fs=sr, output='sos'), v)
     def finish(v, seed):
         v = sosfiltfilt(butter(2, 7500, 'low', fs=sr, output='sos'), v)
-        v = v + sosfiltfilt(butter(2, 500, 'low', fs=sr, output='sos'), v) * (10 ** (2.5 / 20) - 1)          # 近さ: 基音のあたり +2.5 dB
+        v = v + sosfiltfilt(butter(2, 500, 'low', fs=sr, output='sos'), v) * (10 ** (warm_db / 20) - 1)      # 近さ: 基音のあたり +2.5 dB
         v = v + bp(v, 2000, 5000) * (10 ** (2.0 / 20) - 1)                                                   # 言葉のはっきりさ +2 dB
         v = v - sosfiltfilt(butter(2, 70, 'low', fs=sr, output='sos'), v) * 0.5                              # 70 Hz 以下のこもりを半分に
         rng = np.random.default_rng(seed); K = int(sr * 2.2); t = np.arange(K) / sr
         ir = rng.standard_normal(K) * np.exp(-t / 0.7); ir = sosfiltfilt(butter(2, 5500, 'low', fs=sr, output='sos'), ir); ir[0] = 0; ir /= np.sqrt((ir ** 2).sum())
         return v, ir
-    (L, irL), (R, irR) = finish(L, 255), finish(R, 256)
-    pk = max(np.abs(L).max(), np.abs(R).max()); L, R = (np.tanh(c / pk * 2.0) / 2.0 * pk for c in (L, R))    # 柔らかい圧縮 (近く)
-    y = np.stack([L + fftconvolve(L, irL)[:n] * 0.30, R + fftconvolve(R, irR)[:n] * 0.30], axis=1)           # 光輪の響き 2.2 秒・0.3
+    (L, irL), (R, irR) = finish(L, seed), finish(R, seed + 1)
+    pk = max(np.abs(L).max(), np.abs(R).max()); L, R = (np.tanh(c / pk * comp) / comp * pk for c in (L, R))  # 柔らかい圧縮 (近く)
+    y = np.stack([L + fftconvolve(L, irL)[:n] * rev, R + fftconvolve(R, irR)[:n] * rev], axis=1)             # 光輪の響き 2.2 秒・0.3
     e = np.sqrt((y ** 2).mean(axis=0)); y = y * (np.sqrt(e[0] * e[1]) / e)[None, :]                           # 左右の音量を揃える
     rms = 20 * np.log10(np.sqrt((y ** 2).mean())); z = np.tanh(y * 10 ** ((-24.0 - rms) / 20) * 1.1) / 1.1
     sf.write(out, z.astype(np.float32), sr)
-    print('%.1f 秒、%g 半音上げ、rms %.1f dB、peak %.2f' % (n / sr, SEMIS, 20 * np.log10(np.sqrt((z ** 2).mean())), np.abs(z).max()))
+    print('%.1f 秒、%g 半音上げ、rms %.1f dB、peak %.2f' % (n / sr, semis, 20 * np.log10(np.sqrt((z ** 2).mean())), np.abs(z).max()))
 
 if __name__ == '__main__':
     main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
