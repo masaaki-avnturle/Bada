@@ -8,6 +8,8 @@
   - 音高: f0 を semis 半音上げる (既定 12 = 1 オクターヴ)。声の響き (フォルマント) は formant 倍だけ上げる (既定 1.12、控えめ)
   - 音程の補正: 伸ばした音だけ、音階の最も近い音へ 60% だけ寄せる (揺れや滑らかな移り変わりは残す)。音階は主音の長音階、または scale に音の一覧 (0=C … 11=B; 移調した後の高さで) を渡す
   - 息・雑音: 歌っていない所を柔らかく閉じる (ゲート)。エコー (残響) は足さない
+  - ana: 声の分析 (f0, 響きの形 sp, 非周期成分 ap; 5 ms ごと) を外で済ませて渡す (同じ声から倍音の声をいくつも作るとき、分析に手を入れたいとき — make_voice265.py)
+  - gate: 歌っていない所を閉じる高さ (既定 0.08 = 強い所の 8%)。静かに話す所のある声は下げる
   使い方: python feminize_voice.py <voice.json> <出力フォルダ> <音階の主音 (0=C … 9=A)> [semis] [formant] -- <録音 id ...>
   出力: <出力フォルダ>/<id>_fem.wav と <出力フォルダ>/voice.json (extract_voice.py と同じ形 → voice_bank.py にそのまま渡せる)
 """
@@ -17,11 +19,13 @@ import numpy as np, soundfile as sf, pyworld as pw
 SR = 44100
 MAJOR = [0, 2, 4, 5, 7, 9, 11]
 
-def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=1.0, breath=0.0, harm=1.0, whisper=False, scale=None, f0_floor=60, f0_ceil=900):
+def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=1.0, breath=0.0, harm=1.0, whisper=False, scale=None, f0_floor=60, f0_ceil=900, ana=None, gate=0.08):
     x = x.astype(np.float64)
-    f0, t = pw.dio(x, sr, f0_floor=f0_floor, f0_ceil=f0_ceil, frame_period=5.0)        # 声の音域が分かっているときは f0_floor / f0_ceil を狭めると、息や伴奏の残りを声の高さと読み違えない
-    f0 = pw.stonemask(x, f0, t, sr)
-    sp = pw.cheaptrick(x, f0, t, sr); ap = pw.d4c(x, f0, t, sr)
+    if ana is not None: f0, sp, ap = ana                                             # 分析は外で済んでいる
+    else:
+        f0, t = pw.dio(x, sr, f0_floor=f0_floor, f0_ceil=f0_ceil, frame_period=5.0)    # 声の音域が分かっているときは f0_floor / f0_ceil を狭めると、息や伴奏の残りを声の高さと読み違えない
+        f0 = pw.stonemask(x, f0, t, sr)
+        sp = pw.cheaptrick(x, f0, t, sr); ap = pw.d4c(x, f0, t, sr)
     v = f0 > 0
     m = np.where(v, 69 + 12 * np.log2(np.maximum(f0, 1) / 440.0), 0)
     if flatten != 1.0 and v.any():                                                  # 抑揚を抑える: 中央値からの揺れを flatten 倍に (0.5 で半分)
@@ -51,10 +55,10 @@ def feminize(x, sr, tonic_major, semis=12.0, formant=1.12, correct=0.6, flatten=
         fhz = np.arange(nb) * (sr / 2.0) / (nb - 1)
         ap = ap + (1.0 - ap) * (breath * np.clip((fhz - 1000.0) / 3000.0, 0.0, 1.0))[None, :]
     y = pw.synthesize(f0n, np.ascontiguousarray(spn), np.ascontiguousarray(ap), sr, frame_period=5.0)
-    # ゲート: 50 ms の RMS が強い所の 8% を下回る所を柔らかく閉じる
+    # ゲート: 50 ms の RMS が強い所の 8% (gate) を下回る所を柔らかく閉じる
     hop = int(0.05 * sr); n = len(y) // hop
     rms = np.array([np.sqrt((y[i * hop:(i + 1) * hop] ** 2).mean()) for i in range(n)])
-    g = (rms > 0.08 * np.percentile(rms, 97)).astype(float)
+    g = (rms > gate * np.percentile(rms, 97)).astype(float)
     g = np.convolve(g, np.ones(5) / 5, mode='same')
     gain = np.interp(np.arange(len(y)), (np.arange(n) + 0.5) * hop, g)
     return (y * gain).astype(np.float32)
