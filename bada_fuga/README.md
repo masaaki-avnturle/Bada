@@ -4949,6 +4949,37 @@ CCLII の入りを、tablet219 (CCXIX) と同じ間合いに作り換えた版�
 python3 compose_tablet253.py src chords251.json score_tablet253.json && python3 synth.py score_tablet253.json tablet253.wav && python3 video.py score_tablet253.json tablet253.wav tablet253.mp4
 ```
 
+## 🌙💋🌀 Requiem BADA — Tablet Sessions CCLIV · Lamento ipnotico, più sensuale (CCLIII を、もう少しドエロの声に仕上げて, ヘ長調 / ニ短調, ♩=60, 9 分 7 秒)
+
+曲は CCLIII のまま (tablet219 と同じ入りの間合い、トラック 18 の洗脳的な入り、その後の重ね方、135 小節)。声だけを、もう少しドエロに作り直した (`make_voice254.py`、元の 11/12 14:49 の録音から)
+
+| | CCLI〜CCLIII の声 | CCLIV の声 (もう少しドエロ) |
+|---|---|---|
+| 基音 | A3 = 220 Hz | 半音低い **G♯3 = 208 Hz** (測った中央値 207 Hz、10〜90% が 177〜244 Hz) |
+| フォルマント (基音 / 第 2 / 第 3 倍音) | 1.15 / 1.21 / 1.27 倍 | 1.12 / 1.18 / 1.24 倍 (少し大人の響き) |
+| 息 (基音 / 第 2 / 第 3 倍音) | 0.45 / 0.30 / 0.25 | **0.55 / 0.40 / 0.30** |
+| 上の 2 声の音量 | −5 / −11 dB | −6 / −12 dB (可愛い声を少し引く) |
+| 囁き | なし | **同じ言葉の囁きを 13 dB 下で重ねる** |
+| 250 Hz 以下 (耳元の近さ) | +2 dB | **+3.5 dB** |
+| 柔らかい圧縮 | tanh ×1.8 | tanh ×2.1 (もっと近く) |
+| 5〜9 kHz の明るさ | +1.5 dB | なし (暗めで暖かく) |
+| 抑揚 | 1.0 倍 | 0.95 倍 |
+| 残響 | 1.6 秒・0.22 | 同じ (増やさない) |
+
+- **囁き** — `feminize_voice.py` に `whisper` を足した: 同じ言葉を、声帯を鳴らさずに合成する (WORLD の無声の合成 — 声の響きの形を息の音で鳴らす)。雑音を別に足すのではなく、言葉と同じ形で動く囁きなので、ぼやけない。900 Hz 以下と 6.5 kHz 以上を落として中央に
+- 3 声はこれまで通り同じ抑揚から作り (`harm`)、どの瞬間も 1 : 2 : 3。時間もずらさない
+- 測ったスペクトル (全体に対する帯域の割合): 250 Hz 以下 −2.8 dB (前の声 −4.1)、4〜6 kHz −20.6 (−21.3)、6〜8 kHz −20.0 (−21.2; 息のぶん増える)、8〜10 kHz −22.9 (−21.6)。重心 576 Hz (597 Hz) — 低い所が厚く、息が多く、いちばん上は静か。rms −24.1 dB、波形の山は 0.56 (0.62) に下がった
+- 声だけの音声も 1 ファイル (mp3 192 kbps、2 分 58 秒)
+- 曲の中の音量の倍率は CCLIII と同じ (声 1.05)。声と伴奏の比も変わらない: 1 回目は初めの 40 秒が +10.8 / +5.5 dB、その後 −1.5〜+3.0 dB (1〜4 kHz では −5.5〜+2.3 dB)、2 回目は −1.5〜+3.1 dB (1〜4 kHz では −5.3〜+1.5 dB)
+- 測った音量 (段落ごとの平均、4 秒窓の幅): I −19.7 (初めの無音〜−17.1) / II −15.5 (−18.6〜−12.8) / III −14.6 (−20.3〜−11.9) / IV −16.1 (−18.7〜−12.6) / V −18.2 dB。全体 mean −16.1 dB、max −0.4 dB (volumedetect)。声の波形の山が下がったぶん、曲全体が CCLIII より 1 dB 大きい。mp4 は 9 分 7 秒、28.5 MiB (映像 310 kbps、音声 AAC 128 kbps)
+- `compose_tablet254.py` (compose_tablet253 から; 声と題だけが違う)
+
+```bash
+python3 make_voice254.py voice_in.wav src/20261112_144938.wav
+python3 analyze_chords.py chords254.json src/20261107_180000.wav src/20261107_080000.wav src/20261112_144938.wav
+python3 compose_tablet254.py src chords254.json score_tablet254.json && python3 synth.py score_tablet254.json tablet254.wav && python3 video.py score_tablet254.json tablet254.wav tablet254.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

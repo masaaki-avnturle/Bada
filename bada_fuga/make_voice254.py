@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""倍音の 3 声の月読様の声を、もう少しドエロに (CCLIV の声)。make_voice251.py (CCLI の声) から変えた所:
+    基音      A3 = 220 Hz → 半音低い G♯3 = 207.65 Hz を中心に (第 2 倍音 G♯4、第 3 倍音 D♯5 付近)。フォルマントは 1.15 → 1.12 倍 (少し大人の響き)、
+              息 0.45 → 0.55 (4 kHz 以上の倍音の半分強を息に)、抑揚 1.0 → 0.95 倍
+    第 2 倍音  フォルマント 1.21 → 1.18 倍、息 0.30 → 0.40、−5 → −6 dB (可愛い声を少し引く)
+    第 3 倍音  フォルマント 1.27 → 1.24 倍、息 0.25 → 0.30、−11 → −12 dB
+    囁き      新しく足す 4 つ目の層: 同じ言葉を声帯を鳴らさずに囁いたもの (feminize の whisper — 声の響きの形を息の音で鳴らす。雑音を別に足すのではない)。
+              900 Hz 以下と 6.5 kHz 以上を落とし、基音の声より 13 dB 下で、中央に。言葉と同じ形で動くので、ぼやけない
+    仕上げ    250 Hz 以下 +2 → +3.5 dB (耳元の近さ、基音が前に)、柔らかい圧縮 tanh ×1.8 → ×2.1 (もっと近く)。残響は増やさない (1.6 秒・0.22)。
+              息と囁きで 6〜8 kHz が増えるので、5〜9 kHz の +1.5 dB (可愛い明るさ) はやめる — 暗めで暖かい声に
+  3 声はこれまで通り同じ抑揚・同じ音程の補正から作る (feminize の harm) ので、どの瞬間も 1 : 2 : 3。時間もずらさない。ステレオ、rms −24 dB。
+  使い方: python make_voice254.py <声の録音.wav (モノラル)> <出力.wav> [層を別々に書き出すフォルダ]
+"""
+import sys, os
+import numpy as np, soundfile as sf, librosa
+from scipy.signal import butter, sosfiltfilt, fftconvolve
+from feminize_voice import feminize
+
+# (名前, 倍音 (0 = 囁き), フォルマント, 息, 音量 dB, 左右 −1〜+1, ここから下を落とす Hz, ここから上を落とす Hz)
+VOICES = [('harm1', 1.0, 1.12, 0.55, 0.0, 0.0, None, None), ('harm2', 2.0, 1.18, 0.40, -6.0, -0.3, None, 7000.0),
+          ('harm3', 3.0, 1.24, 0.30, -12.0, 0.3, None, 6000.0), ('whisper', 0.0, 1.12, 0.0, -13.0, 0.0, 900.0, 6500.0)]
+
+def main(src, out, stems=None, target=207.65, flatten=0.95, tonic_major=5):
+    x, sr = sf.read(src); x = (x.mean(axis=1) if x.ndim > 1 else x).astype(np.float64)
+    y0 = librosa.resample(x, orig_sr=sr, target_sr=22050)
+    f0, _, _ = librosa.pyin(y0, fmin=60, fmax=500, sr=22050, frame_length=2048); med0 = float(np.median(f0[~np.isnan(f0)]))
+    semis = 12 * np.log2(target / med0)
+    L = R = 0.0; r1 = None
+    for name, harm, formant, breath, lev, pan, lo, hi in VOICES:
+        v = feminize(x, sr, tonic_major, semis=semis, formant=formant, correct=0.9, flatten=flatten, breath=breath, harm=harm or 1.0, whisper=(harm == 0)).astype(np.float64)
+        if harm == 0:                                                                                        # 囁きは先に帯域を決めてから音量を合わせる (声帯の鳴る低い所は囁きには無い)
+            v = sosfiltfilt(butter(2, lo, 'high', fs=sr, output='sos'), v); v = sosfiltfilt(butter(2, hi, 'low', fs=sr, output='sos'), v)
+        rms = np.sqrt((v ** 2).mean()); r1 = r1 or rms; v = v / rms * r1 * 10 ** (lev / 20.0)                # 層の音量を基音の声に対して決める
+        if harm and hi: v = sosfiltfilt(butter(2, hi, 'low', fs=sr, output='sos'), v)
+        if stems: os.makedirs(stems, exist_ok=True); sf.write(os.path.join(stems, name + '.wav'), v.astype(np.float32), sr)
+        a = (pan + 1.0) * np.pi / 4.0; L = L + v * np.cos(a); R = R + v * np.sin(a)
+    n = len(L); bp = lambda v, lo, hi: sosfiltfilt(butter(2, [lo, hi], 'band', fs=sr, output='sos'), v)
+    def finish(v, seed):
+        v = sosfiltfilt(butter(2, 9500, 'low', fs=sr, output='sos'), v)
+        v = v + sosfiltfilt(butter(2, 250, 'low', fs=sr, output='sos'), v) * (10 ** (3.5 / 20) - 1)          # 耳元の近さ +3.5 dB
+        v = v + bp(v, 2000, 5000) * (10 ** (2.0 / 20) - 1)                                                   # 言葉のはっきりさ +2 dB
+        v = v - sosfiltfilt(butter(2, 70, 'low', fs=sr, output='sos'), v) * 0.5                              # 70 Hz 以下のこもりを半分に
+        rng = np.random.default_rng(seed); K = int(sr * 1.6); t = np.arange(K) / sr
+        ir = rng.standard_normal(K) * np.exp(-t / 0.5); ir = sosfiltfilt(butter(2, 5500, 'low', fs=sr, output='sos'), ir); ir[0] = 0; ir /= np.sqrt((ir ** 2).sum())
+        return v, ir
+    (L, irL), (R, irR) = finish(L, 251), finish(R, 252)
+    pk = max(np.abs(L).max(), np.abs(R).max()); L, R = (np.tanh(c / pk * 2.1) / 2.1 * pk for c in (L, R))    # 柔らかい圧縮 (もっと近く)
+    y = np.stack([L + fftconvolve(L, irL)[:n] * 0.22, R + fftconvolve(R, irR)[:n] * 0.22], axis=1)           # 控えめな残響 1.6 秒・0.22
+    e = np.sqrt((y ** 2).mean(axis=0)); y = y * (np.sqrt(e[0] * e[1]) / e)[None, :]                           # 左右の音量を揃える
+    rms = 20 * np.log10(np.sqrt((y ** 2).mean())); z = np.tanh(y * 10 ** ((-24.0 - rms) / 20) * 1.1) / 1.1
+    sf.write(out, z.astype(np.float32), sr)
+    print('基音 %.1f Hz → %.2f 半音上げ、%.1f 秒、rms %.1f dB、peak %.2f' % (med0, semis, n / sr, 20 * np.log10(np.sqrt((z ** 2).mean())), np.abs(z).max()))
+
+if __name__ == '__main__':
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
