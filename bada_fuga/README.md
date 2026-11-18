@@ -5463,6 +5463,32 @@ python3 analyze_chords.py chords270.json src/20261107_086000.wav src/20261107_08
 python3 compose_tablet270.py src chords270.json score_tablet270.json && python3 synth.py score_tablet270.json tablet270.wav && python3 video.py score_tablet270.json tablet270.wav tablet270.mp4
 ```
 
+## 🌙🌸⛪ Requiem BADA — Tablet Sessions CCLXXI · Tsukuyomi, il Fiore e il Requiem (tablet270 の音声を、ホッと一安心できる月読様の 3 声の倍音の、17 歳の女性の声に作り換えて, ニ短調 → ニ長調, ♩=60, 9 分 39 秒)
+
+CCLXX の声だけを替える。tablet86 (2 半音下げてニ短調に)・tablet89 (そのまま) の使い方と並べ方は CCLXX のまま。楽器は何も加えない。143 小節
+
+**声**: `make_voice266.py` の声 — 11/12 14:49 の録音 (男声、基音の中央値 112 Hz) を、月読様の 3 声の倍音 (基音・ちょうど 2 倍 −8 dB・ちょうど 3 倍 −14 dB; どの瞬間も 1 : 2 : 3) の、17 歳のホッとする女性の声に。基音は B♭3 = 233 Hz を中心に、フォルマント 1.19 倍、息はほんの少し、柔らかい圧縮、暖かい残響をごく控えめに。tablet266 (CCLXVI) と同じ声で、伸ばした音はヘ長調 (= ニ短調、この曲の調) の音階に調律してある
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I. 月読様の 17 歳の声と Fiore dolce | 0〜45 | 2 小節 (8 秒) から声、4 小節から tablet86。声は 2 分 57 秒まで |
+| II. Fiore dolce の終わりと Requiem | 45〜69 | 3 分から tablet89 の Requiem。tablet86 は 4 分 46 秒で消える |
+| III. フーガ I | 69〜85 | tablet89 のフーガ |
+| IV. 声 (2 回目) と 2 つ目の Requiem | 85〜109 | 5 分 40 秒から声をもう一度 |
+| V. フーガ II | 109〜125 | 声の後半はフーガに溶けていく。声は 8 分 29 秒まで |
+| VI. ストレッタ、Amen | 125〜143 | ストレッタから Amen (ニ長調) |
+
+- **声の音量を CCLXX より下げる**: この声は言葉の帯域 (1〜4 kHz) がピアノよりずっと強い。CCLXX と同じ倍率 (1.0) だと、声と伴奏の比は全体で −0.5〜+2.6 dB なのに 1〜4 kHz では +3.0〜+10.4 dB になった。ホッとできるように、声を 0.85 (2 回目は 1.2 倍の 1.02) に下げてピアノとなじませる
+- 声と伴奏の比 (20 秒ごと): 1 回目は tablet86 が現れる間 +9.8 dB、その後 −1.8〜+1.2 dB (1〜4 kHz では +1.6〜+9.1 dB)、2 回目 −2.4〜+0.1 dB (1〜4 kHz では +1.8〜+8.2 dB)。全体の比が 0 dB を少し下回っても、言葉の帯域では声が前に出る
+- 測った音量 (段落ごとの平均、4 秒窓の幅): I −17.4 (−24.3〜−14.1) / II −15.5 (−19.3〜−12.9) / III −17.4 (−21.5〜−15.3) / IV −15.2 (−20.1〜−12.3) / V −15.4 (−18.3〜−13.3) / VI −16.2 dB (Amen で消える)。全体 mean −16.3 dB、max −0.3 dB (volumedetect)。声が入ってからは音は途切れない。mp4 は 9 分 39 秒、28.6 MiB (映像 290 kbps、音声 AAC 128 kbps)
+- `compose_tablet271.py` (compose_tablet270 から; 声と、声の音量、題が違う)
+
+```bash
+python3 make_voice266.py 20261112_144938.wav src/20261112_144938.wav
+python3 analyze_chords.py chords271.json src/20261107_086000.wav src/20261107_089000.wav src/20261112_144938.wav
+python3 compose_tablet271.py src chords271.json score_tablet271.json && python3 synth.py score_tablet271.json tablet271.wav && python3 video.py score_tablet271.json tablet271.wav tablet271.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
