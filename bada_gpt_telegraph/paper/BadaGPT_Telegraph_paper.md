@@ -91,18 +91,19 @@ GPT::paper                   # 論文
 
 | ファイル | 行数 | 役割 |
 |---|---|---|
-| `src/engine.js` | 435 | ZIP / PDF / Markdown、Bada インタプリタ、Ξ、Jones、モールス、FSK |
+| `src/engine.js` | 442 | ZIP / PDF / Markdown、Bada インタプリタ、Ξ、Jones、モールス、FSK |
 | `src/comprehend.js` | 320 | 全体把握 (節分割・対応付け・網羅率) |
-| `src/silent.js` | 471 | サイレント・トーク (ジェスチャー / 非言語アトム・トランスフォーマー・latent → 文章 / 画像 / Bada) |
+| `src/phasecore.js` | 148 | 位相核 (文献の検証できる数理: エントロピー位相融合・大域的部分積分・N(T)・ナッシュ・シャノン位相・標識表・文献一覧) |
+| `src/silent.js` | 507 | サイレント・トーク (ジェスチャー / 非言語アトム・トランスフォーマー・latent → 文章 / 画像 / Bada・チャネルの位相融合) |
 | `src/generate.js` | 779 | 14 種の実行時部品、HTML 組み立て、検証 |
-| `src/telephacy.js` | 194 | Ω-Telephacy (無音の口形認識・辞書・共鳴 7 帯・Jones 熱経路・イメージ入力・チャット) |
+| `src/telephacy.js` | 200 | Ω-Telephacy (無音の口形認識・辞書・共鳴 7 帯・Jones 熱経路・イメージ入力・チャット) |
 | `src/bio.js` | 124 | 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ) |
 | `src/bci.js` | 213 | 思考だけで (脳波 BCI: 集中度 / SSVEP・Muse / OpenBCI 復号・スキャン選択) |
 | `src/codegen.js` | 281 | ソースコード化 (仕様 → Python / Node / Bada の動くソース) |
 | `src/autobuild.js` | 254 | 自動コンパイル (一式を GitHub へ 1 コミット → Actions が exe/apk をビルド → 監視) |
-| `src/paper.js` | 435 | 論文の自動執筆、ビルド一式、Claude (任意) |
-| `src/ui.js` | 979 | 画面 |
-| `tools/engine-test.js` | 488 | 単体テスト 209 件 |
+| `src/paper.js` | 449 | 論文の自動執筆、ビルド一式、Claude (任意) |
+| `src/ui.js` | 1005 | 画面 |
+| `tools/engine-test.js` | 535 | 単体テスト 234 件 |
 | `tools/evaluate.js` | 114 | 第 7 章の評価の再現 |
 
 `tools/build.js` がこれらを 1 枚の `index.html` に埋め込み、同じファイルを Cordova (Android) と Electron (Windows / Linux) に同梱する。
@@ -239,13 +240,25 @@ latent からは四つを決定的に復号する: (a) **本と同じ分量ま�
 
 検証は Python 版の試験と同じ観点で行った: 合成した口形フレームで各 viseme が自分自身に分類されること、辞書の全語 (27 語) が合成フレーム列から往復して復号されること、縮約と区切り、辞書にない列の扱い、適応しきい値の範囲、較正の正規化、共鳴帯の正規化、熱経路の n の範囲、イメージ入力の対応、チャットの意図振り分け。**限界と正直な範囲.** 認識できるのは辞書にある口形語であり、自由な読唇や思考の読み取りではない。実際のカメラでは照明・顔の位置・ひげや化粧の影響を受けるため、較正と枠内への位置合わせが必要である。熱 (温度) は測らない。利用者本人の顔を本人の同意の上で映す。
 
+## 6.11 拡張：文献による根拠付け — 山口フレームワークから「検証できる数理」を取り込む
+
+利用者が提出した 17 本の文献 ([9]–[25]、`paper/references/` に同梱) を読み、計算で確かめられるものだけを `src/phasecore.js` に実装した。文献集 [9] が各式に付けている標識 (証明済 / 検証済 / 古典 / 未検証 / 予想) をアプリ内の標識表 (⓪-γ 位相核) にそのまま掲げ、未検証の式は可視化にとどめる。
+
+**(1) エントロピー位相融合.** [11] 定義 1 と [22] 定義 5 は、基底分布 a に補助モジュール m を位相でのみ結合する: ψ_i = √a_i · exp(iΣ_m β_m H_m φ_{m,i}), q̂_i = |ψ_i|²/Σ_j|ψ_j|²。根拠は初等的な原理 1「非零因子の乗算だけが零点を保存する」であり、命題 1 (i) a_i = 0 はどのモジュールでも復活しない、(ii) 一様な位相は正規化で洗い流される、が従う。BadaGPT では、主チャネル (描いた動き・無言のグリフ・口形語・脳波で選んだ語) がアトム語彙 (33 語) 上の分布 a を作り、補助チャネル (体のサイン・画像) は位相 φ_{m,i} (提案したアトム +π/2、同じ調子カテゴリの他のアトム −π/2、それ以外 0 = 語らない) と、未知事前 ([22] 定義 4、最大エントロピーの床) を証拠で尖らせた分布 q^(m) のエントロピー H_m を与える。6.7 節では「体のサインはアプリの中身を決めない」を規則として置いたが、位相融合ではこれが数学的性質になる。補助チャネルの情報は位相 θ_i = Σ_m β_m H_m φ_{m,i} に残り、θ_i が正で最大の調子アトムを 1 つだけ添える形で読み出す (調子アトムは文章の調子・配色にのみ効く)。単体テストで、q̂ と a の最大偏差 0 (機械精度)、a_i = 0 の保存、調子の読み出し、2 つの補助チャネルの合成、依頼文のモジュール・対象が変わらないことを確かめた。
+
+**(2) 大域的部分積分.** [10] 定理 6・系 2 は、生成関数 f = log x (ポテンシャル L = x log x − x のルジャンドル双対、定理 7) のもとで ∫_1^x log t dt + ∫_1^x t d(log t) = x log x を与える。Ω-Telephacy の熱エネルギー経路 (6.10 節) は、口形特徴 feat から x = 1 + 9·feat を取り、この分解の積分側・微分側・和 (エントロピー項 x log x) を各語の読み取りに表示する。シンプソン法で残差が 10⁻⁹ 以下であること、f = ∇L・g = 1/x を数値微分で確かめた。
+
+**(3) 零点計数と位相因子.** [9] 定理 I-10 の N(T) = x log x − x + 7/8 + S(T) (x = T/2π、Riemann–von Mangoldt、古典) を実装し、N(100) = 29、N(1000) = 649 を再現する。文献集はこれだけが「ζ は x log x である」の内容を持つ読みだと述べる。[12] の素数ゲーム q_k(σ) = p_k^{−σ}/Z(σ) のエントロピー H(σ) と位相因子 e^{iβH(σ)} (|·| = 1、σ について H は単調減少) も実装し、熱経路の位相として表示する。
+
+**標識表と、取り込まなかったもの.** 旧 Telegraph の Ξ = β(H+1, M+1)/log(N+2) と π(χ,x) = ∬(x log x)^{−2} dx_m = ½i ([14]) は文献集 [9] が「未検証・定義がない」と判定しているため、標識「未検証」を付けて思考実験の可視化のままとした。グラビトン↔電磁波変換も同じ扱いである。リーマン予想・深リーマン予想・統一場 ([9][17]) は文献自身が「予想・研究計画」としており、本システムは何も主張しない。[11][22] が明記する通り「ζ(s) = x log x」「x^{1/2+iy} = e^{x log x}」は恒等式として偽であり、本システムもそれらを用いない。Bada 言語の処理系の文献 ([21][23]–[25]) は参照にとどめ、本システムの Bada インタプリタは従来どおり `engine.js` のものである。
+
 ---
 
 ## 7. 評価
 
 ### 7.1 単体テスト
 
-`tools/engine-test.js` の 209 件 (Ω-Telephacy の口形認識と辞書往復、脳波 BCI の集中度・SSVEP・機器復号・スキャン選択、自動コンパイルの偽 GitHub API 検証、体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
+`tools/engine-test.js` の 234 件 (位相核の大域的部分積分・N(T)・単位位相・位相融合の零保存と調子の読み出し・標識表・文献 17 本、Ω-Telephacy の口形認識と辞書往復、脳波 BCI の集中度・SSVEP・機器復号・スキャン選択、自動コンパイルの偽 GitHub API 検証、体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
 
 ### 7.2 開発用の依頼集合 (24 件)
 
@@ -307,6 +320,8 @@ latent からは四つを決定的に復号する: (a) **本と同じ分量ま�
 
 **思考入力.** 本システムは文章・音声・電信で与えた依頼文を扱い、脳の信号は読み取らない。
 
+**文献の標識.** 山口フレームワークの文献から取り込んだのは、証明済・古典・検証済の標識を持つ数理 (位相による零の保存、大域的部分積分、N(T)、素数ゲームのエントロピー) だけである。未検証の式は可視化にとどめ、予想は主張しない。位相融合は「補助チャネルは内容を変えない」という設計上の約束を、規則ではなく数学的性質として与えた点で、本システムの正直な範囲を支えている。
+
 ---
 
 ## 9. 結論
@@ -329,6 +344,23 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 6. C. E. Shannon. A Mathematical Theory of Communication. *Bell System Technical Journal* 27 (1948) 379–423, 623–656.
 7. G. Goertzel. An Algorithm for the Evaluation of Finite Trigonometric Series. *American Mathematical Monthly* 65 (1958) 34–35.
 8. O. C. Z. Gotel, A. C. W. Finkelstein. An Analysis of the Requirements Traceability Problem. *Proc. IEEE ICRE* (1994) 94–101.
+9. 山口 正明 (Yamaguchi Framework). 山口フレームワーク論文集: リーマン予想・深リーマン予想・量子力学・一般相対性理論の統一場 (エントロピー交換子版). 2026-09. `paper/references/01_yamaguchi_framework_collection_unified_field.pdf`.
+10. 山口 正明. 微分・積分の計算体系に関する定理の構成 —「大域的偏微分と大域的多重積分、大域的部分積についてのレポート」の定理化. 2026-11. `paper/references/02_global_partial_integration_calculus_theorems.pdf`.
+11. M. Yamaguchi. An Entropy–Phase Mechanism for Generative AI. 2026-06. `paper/references/03_entropy_phase_generative_ai.pdf`.
+12. 山口 正明. ナッシュ・シャノン公式に基づくゼータ関数と本物のゼータの相関. 2026-06. `paper/references/04_nash_shannon_zeta.pdf`.
+13. M. Yamaguchi. Reviser-Extensible Grammars: A Q#-Targeted Quantum Front End for the Unknown-Prior Engine (Bada). 2026. `paper/references/05_bada_quantum_reviser.pdf`.
+14. M. Yamaguchi. Euler product estrade from Heisenberg Non-commutative with deprivate equation (caostics). `paper/references/06_caostics_euler_product_heisenberg.pdf`.
+15. M. Yamaguchi. Entropy, the Zeta Function, and Generative AI — three genuinely related ideas, and what the relationship actually is. `paper/references/07_entropy_zeta_ai.pdf`.
+16. 山口 正明. ベータ関数とゼータ関数の構造的対応 — 関数等式・自明な零点・臨界線 Re s = 1/2 に関する証明可能な部分と予想の分離. 2026-07. `paper/references/08_beta_zeta.pdf`.
+17. M. Yamaguchi. Proof of the Deep Riemann Hypothesis via the Global Differential Manifold and the √2 Phenomenon as an Entropy-Saddle Identity. 2026-05. `paper/references/09_deep_riemann.pdf`.
+18. 山口 正明. ガウスの曲面論の量子化 — 空間概念の量子化としての重力の量子化について. 2026-09. `paper/references/10_gauss_surface_quantization.pdf`.
+19. 山口 正明. HΨ = ⊕(iħ∇)^⊕L の同定と、球面族への拡張. 2026-09. `paper/references/11_hpsi_multiplicity_sphere_family.pdf`.
+20. M. Yamaguchi. The Inter-Dimensional Port Directory of the Universe: A TupleSpace Address Book of the Other Dimension via the Zeta Function. 2026-05. `paper/references/12_inter_dimensional_port_directory.pdf`.
+21. M. Yamaguchi. The Unknown-Prior Engine: Full Source — a complete generative-AI specification in Bada notation. 2026-06. `paper/references/13_bada_engine_full_source.pdf`.
+22. M. Yamaguchi. The Unknown-Prior Engine: A formal calculus for Bada. 2026-06. `paper/references/14_bada_unknown_prior_engine.pdf`.
+23. 山口 正明. Bada 拡張実装 — コンパイラ／インタープリタ・リバイザ・Bada製ライブラリ. `paper/references/15_bada_extended_sources.pdf`.
+24. M. Yamaguchi. Bada: A self-describing language for the Unknown-Prior Engine (Self-Hosting Project). `paper/references/16_bada_self_hosting_project.pdf`.
+25. M. Yamaguchi. Bada — The Unknown-Prior Engine Language (full source). `paper/references/17_bada_source.pdf`.
 
 ---
 
@@ -336,7 +368,7 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 209 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 234 件
 node bada_gpt_telegraph/tools/evaluate.js           # 7.2 開発用の依頼集合
 node bada_gpt_telegraph/tools/evaluate.js --heldout # 7.3 未見の依頼集合
 ```

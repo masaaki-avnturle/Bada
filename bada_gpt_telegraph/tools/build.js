@@ -12,8 +12,8 @@ const path = require("path");
 const root = path.join(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 
-/* engine → comprehend → generate → paper の順に連結 (後のファイルが前の関数を使う) */
-const ENGINE_FILES = ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/telephacy.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"];
+/* engine → phasecore → comprehend → … → paper の順に連結 (後のファイルが前の関数を使う) */
+const ENGINE_FILES = ["src/engine.js", "src/phasecore.js", "src/comprehend.js", "src/silent.js", "src/telephacy.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"];
 const engine = ENGINE_FILES.map(read).join("\n");
 const ui = read("src/ui.js");
 for (const [name, src] of [["engine", engine], ["ui.js", ui]]) {

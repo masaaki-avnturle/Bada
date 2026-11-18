@@ -140,11 +140,17 @@ function synthUtterance(word, hold) {
 function synthStream(words, hold) { var out = []; words.forEach(function (w) { out = out.concat(synthUtterance(w, hold)); }); return out; }
 
 /* ───────────── Γ多様体 × Jones の「熱エネルギー経路」(可視化・重み) ───────────── */
-/* feat ∈ [0,1] → (2,n) トーラス結び目 n = 3 + 2·round(7·feat)、|V(e^{2πi/5})| を 0..1 に */
+/* feat ∈ [0,1] → (2,n) トーラス結び目 n = 3 + 2·round(7·feat)、|V(e^{2πi/5})| を 0..1 に。
+ * 経路の「エネルギー」は文献 02 (大域的部分積分・系 2) の分解で表す:
+ *   x = 1 + 9·feat,  ∫_1^x log t dt (積分側) + ∫_1^x t d(log t) (微分側) = x log x (エントロピー項)
+ * 位相は文献 04 の e^{iβH(σ)} (σ = 1/2 + feat、|·| = 1) で、零点を保存する唯一の結合 (文献 03 原理 1)。
+ * これらは可視化と重みであり、温度の測定ではない。 */
 function thermalPath(feat) {
-  var n = 3 + 2 * Math.round(Math.max(0, Math.min(1, feat)) * 7);
+  feat = Math.max(0, Math.min(1, isFinite(feat) ? feat : 0));
+  var n = 3 + 2 * Math.round(feat * 7);
   var v = Jones.Vabs(n, 2 * Math.PI / 5);
-  return { n: n, abs: v, score: Math.min(1, v / 3) };
+  var x = 1 + 9 * feat, pi = partialIntegration(x), ph = nsPhase(0.5 + feat, 1);
+  return { n: n, abs: v, score: Math.min(1, v / 3), x: x, integralSide: pi.integralSide, differentialSide: pi.differentialSide, xlogx: pi.xlogx, residual: pi.residual, phase: ph };
 }
 
 /* ───────────── 疑似サーモ (Ω-Thermal Trace のカラーマップ・実温度ではない) ───────────── */

@@ -566,10 +566,14 @@
     else if (tok.visemes) tpStat("辞書にない口形の列: " + tok.visemes + " (辞書を見て発音してください)");
   }
   function tpSendToChat() {
-    var atoms = tpAtoms(); if (!atoms.length) { tpStat("語がまだありません"); return; }
-    var proc = silentProcess(atoms, volOpt());
+    /* 主チャネル (内容) = 口形で発音した語。補助チャネル (位相 = 調子) = 画像・体のサイン */
+    var main = tp.words.filter(function (w) { return w.atom && w.visemes !== "img"; }).map(function (w) { return w.atom; });
+    var imgIds = tp.words.filter(function (w) { return w.atom && w.visemes === "img"; }).map(function (w) { return w.atom; });
+    if (!main.length && !imgIds.length) { tpStat("語がまだありません"); return; }
+    var mods = []; if (imgIds.length) mods.push({ name: "画像", ids: imgIds }); if (bioAtoms.length) mods.push({ name: "体のサイン", ids: bioAtoms });
+    var fz = channelFuse(main, mods), proc = silentProcess(fz.ids, volOpt()); proc.fuse = fz;
     lastSilent = { seq: proc.seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags,
-      readout: tp.words.map(function (w) { var th = thermalPath(w.feat ? Math.min(1, w.feat.aperture + w.feat.spread) : 0.5); return { label: "口形 " + w.visemes, value: w.bandName + " / T(2," + th.n + ")", meant: (w.label || "") + " (熱経路 " + th.score.toFixed(2) + ")" }; }), features: null };
+      readout: tp.words.map(function (w) { var th = thermalPath(w.feat ? Math.min(1, w.feat.aperture + w.feat.spread) : 0.5); return { label: "口形 " + w.visemes, value: w.bandName + " / T(2," + th.n + ")", meant: (w.label || "") + " (熱経路 " + th.score.toFixed(2) + " · 微分側 " + th.differentialSide.toFixed(1) + " + 積分側 " + th.integralSide.toFixed(1) + " = x log x " + th.xlogx.toFixed(1) + ")" }; }).concat(fz.readout), features: null, fuse: fz };
     $("silent-out").classList.remove("hidden"); renderReadout(lastSilent.readout);
     $("silent-req").textContent = proc.request; $("silent-doc").innerHTML = mdToHtml(proc.document.markdown); $("silent-bada").textContent = proc.bada; $("silent-imgs").innerHTML = proc.imagery.join("");
     chatHandle(proc.request, "Ω-Telephacy (口形 " + tp.words.length + " 語)");
@@ -581,7 +585,7 @@
     var f = normalizeFeat(raw, tp.cal), v = classifyViseme(f);
     $("tp-vis").textContent = v; $("tp-feat").textContent = "開き " + f.aperture.toFixed(2) + " · 幅 " + f.spread.toFixed(2) + " · 力 " + f.energy.toFixed(2);
     var th = thermalPath(Math.min(1, f.aperture + f.spread));
-    $("tp-band").textContent = BAND_NAMES[dominantBand(f)] + " · T(2," + th.n + ") |V|=" + th.abs.toFixed(2);
+    $("tp-band").textContent = BAND_NAMES[dominantBand(f)] + " · T(2," + th.n + ") |V|=" + th.abs.toFixed(2) + " · 微分側 " + th.differentialSide.toFixed(1) + " + 積分側 " + th.integralSide.toFixed(1) + " = x log x " + th.xlogx.toFixed(1) + " · e^{iβH} H=" + th.phase.H.toFixed(2);
     if (v === "C") { tp.restRun++; if (tp.restRun >= 3 && tp.seq.length) { /* 閉じが 3 フレーム (約 0.2 秒) 続いたら語を区切る */ var toks = decodeVisemes(tp.seq.concat(["C"]), tp.feats.concat([f])); tp.seq = []; tp.feats = []; toks.forEach(tpAccept); $("tp-seq").textContent = "—"; } }
     else { tp.restRun = 0; if (!tp.seq.length || tp.seq[tp.seq.length - 1] !== v) { tp.seq.push(v); tp.feats.push(f); } else { tp.feats[tp.feats.length - 1] = f; } $("tp-seq").textContent = tp.seq.join(" → "); }
   }
@@ -780,6 +784,23 @@
   };
   bciRenderOptions(); bciRenderPicked();
 
+  /* ═════════════ ⓪-γ 位相核 — 文献 (paper/references/) の検証できる数理 (phasecore.js) ═════════════ */
+  (function () {
+    var pi10 = partialIntegration(10), z100 = zeroCount(100), ph = nsPhase(0.5, 1);
+    var demo = channelFuse(["book", "records", "sort"], [{ name: "体のサイン", ids: ["calm"] }, { name: "画像", ids: ["warm", "vivid"] }]);
+    var rows = [
+      { label: "系 2 (文献 02)", value: pi10.sum.toFixed(4), meant: "∫₁¹⁰ log t dt (積分側) + ∫₁¹⁰ t d(log t) (微分側) = 10 log 10 = " + pi10.xlogx.toFixed(4) + " (残差 " + pi10.residual.toExponential(1) + ")" },
+      { label: "N(T) (文献 01 定理 I-10)", value: z100.main.toFixed(2), meant: "x log x − x + 7/8, x = 100/2π → ζ の零点の個数 N(100) = 29 (古典・Riemann–von Mangoldt)" },
+      { label: "e^{iβH} (文献 04)", value: "|·| = " + ph.abs.toFixed(0), meant: "素数ゲームの H(1/2) = " + ph.H.toFixed(3) + " · 単位絶対値なので零点を保存する (文献 03 原理 1)" },
+      { label: "位相融合 (文献 03 / 14)", value: "|q̂−a| " + demo.maxDev.toExponential(1), meant: "📖 ▤ ⇅ + 体のサイン calm + 画像 warm,vivid → 内容 q̂ = a (零を保存)、調子 " + demo.tone + " を位相から読み出し" }
+    ];
+    $("pc-checks").innerHTML = rows.map(function (r) { return '<div class="rrow"><i>' + escHtml(r.label) + '</i><b>' + escHtml(r.value) + '</b><span>' + escHtml(r.meant) + "</span></div>"; }).join("");
+    var cls = { "証明済": "ok", "古典・検証済": "ok", "古典": "ok", "未検証": "warn", "予想 (未解決)": "warn" };
+    $("pc-claims").innerHTML = "<table><tr><th>式</th><th>標識</th><th>文献</th><th>本アプリでの扱い</th></tr>" + FRAMEWORK_CLAIMS.map(function (c) {
+      return "<tr><td>" + escHtml(c.label) + '</td><td><span class="st ' + (cls[c.status] || "") + '">' + escHtml(c.status) + "</span></td><td>" + escHtml(c.ref) + "</td><td>" + escHtml(c.note) + "</td></tr>"; }).join("") + "</table>";
+    $("pc-refs").innerHTML = REFERENCE_DOCS.map(function (d) { return "<li>" + escHtml(d.title) + ' <span class="muted">(' + escHtml(d.file) + (d.year !== "—" ? " · " + escHtml(d.year) : "") + ")</span></li>"; }).join("");
+  })();
+
   /* ═════════════ ⓪ サイレント・トーク (非言語思考入力) ═════════════ */
   var lastSilent = null;
   var CAT_LABEL = { tone: "感情・質感", domain: "領域", object: "対象", action: "動作", scale: "分量", platform: "環境" };
@@ -931,21 +952,26 @@
   function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function runSilent() {
     var proc, readout, srcLabel;
-    /* 補い: 無言のグリフ + 体のサイン (気分の tone アトムのみ) */
-    var supp = silentSeq.concat(bioAtoms);
-    var suppLabel = (silentSeq.length ? "グリフ " + silentSeq.length + " 個" : "") + (bioAtoms.length ? (silentSeq.length ? " + " : "") + "体のサイン" : "");
+    /* 主チャネル (内容): 描いた動き + 無言のグリフ。補助チャネル (位相 = 調子だけ): 体のサイン — 位相融合 (channelFuse) で合成 */
+    var auxMods = bioAtoms.length ? [{ name: "体のサイン", ids: bioAtoms }] : [];
+    var suppLabel = (silentSeq.length ? "グリフ " + silentSeq.length + " 個" : "") + (bioAtoms.length ? (silentSeq.length ? " + " : "") + "体のサイン (位相)" : "");
     if (hasGesture()) {
       var gp = gestureProcess(gstrokes, volOpt());
-      proc = supp.length ? silentProcess(gp.atoms.concat(supp).concat(gp.seq.filter(function (s) { return s.indexOf("g:") === 0; })), volOpt()) : gp;
+      if (silentSeq.length || auxMods.length) {
+        var fz = channelFuse(gp.atoms.concat(silentSeq), auxMods);
+        proc = silentProcess(fz.ids.concat(gp.seq.filter(function (s) { return s.indexOf("g:") === 0; })), volOpt()); proc.fuse = fz;
+      } else proc = gp;
       proc.features = gp.features;
-      readout = (gp.readout || []).concat(bioAtoms.length ? bioReadout : []);
+      readout = (gp.readout || []).concat(bioAtoms.length ? bioReadout : []).concat(proc.fuse ? proc.fuse.readout : []);
       srcLabel = "描いた思い" + (suppLabel ? " + " + suppLabel : "");
-    } else if (supp.length) {
-      proc = silentProcess(supp.slice(), volOpt()); readout = bioAtoms.length ? bioReadout : null; srcLabel = suppLabel;
+    } else if (silentSeq.length || auxMods.length) {
+      var fz2 = channelFuse(silentSeq, auxMods);
+      proc = silentProcess(fz2.ids, volOpt()); proc.fuse = fz2;
+      readout = (bioAtoms.length ? bioReadout : []).concat(fz2.readout); srcLabel = suppLabel;
     } else {
       $("silent-outstate").innerHTML = '<span class="err">上の面に思いを描いてください (グリフだけでも可)。</span>'; return;
     }
-    lastSilent = { seq: proc.seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags, readout: readout, features: proc.features };
+    lastSilent = { seq: proc.seq, request: proc.request, document: proc.document, bada: proc.bada, imagery: proc.imagery, tags: proc.tags, readout: readout, features: proc.features, fuse: proc.fuse || null };
     $("silent-out").classList.remove("hidden");
     renderReadout(readout);
     var amax = 0; proc.enc.seq.forEach(function (row) { row.forEach(function (v) { amax = Math.max(amax, Math.abs(v)); }); });

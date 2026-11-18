@@ -71,6 +71,17 @@ function writePaper(spec, gen, ver, meta) {
       sv.readout.forEach(function (r) { L.push("| " + mdCell(r.label) + " | " + mdCell(r.value) + " | " + mdCell(r.meant) + " |"); });
       L.push("");
     }
+    if (sv.fuse && sv.fuse.modules && sv.fuse.modules.length) {
+      var fz = sv.fuse;
+      L.push("補助チャネルは**エントロピー位相融合** [9][20] で合成した: ψ_i = √a_i·exp(iΣ_m β_m H_m φ_{m,i}), q̂_i = |ψ_i|²/Σ|ψ_j|²。" +
+        "主チャネルの分布 a に対する q̂ の最大偏差は " + fz.maxDev.toExponential(1) + " で、a_i = 0 のアトムは" + (fz.zerosKept ? "すべて 0 のまま (零の保存・命題 1 (i))" : "保存されなかった") +
+        "。補助チャネルが語るのは位相であり、そこから調子「" + (fz.tone || "なし") + "」を読み出した。補助チャネルはアプリの中身 (モジュール・対象・項目) を変えない。");
+      L.push("");
+      L.push("| 補助チャネル | 提案したアトム | エントロピー H_m | 利得 β_m |");
+      L.push("|---|---|---|---|");
+      fz.modules.forEach(function (m, k) { L.push("| " + mdCell(m.name) + " | " + mdCell(m.ids.join(", ")) + " | " + (fz.H[k] != null ? fz.H[k].toFixed(3) : "—") + " | " + m.beta + " |"); });
+      L.push("");
+    }
   }
   L.push("### 2.1 電信による入力");
   L.push("");
@@ -167,7 +178,9 @@ function writePaper(spec, gen, ver, meta) {
   }
   L.push("**限界.** 内蔵エンジンは語彙と規則に基づく解析であり、辞書にない新しい種類の機能は既存モジュールの組み合わせでしか表現できない。" +
     "また「思考入力」は文章・音声・電信 (FSK 音) で与えられた依頼文を指し、脳の信号を読み取るものではない。" +
-    "電信の物理量 (グラビトン↔電磁波変換・量子テレポーテーション) は思考実験の可視化である。");
+    "電信の物理量 (グラビトン↔電磁波変換・量子テレポーテーション) は思考実験の可視化である。" +
+    "体のサイン・画像などの補助チャネルは位相融合 [9][20] により主チャネルの分布を変えられず (零の保存)、調子としてのみ読み出される。" +
+    "Γ 多様体・Jones 多項式・x log x の各量は文献の標識 (証明済 / 古典 / 未検証 / 予想) に従って扱い、未検証の式は可視化にとどめる。");
   L.push("");
   L.push("## 5. 結論");
   L.push("");
@@ -183,6 +196,7 @@ function writePaper(spec, gen, ver, meta) {
   L.push("4. L. H. Kauffman. State models and the Jones polynomial. Topology 26 (1987) 395–407.");
   L.push("5. C. E. Shannon. A Mathematical Theory of Communication. Bell System Technical Journal 27 (1948).");
   L.push("6. Apache Cordova / Electron 公式ドキュメント (クロスプラットフォーム配布).");
+  REFERENCE_DOCS.forEach(function (d, i) { L.push((7 + i) + ". M. Yamaguchi (Yamaguchi Framework). " + d.title + (d.year !== "—" ? " (" + d.year + ")" : "") + ". paper/references/" + d.file + "."); });
   L.push("");
   return L.join("\n");
 }

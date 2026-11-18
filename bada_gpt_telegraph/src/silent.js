@@ -469,3 +469,39 @@ function silentProcess(ids, opts) {
     bada: latentToBada(ids, enc, req)
   };
 }
+
+/* ───────────── エントロピー位相融合 (phasecore.js · 文献 03 定義 1 / 文献 14 定義 5) ─────────────
+ * 主チャネル (描いた動き・無言のグリフ・口形語・脳波で選んだ語) がアトム語彙上の分布 a を作り、
+ * 補助チャネル (体のサイン・画像) は位相 φ だけを与える:
+ *   ψ_i = √a_i · exp(i Σ_m β_m H_m φ_{m,i}),  q̂_i = |ψ_i|² / Σ_j |ψ_j|²
+ * 命題 1 (i) a_i = 0 のアトムはどの補助チャネルでも復活しない (零の保存)。
+ *        (ii) 位相は |·|² で消えるので q̂ = a。補助チャネルが語るのは位相 θ で、それを「調子」として読み出す。
+ * 以前は「体のサインはアプリの中身を決めない」を規則で縛っていたが、ここではそれが数学的性質になる。 */
+var FUSE_FLOOR = 0.01;
+function channelFuse(mainIds, modules) {
+  var V = SILENT_ATOMS.map(function (a) { return a.id; }), idx = {};
+  V.forEach(function (id, i) { idx[id] = i; });
+  var a = new Array(V.length).fill(0), main = (mainIds || []).filter(function (id) { return idx[id] != null; });
+  main.forEach(function (id) { a[idx[id]] += 1; });
+  var mods = (modules || []).filter(function (m) { return m && m.ids && m.ids.length; }).map(function (m) {
+    var ids = m.ids.filter(function (id) { return idx[id] != null; });
+    /* 未知事前 (最大エントロピー) を証拠で尖らせた分布 q^(m): 床 ε を全語彙に、残りを提案アトムへ (文献 14 定義 4) */
+    var p = new Array(V.length).fill(FUSE_FLOOR / V.length), share = ids.length ? (1 - FUSE_FLOOR) / ids.length : 0;
+    ids.forEach(function (id) { p[idx[id]] += share; });
+    var speaksTone = ids.some(function (x) { return ATOM_BY_ID[x].cat === "tone"; });
+    /* 位相 φ ∈ [−π, π]: 提案したアトム +π/2、同じ調子カテゴリで提案しなかったアトム −π/2、それ以外 0 (語らない) */
+    var phi = V.map(function (id) { if (ids.indexOf(id) >= 0) return Math.PI / 2; return speaksTone && ATOM_BY_ID[id].cat === "tone" ? -Math.PI / 2 : 0; });
+    return { name: m.name || "aux", ids: ids, p: p, phi: phi, beta: m.beta != null ? m.beta : 1 };
+  });
+  var f = entropyPhaseFuse(a, mods);
+  var maxDev = 0; for (var i = 0; i < V.length; i++) maxDev = Math.max(maxDev, Math.abs(f.q[i] - f.a[i]));
+  var zerosKept = V.every(function (id, i) { return f.a[i] > 0 || f.q[i] === 0; });
+  /* 位相の読み出し: 調子アトムのうち θ が正で最大のもの (補助チャネルの合意) を 1 つだけ添える */
+  var tone = null, best = 0;
+  V.forEach(function (id, i) { if (ATOM_BY_ID[id].cat === "tone" && f.theta[i] > best) { best = f.theta[i]; tone = id; } });
+  var ids = main.slice(); if (tone && main.indexOf(tone) < 0) ids.push(tone);
+  var readout = mods.map(function (m, k) { return { label: "位相 " + m.name, value: "H=" + f.H[k].toFixed(2), meant: m.ids.join(",") + " を位相で添える (内容の分布は変えない)" }; });
+  if (mods.length) readout.push({ label: "位相融合", value: "|q̂−a| " + maxDev.toExponential(1), meant: (zerosKept ? "零を保存" : "零が壊れた") + (tone ? " · 調子 " + tone + " を位相から読み出し" : " · 調子なし") });
+  return { ids: ids, main: main, tone: tone, a: f.a, q: f.q, theta: f.theta, H: f.H, maxDev: maxDev, zerosKept: zerosKept, readout: readout,
+    modules: mods.map(function (m) { return { name: m.name, ids: m.ids, beta: m.beta }; }) };
+}

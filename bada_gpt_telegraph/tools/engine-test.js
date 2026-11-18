@@ -21,7 +21,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const ctx = { console, TextEncoder, TextDecoder, atob, btoa, Uint8Array, Float32Array, Map };
 vm.createContext(ctx);
-for (const f of ["src/engine.js", "src/comprehend.js", "src/silent.js", "src/telephacy.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
+for (const f of ["src/engine.js", "src/phasecore.js", "src/comprehend.js", "src/silent.js", "src/telephacy.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), ctx, { filename: f });
 }
 const E = (expr) => vm.runInContext(expr, ctx);
@@ -115,6 +115,53 @@ section("体のサイン (本人の心拍・呼吸 → 気分のヒント)");
   const r0 = call("silentToRequest", base, call("silentEncode", base)), r1 = call("silentToRequest", withBio, call("silentEncode", withBio));
   ok(JSON.stringify(call("silentEncode", base).pooled) !== JSON.stringify(call("silentEncode", withBio).pooled), "気分アトムは latent に効く");
   ok(r0.tags.mods.join() === r1.tags.mods.join() && r0.tags.entity === r1.tags.entity, "気分アトムは依頼文のモジュール・対象を変えない");
+}
+
+/* 0.52 位相核 — 文献 (paper/references/) の検証できる数理 */
+section("位相核 (文献の検証できる数理: 位相融合・大域的部分積分・零点計数)");
+{
+  for (const x of [2, 10, 100]) { const p = call("partialIntegration", x); ok(Math.abs(p.residual) < 1e-6 * Math.max(1, p.xlogx), "系 2: ∫log t dt + ∫t d(log t) = x log x (x=" + x + ", 残差 " + p.residual.toExponential(1) + ")"); }
+  const ep = call("entropyPotential", 5), dL = (call("entropyPotential", 5.0005).L - call("entropyPotential", 4.9995).L) / 0.001;
+  ok(Math.abs(ep.f - Math.log(5)) < 1e-12 && Math.abs(dL - ep.f) < 1e-6 && Math.abs(ep.g - 0.2) < 1e-12, "定理 7: f = ∇L = log x, L = x log x − x, g = 1/x");
+  ok(Math.round(call("zeroCount", 100).main) === 29 && Math.round(call("zeroCount", 1000).main) === 649, "N(T) = x log x − x + 7/8 の主項: N(100) = 29, N(1000) = 649 (古典値)");
+  const H = [0.5, 1, 2, 3].map((s) => call("nashShannonH", s));
+  ok(H.every((h, i) => i === 0 || h < H[i - 1]) && H[0] > 0, "ナッシュ・シャノン素数ゲームの H(σ) は σ について単調減少");
+  const ph = call("nsPhase", 0.5, 2.0);
+  ok(Math.abs(Math.hypot(ph.re, ph.im) - 1) < 1e-12 && ph.abs === 1, "位相因子 e^{iβH} は単位絶対値 (零点を保存する唯一の結合)");
+  /* エントロピー位相融合 (文献 03 定義 1 / 文献 14 定義 5) */
+  const a = [0.5, 0.3, 0, 0.2], mods = [{ phi: [0.3, -1, 2, 3], p: [0.4, 0.3, 0.2, 0.1], beta: 1 }, { phi: [1, 1, -2, 0.5], p: [0.7, 0.1, 0.1, 0.1], beta: 0.7 }];
+  const f = call("entropyPhaseFuse", a, mods);
+  ok(Math.max(...f.q.map((q, i) => Math.abs(q - a[i]))) < 1e-15, "q̂ = |ψ|²/Σ|ψ|² = a (機械精度)");
+  ok(f.q[2] === 0 && f.psi.re[2] === 0 && f.psi.im[2] === 0, "命題 1 (i): a_i = 0 はどのモジュールでも復活しない (零の保存)");
+  ok(call("entropyPhaseFuse", a, []).theta.every((t) => t === 0), "モジュールなしなら位相 0");
+  const uni = call("entropyPhaseFuse", a, [{ phi: [1, 1, 1, 1], p: [0.25, 0.25, 0.25, 0.25], beta: 1 }]);
+  ok(Math.max(...uni.readout.map((r, i) => Math.abs(r - a[i]))) < 1e-12, "命題 1 (ii): 一様な位相 (語らないモジュール) は読み出しで洗い流される");
+  ok(Math.abs(f.H[0] - 1.2798542258) < 1e-6, "H_m はモジュール分布のシャノンエントロピー");
+  /* アトム語彙上の位相融合 (主チャネル = 内容、補助チャネル = 位相 = 調子) */
+  const fz = call("channelFuse", ["book", "records", "sort"], [{ name: "体のサイン", ids: ["calm"] }]);
+  ok(fz.main.join() === "book,records,sort" && fz.ids.join() === "book,records,sort,calm" && fz.tone === "calm", "体のサインは位相から調子 calm を読み出し、内容はそのまま");
+  ok(fz.maxDev < 1e-15 && fz.zerosKept, "語彙上でも q̂ = a・零を保存 (最大偏差 " + fz.maxDev.toExponential(1) + ")");
+  const V = E("SILENT_ATOMS").map((x) => x.id);
+  ok(V.every((id, i) => fz.main.indexOf(id) >= 0 || fz.q[i] === 0), "主チャネルにないアトムは補助チャネルでは加わらない (money 等は 0 のまま)");
+  const two = call("channelFuse", ["book", "records"], [{ name: "体のサイン", ids: ["calm"] }, { name: "画像", ids: ["warm", "vivid"] }]);
+  ok(two.modules.length === 2 && two.H.length === 2 && two.tone && E("ATOM_BY_ID")[two.tone].cat === "tone" && two.ids.slice(0, 2).join() === "book,records" && two.ids.length === 3, "2 つの補助チャネルは位相の和で調子を 1 つに決め、内容を変えない");
+  ok(JSON.stringify(call("channelFuse", ["book", "records"], [{ name: "x", ids: ["calm"] }])) === JSON.stringify(call("channelFuse", ["book", "records"], [{ name: "x", ids: ["calm"] }])), "位相融合は決定的");
+  const none = call("channelFuse", [], [{ name: "画像", ids: ["cool"] }]);
+  ok(none.ids.join() === "cool" && none.main.length === 0, "主チャネルが空でも補助チャネルの調子だけが残る");
+  ok(call("channelFuse", ["book"], []).ids.join() === "book" && call("channelFuse", ["book"], []).tone === null && call("channelFuse", ["book"], []).readout.length === 0, "補助チャネルなしなら調子も添えない");
+  const r0 = call("silentToRequest", fz.main, call("silentEncode", fz.main)), r1 = call("silentToRequest", fz.ids, call("silentEncode", fz.ids));
+  ok(r0.tags.mods.join() === r1.tags.mods.join() && r0.tags.entity === r1.tags.entity, "位相で添えた調子は依頼文のモジュール・対象を変えない");
+  /* 標識表と文献 */
+  const claims = E("FRAMEWORK_CLAIMS"), allowed = ["証明済", "古典・検証済", "古典", "未検証", "予想 (未解決)"];
+  ok(claims.length >= 8 && claims.every((c) => allowed.indexOf(c.status) >= 0 && c.ref && c.note), "標識表: すべての式に文献集の標識");
+  ok(call("claimStatus", "xi") === "未検証" && call("claimStatus", "rh") === "予想 (未解決)" && call("claimStatus", "phase") === "証明済" && call("claimStatus", "nope") === "—", "Ξ は未検証、RH は予想、位相の零保存は証明済");
+  const refs = E("REFERENCE_DOCS");
+  ok(refs.length === 17 && refs.every((d) => fs.existsSync(path.join(root, "paper/references", d.file))), "文献 17 本が paper/references/ に揃っている");
+  const tp = call("thermalPath", 0.5);
+  ok(Math.abs(tp.integralSide + tp.differentialSide - tp.xlogx) < 1e-6 && tp.phase.abs === 1 && tp.x === 5.5, "熱経路は大域的部分積分 (微分側 + 積分側 = x log x) と単位位相を持つ");
+  const sp = call("comprehend", "読んだ本を管理したい。"), gsp = call("generateApp", sp);
+  const pm = call("writePaper", sp, gsp, call("verifyApp", gsp.html, sp), { silent: Object.assign(call("silentProcess", fz.ids, { targetChars: 1000 }), { fuse: fz }) });
+  ok(/エントロピー位相融合/.test(pm) && /\| 補助チャネル \|/.test(pm) && /paper\/references\/03_entropy_phase_generative_ai\.pdf/.test(pm), "論文に位相融合の表と文献 17 本");
 }
 
 /* 0.55 Ω-Telephacy: 無音の口形 (viseme) 認識 — silenttalk (Python) の移植 */

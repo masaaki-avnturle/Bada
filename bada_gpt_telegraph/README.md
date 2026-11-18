@@ -123,6 +123,23 @@ latent に添えられ、**アプリの中身 (モジュール・対象・項目
 > ※ **他人の思考や体内情報を読む機能ではありません。** 通常のカメラで、本人が自分を測る自己計測です。
 > 皮膚温・赤外線から思考や言語を推定することは科学的にできず、本アプリはそれを行いません・主張しません。
 
+## ⓪-γ 位相核 — 山口フレームワークの文献から「検証できる数理」だけを取り込む
+
+提出された 17 本の文献 ([`paper/references/`](paper/references/)) を読み、計算で確かめられるものだけを
+[`src/phasecore.js`](src/phasecore.js) に実装しました (論文 6.11 節)。
+
+- **エントロピー位相融合** (文献 03 定義 1・文献 14 定義 5): 主チャネル (描いた動き・グリフ・口形語・脳波で選んだ語) が
+  アトム語彙上の分布 a を作り、補助チャネル (体のサイン・画像) は**位相でしか**作用できません —
+  ψᵢ = √aᵢ·e^{iΣβₘHₘφₘ,ᵢ}, q̂ = |ψ|²/Σ|ψ|² = a。「体のサインはアプリの中身を決めない」が規則ではなく
+  **数学的性質 (零の保存)** になり、補助チャネルの情報は位相から**調子**として読み出します。
+- **大域的部分積分** (文献 02 系 2): Ω-Telephacy の熱エネルギー経路を 微分側 + 積分側 = x log x に分解して表示します。
+- **N(T) = x log x − x + 7/8** (文献 01 定理 I-10・古典) と **素数ゲームの位相因子 e^{iβH}** (文献 04・|·| = 1)。
+- **標識表**: 文献集の分類 (証明済 / 古典・検証済 / 未検証 / 予想) をそのまま掲げ、Ξ や π(χ,x) = ½i は「未検証」、
+  リーマン予想・統一場は「予想」として何も主張しません。
+
+> ※ 文献自身が述べる通り「ζ(s) = x log x」などは恒等式として偽であり、本アプリも用いません。取り込んだのは標識が
+> 証明済・古典・検証済の数理だけです。
+
 ## 🧭 全体把握とは
 
 依頼文を節に分け、**すべての節**をモジュール・記録対象・項目と型・機能・見た目・対象環境・題名・目的のどれかに対応付けます。
@@ -183,7 +200,7 @@ Actions の監視は、偽の GitHub API を注入した単体テストと、API
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html (CI は --check で一致を検査)
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 209 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 234 件
 node bada_gpt_telegraph/tools/evaluate.js           # 論文 7.2 の評価 (--heldout で 7.3)
 cd bada_gpt_telegraph/app/electron && npm install && npm start   # デスクトップ版 (要 ../www/index.html)
 ```
@@ -193,8 +210,9 @@ bada_gpt_telegraph/
 ├── index.html              ← アプリ本体 (src/ から生成・これだけで動く)
 ├── src/
 │   ├── engine.js           ← ZIP / PDF / Markdown・Bada インタプリタ・Ξ・Jones・モールス・FSK
+│   ├── phasecore.js        ← 位相核 (文献の検証できる数理: 位相融合・大域的部分積分・N(T)・e^{iβH}・標識表)
 │   ├── comprehend.js       ← 全体把握
-│   ├── silent.js           ← サイレント・トーク (非言語 → トランスフォーマー → latent → 文章・画像・Bada)
+│   ├── silent.js           ← サイレント・トーク (非言語 → トランスフォーマー → latent → 文章・画像・Bada・チャネルの位相融合)
 │   ├── telephacy.js        ← Ω-Telephacy (無音の口形 viseme 認識・辞書・共鳴 7 帯・Jones 熱経路・イメージ入力・チャット)
 │   ├── bio.js              ← 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ)
 │   ├── bci.js              ← 思考だけで (脳波 BCI: 集中度 / SSVEP・Muse / OpenBCI 復号・スキャン選択)
@@ -206,7 +224,7 @@ bada_gpt_telegraph/
 ├── tools/                  ← build.js / engine-test.js / evaluate.js
 ├── app/electron/           ← Windows EXE / Linux AppImage・deb
 ├── app/cordova/config.xml  ← Android APK
-└── paper/                  ← 論文 (Markdown / PDF)
+└── paper/                  ← 論文 (Markdown / PDF) と references/ (取り込んだ文献 17 本)
 ```
 
 ## ⚠️ 正直な範囲
@@ -215,3 +233,4 @@ bada_gpt_telegraph/
 - グラビトン↔電磁波変換・量子テレポーテーションの数値は山口フレームワークに基づく**思考実験の可視化**です。
 - 依頼の全体把握・アプリ生成・検証・論文・PDF / ZIP 書き出し・FSK 音響通信は**実際に動作**します。
 - 内蔵エンジンは規則ベースのため、辞書にない機能は 14 部品の組み合わせでしか表せません (論文 第 8 章)。
+- 山口フレームワークの文献からは標識が証明済・古典・検証済の数理だけを取り込み、未検証の式は可視化、予想は主張しません (論文 6.11 節)。
