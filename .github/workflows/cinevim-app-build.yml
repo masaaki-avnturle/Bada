@@ -1,0 +1,236 @@
+name: Bada CineVim app build (Android APK + Windows EXE + Ubuntu)
+
+# bada_cinevim/ の「Bada CineVim」— 量子プログラミング言語 Bada の
+# 映画的 VIM エディタ。
+#   ・本物のモーダル編集 (hjkl / w b e / f t % { } / d c y / レジスタ /
+#     u / Ctrl-R / . リピート / ビジュアル / :%s/// などの Ex コマンド)
+#   ・Bada シンタックスハイライト (<- / -< / >- / Ω:: / qubit / |0⟩)
+#   ・📄 多段落の文章ビュー — 空行で段落に分けて折り返して組む
+#   ・🔎 ポイント位置のどアップ — 1 行を語のまとまりに切り分け、ポインタや
+#     カーソルが指した位置が「その場で」拡大される (拡大鏡は要らない)。
+#     上下に動かせばその行がまるごと持ち上がり、右へ左へ動かせば行の中で
+#     指した位置がさらに大きくなる。縦は行の距離、横は px の距離で減衰する
+#     二軸の魚眼 (縦の効きのうち vmix の割合が行全体に及ぶ)
+#   ・🎬 シネマフォーカス (コードビュー) — カーソル行を「どアップ」に拡大し、
+#     離れた行ほどガウス減衰で縮小・ぼかし・減光する被写界深度表現
+#   ・✨ イベント処理のフラッシュ効果 — すべての操作をイベントとして
+#     イベントバスへ投入し、ディスパッチされた瞬間にその行が発光する。
+#     種別ごとに色が変わり (KEY / MOTION / EDIT / MODE / EX / SEARCH /
+#     SIGNAL / TICK / RUN / IO / ERROR)、処理の光が行を走り抜ける
+#   ・⏱ 映画のカウントダウン — アカデミー・リーダーの掃引 + フィルムグレイン
+#     (毎秒 TICK イベント、T-0 で全画面フラッシュ)
+#   ・⚛ 量子 Bada 実行系 — 状態ベクトルシミュレータと β(p,q) / Γ(s)
+# これを
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は bada_cinevim/index.html の自己完結
+# HTML で、これをそのまま www として各ラッパーに同梱します。
+# PDF を文字化けなしで読むためのエンジン (bada_cinevim/pdf/) も一緒に入れます。
+# Actions アーティファクト、および (cinevim-v* タグ / release_tag
+# 指定時) GitHub Release に添付します。
+
+on:
+  # 手動実行 (workflow_dispatch のボタンはデフォルトブランチにある workflow に
+  # しか出ないため、main へ取り込んだあとに使えます)
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: cinevim-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    # 作業ブランチへの push でも自動ビルドし、Actions の「Artifacts」から
+    # APK / EXE / AppImage / deb をそのままダウンロードできるようにする
+    # (push イベントはそのブランチ上の workflow ファイルで実行されるため、
+    #  デフォルトブランチへ取り込む前でも Actions に現れます)
+    branches:
+      - 'claude/bada-countdown-editor-**'
+      - 'ccr-0422a438-**'
+    # タグを打つと同じ成果物を GitHub Release にも添付する
+    tags:
+      - 'cinevim-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Self-check app HTML (inline JS syntax + engine markers)
+        run: |
+          set -e
+          test -f bada_cinevim/index.html
+          for f in pdf.min.js pdf.worker.min.js cmaps.js; do test -s "bada_cinevim/pdf/$f"; done
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("bada_cinevim/index.html", "utf8");
+            const m = src.match(/<script>([\s\S]*)<\/script>/);
+            if (!m) { console.error("no inline <script> found"); process.exit(1); }
+            fs.writeFileSync("/tmp/cinevim.js", m[1]);
+            for (const marker of ["function badaTokenize", "function badaTokenizeAll",
+                                  "function gammaFn", "function betaFn", "function zetaBeta",
+                                  "function badaLeft", "function badaMani", "function badaRight",
+                                  "function qnew", "function qgate1", "function qcnot",
+                                  "function qmeasure", "function qprobs", "function mulberry32",
+                                  "function badaEval", "function quantumRun",
+                                  "function vimNew", "function evalMotion", "function applyOp",
+                                  "function execEx", "function runNormal", "function feedKey",
+                                  "function focusStyle", "function docLayout",
+                                  "function flashFrame", "function eventStyle",
+                                  "function splitParagraphs", "function wordAt",
+                                  "function segmentLine", "function gauss",
+                                  "function segScale",
+                                  "function blockLayout", "function segmentCenters",
+                                  "function displayToNatural", "function nearestIndex",
+                                  "function eventMag",
+                                  "function isPdfBytes", "function decodeTextBytes",
+                                  "function pdfItemsToLines", "function pdfPagesToLines",
+                                  "function countdownState", "function boot"]) {
+              if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
+            }
+          '
+          node --check /tmp/cinevim.js
+          echo "Bada CineVim self-check OK"
+      - name: Engine tests (tokenizer / Γ β ζ / quantum sim / VIM / Ex / event bus / segments + fisheye)
+        run: |
+          set -e
+          node bada_cinevim/tools/engine-test.js
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は SDK リポジトリから
+      # 廃止済みで、そのままだと "Failed to find package 'tools'" で落ちる。
+      # packages を空にして既定の導入を止め、必要な物は次のステップで明示的に入れる。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_cinevim/app/www
+          cp bada_cinevim/index.html bada_cinevim/app/www/index.html
+          # PDF 読み込みエンジン (pdf.js + 日本語などの CMap) も同梱する
+          cp -r bada_cinevim/pdf bada_cinevim/app/www/pdf
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="bada_cinevim/app"
+          cordova create cordova-build io.github.masaaki_avnturle.badacinevim BadaCineVim
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-cinevim-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinevim-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p bada_cinevim/app/www
+          cp bada_cinevim/index.html bada_cinevim/app/www/index.html
+          # PDF 読み込みエンジン (pdf.js + 日本語などの CMap) も同梱する
+          cp -r bada_cinevim/pdf bada_cinevim/app/www/pdf
+      - name: Build Windows EXE (Electron)
+        working-directory: bada_cinevim/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinevim-windows
+          path: bada_cinevim/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: bada_cinevim/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_cinevim/app/www
+          cp bada_cinevim/index.html bada_cinevim/app/www/index.html
+          # PDF 読み込みエンジン (pdf.js + 日本語などの CMap) も同梱する
+          cp -r bada_cinevim/pdf bada_cinevim/app/www/pdf
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: bada_cinevim/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinevim-linux
+          path: |
+            bada_cinevim/app/electron/dist/*.AppImage
+            bada_cinevim/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_cinevim/app/electron/dist/*.AppImage
+            bada_cinevim/app/electron/dist/*.deb
