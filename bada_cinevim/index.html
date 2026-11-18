@@ -1,0 +1,3782 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bada CineVim — 映画カウントダウンの VIM エディタ</title>
+<!--
+  Bada CineVim — 量子プログラミング言語 Bada 用の映画的 VIM エディタ
+  (依存ゼロ・単一 HTML・オフライン動作)
+
+  ・本物のモーダル編集 (ノーマル / 挿入 / ビジュアル / ビジュアル行 /
+    コマンドライン / 置換) — hjkl w b e 0 ^ $ gg G { } % f t F T、
+    オペレータ d c y > <、カウント、レジスタ、u / Ctrl-R、. リピート、
+    / 検索、:%s/// 置換、:w :q :set などの Ex コマンド
+  ・Bada 言語シンタックスハイライト (<- / -< / >- / Ω:: / qubit / gate …)
+  ・📄 多段落の文章ビュー — 空行で段落に分け、折り返して組む。内側は
+    行のままなので VIM のモーションもオペレータもそのまま効く
+  ・🔎 ポイント位置のどアップ — 1 行を語のまとまりに切り分け、ポインタや
+    カーソルが指した位置がその場で拡大される (拡大鏡は要らない)。
+    上下に動かせばその行がまるごと持ち上がり、右へ左へ動かせば行の中で
+    指した位置がさらに大きくなる。縦は行の距離、横は px の距離で減衰する
+    二軸の魚眼 (縦の効きのうち vmix の割合が行全体に及ぶ)
+  ・🎬 シネマフォーカス (コードビュー) — カーソル行を「どアップ」に拡大し、
+    離れた行ほどガウス減衰で縮小・ぼかし・減光する被写界深度表現
+  ・✨ イベント処理のフラッシュ効果 — すべての操作をイベントとして
+    イベントバスに投入し、ディスパッチされた瞬間にその行が発光する。
+    種別ごとに色が変わり (KEY / MOTION / EDIT / MODE / EX / SEARCH /
+    TICK / RUN / IO / ERROR)、処理の光が行を左から右へ走り抜ける
+  ・⏱ 映画のカウントダウン — アカデミー・リーダー (5→4→3→2→1) の
+    スイープ + 走査線 + フィルムグレイン。秒ごとに TICK イベント、
+    T-0 で全画面フラッシュ
+  ・⚛ 量子 Bada 実行系 — 状態ベクトルシミュレータ (H X Y Z S T CNOT
+    CZ SWAP / measure)、β(p,q)・Γ(s) の実装、<- -< >- の数値意味論
+-->
+<style>
+  :root{
+    --bg:#05070c; --panel:#0c111c; --panel2:#111827; --line:#1e2740;
+    --tx:#e6ecf7; --tx2:#7f8aa3; --gold:#e8c76a; --cyan:#5ad7e8;
+    --mag:#ff4d7e; --ok:#5fd68a; --err:#ff6b6b; --amber:#ffb454;
+    --base-h:30px;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; height:100%; overflow:hidden; }
+  body{
+    background:
+      radial-gradient(1200px 700px at 50% 38%, #101a2c 0%, #05070c 68%),
+      var(--bg);
+    color:var(--tx);
+    font-family:"Segoe UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    display:flex; flex-direction:column;
+  }
+  /* ── 印刷 / PDF 書き出し (:pdf) — 本文だけを白地に黒で出す ── */
+  #printDoc{ display:none; }
+  @media print{
+    html,body{ height:auto; overflow:visible; background:#fff !important; display:block; }
+    body > *{ display:none !important; }
+    body > #printDoc{
+      display:block !important; color:#000; background:#fff;
+      font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif CJK JP","Noto Serif JP","MS Mincho",serif;
+      font-size:11pt; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere;
+    }
+    body > #printDoc.code{
+      font-family:"Cascadia Mono","Consolas","Noto Sans Mono CJK JP","MS Gothic",monospace;
+      font-size:9.5pt; line-height:1.5;
+    }
+  }
+  /* ── ヘッダ ── */
+  header{
+    flex:0 0 auto; padding:9px 14px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:linear-gradient(180deg,#0d1421,#080c15); z-index:40;
+  }
+  header h1{ margin:0; font-size:16px; letter-spacing:1.2px; white-space:nowrap; }
+  header h1 .gold{ color:var(--gold); }
+  header h1 .cy{ color:var(--cyan); }
+  header .sub{ color:var(--tx2); font-size:11.5px; }
+  .spacer{ flex:1 1 auto; }
+  button.tb{
+    background:var(--panel2); color:var(--tx); border:1px solid var(--line);
+    border-radius:7px; padding:6px 11px; font-size:12.5px; cursor:pointer;
+    font-family:inherit; white-space:nowrap;
+  }
+  button.tb:hover{ border-color:var(--cyan); color:#fff; }
+  button.tb.on{ border-color:var(--gold); color:var(--gold); box-shadow:0 0 12px rgba(232,199,106,.22) inset; }
+  button.tb:active{ transform:translateY(1px); }
+
+  /* ── ステージ (どアップの舞台) ── */
+  /* position:relative — 狭い画面で重ねる出力パネル (#side.force) を
+     ヘッダの下、この領域の中だけに収めるための基準にする */
+  #wrap{ flex:1 1 auto; display:flex; min-height:0; position:relative; }
+  #stage{
+    flex:1 1 auto; position:relative; overflow:hidden;
+    perspective:1000px; perspective-origin:50% 50%;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.017) 0 1px, transparent 1px 3px),
+      radial-gradient(900px 520px at 50% 50%, rgba(90,215,232,.07), transparent 70%);
+  }
+  /* ビネット (映画的な周辺減光) */
+  #stage::after{
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:12;
+    background:radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(0,0,0,.62) 100%);
+  }
+  /* かつて画面を揺らしていたレイヤ。フラッシュ方式では揺らさず、
+     行レイヤとイベント表示の重ね合わせの基準としてのみ使う */
+  #layers{ position:absolute; inset:0; }
+  #doc{
+    position:absolute; left:0; right:0; top:0;
+    /* flex-column にするのは見た目のためではなく、隣接する .ln の上下
+       マージンが相殺(margin collapsing)されるのを防ぐため。相殺されると
+       docLayout() が計算した占有高さ (baseH × scale) と実レイアウトがずれ、
+       どアップの行が中央からずれて重なる。 */
+    display:flex; flex-direction:column;
+    transform-style:preserve-3d; will-change:transform;
+    font-family:"Cascadia Mono","Consolas","SF Mono","Noto Sans Mono CJK JP","DejaVu Sans Mono",monospace;
+    font-size:17px; line-height:var(--base-h);
+    padding:0 clamp(10px,4vw,64px);
+  }
+  .ln{
+    display:flex; align-items:center; height:var(--base-h);
+    transform-origin:8% 50%; will-change:transform,filter,opacity;
+    white-space:pre; position:relative;
+  }
+  .ln .gut{
+    flex:0 0 auto; width:3.6ch; text-align:right; margin-right:1.2ch;
+    color:#3b4763; font-size:.82em; user-select:none;
+  }
+  .ln.cur .gut{ color:var(--gold); }
+  .ln .code{ flex:0 1 auto; position:relative; }
+  .ln.cur .code{ text-shadow:0 0 22px rgba(90,215,232,.30); }
+
+  /* ── イベント処理フラッシュ ──
+     ディスパッチされた行が発光する。--fh が種別の色相、--fw が発光量、
+     --fg が文字のにじみ、--fe が左端マーカーの太さ、--fs が
+     「処理の光」が行を走る位置 (0→1)。すべて JS が 1 フレームごとに更新。 */
+  .ln.flash .code{
+    text-shadow:0 0 calc(var(--fg,0px)) hsla(var(--fh,200),95%,72%,.85);
+  }
+  .ln.flash .code::before{
+    content:""; position:absolute; inset:-3px -10px; border-radius:4px;
+    pointer-events:none; z-index:-1;
+    background:
+      /* 処理の光: 行を左から右へ走る */
+      linear-gradient(90deg,
+        transparent calc(var(--fs,0) * 100% - 16%),
+        hsla(var(--fh,200),98%,76%,calc(var(--fw,0) * 0.9)) calc(var(--fs,0) * 100%),
+        transparent calc(var(--fs,0) * 100% + 16%)),
+      /* ディスパッチ中の行の下地 */
+      linear-gradient(90deg,
+        hsla(var(--fh,200),90%,60%,calc(var(--fw,0) * 0.55)),
+        hsla(var(--fh,200),90%,60%,0) 88%);
+  }
+  /* 左端のイベントマーカー */
+  .ln.flash::before{
+    content:""; position:absolute; left:-2px; top:8%; bottom:8%;
+    width:var(--fe,0px); border-radius:2px;
+    background:hsl(var(--fh,200),95%,66%);
+    box-shadow:0 0 calc(var(--fe,0px) * 3) hsla(var(--fh,200),95%,66%,.9);
+  }
+  .ln .hair{
+    position:absolute; left:-1.4ch; right:-1.2ch; top:50%; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(232,199,106,.55),transparent);
+    opacity:0; pointer-events:none;
+  }
+  .ln.cur .hair{ opacity:.5; }
+
+  /* ── 多段落の文章ビュー ──
+     行ではなく段落として流し込み、ブラウザに折り返させる。
+     各行は .src として残るので、VIM の (行, 桁) はそのまま使える。 */
+  #page{
+    position:absolute; left:50%; top:0; transform:translateX(-50%);
+    width:min(54ch, calc(100% - 2 * clamp(14px,5vw,72px)));  /* JS が fitColumn() で上書きする */
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Georgia",serif;
+    font-size:var(--prose-size,19px); line-height:2.0;
+    color:#c3cde0; letter-spacing:.02em; text-align:justify;
+    padding:calc(50vh - 3em) 0 60vh;
+  }
+  #page.mono{
+    font-family:"Cascadia Mono","Consolas","Noto Sans Mono CJK JP",monospace;
+    line-height:1.9; text-align:left; letter-spacing:0;
+  }
+  .para{ margin:0 0 1.55em; text-indent:1em; }
+  .para:first-child{ text-indent:0; }
+  .gap{ line-height:.6em; }
+  .src{ white-space:pre-wrap; }
+
+  /* ── 行とセグメント ──
+     1 行を語のまとまり (.seg) に切り分ける。ポイントされた位置の
+     セグメントがその場で拡大され、左右に離れるほど 1 倍へ戻る (魚眼)。
+     縦は行の距離、横は px の距離で同じガウス式を使う。
+     はみ出しの補正は blockLayout() が縦横どちらにも効く。 */
+  .row{
+    display:block; white-space:pre;
+    will-change:transform; transform-origin:0 50%;
+  }
+  .seg{
+    display:inline-block; transform-origin:0 50%;
+    will-change:transform;
+  }
+  /* 空行 — 行ボックスの高さを隙間の高さに合わせる。
+     合っていないと、空の行が次の段落へはみ出して配置計算が狂う。 */
+  .gap .row{ height:.6em; line-height:.6em; }
+  .gap .seg{ height:.6em; line-height:.6em; }
+  /* 焦点から離れた行は静かに退く */
+  #page.dim .row{ opacity:.4; }
+  #page.dim .row.near{ opacity:.7; }
+  #page.dim .row.hit{ opacity:1; }
+  .row.hit{ color:#eef4ff; }
+  /* ポイントされたセグメント */
+  .seg.hit{
+    color:#fff;
+    text-shadow:0 0 18px rgba(120,220,255,.55);
+  }
+
+  /* シンタックス */
+  .t-kw{ color:#ff8fb0; font-weight:600; }
+  .t-op{ color:var(--gold); font-weight:700; }
+  .t-qop{ color:#ff4d7e; font-weight:700; text-shadow:0 0 10px rgba(255,77,126,.45); }
+  .t-num{ color:#9ae6a0; }
+  .t-str{ color:#e8c76a; }
+  .t-com{ color:#4d5a75; font-style:italic; }
+  .t-fn{ color:var(--cyan); }
+  .t-ns{ color:#c792ea; font-weight:700; }
+  .t-ket{ color:#7ee0ff; text-shadow:0 0 12px rgba(126,224,255,.55); }
+  .t-id{ color:var(--tx); }
+  .t-punct{ color:#8d99b5; }
+  .t-ws{ color:inherit; }
+  .t-match{ background:rgba(232,199,106,.22); border-radius:2px; }
+
+  /* カーソル */
+  #caret{
+    position:absolute; z-index:14; pointer-events:none;
+    background:var(--gold); mix-blend-mode:screen; border-radius:1px;
+    box-shadow:0 0 18px rgba(232,199,106,.8);
+    transition:opacity .08s linear;
+  }
+  #caret.ins{ background:var(--cyan); box-shadow:0 0 18px rgba(90,215,232,.9); }
+  #caret.blink{ opacity:.18; }
+
+  /* 選択 */
+  #selLayer{ position:absolute; inset:0; z-index:8; pointer-events:none; }
+  .selbox{ position:absolute; background:rgba(90,215,232,.18); border-radius:2px; }
+
+  /* FX / リーダー キャンバス */
+  #fx,#leader{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #fx{ z-index:13; }
+  #leader{ z-index:30; display:none; }
+
+  /* 出力パネル */
+  #side{
+    flex:0 0 340px; min-width:0; border-left:1px solid var(--line);
+    background:linear-gradient(180deg,#0a0f1a,#070a12);
+    display:flex; flex-direction:column; z-index:20;
+  }
+  #side.hide{ display:none !important; }
+  #side h2{
+    margin:0; padding:7px 8px 7px 12px; font-size:12px; letter-spacing:1px;
+    color:var(--tx2); border-bottom:1px solid var(--line); text-transform:uppercase;
+    display:flex; align-items:center; gap:8px;
+  }
+  #sideClose{
+    margin-left:auto; background:transparent; color:var(--tx2); border:1px solid var(--line);
+    border-radius:6px; padding:3px 9px; font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  #sideClose:hover{ color:var(--err); border-color:var(--err); }
+  #out{
+    flex:1 1 auto; overflow:auto; padding:10px 12px; font-size:12.5px;
+    font-family:"Cascadia Mono","Consolas","DejaVu Sans Mono",monospace;
+    white-space:pre-wrap; word-break:break-word; line-height:1.65;
+  }
+  #out .o-ok{ color:var(--ok); }
+  #out .o-err{ color:var(--err); }
+  #out .o-dim{ color:var(--tx2); }
+  #out .o-key{ color:var(--gold); }
+  #out .o-q{ color:var(--cyan); }
+  #out .bar{ display:inline-block; height:7px; background:linear-gradient(90deg,var(--cyan),var(--mag)); border-radius:3px; vertical-align:middle; }
+
+  /* ステータスライン */
+  #status{
+    flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding:5px 12px; border-top:1px solid var(--line);
+    background:#0a0f1a; font-size:12.5px; z-index:40;
+    font-family:"Cascadia Mono","Consolas","DejaVu Sans Mono",monospace;
+  }
+  #mode{
+    padding:2px 10px; border-radius:5px; font-weight:800; letter-spacing:1.5px;
+    background:var(--gold); color:#12161f; font-size:11.5px;
+  }
+  #mode.m-insert{ background:var(--ok); }
+  #mode.m-visual,#mode.m-vline{ background:var(--mag); color:#fff; }
+  #mode.m-command,#mode.m-search{ background:var(--cyan); color:#0a1016; }
+  #mode.m-replace{ background:var(--amber); color:#12161f; }
+  #fname{ color:var(--tx2); }
+  #msg{ flex:1 1 auto; color:var(--cyan); white-space:pre; overflow:hidden; text-overflow:ellipsis; }
+  #msg.err{ color:var(--err); }
+  #pos{ color:var(--tx2); white-space:nowrap; }
+  #cmdline{
+    display:none; flex:1 1 auto; color:var(--tx); white-space:pre;
+  }
+  #cmdline.show{ display:block; }
+  #cmdline .cc{ background:var(--gold); color:#12161f; }
+
+  /* タッチ用キーバー (APK / タブレット) */
+  #keys{
+    flex:0 0 auto; display:none; gap:5px; padding:6px 7px; overflow-x:auto;
+    border-top:1px solid var(--line); background:#080c15; z-index:40;
+  }
+  #keys.show{ display:flex; }
+  #keys button{
+    flex:0 0 auto; min-width:40px; padding:9px 9px; font-size:13px;
+    background:#141c2c; color:var(--tx); border:1px solid var(--line);
+    border-radius:7px; font-family:"Consolas",monospace; cursor:pointer;
+  }
+  #keys button:active{ background:var(--gold); color:#12161f; }
+  #hidden{
+    position:absolute; opacity:0; width:1px; height:1px; left:-9999px; top:0;
+    border:0; padding:0;
+  }
+
+  /* ── イベントバス HUD ──
+     ディスパッチされたイベントが新しい順に並び、処理された瞬間に光る */
+  #bus{
+    position:absolute; left:10px; bottom:10px; z-index:32; pointer-events:none;
+    display:flex; flex-direction:column-reverse; gap:3px; max-width:min(52vw,420px);
+    font-family:"Cascadia Mono","Consolas",monospace; font-size:11px;
+  }
+  #bus.hide{ display:none; }
+  #bus .ev{
+    display:flex; align-items:center; gap:7px; padding:2px 8px 2px 5px;
+    border-radius:5px; white-space:nowrap; overflow:hidden;
+    background:rgba(10,15,26,.72); border:1px solid rgba(255,255,255,.07);
+    border-left:3px solid hsl(var(--eh,200),90%,62%);
+    color:var(--tx2);
+  }
+  #bus .ev .tag{
+    color:hsl(var(--eh,200),95%,72%); font-weight:700; letter-spacing:.6px;
+    min-width:6.2em;
+  }
+  #bus .ev .at{ color:#59657f; min-width:4.5em; }
+  #bus .ev .dt{ color:#59657f; }
+  #bus .ev.hot{
+    background:hsla(var(--eh,200),70%,26%,.85);
+    border-color:hsl(var(--eh,200),90%,62%);
+    color:#eaf2ff;
+    box-shadow:0 0 16px hsla(var(--eh,200),90%,60%,.45);
+  }
+  /* ディスパッチ統計 */
+  #meter{
+    position:absolute; right:14px; bottom:10px; z-index:32; pointer-events:none;
+    font-family:"Cascadia Mono","Consolas",monospace; font-size:11px;
+    color:var(--tx2); text-align:right; line-height:1.5;
+  }
+  #meter.hide{ display:none; }
+  #meter b{ color:var(--cyan); font-weight:700; }
+
+  /* 全画面フラッシュ (T-0 / :run の完了など) */
+  #blast{
+    position:absolute; inset:0; z-index:33; pointer-events:none; opacity:0;
+    background:radial-gradient(ellipse at 50% 50%, rgba(255,255,255,.92), rgba(160,230,255,.35) 45%, transparent 72%);
+  }
+
+  /* カウントダウン HUD */
+  #hud{
+    position:absolute; right:14px; top:12px; z-index:31; text-align:right;
+    font-family:"Cascadia Mono","Consolas",monospace; pointer-events:none;
+    display:none;
+  }
+  #hud.show{ display:block; }
+  #hudNum{ font-size:44px; font-weight:800; color:var(--mag); text-shadow:0 0 26px rgba(255,77,126,.7); line-height:1; }
+  #hudLbl{ font-size:11px; letter-spacing:3px; color:var(--tx2); }
+
+  /* ヘルプ オーバーレイ */
+  #help{
+    position:absolute; inset:0; z-index:50; display:none;
+    background:rgba(3,5,10,.93); padding:18px; overflow:auto;
+  }
+  #help.show{ display:block; }
+  #help .inner{ max-width:860px; margin:0 auto; }
+  #help h3{ color:var(--gold); margin:16px 0 6px; font-size:14px; }
+  #help table{ border-collapse:collapse; width:100%; font-size:12.5px; }
+  #help td{ padding:3px 8px; border-bottom:1px solid #131a2a; vertical-align:top; }
+  #help td:first-child{
+    color:var(--cyan); white-space:nowrap; width:170px;
+    font-family:"Cascadia Mono","Consolas",monospace;
+  }
+  #help .close{ float:right; }
+
+  @media (max-width:900px){
+    #side{ display:none; }
+    #side.force{ display:flex; position:absolute; right:0; top:0; bottom:0; width:min(88vw,340px); }
+    header h1 .sub{ display:none; }
+    #doc{ font-size:15px; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .ln{ transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="gold">Bada</span> <span class="cy">CineVim</span></h1>
+  <span class="sub">量子言語 Bada の映画的 VIM エディタ</span>
+  <span class="spacer"></span>
+  <button class="tb on" id="btnZoom" title="ポイント位置のどアップ (:mag)">🔎 どアップ</button>
+  <button class="tb" id="btnView" title="文章ビュー / コードビュー (:prose / :code)">📄 文章</button>
+  <button class="tb" id="btnFocus" title="コードビューのどアップ (:focus)">🎬 シネマ</button>
+  <button class="tb on" id="btnFlash" title="イベント処理のフラッシュ効果 (:flash)">✨ フラッシュ</button>
+  <button class="tb" id="btnCount" title="映画のカウントダウン (:countdown 5)">⏱ カウントダウン</button>
+  <button class="tb" id="btnRun" title="量子 Bada を実行 (:run)">▶ 実行</button>
+  <button class="tb on" id="btnOut" title="量子 Bada 出力パネルの表示切替">⚛ 出力</button>
+  <button class="tb" id="btnOpen" title="ファイルを開く (:e) — テキスト / PDF">📂 開く</button>
+  <button class="tb" id="btnSave" title="保存 (:w)">💾 保存</button>
+  <button class="tb" id="btnPdf" title="PDF に書き出す / 印刷 (:pdf)">🖨 PDF</button>
+  <button class="tb" id="btnHelp" title="キーバインド一覧 (:help)">？</button>
+</header>
+
+<div id="wrap">
+  <div id="stage">
+    <div id="layers">
+      <div id="selLayer"></div>
+      <div id="doc"></div>
+      <div id="page"></div>
+      <div id="caret"></div>
+    </div>
+    <canvas id="fx"></canvas>
+    <div id="blast"></div>
+    <div id="bus"></div>
+    <div id="meter"></div>
+    <canvas id="leader"></canvas>
+    <div id="hud"><div id="hudNum">5</div><div id="hudLbl">T-MINUS</div></div>
+    <div id="help"><div class="inner"></div></div>
+  </div>
+  <div id="side">
+    <h2>⚛ 量子 Bada 出力<button id="sideClose" title="出力パネルを閉じる">✕</button></h2>
+    <div id="out"></div>
+  </div>
+</div>
+
+<div id="status">
+  <span id="mode">NORMAL</span>
+  <span id="fname">quantum.bada</span>
+  <span id="msg"></span>
+  <span id="cmdline"></span>
+  <span id="pos">1:1</span>
+</div>
+
+<div id="keys"></div>
+<input id="hidden" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
+<input id="fileIn" type="file" accept=".bada,.om,.txt,.md,.js,.c,.py,.pdf,application/pdf,*/*" style="display:none">
+<div id="printDoc"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+ *  Bada CineVim — エンジン
+ *  すべて純関数として定義し、boot() だけが DOM に触れます
+ *  (tools/engine-test.js が Node の vm でこのブロックを直接読み込みます)
+ * ===================================================================== */
+
+/* ---------------------------------------------------------------------
+ * 0. 既定のサンプル — 量子プログラミング言語 Bada
+ * ------------------------------------------------------------------ */
+var PROSE_SRC = [
+  "量子プログラミング言語 Bada の読み方",
+  "",
+  "　文章は、目で追うものではなく、光を当てて読むものだ。ポインタが指した",
+  "その一点が、その場で大きくなる。拡大鏡は要らない。指した位置から離れるほど、",
+  "文字はもとの大きさに戻っていく。",
+  "",
+  "　右へ動かせば、どアップは右へ滑る。左へ戻せば、左へ戻ってくる。",
+  "読んでいる位置がそのまま焦点になり、焦点はいつも指先の下にある。",
+  "行を切り替えるときも同じで、上下に動かせば、その行が手前に立ち上がる。",
+  "",
+  "　キーボードだけでも読める。h と l で一文字ずつ、w と b で語ごとに、",
+  "焦点は左右へ動く。j と k で行を、} と { で段落を送る。ポインタでも",
+  "キーでも、指した位置が大きくなるという一点は変わらない。",
+  "",
+  "　倍率は Ctrl とホイールで変えられる。どれだけ大きくしても、文字どうしが",
+  "重なることはない。拡大したぶんの余白を前後へ配り直しているからで、",
+  "その配り直しは縦にも横にも同じ式で効く。",
+  "",
+  "　編集はそのまま VIM である。hjkl で動き、w と b で語を渡り、dd で行を消し、",
+  "u で戻す。文章は語のまとまりに切り分けて表示されているが、内側では行の",
+  "ままなので、モーションもオペレータも、いつもどおりに効く。",
+  "",
+  "　そして、すべての操作はイベントとしてイベントバスへ流れる。キーを押せば KEY、",
+  "行を移れば MOTION、文字を消せば EDIT。ディスパッチされた瞬間に、",
+  "その行が種別の色で光る。何が処理されたのかが、読んでいる文章の上に直接現れる。",
+  "",
+  "　:code と打てば、同じ文書を等幅のコードとして開き直す。:demo で量子 Bada の",
+  "サンプルが読み込まれ、:run でそれを実行できる。qubit を確保し、H で重ね合わせ、",
+  "CNOT でもつれさせ、measure で観測する。文章も、コードも、同じ焦点の下にある。"
+].join("\n");
+
+var DEMO_SRC = [
+  "// Bada v3 — 映画カウントダウン・シーケンス",
+  "// ζ(s) = β(p,q) / log x    非可換作用素環プログラミング",
+  "",
+  "import Omega::Manifold;",
+  "",
+  "class CountdownNode <- TupleSpace {",
+  "",
+  "  operator <- (input) {",
+  "    return beta(2, 3) / log(input);      // 非可換左作用 π(χ,x)",
+  "  }",
+  "",
+  "  operator -< (state) {",
+  "    return state -< 12.0;                // 多様体積分 ∬1/(x·log x)²",
+  "  }",
+  "",
+  "  operator >- (output) {",
+  "    return output >- 0.5;                // 量子作用素右作用 ⊕(iℏ∇)^⊕L",
+  "  }",
+  "}",
+  "",
+  "/* ---- T-5 : 量子レジスタを起こす ---- */",
+  "qubit q[3];",
+  "",
+  "H q[0];              // 重ね合わせ  |0⟩ → (|0⟩+|1⟩)/√2",
+  "CNOT q[0], q[1];     // もつれ      → ベル状態 Φ+",
+  "X q[2];",
+  "",
+  "/* ---- T-0 : 崩壊させて観測する ---- */",
+  "let shot = measure q;",
+  "print shot;",
+  "",
+  "let zeta = 4.0 <- 2.0;",
+  "let area = 2.0 -< 12.0;",
+  "let grad = 1.0 >- 0.5;",
+  "print zeta;",
+  "print area;",
+  "print grad;",
+  "",
+  "Omega::DATABASE[tuplespace] {",
+  "  push(CountdownNode);   // Akashic Record への書き込み",
+  "}"
+].join("\n");
+
+/* ---------------------------------------------------------------------
+ * 1. Bada シンタックス トークナイザ
+ * ------------------------------------------------------------------ */
+var BADA_KW = ["class","operator","return","if","elif","else","for","while","do",
+  "let","const","var","fn","func","def","import","export","module","new","this",
+  "super","null","nil","true","false","break","continue","in","of","match","case",
+  "yield","async","await","spawn","observe","collapse","entangle","superpose",
+  "measure","qubit","qreg","gate","circuit","manifold","tuplespace","struct",
+  "enum","trait","impl","pub","use","where","with","end"];
+
+var BADA_FN = ["beta","gamma","zeta","log","ln","exp","sin","cos","tan","atan",
+  "sqrt","abs","floor","ceil","round","pow","min","max","norm","trace","det",
+  "tensor","kron","pi_operator","chi","psi","print","printf","push","pull","emit",
+  "H","X","Y","Z","S","T","CNOT","CZ","SWAP","RX","RY","RZ","TOFFOLI"];
+
+/* 量子/多様体オペレータ (長いものから照合すること) */
+var BADA_QOPS = ["<-","-<",">-","::","⊕","⊗","∬","∇","√","ℏ"];
+var BADA_OPS  = ["->","=>","===","!==","==","!=","<=",">=","&&","||","**",
+  "+=","-=","*=","/=","%=","<<",">>","+","-","*","/","%","=","<",">","!","&","|","^","~","?"];
+
+function isIdStart(ch){ return /[A-Za-z_$À-ɏͰ-Ͽ぀-ヿ一-鿿]/.test(ch); }
+function isIdPart(ch){ return isIdStart(ch) || /[0-9]/.test(ch); }
+
+/* badaTokenize(line, inBlock)
+ *   -> { toks:[{t,v}], inBlock:Boolean }
+ *   t: kw | fn | ns | qop | op | num | str | com | ket | id | punct | ws  */
+function badaTokenize(line, inBlock){
+  line = (line == null ? "" : String(line));
+  var toks = [], i = 0, n = line.length, block = !!inBlock;
+
+  /* ブロックコメントの継続 */
+  if (block){
+    var endAt = line.indexOf("*/");
+    if (endAt < 0){ if (n) toks.push({t:"com", v:line}); return {toks:toks, inBlock:true}; }
+    toks.push({t:"com", v:line.slice(0, endAt+2)});
+    i = endAt + 2; block = false;
+  }
+
+  while (i < n){
+    var ch = line[i], two = line.substr(i,2);
+
+    /* 空白 */
+    if (ch === " " || ch === "\t"){
+      var j = i; while (j < n && (line[j] === " " || line[j] === "\t")) j++;
+      toks.push({t:"ws", v:line.slice(i,j)}); i = j; continue;
+    }
+    /* 行コメント */
+    if (two === "//" || ch === "#"){ toks.push({t:"com", v:line.slice(i)}); i = n; continue; }
+    /* ブロックコメント開始 */
+    if (two === "/*"){
+      var e = line.indexOf("*/", i+2);
+      if (e < 0){ toks.push({t:"com", v:line.slice(i)}); return {toks:toks, inBlock:true}; }
+      toks.push({t:"com", v:line.slice(i, e+2)}); i = e + 2; continue;
+    }
+    /* 量子ケット |0⟩ |1⟩ |ψ⟩ |01> */
+    if (ch === "|"){
+      var km = /^\|[^|<>⟩\s]{0,8}(?:⟩|>)/.exec(line.slice(i));
+      if (km){ toks.push({t:"ket", v:km[0]}); i += km[0].length; continue; }
+    }
+    /* 文字列 */
+    if (ch === '"' || ch === "'" || ch === "`"){
+      var k = i + 1, esc = false;
+      while (k < n){
+        if (esc){ esc = false; k++; continue; }
+        if (line[k] === "\\"){ esc = true; k++; continue; }
+        if (line[k] === ch){ k++; break; }
+        k++;
+      }
+      toks.push({t:"str", v:line.slice(i,k)}); i = k; continue;
+    }
+    /* 数値 (16進 / 小数 / 指数 / 虚数 i) */
+    if (/[0-9]/.test(ch) || (ch === "." && /[0-9]/.test(line[i+1] || ""))){
+      var nm = /^(?:0[xX][0-9a-fA-F_]+|(?:[0-9][0-9_]*)?\.?[0-9][0-9_]*(?:[eE][+-]?[0-9]+)?)i?/.exec(line.slice(i));
+      var v = nm ? nm[0] : ch;
+      toks.push({t:"num", v:v}); i += v.length; continue;
+    }
+    /* 識別子 / 名前空間 / キーワード */
+    if (isIdStart(ch)){
+      var s = i; while (i < n && isIdPart(line[i])) i++;
+      var w = line.slice(s, i);
+      if (line.substr(i,2) === "::"){ toks.push({t:"ns", v:w}); continue; }
+      if (BADA_KW.indexOf(w) >= 0) toks.push({t:"kw", v:w});
+      else if (BADA_FN.indexOf(w) >= 0) toks.push({t:"fn", v:w});
+      else toks.push({t:"id", v:w});
+      continue;
+    }
+    /* 量子/多様体オペレータ (優先) */
+    var hit = null, z;
+    for (z = 0; z < BADA_QOPS.length; z++){
+      var q = BADA_QOPS[z];
+      if (line.substr(i, q.length) === q){ hit = q; break; }
+    }
+    if (hit){ toks.push({t:"qop", v:hit}); i += hit.length; continue; }
+    /* 通常オペレータ */
+    for (z = 0; z < BADA_OPS.length; z++){
+      var o = BADA_OPS[z];
+      if (line.substr(i, o.length) === o){ hit = o; break; }
+    }
+    if (hit){ toks.push({t:"op", v:hit}); i += hit.length; continue; }
+    /* 区切り */
+    toks.push({t:"punct", v:ch}); i++;
+  }
+  return {toks:toks, inBlock:block};
+}
+
+/* 全行をまとめてトークナイズ (ブロックコメント状態を持ち越す) */
+function badaTokenizeAll(lines){
+  var out = [], blk = false;
+  for (var i = 0; i < lines.length; i++){
+    var r = badaTokenize(lines[i], blk);
+    blk = r.inBlock; out.push(r.toks);
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------------
+ * 2. Bada の数学 — Γ(s) / β(p,q) / ζ(s) と 3 つの非可換オペレータ
+ * ------------------------------------------------------------------ */
+var HBAR_EFF = 1.0;   /* 自然単位系の実効 ℏ */
+
+/* Lanczos 近似によるガンマ関数 */
+var LANCZOS = [676.5203681218851, -1259.1392167224028, 771.32342877765313,
+  -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+  9.9843695780195716e-6, 1.5056327351493116e-7];
+
+function gammaFn(z){
+  if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gammaFn(1 - z));
+  z -= 1;
+  var x = 0.99999999999980993;
+  for (var i = 0; i < LANCZOS.length; i++) x += LANCZOS[i] / (z + i + 1);
+  var t = z + LANCZOS.length - 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+}
+
+/* β(p,q) = Γ(p)Γ(q)/Γ(p+q) */
+function betaFn(p, q){ return gammaFn(p) * gammaFn(q) / gammaFn(p + q); }
+
+/* ζ(s) = β(p,q) / log x  (README の核心設計思想より) */
+function zetaBeta(p, q, x){
+  var l = Math.log(x);
+  if (!isFinite(l) || l === 0) return NaN;
+  return betaFn(p, q) / l;
+}
+
+/* `<-` 非可換左作用 π(χ,x) = [iπ, f(x)] の実数表現 */
+function badaLeft(a, b){ return a * Math.cos(b) - b * Math.sin(a); }
+
+/* `-<` 多様体積分 ∬ 1/(x·log x)² dx を [a,b] でシンプソン則により数値積分 */
+function badaMani(a, b, steps){
+  steps = steps || 200;
+  if (steps % 2) steps++;
+  if (!(a > 1) || !(b > 1)) return NaN;
+  if (b === a) return 0;
+  var sign = 1;
+  if (b < a){ var t = a; a = b; b = t; sign = -1; }
+  var f = function(x){ var L = Math.log(x); return 1 / (x * L * x * L); };
+  var h = (b - a) / steps, s = f(a) + f(b);
+  for (var i = 1; i < steps; i++) s += f(a + i * h) * (i % 2 ? 4 : 2);
+  return sign * s * h / 3;
+}
+
+/* `>-` 量子作用素右作用 ⊕(iℏ∇)^⊕L — ℏ × 数値勾配 ∇sin(a) */
+function badaRight(a, b){
+  if (!b) return HBAR_EFF * Math.cos(a);
+  return HBAR_EFF * (Math.sin(a + b) - Math.sin(a)) / b;
+}
+
+/* ---------------------------------------------------------------------
+ * 3. 量子 Bada 実行系 — 状態ベクトルシミュレータ
+ * ------------------------------------------------------------------ */
+function qnew(n){
+  var size = 1 << n;
+  var re = new Array(size), im = new Array(size);
+  for (var i = 0; i < size; i++){ re[i] = 0; im[i] = 0; }
+  re[0] = 1;
+  return {n:n, re:re, im:im};
+}
+
+/* 1 量子ビット ゲート: 2x2 行列 [[a,b],[c,d]] を複素数の平坦配列で */
+var QGATES = {
+  H: [Math.SQRT1_2,0, Math.SQRT1_2,0, Math.SQRT1_2,0, -Math.SQRT1_2,0],
+  X: [0,0, 1,0, 1,0, 0,0],
+  Y: [0,0, 0,-1, 0,1, 0,0],
+  Z: [1,0, 0,0, 0,0, -1,0],
+  S: [1,0, 0,0, 0,0, 0,1],
+  T: [1,0, 0,0, 0,0, Math.SQRT1_2, Math.SQRT1_2]
+};
+
+function qapply1(st, g, q){
+  if (q < 0 || q >= st.n) throw new Error("量子ビット番号が範囲外: " + q);
+  var bit = 1 << q, size = 1 << st.n;
+  for (var i = 0; i < size; i++){
+    if (i & bit) continue;
+    var j = i | bit;
+    var ar = st.re[i], ai = st.im[i], br = st.re[j], bi = st.im[j];
+    st.re[i] = g[0]*ar - g[1]*ai + g[2]*br - g[3]*bi;
+    st.im[i] = g[0]*ai + g[1]*ar + g[2]*bi + g[3]*br;
+    st.re[j] = g[4]*ar - g[5]*ai + g[6]*br - g[7]*bi;
+    st.im[j] = g[4]*ai + g[5]*ar + g[6]*bi + g[7]*br;
+  }
+  return st;
+}
+
+function qgate1(st, name, q){
+  var g = QGATES[name];
+  if (!g) throw new Error("未知のゲート: " + name);
+  return qapply1(st, g, q);
+}
+
+/* 回転ゲート RX / RY / RZ (角度 θ) */
+function qrot(st, axis, q, theta){
+  var c = Math.cos(theta/2), s = Math.sin(theta/2), g;
+  if (axis === "RX") g = [c,0, 0,-s, 0,-s, c,0];
+  else if (axis === "RY") g = [c,0, -s,0, s,0, c,0];
+  else g = [c,-s, 0,0, 0,0, c,s];
+  return qapply1(st, g, q);
+}
+
+function qcnot(st, c, t){
+  if (c === t) throw new Error("CNOT の制御と標的が同じです");
+  if (c < 0 || c >= st.n || t < 0 || t >= st.n) throw new Error("量子ビット番号が範囲外");
+  var cb = 1 << c, tb = 1 << t, size = 1 << st.n;
+  for (var i = 0; i < size; i++){
+    if ((i & cb) && !(i & tb)){
+      var j = i | tb;
+      var r = st.re[i], m = st.im[i];
+      st.re[i] = st.re[j]; st.im[i] = st.im[j];
+      st.re[j] = r; st.im[j] = m;
+    }
+  }
+  return st;
+}
+
+function qcz(st, c, t){
+  var cb = 1 << c, tb = 1 << t, size = 1 << st.n;
+  for (var i = 0; i < size; i++){
+    if ((i & cb) && (i & tb)){ st.re[i] = -st.re[i]; st.im[i] = -st.im[i]; }
+  }
+  return st;
+}
+
+function qswap(st, a, b){ qcnot(st,a,b); qcnot(st,b,a); qcnot(st,a,b); return st; }
+
+function qprobs(st){
+  var size = 1 << st.n, p = new Array(size);
+  for (var i = 0; i < size; i++) p[i] = st.re[i]*st.re[i] + st.im[i]*st.im[i];
+  return p;
+}
+
+/* 決定的な擬似乱数 (テスト再現性のため) */
+function mulberry32(seed){
+  var a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    var t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* 観測 — 状態を固有状態へ collapse させ、測定値 (整数) を返す */
+function qmeasure(st, rng){
+  var p = qprobs(st), r = (rng ? rng() : Math.random()), acc = 0, idx = p.length - 1;
+  for (var i = 0; i < p.length; i++){ acc += p[i]; if (r < acc){ idx = i; break; } }
+  for (var k = 0; k < p.length; k++){ st.re[k] = 0; st.im[k] = 0; }
+  st.re[idx] = 1;
+  return idx;
+}
+
+function qbits(idx, n){
+  var s = "";
+  for (var i = n - 1; i >= 0; i--) s += ((idx >> i) & 1);
+  return s;
+}
+
+/* ---------------------------------------------------------------------
+ * 4. Bada 式評価器 — 再帰下降パーサ
+ *    優先順位 (低→高):  <- -< >-   |  + -  |  * / %  |  **  |  単項  |  一次
+ * ------------------------------------------------------------------ */
+var BADA_MATHFN = {
+  log:  function(a){ return Math.log(a); },
+  ln:   function(a){ return Math.log(a); },
+  exp:  function(a){ return Math.exp(a); },
+  sin:  function(a){ return Math.sin(a); },
+  cos:  function(a){ return Math.cos(a); },
+  tan:  function(a){ return Math.tan(a); },
+  atan: function(a){ return Math.atan(a); },
+  sqrt: function(a){ return Math.sqrt(a); },
+  abs:  function(a){ return Math.abs(a); },
+  floor:function(a){ return Math.floor(a); },
+  ceil: function(a){ return Math.ceil(a); },
+  round:function(a){ return Math.round(a); },
+  pow:  function(a,b){ return Math.pow(a,b); },
+  min:  function(a,b){ return Math.min(a,b); },
+  max:  function(a,b){ return Math.max(a,b); },
+  gamma:function(a){ return gammaFn(a); },
+  beta: function(a,b){ return betaFn(a,b); },
+  zeta: function(a,b,c){ return zetaBeta(a,b,c); },
+  pi_operator: function(a,b){ return badaLeft(a,b); },
+  norm: function(a){ return Math.abs(a); }
+};
+
+function badaApplyQop(op, a, b){
+  if (op === "<-") return badaLeft(a, b);
+  if (op === "-<") return badaMani(a, b);
+  if (op === ">-") return badaRight(a, b);
+  throw new Error("未知の作用素: " + op);
+}
+
+function _peek(p){ return p.i < p.toks.length ? p.toks[p.i] : null; }
+function _isOp(t, v){ return t && (t.t === "op" || t.t === "qop" || t.t === "punct") && t.v === v; }
+
+function _parsePrimary(p, env){
+  var t = _peek(p);
+  if (!t) throw new Error("式が途中で終わっています");
+  if (t.t === "num"){ p.i++; return parseFloat(String(t.v).replace(/_/g, "").replace(/i$/, "")); }
+  if (t.t === "str"){ p.i++; return t.v.slice(1, -1); }
+  if (_isOp(t, "(")){
+    p.i++;
+    var v = _parseQop(p, env);
+    if (!_isOp(_peek(p), ")")) throw new Error("')' がありません");
+    p.i++; return v;
+  }
+  if (t.t === "kw" && t.v === "measure"){
+    p.i++;
+    var nm = _peek(p);
+    if (nm) p.i++;
+    if (!env.q) throw new Error("観測する量子レジスタがありません (qubit q[n]; が必要)");
+    var idx = qmeasure(env.q, env.rng);
+    env.lastShot = idx;
+    return idx;
+  }
+  if (t.t === "id" || t.t === "fn" || t.t === "ns" || t.t === "kw"){
+    var name = t.v; p.i++;
+    if (_isOp(_peek(p), "(")){
+      p.i++;
+      var args = [];
+      if (!_isOp(_peek(p), ")")){
+        for (;;){
+          args.push(_parseQop(p, env));
+          if (_isOp(_peek(p), ",")){ p.i++; continue; }
+          break;
+        }
+      }
+      if (!_isOp(_peek(p), ")")) throw new Error("')' がありません: " + name);
+      p.i++;
+      var f = BADA_MATHFN[name];
+      if (!f) throw new Error("未知の関数: " + name);
+      return f.apply(null, args);
+    }
+    /* q[3] のような添字は測定値のビット取り出しとして扱う */
+    if (_isOp(_peek(p), "[")){
+      p.i++;
+      var ix = _parseQop(p, env);
+      if (_isOp(_peek(p), "]")) p.i++;
+      var base = env.vars.hasOwnProperty(name) ? env.vars[name] : (env.lastShot || 0);
+      return (Number(base) >> Number(ix)) & 1;
+    }
+    if (env.vars.hasOwnProperty(name)) return env.vars[name];
+    if (name === "PI" || name === "pi" || name === "π") return Math.PI;
+    if (name === "E" || name === "e") return Math.E;
+    if (name === "hbar" || name === "ℏ") return HBAR_EFF;
+    throw new Error("未定義の識別子: " + name);
+  }
+  if (t.t === "ket"){ /* |0⟩ → そのビット列の整数値 */
+    p.i++;
+    var body = t.v.replace(/^\||[⟩>]$/g, "");
+    return /^[01]+$/.test(body) ? parseInt(body, 2) : 0;
+  }
+  throw new Error("解釈できないトークン: " + t.v);
+}
+
+function _parseUnary(p, env){
+  var t = _peek(p);
+  if (_isOp(t, "-")){ p.i++; return -_parseUnary(p, env); }
+  if (_isOp(t, "+")){ p.i++; return _parseUnary(p, env); }
+  if (_isOp(t, "!")){ p.i++; return _parseUnary(p, env) ? 0 : 1; }
+  if (_isOp(t, "√")){ p.i++; return Math.sqrt(_parseUnary(p, env)); }
+  return _parsePrimary(p, env);
+}
+
+function _parsePow(p, env){
+  var a = _parseUnary(p, env);
+  if (_isOp(_peek(p), "**")){ p.i++; return Math.pow(a, _parsePow(p, env)); }
+  return a;
+}
+
+function _parseMul(p, env){
+  var a = _parsePow(p, env);
+  for (;;){
+    var t = _peek(p);
+    if (_isOp(t, "*")){ p.i++; a = a * _parsePow(p, env); }
+    else if (_isOp(t, "/")){ p.i++; a = a / _parsePow(p, env); }
+    else if (_isOp(t, "%")){ p.i++; a = a % _parsePow(p, env); }
+    else if (_isOp(t, "⊗")){ p.i++; a = a * _parsePow(p, env); }   /* テンソル積 */
+    else return a;
+  }
+}
+
+function _parseAdd(p, env){
+  var a = _parseMul(p, env);
+  for (;;){
+    var t = _peek(p);
+    if (_isOp(t, "+")){ p.i++; a = a + _parseMul(p, env); }
+    else if (_isOp(t, "-")){ p.i++; a = a - _parseMul(p, env); }
+    else if (_isOp(t, "⊕")){ p.i++; a = a + _parseMul(p, env); }   /* 直和 */
+    else return a;
+  }
+}
+
+function _parseQop(p, env){
+  var a = _parseAdd(p, env);
+  for (;;){
+    var t = _peek(p);
+    if (t && t.t === "qop" && (t.v === "<-" || t.v === "-<" || t.v === ">-")){
+      p.i++; a = badaApplyQop(t.v, a, _parseAdd(p, env));
+    } else return a;
+  }
+}
+
+/* badaEval("4.0 <- 2.0", env) -> Number */
+function badaEval(src, env){
+  env = env || {vars:{}};
+  var toks = badaTokenize(src).toks.filter(function(t){ return t.t !== "ws" && t.t !== "com"; });
+  if (!toks.length) throw new Error("空の式");
+  var p = {toks:toks, i:0};
+  var v = _parseQop(p, env);
+  return v;
+}
+
+/* 数値の表示整形 */
+function fmtNum(v){
+  if (typeof v === "string") return v;
+  if (v == null || (typeof v === "number" && !isFinite(v))) return String(v);
+  if (Number.isInteger(v)) return String(v);
+  var a = Math.abs(v);
+  if (a !== 0 && (a < 1e-4 || a >= 1e7)) return v.toExponential(6);
+  return String(Math.round(v * 1e9) / 1e9);
+}
+
+/* ---------------------------------------------------------------------
+ * 5. 量子 Bada プログラム実行
+ *    quantumRun(src, seed) -> { out:[{cls,text}], vars, state, err }
+ * ------------------------------------------------------------------ */
+function stripComments(line){
+  var r = badaTokenize(line), s = "";
+  for (var i = 0; i < r.toks.length; i++){
+    if (r.toks[i].t !== "com") s += r.toks[i].v;
+  }
+  return s;
+}
+
+function quantumRun(src, seed){
+  var env = {
+    vars:{}, q:null, rng: mulberry32(seed === undefined ? 0x5EED : (seed >>> 0)),
+    lastShot: 0
+  };
+  var out = [], err = null;
+  var push = function(cls, text){ out.push({cls:cls, text:text}); };
+
+  var lines = String(src == null ? "" : src).replace(/\r\n?/g, "\n").split("\n");
+  var depth = 0, blockComment = false, classes = [], ops = [];
+
+  push("o-dim", "⚛ Bada 量子ランタイム — 起動");
+
+  for (var li = 0; li < lines.length; li++){
+    var raw = lines[li];
+    /* ブロックコメントの追跡 */
+    var tk = badaTokenize(raw, blockComment);
+    blockComment = tk.inBlock;
+    var text = "";
+    for (var ti = 0; ti < tk.toks.length; ti++) if (tk.toks[ti].t !== "com") text += tk.toks[ti].v;
+    text = text.trim();
+    if (!text) continue;
+
+    var opens = (text.match(/\{/g) || []).length;
+    var closes = (text.match(/\}/g) || []).length;
+
+    try {
+      if (depth > 0){
+        /* 定義ブロックの内部は宣言として記録するだけ */
+        depth += opens - closes;
+        if (depth < 0) depth = 0;
+        continue;
+      }
+
+      var m;
+      if ((m = /^import\s+(.+?);?$/.exec(text))){
+        push("o-dim", "  import " + m[1]);
+      } else if ((m = /^class\s+([A-Za-z_]\w*)/.exec(text))){
+        classes.push(m[1]);
+        push("o-key", "  class " + m[1] + " を定義");
+      } else if ((m = /^operator\s+(\S+)/.exec(text))){
+        ops.push(m[1]);
+        push("o-key", "  operator " + m[1] + " を定義");
+      } else if (/^Omega::|^Ω::/.test(text)){
+        push("o-key", "  Ω::TupleSpace — Akashic Record へ接続");
+      } else if ((m = /^qubit\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*;?$/.exec(text))){
+        var n = parseInt(m[2], 10);
+        if (n < 1 || n > 14) throw new Error("量子ビット数は 1〜14 の範囲で指定してください");
+        env.q = qnew(n); env.qname = m[1];
+        push("o-q", "  qubit " + m[1] + "[" + n + "]  → |" + new Array(n + 1).join("0") + "⟩");
+      } else if ((m = /^(H|X|Y|Z|S|T)\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*;?$/.exec(text))){
+        if (!env.q) throw new Error("量子レジスタが未宣言です");
+        qgate1(env.q, m[1], parseInt(m[3], 10));
+        push("o-q", "  " + m[1] + " → q[" + m[3] + "]");
+      } else if ((m = /^(RX|RY|RZ)\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*,\s*(.+?)\s*;?$/.exec(text))){
+        if (!env.q) throw new Error("量子レジスタが未宣言です");
+        var th = badaEval(m[4], env);
+        qrot(env.q, m[1], parseInt(m[3], 10), th);
+        push("o-q", "  " + m[1] + "(" + fmtNum(th) + ") → q[" + m[3] + "]");
+      } else if ((m = /^(CNOT|CZ|SWAP)\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*,\s*([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*;?$/.exec(text))){
+        if (!env.q) throw new Error("量子レジスタが未宣言です");
+        var a = parseInt(m[3], 10), b = parseInt(m[5], 10);
+        if (m[1] === "CNOT") qcnot(env.q, a, b);
+        else if (m[1] === "CZ") qcz(env.q, a, b);
+        else qswap(env.q, a, b);
+        push("o-q", "  " + m[1] + " q[" + a + "] , q[" + b + "]");
+      } else if ((m = /^(?:let|const|var)\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*;?$/.exec(text))){
+        env.vars[m[1]] = badaEval(m[2], env);
+        push("", "  let " + m[1] + " = " + fmtNum(env.vars[m[1]]));
+      } else if ((m = /^print\s*\(?\s*(.+?)\s*\)?\s*;?$/.exec(text))){
+        var pv = badaEval(m[1], env);
+        push("o-ok", "  ▸ " + fmtNum(pv));
+      } else if ((m = /^measure\s+([A-Za-z_]\w*)\s*(?:->\s*([A-Za-z_]\w*)\s*)?;?$/.exec(text))){
+        if (!env.q) throw new Error("観測する量子レジスタがありません");
+        var sh = qmeasure(env.q, env.rng);
+        env.lastShot = sh;
+        if (m[2]) env.vars[m[2]] = sh;
+        push("o-q", "  measure → |" + qbits(sh, env.q.n) + "⟩  (" + sh + ")");
+      } else if ((m = /^([A-Za-z_]\w*)\s*=\s*(.+?)\s*;?$/.exec(text))){
+        env.vars[m[1]] = badaEval(m[2], env);
+        push("", "  " + m[1] + " = " + fmtNum(env.vars[m[1]]));
+      } else if (/^[}{;]+$/.test(text)){
+        /* 括弧のみの行 */
+      } else {
+        var val = badaEval(text.replace(/;$/, ""), env);
+        push("", "  = " + fmtNum(val));
+      }
+    } catch (e){
+      err = "行 " + (li + 1) + ": " + e.message;
+      push("o-err", "  ✘ " + err);
+      break;
+    }
+    depth += opens - closes;
+    if (depth < 0) depth = 0;
+  }
+
+  /* 終了時の量子状態 */
+  if (env.q){
+    var probs = qprobs(env.q), rows = [];
+    for (var i = 0; i < probs.length; i++){
+      if (probs[i] > 1e-9) rows.push({ket: qbits(i, env.q.n), p: probs[i]});
+    }
+    rows.sort(function(a, b){ return b.p - a.p; });
+    push("o-dim", "── 終状態 |ψ⟩ ──");
+    for (var r = 0; r < Math.min(rows.length, 8); r++){
+      push("o-q", "  |" + rows[r].ket + "⟩  " + (rows[r].p * 100).toFixed(2) + " %");
+    }
+  }
+  push(err ? "o-err" : "o-ok", err ? "⚠ 実行中断" : "✔ 実行完了");
+  return {out:out, vars:env.vars, state:env.q, err:err, classes:classes, ops:ops};
+}
+
+/* =====================================================================
+ * 6. VIM エンジン
+ *    モーダル編集の純ロジック。DOM に一切触れません。
+ * ================================================================== */
+
+function vimNew(text, name){
+  var st = {
+    lines: String(text == null ? "" : text).replace(/\r\n?/g, "\n").split("\n"),
+    cur:{l:0, c:0}, mode:"normal", pending:"", cmdline:"", msg:"", msgErr:false,
+    regs:{}, undo:[], redo:[], visStart:null, search:{pat:"", dir:1},
+    lastFind:null, desired:0, fname:name || "quantum.bada", dirty:false,
+    insertLog:null, lastChange:null, events:[], shiftwidth:2,
+    seq:0, rev:0, dispatched:0,
+    opts:{ number:true, focus:true, flash:true, sound:true, bus:true,
+           depth:1, peak:2.6, spread:2.2, maxBlur:3.2, minOpacity:0.13, maxZ:26,
+           /* 文章ビュー: ポイント位置のどアップ (二軸の魚眼)
+              zpeak / vspread / hspread はコードビューの peak / spread とは別物。
+              vspread は行数、hspread は px で測る */
+           view:"prose", zoom:true, zpeak:2.2, vspread:1.6, hspread:110,
+           vmix:0.45, dim:true }
+  };
+  if (!st.lines.length) st.lines = [""];
+  return st;
+}
+function vimText(st){ return st.lines.join("\n"); }
+/* emit — イベントバスへ 1 件投入する。
+   seq は発行順の通し番号で、UI 側はこの順にディスパッチして行を光らせる。 */
+function emit(st, type, data){
+  st.seq++;
+  st.events.push(Object.assign({type:type, seq:st.seq, line:st.cur.l}, data || {}));
+}
+
+function _len(st, l){ return (st.lines[l] || "").length; }
+function _maxCol(st, l){
+  var n = _len(st, l);
+  return (st.mode === "insert" || st.mode === "replace" || st.mode === "visual" || st.mode === "vline")
+    ? n : Math.max(0, n - 1);
+}
+function clampCur(st){
+  if (!st.lines.length) st.lines = [""];
+  if (st.cur.l < 0) st.cur.l = 0;
+  if (st.cur.l > st.lines.length - 1) st.cur.l = st.lines.length - 1;
+  if (st.cur.c < 0) st.cur.c = 0;
+  var mx = _maxCol(st, st.cur.l);
+  if (st.cur.c > mx) st.cur.c = mx;
+}
+function snapshot(st){
+  st.rev++;
+  st.undo.push({lines:st.lines.slice(), cur:{l:st.cur.l, c:st.cur.c}});
+  if (st.undo.length > 500) st.undo.shift();
+  st.redo.length = 0;
+}
+function doUndo(st){
+  if (!st.undo.length){ st.msg = "既に最古の変更です"; return false; }
+  st.rev++;
+  var s = st.undo.pop();
+  st.redo.push({lines:st.lines.slice(), cur:{l:st.cur.l, c:st.cur.c}});
+  st.lines = s.lines; st.cur = {l:s.cur.l, c:s.cur.c};
+  st.dirty = true; clampCur(st); st.msg = "元に戻しました"; return true;
+}
+function doRedo(st){
+  if (!st.redo.length){ st.msg = "やり直す変更がありません"; return false; }
+  st.rev++;
+  var s = st.redo.pop();
+  st.undo.push({lines:st.lines.slice(), cur:{l:st.cur.l, c:st.cur.c}});
+  st.lines = s.lines; st.cur = {l:s.cur.l, c:s.cur.c};
+  st.dirty = true; clampCur(st); st.msg = "やり直しました"; return true;
+}
+
+/* ── 文字クラスと位置の前後移動 ── */
+function chClass(ch){
+  if (ch === undefined || ch === null || ch === "") return 0;
+  if (/\s/.test(ch)) return 0;
+  if (/[A-Za-z0-9_À-ɏͰ-Ͽ぀-ヿ一-鿿]/.test(ch)) return 2;
+  return 1;
+}
+function charAt(st, p){ var s = st.lines[p.l] || ""; return p.c < s.length ? s.charAt(p.c) : ""; }
+function posAdvance(st, p){
+  if (p.c < _len(st, p.l)) return {l:p.l, c:p.c + 1};
+  if (p.l < st.lines.length - 1) return {l:p.l + 1, c:0};
+  return null;
+}
+function posRetreat(st, p){
+  if (p.c > 0) return {l:p.l, c:p.c - 1};
+  if (p.l > 0) return {l:p.l - 1, c:_len(st, p.l - 1)};
+  return null;
+}
+function _cls(st, p, big){ var k = chClass(charAt(st, p)); return (big && k === 1) ? 2 : k; }
+
+function wordFwd(st, p, big){
+  var q = {l:p.l, c:p.c}, cur = _cls(st, q, big), nx, moved = false;
+  if (cur !== 0){
+    for (;;){
+      nx = posAdvance(st, q); if (!nx) return q;
+      q = nx; moved = true; if (_cls(st, q, big) !== cur) break;
+    }
+  }
+  for (;;){
+    if (_cls(st, q, big) !== 0) return q;
+    /* 空行では止まる (vim と同じ)。ただし「もともと空行にいた」場合は
+       そこで止まると動けなくなるので、動いたあとにだけ止まる。 */
+    if (moved && q.c === 0 && _len(st, q.l) === 0) return q;
+    nx = posAdvance(st, q); if (!nx) return q; q = nx; moved = true;
+  }
+}
+function wordBack(st, p, big){
+  var q = posRetreat(st, p); if (!q) return {l:p.l, c:p.c};
+  var pv;
+  for (;;){
+    if (_cls(st, q, big) !== 0) break;
+    if (q.c === 0 && _len(st, q.l) === 0) return q;
+    pv = posRetreat(st, q); if (!pv) return q; q = pv;
+  }
+  var cls = _cls(st, q, big);
+  for (;;){
+    pv = posRetreat(st, q); if (!pv) return q;
+    if (_cls(st, pv, big) !== cls) return q;
+    q = pv;
+  }
+}
+function wordEnd(st, p, big){
+  var q = posAdvance(st, p); if (!q) return {l:p.l, c:p.c};
+  var nx;
+  for (;;){
+    if (_cls(st, q, big) !== 0) break;
+    nx = posAdvance(st, q); if (!nx) return q; q = nx;
+  }
+  var cls = _cls(st, q, big);
+  for (;;){
+    nx = posAdvance(st, q); if (!nx) return q;
+    if (_cls(st, nx, big) !== cls) return q;
+    q = nx;
+  }
+}
+function firstNonBlank(st, l){
+  var s = st.lines[l] || "", m = /\S/.exec(s);
+  return m ? m.index : 0;
+}
+function paraMove(st, l, dir){
+  var N = st.lines.length, i = l + dir;
+  var blank = function(k){ return /^\s*$/.test(st.lines[k] || ""); };
+  while (i > 0 && i < N - 1 && blank(i)) i += dir;
+  while (i > 0 && i < N - 1 && !blank(i)) i += dir;
+  return Math.max(0, Math.min(N - 1, i));
+}
+function matchPair(st, p){
+  var open = "([{", close = ")]}", line = st.lines[p.l] || "";
+  var c = -1, ch = null, i;
+  for (i = p.c; i < line.length; i++){
+    if (open.indexOf(line.charAt(i)) >= 0 || close.indexOf(line.charAt(i)) >= 0){
+      c = i; ch = line.charAt(i); break;
+    }
+  }
+  if (ch === null) return null;
+  var oi = open.indexOf(ch), pos = {l:p.l, c:c}, depth = 0, step, target, cc;
+  if (oi >= 0){ step = posAdvance; target = close.charAt(oi); }
+  else { step = posRetreat; target = open.charAt(close.indexOf(ch)); }
+  for (;;){
+    cc = charAt(st, pos);
+    if (cc === ch) depth++;
+    else if (cc === target){ depth--; if (depth === 0) return pos; }
+    var nx = step(st, pos); if (!nx) return null; pos = nx;
+  }
+}
+function findChar(st, p, cmd, ch, count){
+  var line = st.lines[p.l] || "", c = p.c, k, idx;
+  var fwd = (cmd === "f" || cmd === "t");
+  /* c は常に「実際に当たった文字の位置」を保持し、t/T の調整は最後に一度だけ行う */
+  for (k = 0; k < count; k++){
+    idx = fwd ? line.indexOf(ch, c + 1) : line.lastIndexOf(ch, c - 1);
+    if (idx < 0) return null;
+    c = idx;
+  }
+  if (cmd === "t") c = Math.max(0, c - 1);
+  if (cmd === "T") c = Math.min(Math.max(0, line.length - 1), c + 1);
+  return {l:p.l, c:c};
+}
+function searchFrom(st, pat, dir, from){
+  var re;
+  try { re = new RegExp(pat, "g"); } catch (e){ return null; }
+  var N = st.lines.length, k, l, line, m;
+  if (dir > 0){
+    for (k = 0; k <= N; k++){
+      l = (from.l + k) % N; line = st.lines[l] || "";
+      re.lastIndex = (k === 0) ? from.c + 1 : 0;
+      if (re.lastIndex > line.length) continue;
+      m = re.exec(line);
+      if (m) return {l:l, c:m.index};
+    }
+  } else {
+    for (k = 0; k <= N; k++){
+      l = ((from.l - k) % N + N) % N; line = st.lines[l] || "";
+      var limit = (k === 0) ? from.c : line.length + 1, best = null;
+      re.lastIndex = 0;
+      while ((m = re.exec(line))){
+        if (m.index >= limit) break;
+        best = m.index;
+        if (re.lastIndex === m.index) re.lastIndex++;
+      }
+      if (best !== null) return {l:l, c:best};
+    }
+  }
+  return null;
+}
+
+/* ── モーション評価 ──
+ * evalMotion -> { pos:{l,c}, linewise:Boolean, inclusive:Boolean } | null  */
+function evalMotion(st, m, count, arg){
+  var p = {l:st.cur.l, c:st.cur.c}, i, r;
+  var rawCount = count;          /* 0 = カウント指定なし */
+  count = count || 1;
+  switch (m){
+    case "h": return {pos:{l:p.l, c:Math.max(0, p.c - count)}, linewise:false, inclusive:false};
+    case "l": return {pos:{l:p.l, c:Math.min(_len(st, p.l), p.c + count)}, linewise:false, inclusive:false};
+    case " ": return {pos:{l:p.l, c:Math.min(_len(st, p.l), p.c + count)}, linewise:false, inclusive:false};
+    case "j": case "+":
+      r = Math.min(st.lines.length - 1, p.l + count);
+      return {pos:{l:r, c:Math.min(st.desired, Math.max(0, _len(st, r) - 1))}, linewise:true, inclusive:false};
+    case "k": case "-":
+      r = Math.max(0, p.l - count);
+      return {pos:{l:r, c:Math.min(st.desired, Math.max(0, _len(st, r) - 1))}, linewise:true, inclusive:false};
+    case "w": for (i = 0; i < count; i++) p = wordFwd(st, p, false); return {pos:p, linewise:false, inclusive:false};
+    case "W": for (i = 0; i < count; i++) p = wordFwd(st, p, true);  return {pos:p, linewise:false, inclusive:false};
+    case "b": for (i = 0; i < count; i++) p = wordBack(st, p, false); return {pos:p, linewise:false, inclusive:false};
+    case "B": for (i = 0; i < count; i++) p = wordBack(st, p, true);  return {pos:p, linewise:false, inclusive:false};
+    case "e": for (i = 0; i < count; i++) p = wordEnd(st, p, false); return {pos:p, linewise:false, inclusive:true};
+    case "E": for (i = 0; i < count; i++) p = wordEnd(st, p, true);  return {pos:p, linewise:false, inclusive:true};
+    case "0": return {pos:{l:p.l, c:0}, linewise:false, inclusive:false};
+    case "^": return {pos:{l:p.l, c:firstNonBlank(st, p.l)}, linewise:false, inclusive:false};
+    case "$":
+      r = Math.min(st.lines.length - 1, p.l + count - 1);
+      return {pos:{l:r, c:Math.max(0, _len(st, r) - 1)}, linewise:false, inclusive:true};
+    case "G":
+      r = rawCount ? Math.min(st.lines.length - 1, rawCount - 1) : st.lines.length - 1;
+      return {pos:{l:r, c:firstNonBlank(st, r)}, linewise:true, inclusive:false};
+    case "gg":
+      r = Math.min(st.lines.length - 1, (count || 1) - 1);
+      return {pos:{l:r, c:firstNonBlank(st, r)}, linewise:true, inclusive:false};
+    case "}": r = p.l; for (i = 0; i < count; i++) r = paraMove(st, r, 1); return {pos:{l:r, c:0}, linewise:false, inclusive:false};
+    case "{": r = p.l; for (i = 0; i < count; i++) r = paraMove(st, r, -1); return {pos:{l:r, c:0}, linewise:false, inclusive:false};
+    case "%": { var mp = matchPair(st, p); return mp ? {pos:mp, linewise:false, inclusive:true} : null; }
+    case "f": case "t": case "F": case "T": {
+      var fp = findChar(st, p, m, arg, count);
+      if (!fp) return null;
+      st.lastFind = {cmd:m, ch:arg};
+      return {pos:fp, linewise:false, inclusive:(m === "f" || m === "t")};
+    }
+    case ";": case ",": {
+      if (!st.lastFind) return null;
+      var cmd = st.lastFind.cmd;
+      if (m === ","){ cmd = {f:"F", F:"f", t:"T", T:"t"}[cmd]; }
+      var fp2 = findChar(st, p, cmd, st.lastFind.ch, count);
+      return fp2 ? {pos:fp2, linewise:false, inclusive:(cmd === "f" || cmd === "t")} : null;
+    }
+    case "n": case "N": {
+      if (!st.search.pat){ st.msg = "検索パターンがありません"; return null; }
+      var dir = st.search.dir * (m === "n" ? 1 : -1), sp = {l:p.l, c:p.c};
+      for (i = 0; i < count; i++){
+        var f = searchFrom(st, st.search.pat, dir, sp);
+        if (!f) return null; sp = f;
+      }
+      return {pos:sp, linewise:false, inclusive:false};
+    }
+  }
+  return null;
+}
+
+/* ── 範囲操作 ── */
+function cmpPos(a, b){ return a.l !== b.l ? a.l - b.l : a.c - b.c; }
+function makeRange(st, from, to, linewise, inclusive){
+  var a = from, b = to;
+  if (cmpPos(a, b) > 0){ var t = a; a = b; b = t; }
+  if (linewise) return {a:{l:a.l, c:0}, b:{l:b.l, c:_len(st, b.l)}, linewise:true};
+  return {a:{l:a.l, c:a.c}, b:{l:b.l, c:inclusive ? b.c + 1 : b.c}, linewise:false};
+}
+function extractRange(st, r){
+  if (r.linewise) return st.lines.slice(r.a.l, r.b.l + 1);
+  if (r.a.l === r.b.l) return [(st.lines[r.a.l] || "").slice(r.a.c, r.b.c)];
+  var out = [(st.lines[r.a.l] || "").slice(r.a.c)];
+  for (var l = r.a.l + 1; l < r.b.l; l++) out.push(st.lines[l] || "");
+  out.push((st.lines[r.b.l] || "").slice(0, r.b.c));
+  return out;
+}
+function deleteRange(st, r){
+  if (r.linewise){
+    st.lines.splice(r.a.l, r.b.l - r.a.l + 1);
+    if (!st.lines.length) st.lines = [""];
+    st.cur.l = Math.min(r.a.l, st.lines.length - 1);
+    st.cur.c = firstNonBlank(st, st.cur.l);
+  } else {
+    var head = (st.lines[r.a.l] || "").slice(0, r.a.c);
+    var tail = (st.lines[r.b.l] || "").slice(r.b.c);
+    st.lines.splice(r.a.l, r.b.l - r.a.l + 1, head + tail);
+    st.cur.l = r.a.l; st.cur.c = r.a.c;
+  }
+  st.dirty = true;
+}
+function setReg(st, name, text, linewise){
+  var rec = {text:text.slice(), linewise:!!linewise};
+  st.regs['"'] = rec;
+  if (name && name !== '"') st.regs[name] = {text:text.slice(), linewise:!!linewise};
+}
+function getReg(st, name){ return st.regs[name || '"'] || {text:[""], linewise:false}; }
+
+function indentLines(st, l0, l1, dir){
+  var pad = new Array(st.shiftwidth + 1).join(" ");
+  for (var l = l0; l <= l1 && l < st.lines.length; l++){
+    if (dir > 0) st.lines[l] = pad + st.lines[l];
+    else st.lines[l] = st.lines[l].replace(new RegExp("^(?: {1," + st.shiftwidth + "}|\\t)"), "");
+  }
+  st.cur.l = l0; st.cur.c = firstNonBlank(st, l0); st.dirty = true;
+}
+
+function applyOp(st, op, r, reg){
+  var txt = extractRange(st, r);
+  if (op === "y"){
+    setReg(st, reg, txt, r.linewise);
+    st.cur = {l:r.a.l, c:r.linewise ? firstNonBlank(st, r.a.l) : r.a.c};
+    st.msg = (r.linewise ? txt.length + " 行" : txt.join("").length + " 文字") + "をヤンクしました";
+    clampCur(st); return;
+  }
+  if (op === ">" || op === "<"){
+    snapshot(st); indentLines(st, r.a.l, r.b.l, op === ">" ? 1 : -1); return;
+  }
+  snapshot(st);
+  setReg(st, reg, txt, r.linewise);
+  if (op === "c" && r.linewise){
+    /* cc — 行を空にして挿入モードへ (インデントは保持) */
+    var ind = (st.lines[r.a.l] || "").match(/^\s*/)[0];
+    st.lines.splice(r.a.l, r.b.l - r.a.l + 1, ind);
+    st.cur = {l:r.a.l, c:ind.length};
+    st.mode = "insert"; st.dirty = true; return;
+  }
+  deleteRange(st, r);
+  if (op === "c"){ st.mode = "insert"; }
+  clampCur(st);
+}
+
+function doPut(st, after, count, reg){
+  var R = getReg(st, reg);
+  if (!R.text.length) return;
+  snapshot(st); count = count || 1;
+  var i, k;
+  if (R.linewise){
+    var ins = [];
+    for (k = 0; k < count; k++) for (i = 0; i < R.text.length; i++) ins.push(R.text[i]);
+    var at = st.cur.l + (after ? 1 : 0);
+    st.lines.splice.apply(st.lines, [at, 0].concat(ins));
+    st.cur.l = at; st.cur.c = firstNonBlank(st, at);
+  } else {
+    var line = st.lines[st.cur.l] || "";
+    var at2 = st.cur.c + (after && line.length ? 1 : 0);
+    if (R.text.length === 1){
+      var piece = "";
+      for (k = 0; k < count; k++) piece += R.text[0];
+      st.lines[st.cur.l] = line.slice(0, at2) + piece + line.slice(at2);
+      st.cur.c = at2 + piece.length - 1;
+    } else {
+      var head = line.slice(0, at2), tail = line.slice(at2), blk = R.text.slice();
+      var nl = [head + blk[0]];
+      for (i = 1; i < blk.length - 1; i++) nl.push(blk[i]);
+      nl.push(blk[blk.length - 1] + tail);
+      st.lines.splice.apply(st.lines, [st.cur.l, 1].concat(nl));
+      st.cur.l = st.cur.l + blk.length - 1;
+      st.cur.c = Math.max(0, blk[blk.length - 1].length - 1);
+    }
+  }
+  st.dirty = true; clampCur(st);
+}
+
+/* ── 挿入モード ── */
+function insertKey(st, key){
+  var line = st.lines[st.cur.l] || "";
+  if (key === "<Esc>"){
+    st.mode = "normal";
+    if (st.lastChange && st.insertLog) st.lastChange.insert = st.insertLog.slice();
+    st.insertLog = null;
+    st.cur.c = Math.max(0, st.cur.c - 1);
+    clampCur(st); st.desired = st.cur.c;
+    return;
+  }
+  if (st.insertLog) st.insertLog.push(key);
+  if (key === "<CR>"){
+    var ind = line.slice(0, st.cur.c).match(/^\s*/)[0];
+    var head = line.slice(0, st.cur.c), tail = ind + line.slice(st.cur.c);
+    st.lines.splice(st.cur.l, 1, head, tail);
+    st.cur.l++; st.cur.c = ind.length; st.dirty = true; st.rev++; return;
+  }
+  if (key === "<BS>"){
+    if (st.cur.c > 0){
+      st.lines[st.cur.l] = line.slice(0, st.cur.c - 1) + line.slice(st.cur.c);
+      st.cur.c--;
+    } else if (st.cur.l > 0){
+      var prev = st.lines[st.cur.l - 1] || "";
+      st.lines.splice(st.cur.l - 1, 2, prev + line);
+      st.cur.l--; st.cur.c = prev.length;
+    }
+    st.dirty = true; st.rev++; return;
+  }
+  if (key === "<Del>"){
+    if (st.cur.c < line.length) st.lines[st.cur.l] = line.slice(0, st.cur.c) + line.slice(st.cur.c + 1);
+    else if (st.cur.l < st.lines.length - 1) st.lines.splice(st.cur.l, 2, line + (st.lines[st.cur.l + 1] || ""));
+    st.dirty = true; st.rev++; return;
+  }
+  var ins = (key === "<Tab>") ? new Array(st.shiftwidth + 1).join(" ") : key;
+  if (ins.length !== 1 && key !== "<Tab>") return;      /* 未知の特殊キーは無視 */
+  if (st.mode === "replace"){
+    st.lines[st.cur.l] = line.slice(0, st.cur.c) + ins + line.slice(st.cur.c + ins.length);
+  } else {
+    st.lines[st.cur.l] = line.slice(0, st.cur.c) + ins + line.slice(st.cur.c);
+  }
+  st.cur.c += ins.length; st.dirty = true; st.rev++;
+}
+
+/* ── コマンドライン / 検索モード ── */
+function cmdlineKey(st, key){
+  if (key === "<Esc>"){ st.mode = "normal"; st.cmdline = ""; return; }
+  if (key === "<BS>"){
+    st.cmdline = st.cmdline.slice(0, -1);
+    if (!st.cmdline){ st.mode = "normal"; }
+    return;
+  }
+  if (key === "<CR>"){
+    var line = st.cmdline, kind = line.charAt(0), body = line.slice(1);
+    st.cmdline = ""; st.mode = "normal";
+    if (kind === ":") execEx(st, body);
+    else {
+      st.search.pat = body || st.search.pat;
+      st.search.dir = (kind === "/") ? 1 : -1;
+      var f = searchFrom(st, st.search.pat, st.search.dir, st.cur);
+      if (f){ st.cur = f; st.desired = f.c; st.msg = kind + st.search.pat; emit(st, "jump", {line:f.l}); }
+      else { st.msg = "パターンが見つかりません: " + st.search.pat; st.msgErr = true; }
+    }
+    clampCur(st); return;
+  }
+  if (key === "<Tab>") return;
+  if (key.length === 1) st.cmdline += key;
+}
+
+/* ── Ex コマンド ── */
+function execEx(st, cmd){
+  cmd = String(cmd || "").trim();
+  st.msgErr = false;
+  if (!cmd) return;
+  var m;
+
+  /* 行番号ジャンプ  :42  :$  */
+  if ((m = /^(\d+)$/.exec(cmd))){
+    st.cur.l = Math.max(0, Math.min(st.lines.length - 1, parseInt(m[1], 10) - 1));
+    st.cur.c = firstNonBlank(st, st.cur.l); st.desired = st.cur.c;
+    emit(st, "jump", {line:st.cur.l}); return;
+  }
+  if (cmd === "$"){ st.cur.l = st.lines.length - 1; st.cur.c = 0; emit(st, "jump", {line:st.cur.l}); return; }
+
+  /* 置換  :%s/pat/rep/g   :s/pat/rep/   :3,9s/pat/rep/g */
+  if ((m = /^(%|\d+\s*,\s*\d+|\.)?\s*s\/((?:[^\/\\]|\\.)*)\/((?:[^\/\\]|\\.)*)\/?([gi]*)$/.exec(cmd))){
+    var lo = st.cur.l, hi = st.cur.l;
+    if (m[1] === "%"){ lo = 0; hi = st.lines.length - 1; }
+    else if (m[1] && m[1].indexOf(",") >= 0){
+      var pr = m[1].split(",");
+      lo = Math.max(0, parseInt(pr[0], 10) - 1);
+      hi = Math.min(st.lines.length - 1, parseInt(pr[1], 10) - 1);
+    }
+    var flags = m[4] || "", re;
+    try { re = new RegExp(m[2], flags.indexOf("g") >= 0 ? "g" + (flags.indexOf("i") >= 0 ? "i" : "") : (flags.indexOf("i") >= 0 ? "i" : "")); }
+    catch (e){ st.msg = "不正な正規表現: " + m[2]; st.msgErr = true; return; }
+    var rep = m[3].replace(/\\\//g, "/"), hits = 0, hitLines = 0;
+    snapshot(st);
+    for (var l = lo; l <= hi; l++){
+      var before = st.lines[l];
+      var after = before.replace(re, function(){
+        hits++; return rep.replace(/\$(\d)|\\(\d)/g, function(_, a, b){ return arguments[parseInt(a || b, 10)] || ""; });
+      });
+      if (after !== before){ st.lines[l] = after; hitLines++; }
+    }
+    if (!hits){ st.undo.pop(); st.msg = "パターンが見つかりません: " + m[2]; st.msgErr = true; }
+    else { st.dirty = true; st.msg = hits + " 件を " + hitLines + " 行で置換しました"; }
+    clampCur(st); return;
+  }
+
+  var parts = cmd.split(/\s+/), head = parts[0], arg = cmd.slice(head.length).trim();
+
+  switch (head){
+    case "w": case "write":
+      emit(st, "write", {name:arg || st.fname});
+      if (arg) st.fname = arg;
+      st.dirty = false; st.msg = '"' + st.fname + '" を保存しました'; return;
+    case "wq": case "x":
+      emit(st, "write", {name:arg || st.fname}); emit(st, "quit", {});
+      st.dirty = false; st.msg = '"' + st.fname + '" を保存して終了'; return;
+    case "q": case "quit": case "q!":
+      if (st.dirty && head === "q"){ st.msg = "変更が保存されていません (:q! で破棄)"; st.msgErr = true; return; }
+      emit(st, "quit", {}); st.msg = "終了"; return;
+    case "e": case "edit":
+      emit(st, "open", {name:arg}); st.msg = "ファイルを開きます…"; return;
+    case "pdf": case "print": case "hardcopy": case "ha":
+      emit(st, "print", {}); st.msg = "PDF に書き出します (印刷ダイアログで「PDF に保存」)"; return;
+    case "new": case "enew":
+      snapshot(st); st.lines = [""]; st.cur = {l:0, c:0}; st.dirty = false;
+      st.fname = arg || "untitled.bada"; st.msg = "新規バッファ"; return;
+    case "demo":
+      snapshot(st); st.lines = DEMO_SRC.split("\n"); st.cur = {l:0, c:0};
+      st.fname = "quantum.bada"; st.msg = "デモを読み込みました"; return;
+    case "run": case "q!run": case "quantum":
+      emit(st, "run", {}); st.msg = "⚛ 量子 Bada を実行"; return;
+    case "emit": case "signal": case "slam":
+      emit(st, "signal", {line:st.cur.l, mag:1, what:arg || "manual"});
+      st.msg = "✨ " + (st.cur.l + 1) + " 行目へイベントをディスパッチ"; return;
+    case "countdown": case "cd": {
+      var sec = parseFloat(arg);
+      if (!isFinite(sec) || sec <= 0) sec = 5;
+      sec = Math.min(60, sec);
+      emit(st, "countdown", {seconds:sec});
+      st.msg = "⏱ T-" + sec + " カウントダウン開始"; return;
+    }
+    case "focus":
+      st.opts.focus = !st.opts.focus;
+      st.msg = "シネマフォーカス: " + (st.opts.focus ? "ON" : "OFF"); return;
+    case "prose": case "text":
+      st.opts.view = "prose"; st.msg = "📄 文章ビュー (ポイント位置のどアップ)";
+      emit(st, "view", {to:"prose"}); return;
+    case "code": case "mono":
+      st.opts.view = "code"; st.msg = "💻 コードビュー";
+      emit(st, "view", {to:"code"}); return;
+    case "mag": case "zoom": case "wave":
+      st.opts.zoom = !st.opts.zoom;
+      st.msg = "🔎 どアップ: " + (st.opts.zoom ? "ON" : "OFF"); return;
+    case "flash":
+      st.opts.flash = !st.opts.flash;
+      st.msg = "イベントフラッシュ: " + (st.opts.flash ? "ON" : "OFF"); return;
+    case "bus":
+      st.opts.bus = !st.opts.bus;
+      st.msg = "イベントバス表示: " + (st.opts.bus ? "ON" : "OFF");
+      emit(st, "opts", {}); return;
+    case "noh": case "nohl": case "nohlsearch":
+      st.search.pat = ""; st.msg = ""; return;
+    case "help": case "h":
+      emit(st, "help", {}); return;
+    case "reg": case "registers":
+      st.msg = "レジスタ: " + Object.keys(st.regs).join(" "); return;
+    case "set": {
+      if (!arg){ st.msg = "使い方: :set number / :set nonumber / :set peak=3.0"; st.msgErr = true; return; }
+      var toks = arg.split(/\s+/);
+      for (var ti = 0; ti < toks.length; ti++){
+        var t = toks[ti], mm;
+        /* 文字列を取るオプション (view) */
+        if ((mm = /^(view)=(\w+)$/.exec(t))){
+          var ok = {view:["prose", "code"]};
+          if (ok[mm[1]].indexOf(mm[2]) < 0){
+            st.msg = mm[1] + " は " + ok[mm[1]].join(" / ") + " のいずれかです";
+            st.msgErr = true; return;
+          }
+          st.opts[mm[1]] = mm[2];
+          continue;
+        }
+        if ((mm = /^(\w+)=([-\d.]+)$/.exec(t))){
+          var key = {sw:"shiftwidth", shiftwidth:"shiftwidth"}[mm[1]] || mm[1];
+          if (key === "shiftwidth"){ st.shiftwidth = Math.max(1, Math.min(8, parseFloat(mm[2]))); }
+          else if (st.opts.hasOwnProperty(key)) st.opts[key] = parseFloat(mm[2]);
+          else { st.msg = "未知のオプション: " + mm[1]; st.msgErr = true; return; }
+        } else {
+          var on = true, nm = t;
+          if (/^no/.test(t) && !st.opts.hasOwnProperty(t)){ on = false; nm = t.slice(2); }
+          nm = {nu:"number", number:"number", so:"sound", sound:"sound"}[nm] || nm;
+          if (!st.opts.hasOwnProperty(nm)){ st.msg = "未知のオプション: " + t; st.msgErr = true; return; }
+          st.opts[nm] = on;
+        }
+      }
+      st.msg = "set " + arg; emit(st, "opts", {}); return;
+    }
+  }
+  st.msg = "未知のコマンド: " + cmd; st.msgErr = true;
+}
+
+/* ── ビジュアルモードの範囲 ── */
+function visualRange(st){
+  var a = st.visStart, b = st.cur;
+  if (cmpPos(a, b) > 0){ var t = a; a = b; b = t; }
+  if (st.mode === "vline") return {a:{l:a.l, c:0}, b:{l:b.l, c:_len(st, b.l)}, linewise:true};
+  return {a:{l:a.l, c:a.c}, b:{l:b.l, c:Math.min(_len(st, b.l), b.c + 1)}, linewise:false};
+}
+
+/* ── ノーマル/ビジュアルモードのパース ──
+ * runNormal は "incomplete" を返した場合のみ pending を保持します。  */
+function parseMotionKeys(s){
+  if (!s) return "incomplete";
+  var c = s.charAt(0);
+  if ("hjklwWbBeE0^$G{}%;,nN+-".indexOf(c) >= 0) return {m:c, len:1};
+  if (c === "g"){
+    if (s.length < 2) return "incomplete";
+    if (s.charAt(1) === "g") return {m:"gg", len:2};
+    return null;
+  }
+  if ("ftFT".indexOf(c) >= 0){
+    if (s.length < 2) return "incomplete";
+    return {m:c, arg:s.charAt(1), len:2};
+  }
+  return null;
+}
+
+function runNormal(st, seq){
+  var vis = (st.mode === "visual" || st.mode === "vline");
+  var cm = /^([1-9][0-9]*)/.exec(seq), count = cm ? parseInt(cm[1], 10) : 0;
+  var rest = seq.slice(cm ? cm[1].length : 0);
+  if (rest === "") return "incomplete";
+  var n = count || 1, c0 = rest.charAt(0), i;
+  /* <Esc> <CR> <BS> <Space> <C-r> … は単一の特殊キー。
+     先頭の '<' を unindent オペレータと取り違えないよう先に切り分ける。 */
+  var isSpecial = /^<[A-Za-z][A-Za-z-]*>$/.test(rest);
+
+  /* レジスタ指定 "a */
+  if (c0 === '"'){
+    if (rest.length < 2) return "incomplete";
+    var reg = rest.charAt(1);
+    var sub = runNormal(st, (count ? String(count) : "") + rest.slice(2));
+    if (sub === "incomplete") return "incomplete";
+    return sub;
+  }
+
+  /* ── オペレータ (ビジュアルモードでは即時適用) ── */
+  if (!vis && !isSpecial && "dcy><".indexOf(c0) >= 0){
+    var after = rest.slice(1);
+    if (after === "") return "incomplete";
+    var cm2 = /^([1-9][0-9]*)/.exec(after);
+    var n2 = cm2 ? parseInt(cm2[1], 10) : 1;
+    after = after.slice(cm2 ? cm2[1].length : 0);
+    if (after === "") return "incomplete";
+    var total = n * n2;
+    if (after.charAt(0) === c0){                       /* dd yy cc >> << */
+      var l1 = Math.min(st.lines.length - 1, st.cur.l + total - 1);
+      st.lastChange = {seq:seq, insert:null};
+      applyOp(st, c0, {a:{l:st.cur.l, c:0}, b:{l:l1, c:_len(st, l1)}, linewise:true}, null);
+      if (st.mode === "insert") st.insertLog = [];
+      clampCur(st); return "done";
+    }
+    var mo = parseMotionKeys(after);
+    if (mo === "incomplete") return "incomplete";
+    if (!mo) return "done";
+    /* vim の特例: cw / cW は ce / cE として振る舞い、末尾の空白を食わない */
+    var mk = mo.m;
+    if (c0 === "c" && (mk === "w" || mk === "W")) mk = (mk === "w") ? "e" : "E";
+    var res = evalMotion(st, mk, (mk === "G" && !cm2 && !count) ? 0 : total, mo.arg);
+    if (!res){ st.msg = "移動できません"; st.msgErr = true; return "done"; }
+    var lw = res.linewise || (mk === "gg" || mk === "G");
+    st.lastChange = {seq:seq, insert:null};
+    applyOp(st, c0, makeRange(st, st.cur, res.pos, lw, res.inclusive), null);
+    if (st.mode === "insert") st.insertLog = [];
+    clampCur(st); return "done";
+  }
+
+  /* ── モーション単体 ── */
+  var mo2 = isSpecial ? null : parseMotionKeys(rest);
+  if (mo2 === "incomplete") return "incomplete";
+  if (mo2 && mo2.len === rest.length){
+    var r2 = evalMotion(st, mo2.m, (mo2.m === "G" && !count) ? 0 : n, mo2.arg);
+    if (!r2){ if (!st.msg) { st.msg = "見つかりません"; st.msgErr = true; } return "done"; }
+    var prevL = st.cur.l;
+    st.cur = {l:r2.pos.l, c:r2.pos.c};
+    if (mo2.m !== "j" && mo2.m !== "k") st.desired = st.cur.c;
+    clampCur(st);
+    if (st.cur.l !== prevL) emit(st, "motion", {line:st.cur.l, from:prevL, what:mo2.m});
+    return "done";
+  }
+
+  /* ── 単発コマンド ── */
+  switch (rest){
+    case "i": snapshot(st); st.mode = "insert"; st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "a": snapshot(st); st.mode = "insert"; st.cur.c = Math.min(_len(st, st.cur.l), st.cur.c + 1); st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "I": snapshot(st); st.mode = "insert"; st.cur.c = firstNonBlank(st, st.cur.l); st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "A": snapshot(st); st.mode = "insert"; st.cur.c = _len(st, st.cur.l); st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "o": case "O": {
+      snapshot(st);
+      var at = st.cur.l + (rest === "o" ? 1 : 0);
+      var ind = (st.lines[st.cur.l] || "").match(/^\s*/)[0];
+      st.lines.splice(at, 0, ind);
+      st.cur.l = at; st.cur.c = ind.length; st.mode = "insert"; st.dirty = true;
+      st.lastChange = {seq:seq, insert:null}; st.insertLog = [];
+      emit(st, "edit", {line:at, mag:0.55, what:rest === "o" ? "open-below" : "open-above"});
+      return "done";
+    }
+    case "R": snapshot(st); st.mode = "replace"; st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "v": st.mode = (st.mode === "visual") ? "normal" : "visual"; st.visStart = {l:st.cur.l, c:st.cur.c}; return "done";
+    case "V": st.mode = (st.mode === "vline") ? "normal" : "vline"; st.visStart = {l:st.cur.l, c:st.cur.c}; return "done";
+    case ":": st.mode = "command"; st.cmdline = ":"; return "done";
+    case "/": st.mode = "search"; st.cmdline = "/"; return "done";
+    case "?": st.mode = "search"; st.cmdline = "?"; return "done";
+    case "u": doUndo(st); return "done";
+    case "<C-r>": doRedo(st); return "done";
+    case "x": {
+      snapshot(st); st.lastChange = {seq:seq, insert:null};
+      var line = st.lines[st.cur.l] || "";
+      var cut = line.slice(st.cur.c, st.cur.c + n);
+      if (cut){ setReg(st, null, [cut], false);
+        st.lines[st.cur.l] = line.slice(0, st.cur.c) + line.slice(st.cur.c + n); st.dirty = true; }
+      clampCur(st); return "done";
+    }
+    case "X": {
+      snapshot(st); st.lastChange = {seq:seq, insert:null};
+      var line2 = st.lines[st.cur.l] || "", from = Math.max(0, st.cur.c - n);
+      if (st.cur.c > 0){
+        setReg(st, null, [line2.slice(from, st.cur.c)], false);
+        st.lines[st.cur.l] = line2.slice(0, from) + line2.slice(st.cur.c);
+        st.cur.c = from; st.dirty = true;
+      }
+      clampCur(st); return "done";
+    }
+    case "D": st.lastChange = {seq:seq, insert:null};
+      applyOp(st, "d", makeRange(st, st.cur, {l:st.cur.l, c:_len(st, st.cur.l)}, false, false), null); clampCur(st); return "done";
+    case "C": st.lastChange = {seq:seq, insert:null};
+      applyOp(st, "c", makeRange(st, st.cur, {l:st.cur.l, c:_len(st, st.cur.l)}, false, false), null);
+      st.insertLog = []; return "done";
+    case "Y": applyOp(st, "y", {a:{l:st.cur.l, c:0}, b:{l:st.cur.l, c:_len(st, st.cur.l)}, linewise:true}, null); return "done";
+    case "p": st.lastChange = {seq:seq, insert:null}; doPut(st, true, n, null); emit(st, "edit", {line:st.cur.l, mag:0.7, what:"put-after"}); return "done";
+    case "P": st.lastChange = {seq:seq, insert:null}; doPut(st, false, n, null); emit(st, "edit", {line:st.cur.l, mag:0.7, what:"put-before"}); return "done";
+    case "J": {
+      snapshot(st); st.lastChange = {seq:seq, insert:null};
+      for (i = 0; i < Math.max(1, n - 1) && st.cur.l < st.lines.length - 1; i++){
+        var a1 = st.lines[st.cur.l], b1 = (st.lines[st.cur.l + 1] || "").replace(/^\s+/, "");
+        st.cur.c = a1.length;
+        st.lines.splice(st.cur.l, 2, a1 + (a1 && b1 ? " " : "") + b1);
+      }
+      st.dirty = true; clampCur(st); return "done";
+    }
+    case "~": {
+      snapshot(st); st.lastChange = {seq:seq, insert:null};
+      var l3 = st.lines[st.cur.l] || "", e3 = Math.min(l3.length, st.cur.c + n);
+      var mid = l3.slice(st.cur.c, e3).replace(/./g, function(ch){
+        return ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase();
+      });
+      st.lines[st.cur.l] = l3.slice(0, st.cur.c) + mid + l3.slice(e3);
+      st.cur.c = Math.min(Math.max(0, l3.length - 1), e3); st.dirty = true; return "done";
+    }
+    case "ZZ": emit(st, "write", {name:st.fname}); emit(st, "quit", {}); return "done";
+    case "Z": return "incomplete";
+    case ".": {
+      if (!st.lastChange){ st.msg = "繰り返す変更がありません"; return "done"; }
+      var lc = st.lastChange;
+      runNormal(st, lc.seq);
+      if (lc.insert && st.mode === "insert"){
+        for (i = 0; i < lc.insert.length; i++) insertKey(st, lc.insert[i]);
+        insertKey(st, "<Esc>");
+      } else if (st.mode === "insert") insertKey(st, "<Esc>");
+      st.lastChange = lc; return "done";
+    }
+    case "<Esc>":
+      if (vis){ st.mode = "normal"; st.visStart = null; }
+      st.msg = ""; st.msgErr = false; return "done";
+    case "<CR>": {
+      var pl = st.cur.l;
+      st.cur.l = Math.min(st.lines.length - 1, st.cur.l + n);
+      st.cur.c = firstNonBlank(st, st.cur.l); clampCur(st);
+      if (st.cur.l !== pl) emit(st, "motion", {line:st.cur.l, from:pl, what:"<CR>"});
+      return "done";
+    }
+    case "<Space>":
+      emit(st, "signal", {line:st.cur.l, mag:1, what:"manual"});
+      st.msg = "✨ " + (st.cur.l + 1) + " 行目へイベントをディスパッチ";
+      return "done";
+    case "<C-d>": st.cur.l = Math.min(st.lines.length - 1, st.cur.l + 12); clampCur(st); emit(st, "motion", {line:st.cur.l, what:"<C-d>"}); return "done";
+    case "<C-u>": st.cur.l = Math.max(0, st.cur.l - 12); clampCur(st); emit(st, "motion", {line:st.cur.l, what:"<C-u>"}); return "done";
+    case "<C-b>": st.cur.l = Math.max(0, st.cur.l - 24); clampCur(st); emit(st, "motion", {line:st.cur.l, what:"<C-b>"}); return "done";
+    case "<C-f>": st.cur.l = Math.min(st.lines.length - 1, st.cur.l + 24); clampCur(st); emit(st, "motion", {line:st.cur.l, what:"<C-f>"}); return "done";
+  }
+
+  /* r<char> — 一文字置換 */
+  if (rest.charAt(0) === "r"){
+    if (rest.length < 2) return "incomplete";
+    snapshot(st); st.lastChange = {seq:seq, insert:null};
+    var rl = st.lines[st.cur.l] || "", rep = new Array(n + 1).join(rest.charAt(1));
+    if (st.cur.c + n <= rl.length){
+      st.lines[st.cur.l] = rl.slice(0, st.cur.c) + rep + rl.slice(st.cur.c + n);
+      st.cur.c += n - 1; st.dirty = true;
+    }
+    clampCur(st); return "done";
+  }
+
+  /* ── ビジュアルモードの操作 ── */
+  if (vis){
+    switch (rest){
+      case "d": case "x": case "y": case "c": case ">": case "<": {
+        var vr = visualRange(st), wasLine = st.mode === "vline";
+        st.mode = "normal"; st.visStart = null;
+        applyOp(st, (rest === "x" ? "d" : rest), vr, null);
+        if (rest === "c") st.insertLog = [];
+        if (wasLine && rest === "y") st.msg = (vr.b.l - vr.a.l + 1) + " 行をヤンクしました";
+        clampCur(st); return "done";
+      }
+      case "o": {
+        var t2 = st.visStart; st.visStart = {l:st.cur.l, c:st.cur.c}; st.cur = {l:t2.l, c:t2.c};
+        clampCur(st); return "done";
+      }
+      case "u": case "U": {
+        snapshot(st);
+        var vr2 = visualRange(st), txt2 = extractRange(st, vr2);
+        var f2 = (rest === "u") ? "toLowerCase" : "toUpperCase";
+        if (vr2.linewise){
+          for (i = vr2.a.l; i <= vr2.b.l; i++) st.lines[i] = st.lines[i][f2]();
+        } else {
+          st.lines[vr2.a.l] = st.lines[vr2.a.l].slice(0, vr2.a.c) +
+            txt2.join("")[f2]() + (st.lines[vr2.b.l] || "").slice(vr2.b.c);
+        }
+        st.mode = "normal"; st.visStart = null; st.dirty = true; clampCur(st); return "done";
+      }
+      case "✨": case "<Space>":
+        emit(st, "signal", {line:st.cur.l, mag:1, what:"manual"}); return "done";
+    }
+  }
+
+  /* 認識できないキー列 */
+  st.msg = ""; return "done";
+}
+
+/* ── 単一キーの入力 ──
+ * すべての入力を「イベント」として扱います。1 キー = 1 ディスパッチで、
+ *   1. key    — 入力そのもの
+ *   2. ハンドラが発行するイベント (motion / edit / ex / search / …)
+ *   3. mode   — モードが遷移した場合
+ *   4. edit   — 本文が変化した場合 (rev の差分で検出)
+ * を st.events に積み、UI 側がこの順にディスパッチして行を光らせます。 */
+function feedKey(st, key){
+  st.events.length = 0;
+  var beforeMode = st.mode, beforeRev = st.rev, beforeLine = st.cur.l;
+
+  emit(st, "key", {key:key, line:st.cur.l, mode:beforeMode});
+
+  if (st.mode === "insert" || st.mode === "replace"){
+    insertKey(st, key); clampCur(st);
+  } else if (st.mode === "command" || st.mode === "search"){
+    cmdlineKey(st, key);
+  } else {
+    if (key === "<Esc>") st.pending = "";
+    st.pending += key;
+    var r = runNormal(st, st.pending);
+    if (r !== "incomplete") st.pending = "";
+    if (st.pending.length > 12) st.pending = "";
+    clampCur(st);
+  }
+
+  /* 本文が変わったなら edit イベント (ハンドラが個別に出していない場合のみ) */
+  if (st.rev !== beforeRev && !st.events.some(function(e){ return e.type === "edit"; })){
+    emit(st, "edit", {line:st.cur.l, mag:0.62, what:key});
+  }
+  /* モード遷移 */
+  if (st.mode !== beforeMode){
+    emit(st, "mode", {line:st.cur.l, from:beforeMode, to:st.mode, mag:0.5});
+  }
+  /* 挿入モード中のカーソル行移動も motion として拾う */
+  if (st.cur.l !== beforeLine && !st.events.some(function(e){ return e.type === "motion"; })){
+    emit(st, "motion", {line:st.cur.l, from:beforeLine, mag:0.42, what:key});
+  }
+  st.dispatched += st.events.length;
+  return st;
+}
+function feedKeys(st, keys){
+  for (var i = 0; i < keys.length; i++) feedKey(st, keys[i]);
+  return st;
+}
+/* "ciw" のような文字列をキー列として流し込む (テスト用のショートハンド) */
+function feedString(st, s){
+  var i = 0;
+  while (i < s.length){
+    if (s.charAt(i) === "<"){
+      var e = s.indexOf(">", i);
+      if (e > 0){ feedKey(st, s.slice(i, e + 1)); i = e + 1; continue; }
+    }
+    feedKey(st, s.charAt(i)); i++;
+  }
+  return st;
+}
+
+/* =====================================================================
+ * 7. シネマ演出の数理
+ * ================================================================== */
+
+/* focusStyle(dist, o)
+ *   カーソル行からの距離 dist に対する被写界深度。
+ *   dist=0 (ポイントされた行) が最大倍率・ぼかし 0・最前面。
+ *   ガウス核 k = exp(-d²/2σ²) で滑らかに減衰します。
+ *     -> { scale, blur, opacity, z, k }                                */
+function focusStyle(dist, o){
+  o = o || {};
+  var depth   = (o.depth   === undefined) ? 1    : Math.max(0, Math.min(1, o.depth));
+  var peak    = (o.peak    === undefined) ? 2.6  : o.peak;
+  var spread  = (o.spread  === undefined) ? 2.2  : Math.max(0.35, o.spread);
+  var maxBlur = (o.maxBlur === undefined) ? 3.2  : o.maxBlur;
+  var minOp   = (o.minOpacity === undefined) ? 0.13 : o.minOpacity;
+  var maxZ    = (o.maxZ    === undefined) ? 26   : o.maxZ;
+  var d = Math.abs(dist);
+  var k = Math.exp(-(d * d) / (2 * spread * spread));
+  return {
+    k: k,
+    scale:   1 + (peak - 1) * k * depth,
+    blur:    maxBlur * (1 - k) * depth,
+    opacity: 1 - (1 - minOp) * (1 - k) * depth,
+    z:       maxZ * k * depth
+  };
+}
+
+/* docLayout(scales, baseH)
+ *   拡大した行が重ならないよう、行ごとの占有高さと中心位置を求めます。
+ *     -> { tops:[], heights:[], centers:[], total }                    */
+function docLayout(scales, baseH){
+  var tops = [], heights = [], centers = [], y = 0;
+  for (var i = 0; i < scales.length; i++){
+    var h = baseH * scales[i];
+    tops.push(y); heights.push(h); centers.push(y + h / 2);
+    y += h;
+  }
+  return {tops:tops, heights:heights, centers:centers, total:y};
+}
+
+/* ── イベント種別の見た目 ──
+ * 種別ごとに色相と表示名を固定します (UI とテストの両方が参照)。   */
+var EVENT_STYLE = {
+  key:    {hue:205, label:"KEY"},
+  motion: {hue:188, label:"MOTION"},
+  edit:   {hue:145, label:"EDIT"},
+  mode:   {hue:268, label:"MODE"},
+  ex:     {hue:45,  label:"EX"},
+  search: {hue:320, label:"SEARCH"},
+  signal: {hue:52,  label:"SIGNAL"},
+  tick:   {hue:18,  label:"TICK"},
+  run:    {hue:168, label:"RUN"},
+  io:     {hue:96,  label:"IO"},
+  error:  {hue:358, label:"ERROR"}
+};
+function eventStyle(type){
+  return EVENT_STYLE[type] || {hue:210, label:String(type == null ? "EVENT" : type).toUpperCase()};
+}
+
+/* 種別ごとの既定の強さ (明示的な mag がないイベントに使う) */
+var EVENT_MAG = {
+  key:0.22, motion:0.45, edit:0.66, mode:0.5, ex:0.7,
+  search:0.8, signal:1, tick:0.75, run:0.85, io:0.9, error:1
+};
+function eventMag(type){
+  var m = EVENT_MAG[type];
+  return (m === undefined) ? 0.5 : m;
+}
+
+/* flashFrame(t, intensity)
+ *   イベント処理フラッシュの 1 フレーム。t は 0→1 の進行、
+ *   intensity は 0→1 の強さ。信号ランプのように「立ち上がりが速く、
+ *   指数的に減衰する」包絡をとります (揺れも破片もありません)。
+ *     env   — 包絡そのもの (0→1→0、ピークは t = ATTACK)
+ *     glow  — 文字のにじみ (px)
+ *     wash  — 行の下地の発光量 (0→1)
+ *     edge  — 左端イベントマーカーの太さ (px)
+ *     rise  — 処理中の行がわずかに浮く量 (px)
+ *     sweep — 処理の光が行を走る位置 (0→1、t と同じ)
+ *     -> { env, glow, wash, edge, rise, sweep }                       */
+var FLASH_ATTACK = 0.12;
+function flashFrame(t, intensity){
+  intensity = (intensity === undefined) ? 1 : Math.max(0, Math.min(1, intensity));
+  if (!(t > 0) || t >= 1) return {env:0, glow:0, wash:0, edge:0, rise:0, sweep:0};
+  var shape = (t < FLASH_ATTACK) ? (t / FLASH_ATTACK) : Math.exp(-(t - FLASH_ATTACK) * 5.2);
+  var env = shape * (1 - t) * intensity;
+  return {
+    env:   env,
+    glow:  30  * env,
+    wash:  0.9 * env,
+    edge:  5   * env,
+    rise:  7   * env,
+    sweep: t
+  };
+}
+
+/* =====================================================================
+ * 7b. 多段落の文章、文のブロック、どアップと波打ち
+ * ================================================================== */
+
+/* splitParagraphs(lines)
+ *   空行を区切りとして、行の並びを段落に分けます。空行そのものも
+ *   「段落の隙間」として 1 件返すので、どの行にもカーソルを置けます。
+ *     -> [{kind:"para"|"gap", from, to, lines:[…]}]                   */
+function splitParagraphs(lines){
+  var out = [], cur = null;
+  for (var i = 0; i < lines.length; i++){
+    var blank = /^\s*$/.test(lines[i]);
+    if (blank){
+      cur = null;
+      out.push({kind:"gap", from:i, to:i, lines:[lines[i]]});
+    } else {
+      if (!cur){ cur = {kind:"para", from:i, to:i, lines:[]}; out.push(cur); }
+      cur.to = i; cur.lines.push(lines[i]);
+    }
+  }
+  return out;
+}
+
+
+/* 文字クラス — 語の切れ目を見るために、ひらがな/カタカナ/漢字/ラテンを分ける */
+function textClass(ch){
+  if (!ch) return 0;
+  if (/\s/.test(ch)) return 0;
+  if (/[\u3040-\u309f]/.test(ch)) return 1;                    /* ひらがな */
+  if (/[\u30a0-\u30ff\uff66-\uff9f]/.test(ch)) return 2;      /* カタカナ */
+  if (/[\u3400-\u4dbf\u4e00-\u9fff]/.test(ch)) return 3;      /* 漢字 */
+  if (/[A-Za-z0-9_'\u00c0-\u024f]/.test(ch)) return 4;         /* ラテン/数字 */
+  return 5;                                                    /* 約物 */
+}
+
+/* wordAt(text, idx) — idx の位置にある「語」
+ *   規則: ひらがな / カタカナ / 漢字 / ラテン・数字 / 約物 をそれぞれ 1 つの
+ *   類とし、同じ類の連なりを 1 語とする。ただし漢字の直後に続くひらがなは
+ *   送り仮名として同じ語に含める (「動く」「文章は」)。辞書は使わないため、
+ *   カタカナと漢字の境目 (「カタカナ|語」) では語が分かれる。            */
+function wordAt(text, idx){
+  text = String(text == null ? "" : text);
+  if (!text.length) return {from:0, to:0, text:""};
+  idx = Math.max(0, Math.min(text.length - 1, idx));
+  var cls = textClass(text.charAt(idx));
+  if (cls === 0) return {from:idx, to:idx + 1, text:text.charAt(idx)};
+  var a = idx, b = idx;
+  while (a > 0 && textClass(text.charAt(a - 1)) === cls) a--;
+  while (b < text.length - 1 && textClass(text.charAt(b + 1)) === cls) b++;
+
+  /* 送り仮名 — 漢字の直後に続くひらがなは同じ語として扱う
+     (「動く」「浮かび」のように、漢字とひらがなで 1 語になるため) */
+  if (cls === 3){
+    while (b < text.length - 1 && textClass(text.charAt(b + 1)) === 1) b++;
+  } else if (cls === 1 && a > 0 && textClass(text.charAt(a - 1)) === 3){
+    while (a > 0 && textClass(text.charAt(a - 1)) === 3) a--;
+  }
+  return {from:a, to:b + 1, text:text.slice(a, b + 1)};
+}
+
+
+/* HTML エスケープ (描画とテストの両方から使う) */
+function escapeHtml(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+
+/* segmentLine(text)
+ *   1 行を「語のまとまり」に切り分けます。wordAt と同じ規則 (ひらがな /
+ *   カタカナ / 漢字 / ラテン / 約物、漢字の直後のひらがなは送り仮名) で、
+ *   連結すると必ず元の行に戻ります (取りこぼしがない)。
+ *   これがどアップの最小単位になります。
+ *     -> [{from, to, text}]                                           */
+function segmentLine(text){
+  text = String(text == null ? "" : text);
+  var out = [], i = 0;
+  while (i < text.length){
+    var w = wordAt(text, i);
+    var to = Math.max(w.to, i + 1);
+    if (to > text.length) to = text.length;
+    out.push({from:i, to:to, text:text.slice(i, to)});
+    i = to;
+  }
+  return out;
+}
+
+/* blockLayout(sizes, scales, anchor)
+ *   その場で拡大したときに隣どうしが重ならないよう、各要素をどれだけ
+ *   ずらすかを求めます。縦 (行の高さ) にも横 (セグメントの幅) にも
+ *   そのまま使えます。
+ *     offsets[i] = Σ_{j<i} s_j(k_j-1) + s_i(k_i-1)·anchor
+ *   anchor は拡大の基準点:
+ *     0.5 — 中心から拡大する場合 (transform-origin が中央。既定)
+ *     0   — 始点から拡大する場合 (transform-origin:0。横方向はこちら)
+ *   マージンを動かさず transform だけで済むので、毎フレームのレイアウト
+ *   再計算が起きません。
+ *     -> { offsets:[], extras:[], total }                             */
+function blockLayout(sizes, scales, anchor){
+  anchor = (anchor === undefined) ? 0.5 : anchor;
+  var offsets = [], extras = [], acc = 0;
+  for (var i = 0; i < sizes.length; i++){
+    var extra = sizes[i] * ((scales[i] === undefined ? 1 : scales[i]) - 1);
+    extras.push(extra);
+    offsets.push(acc + extra * anchor);
+    acc += extra;
+  }
+  return {offsets:offsets, extras:extras, total:acc};
+}
+
+/* displayToNatural(lefts, widths, scales, dx)
+ *   拡大後の表示位置 dx が、拡大していないときのどの位置に当たるかを
+ *   求めます (横方向の写像の逆)。ポインタの狙いをこの自然位置で持つと、
+ *   「自分が作った拡大に焦点が追われて暴れる」のを防げます。
+ *     -> セグメントの添字                                             */
+function displayToNatural(lefts, widths, scales, dx){
+  var lay = blockLayout(widths, scales, 0);
+  for (var i = 0; i < widths.length; i++){
+    var left = lefts[i] + lay.offsets[i];
+    var right = left + widths[i] * (scales[i] === undefined ? 1 : scales[i]);
+    if (dx < right) return i;
+  }
+  return Math.max(0, widths.length - 1);
+}
+
+/* gauss(d, spread)
+ *   焦点からの距離 d に対する重み (d=0 で 1、離れるほど 0 へ)。
+ *   縦 (行数) にも横 (px) にも同じ式を使います。                      */
+function gauss(d, spread){
+  spread = (spread === undefined || !(spread > 0)) ? 1 : spread;
+  return Math.exp(-(d * d) / (2 * spread * spread));
+}
+
+/* segScale(dRow, dxPx, o)
+ *   縦 (行の距離) と横 (px の距離) を合わせた、そのセグメントの倍率。
+ *
+ *     gv = exp(-dRow² / 2·vspread²)      縦の効き
+ *     gh = exp(-dxPx² / 2·hspread²)      横の効き
+ *     scale = 1 + (zpeak - 1) · gv · (vmix + (1 - vmix)·gh)
+ *
+ *   要は、縦の効きのうち vmix の割合は「行全体」に及び、残りが「指した
+ *   位置」に集まります。こうしておくと:
+ *     ・上下に動かす → その行がまるごと持ち上がる (行全体のどアップ)
+ *     ・左右に動かす → その行の中で、指した位置がさらに大きくなる
+ *   vmix=0 なら純粋な積 (指した一点だけ)、vmix=1 なら行単位のどアップ。
+ *     -> 倍率 (1 以上)                                                 */
+function segScale(dRow, dxPx, o){
+  o = o || {};
+  var peak = (o.peak === undefined) ? 2.2 : o.peak;
+  var vs = (o.vspread === undefined || !(o.vspread > 0)) ? 1.5 : o.vspread;
+  var hs = (o.hspread === undefined || !(o.hspread > 0)) ? 110 : o.hspread;
+  var vmix = (o.vmix === undefined) ? 0.45 : Math.max(0, Math.min(1, o.vmix));
+  var gv = gauss(dRow, vs);
+  var gh = gauss(dxPx, hs);
+  return 1 + (peak - 1) * gv * (vmix + (1 - vmix) * gh);
+}
+
+/* segmentCenters(widths)
+ *   各セグメントの「拡大していないときの」中心位置。横方向の距離を
+ *   測る基準になります (拡大後の位置ではなく自然位置で測るのが要点で、
+ *   そうしないと焦点が自分の作った拡大に追われて暴れます)。
+ *     -> { centers:[], lefts:[], total }                              */
+function segmentCenters(widths){
+  var centers = [], lefts = [], x = 0;
+  for (var i = 0; i < widths.length; i++){
+    lefts.push(x); centers.push(x + widths[i] / 2); x += widths[i];
+  }
+  return {centers:centers, lefts:lefts, total:x};
+}
+
+/* nearestIndex(centers, x) — 自然位置 x にいちばん近いセグメント */
+function nearestIndex(centers, x){
+  if (!centers.length) return 0;
+  var best = 0, bd = Infinity;
+  for (var i = 0; i < centers.length; i++){
+    var d = Math.abs(centers[i] - x);
+    if (d < bd){ bd = d; best = i; }
+  }
+  return best;
+}
+
+/* どアップ倍率の段階 (Ctrl + ホイールで行き来する) */
+var PEAK_STEPS = [1.4, 1.8, 2.2, 2.8, 3.5, 4.4];
+function peakStep(v, dir){
+  var i = 0, best = 1e9, k;
+  for (k = 0; k < PEAK_STEPS.length; k++){
+    var dd = Math.abs(PEAK_STEPS[k] - v);
+    if (dd < best){ best = dd; i = k; }
+  }
+  i = Math.max(0, Math.min(PEAK_STEPS.length - 1, i + dir));
+  return PEAK_STEPS[i];
+}
+
+/* countdownState(elapsed, total)
+ *   映画のアカデミー・リーダー。残り秒 n と、その 1 秒間の進行 phase、
+ *   掃引する指針の角度 sweep を返します。
+ *     -> { n, label, phase, sweep, done, remaining }                   */
+function countdownState(elapsed, total){
+  var remaining = total - elapsed;
+  if (!(remaining > 0)){
+    return {n:0, label:"0", phase:1, sweep:Math.PI * 2, done:true, remaining:0};
+  }
+  var n = Math.ceil(remaining);
+  var frac = remaining - (n - 1);              /* 1 → 0 でその秒が進む */
+  var phase = 1 - frac;                        /* 0 → 1 */
+  return {
+    n: n, label: String(n), phase: phase,
+    sweep: phase * Math.PI * 2, done: false, remaining: remaining
+  };
+}
+
+/* 行番号の桁数 (ガター幅) */
+function gutterWidth(n){ return String(Math.max(1, n)).length; }
+
+/* =====================================================================
+ * 7.5 PDF と文字コード — 文字化けさせずに読み込む (純ロジック)
+ *
+ *   PDF はテキストファイルではありません。中身は圧縮されたバイナリで、
+ *   文字は「フォントごとの番号」で書かれています。そのまま文字列として
+ *   読むと必ず文字化けするので、PDF は pdf.js で解析して文字 (Unicode)
+ *   に戻し、ここで行と段落に組み直します。
+ * ================================================================== */
+
+/* 先頭 1024 バイトに "%PDF-" があれば PDF */
+function isPdfBytes(u8){
+  var n = Math.min(u8.length - 4, 1024);
+  for (var i = 0; i < n; i++){
+    if (u8[i] === 0x25 && u8[i + 1] === 0x50 && u8[i + 2] === 0x44 &&
+        u8[i + 3] === 0x46 && u8[i + 4] === 0x2D) return true;
+  }
+  return false;
+}
+
+/* テキストファイルの文字コードを判定して復号する。
+   UTF-8 / UTF-16 (BOM) / ISO-2022-JP / EUC-JP / Shift_JIS。
+   TD は TextDecoder (テストから差し替えられるよう引数で受ける)。 */
+function decodeTextBytes(u8, TD){
+  function dec(label, fatal){
+    try { return new TD(label, {fatal:!!fatal}).decode(u8); } catch (e){ return null; }
+  }
+  var t;
+  if (u8.length >= 3 && u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) return {text:dec("utf-8"), encoding:"utf-8"};
+  if (u8.length >= 2 && u8[0] === 0xFF && u8[1] === 0xFE) return {text:dec("utf-16le"), encoding:"utf-16le"};
+  if (u8.length >= 2 && u8[0] === 0xFE && u8[1] === 0xFF) return {text:dec("utf-16be"), encoding:"utf-16be"};
+  /* ISO-2022-JP は 7 ビットだけで書かれ、ESC $ / ESC ( で文字集合を切り替える。
+     バイト列としては UTF-8 でも通ってしまうので、UTF-8 より先に調べる。 */
+  var esc = false, high = false;
+  for (var i = 0; i < u8.length; i++){
+    if (u8[i] >= 0x80){ high = true; break; }
+    if (u8[i] === 0x1B && (u8[i + 1] === 0x24 || u8[i + 1] === 0x28)) esc = true;
+  }
+  if (esc && !high){
+    t = dec("iso-2022-jp", true);
+    if (t !== null) return {text:t, encoding:"iso-2022-jp"};
+  }
+  t = dec("utf-8", true);
+  if (t !== null) return {text:t, encoding:"utf-8"};
+  /* EUC-JP と Shift_JIS は両方とも復号できてしまうことがある。
+     かなが多く、半角カナが少ないほうを正しい読みとみなす。 */
+  function score(str){
+    var sc = 0;
+    for (var k = 0; k < str.length; k++){
+      var c = str.charCodeAt(k);
+      if (c >= 0x3040 && c <= 0x30FF) sc += 2;          /* ひらがな・カタカナ */
+      else if (c >= 0xFF61 && c <= 0xFF9F) sc -= 1;     /* 半角カナ */
+    }
+    return sc;
+  }
+  var euc = dec("euc-jp", true), sj = dec("shift_jis", true);
+  if (euc !== null && sj !== null){
+    return score(euc) >= score(sj) ? {text:euc, encoding:"euc-jp"} : {text:sj, encoding:"shift_jis"};
+  }
+  if (euc !== null) return {text:euc, encoding:"euc-jp"};
+  if (sj !== null) return {text:sj, encoding:"shift_jis"};
+  return {text:dec("utf-8") || "", encoding:"utf-8?"};
+}
+
+/* 和文どうしの間に紛れ込んだ空白を消すための判定 */
+function isCjkChar(ch){
+  if (!ch) return false;
+  var c = ch.charCodeAt(0);
+  return (c >= 0x3000 && c <= 0x30FF) || (c >= 0x3400 && c <= 0x9FFF) ||
+         (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFF60) ||
+         (c >= 0xD840 && c <= 0xD87F);                  /* 拡張漢字のサロゲート */
+}
+
+/* 1 行ぶんの文字列を掃除する: 制御文字を落とし、和文の間の空白を詰める */
+function pdfCleanLine(s){
+  s = s.replace(/[\u0000-\u0008\u000B-\u001F\u007F\uFFFE\uFFFF]/g, "")
+       .replace(/[\t\u00A0]/g, " ");
+  var out = "";
+  for (var i = 0; i < s.length; i++){
+    var ch = s.charAt(i);
+    if (ch === " "){
+      var j = i; while (j < s.length && s.charAt(j) === " ") j++;
+      /* 和文に挟まれた 1 個だけの空白は字間の誤検出なので捨てる */
+      if (j - i === 1 && isCjkChar(out.charAt(out.length - 1)) && isCjkChar(s.charAt(j))) continue;
+    }
+    out += ch;
+  }
+  return out.replace(/\s+$/, "");
+}
+
+/* pdf.js の getTextContent().items (1 ページぶん) を行の配列にする。
+   行の区切りは hasEOL。段落の区切り (空行) は、そのページの「ふつうの行送り」
+   (行間の中央値) より目立って広いところに入れる — 行間の広い文書でも
+   1 行ごとに空行が入らないようにするため。
+   items: [{str, transform:[a,b,c,d,x,y], height, hasEOL}] */
+function pdfItemsToLines(items){
+  var rows = [], cur = "", curY = null, curH = 0, i;
+  function flush(){
+    var text = pdfCleanLine(cur);
+    if (text !== "") rows.push({text:text, y:curY, h:curH});
+    cur = ""; curY = null; curH = 0;
+  }
+  for (i = 0; i < items.length; i++){
+    var it = items[i];
+    if (!it || typeof it.str !== "string") continue;      /* マーク付きコンテンツは飛ばす */
+    if (it.str !== ""){
+      if (curY === null && it.transform && it.str.replace(/\s/g, "") !== ""){
+        curY = it.transform[5];
+      }
+      var ih = it.height || (it.transform ? Math.abs(it.transform[3]) : 0);
+      if (ih > curH) curH = ih;
+      cur += it.str;
+    }
+    if (it.hasEOL) flush();
+  }
+  flush();
+
+  /* ふつうの行送り = 下へ進んだ行間の中央値 (PDF 座標は上が大きい) */
+  var gaps = [];
+  for (i = 1; i < rows.length; i++){
+    if (rows[i].y !== null && rows[i - 1].y !== null && rows[i - 1].y - rows[i].y > 0){
+      gaps.push(rows[i - 1].y - rows[i].y);
+    }
+  }
+  gaps.sort(function(a, b){ return a - b; });
+  var typical = gaps.length ? gaps[Math.floor((gaps.length - 1) / 2)] : 0;
+
+  var lines = [];
+  for (i = 0; i < rows.length; i++){
+    if (i > 0 && rows[i].y !== null && rows[i - 1].y !== null){
+      var h = Math.max(rows[i].h, rows[i - 1].h) || 12;
+      var gap = rows[i - 1].y - rows[i].y;
+      var wide = gap > Math.max(typical * 1.4, h * 1.2);   /* 段落の切れ目 */
+      var back = gap < -h * 1.5;                           /* 上へ戻った = 次の段組 */
+      if (wide || back) lines.push("");
+    }
+    lines.push(rows[i].text);
+  }
+  return lines;
+}
+
+/* 全ページを 1 つのバッファに。ページの境目は空行にする */
+function pdfPagesToLines(pages){
+  var out = [];
+  for (var p = 0; p < pages.length; p++){
+    var ls = pdfItemsToLines(pages[p] || []);
+    if (!ls.length) continue;
+    if (out.length) out.push("");
+    for (var i = 0; i < ls.length; i++) out.push(ls[i]);
+  }
+  return out;
+}
+
+/* 読み込んだ PDF を :w で上書きしないよう、名前を .txt に替える */
+function pdfTextName(name){
+  return String(name || "document.pdf").replace(/\.pdf$/i, "") + ".txt";
+}
+
+/* =====================================================================
+ * 8. UI — ここから下だけが DOM / Canvas / Audio に触れます
+ * ================================================================== */
+function boot(){
+  var $ = function(id){ return document.getElementById(id); };
+  var stage = $("stage"), layers = $("layers"), doc = $("doc"), caret = $("caret"),
+      selLayer = $("selLayer"), fx = $("fx"), leader = $("leader"), out = $("out"),
+      hud = $("hud"), hudNum = $("hudNum"), hudLbl = $("hudLbl"), helpEl = $("help"),
+      keysBar = $("keys"), hidden = $("hidden"), fileIn = $("fileIn"),
+      side = $("side"), busEl = $("bus"), meterEl = $("meter"), blast = $("blast"),
+      page = $("page");
+
+  var ST = vimNew(PROSE_SRC, "bada-reader.txt");
+  var BASE_H = 30, WIN = 70;
+  var lineEls = [], winLo = 0, winHi = 0, lastText = null, lastCurL = -1;
+  var live = [];        /* ディスパッチ中のイベント {line, type, mag, t0, seq} */
+  var busLog = [];      /* イベントバスの表示用ログ (新しい順) */
+  var rate = [];        /* 直近のディスパッチ数 (スループット計) */
+  var blastT0 = 0, blastMag = 0;
+  var CD = null;                        /* {total, t0, lastTick, flash} */
+  var AC = null, blinkT = 0, dirtyDom = true, docX = 0, busDirty = true;
+  var fxc = fx.getContext("2d"), ldc = leader.getContext("2d");
+  var DPR = Math.min(2, window.devicePixelRatio || 1);
+  var FLASH_MS = 520;   /* 1 イベントの処理表示時間 */
+
+  /* ── 音 (合成: 外部ファイルなし) ── */
+  function audio(){
+    if (!AC){
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      try { AC = new C(); } catch (e){ return null; }
+    }
+    if (AC.state === "suspended") AC.resume();
+    return AC;
+  }
+  /* イベントごとの短いブリップ (種別で音程が変わる。破砕音ではない) */
+  function blip(type, mag){
+    if (!ST.opts.sound) return;
+    var ac = audio(); if (!ac) return;
+    var hue = eventStyle(type).hue;
+    var freq = 320 + (hue / 360) * 760;            /* 色相と同じ並びで音程を決める */
+    var vol = 0.035 + 0.085 * Math.max(0, Math.min(1, mag));
+    var t = ac.currentTime, g = ac.createGain(), o = ac.createOscillator();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    o.type = "triangle";
+    o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(freq * 1.5, t + 0.1);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + 0.16);
+  }
+  function beep(freq, dur){
+    if (!ST.opts.sound) return;
+    var ac = audio(); if (!ac) return;
+    var t = ac.currentTime, g = ac.createGain(), o = ac.createOscillator();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.1));
+    o.type = "square"; o.frequency.value = freq;
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + (dur || 0.1) + 0.02);
+  }
+
+  /* ── イベントを 1 件ディスパッチして、対象行を光らせる ── */
+  function dispatch(ev){
+    var type = ev.type || "signal";
+    var mag = (ev.mag === undefined) ? eventMag(type) : ev.mag;
+    var line = (ev.line === undefined) ? ST.cur.l : ev.line;
+    var sty = eventStyle(type);
+
+    /* バスのログは効果が OFF でも残す (処理そのものは止まらない) */
+    busLog.unshift({
+      seq: ev.seq || (++ST.seq), type:type, label:sty.label, hue:sty.hue,
+      line:line, what:ev.what || ev.key || ev.to || "", t0:performance.now()
+    });
+    if (busLog.length > 7) busLog.pop();
+    busDirty = true;
+    rate.push(performance.now());
+
+    if (!ST.opts.flash) return;
+    live.push({line:line, type:type, mag:Math.max(0.12, Math.min(1, mag)),
+               hue:sty.hue, t0:performance.now()});
+    if (live.length > 24) live.shift();
+    if (mag >= 0.6) blip(type, mag);
+  }
+  /* 手動 / 内部発火のショートハンド */
+  function flash(line, type, mag){ dispatch({type:type || "signal", line:line, mag:mag}); }
+  /* 全画面フラッシュ (T-0 や実行完了のような「大きなイベント」) */
+  function blastFlash(mag){
+    if (!ST.opts.flash) return;
+    blastT0 = performance.now(); blastMag = Math.max(0, Math.min(1, mag === undefined ? 1 : mag));
+  }
+
+  /* ── 行の描画 ── */
+  function escHtml(s){ return escapeHtml(s); }
+  function renderTokens(toks){
+    if (!toks.length) return '<span class="t-ws"> </span>';
+    var h = "";
+    for (var i = 0; i < toks.length; i++){
+      h += '<span class="t-' + toks[i].t + '">' + escHtml(toks[i].v) + "</span>";
+    }
+    return h;
+  }
+  function rebuild(){
+    var N = ST.lines.length, cl = ST.cur.l;
+    winLo = Math.max(0, cl - WIN); winHi = Math.min(N - 1, cl + WIN);
+    /* ブロックコメント状態を先頭から積み上げる */
+    var blk = false;
+    for (var i = 0; i < winLo; i++) blk = badaTokenize(ST.lines[i], blk).inBlock;
+    var gw = gutterWidth(N), html = [];
+    for (var l = winLo; l <= winHi; l++){
+      var r = badaTokenize(ST.lines[l], blk); blk = r.inBlock;
+      var num = ST.opts.number ? String(l + 1) : "";
+      html.push('<div class="ln' + (l === cl ? " cur" : "") + '" data-l="' + l + '">' +
+                '<span class="hair"></span>' +
+                '<span class="gut" style="width:' + (gw + 0.6) + 'ch">' + num + "</span>" +
+                '<span class="code">' + renderTokens(r.toks) + "</span></div>");
+    }
+    doc.innerHTML = html.join("");
+    lineEls = doc.children;
+    dirtyDom = false;
+  }
+
+  /* ── 1 フレーム ── */
+  function styleLines(now){
+    var cl = ST.cur.l, o = ST.opts;
+    var fo = {depth:o.focus ? o.depth : 0, peak:o.peak, spread:o.spread,
+              maxBlur:o.maxBlur, minOpacity:o.minOpacity, maxZ:o.maxZ};
+    var count = winHi - winLo + 1, scales = new Array(count), styles = new Array(count), i;
+    for (i = 0; i < count; i++){
+      styles[i] = focusStyle((winLo + i) - cl, fo);
+      scales[i] = styles[i].scale;
+    }
+    var lay = docLayout(scales, BASE_H);
+
+    /* 行ごとのフラッシュ量 — 同じ行に複数イベントが来たら最も強いものを採る */
+    var fx = {};
+    for (i = 0; i < live.length; i++){
+      var c = live[i], t = (now - c.t0) / FLASH_MS;
+      if (t >= 1) continue;
+      var ff = flashFrame(t, c.mag);
+      var cur = fx[c.line];
+      if (!cur || ff.env > cur.env) fx[c.line] = {env:ff.env, glow:ff.glow, wash:ff.wash,
+                                                  edge:ff.edge, rise:ff.rise, sweep:ff.sweep, hue:c.hue};
+    }
+
+    for (i = 0; i < count; i++){
+      var el = lineEls[i]; if (!el) continue;
+      var s = styles[i], l = winLo + i;
+      var extra = (lay.heights[i] - BASE_H) / 2;
+      var f = fx[l];
+      var rise = f ? f.rise : 0;
+      el.style.marginTop = extra + "px";
+      el.style.marginBottom = extra + "px";
+      el.style.transform = "translateY(" + (-rise) + "px) translateZ(" + (s.z + rise * 1.6) + "px) scale(" + s.scale + ")";
+      /* フラッシュ中の行はぼかさない — 処理対象がはっきり見えるように */
+      var blur = f ? s.blur * (1 - f.env) : s.blur;
+      el.style.filter = blur > 0.04 ? "blur(" + blur.toFixed(2) + "px)" : "";
+      el.style.opacity = (f ? Math.min(1, s.opacity + f.env * 0.9) : s.opacity).toFixed(3);
+      if (f && f.env > 0.004){
+        el.classList.add("flash");
+        el.style.setProperty("--fh", f.hue.toFixed(0));
+        el.style.setProperty("--fw", f.wash.toFixed(3));
+        el.style.setProperty("--fg", f.glow.toFixed(1) + "px");
+        el.style.setProperty("--fe", f.edge.toFixed(2) + "px");
+        el.style.setProperty("--fs", f.sweep.toFixed(3));
+      } else if (el.classList.contains("flash")){
+        el.classList.remove("flash");
+        el.style.removeProperty("--fh"); el.style.removeProperty("--fw");
+        el.style.removeProperty("--fg"); el.style.removeProperty("--fe");
+        el.style.removeProperty("--fs");
+      }
+    }
+    /* カーソル行をステージ中央へ */
+    var idx = cl - winLo;
+    var offset = (stage.clientHeight / 2) - (lay.centers[idx] || 0);
+    doc.style.transform = "translate(" + docX.toFixed(2) + "px," + offset.toFixed(2) + "px)";
+    return {lay:lay, styles:styles, offset:offset};
+  }
+
+  function placeCaret(){
+    var idx = ST.cur.l - winLo, el = lineEls[idx];
+    if (!el){ caret.style.opacity = "0"; return null; }
+    var code = el.querySelector(".code");
+    var sr = stage.getBoundingClientRect();
+    var rect = null, cw = 9, chH = BASE_H;
+    var walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT, null, false);
+    var node = null, off = 0, acc = 0, t;
+    while ((t = walker.nextNode())){
+      var len = t.nodeValue.length;
+      if (acc + len > ST.cur.c){ node = t; off = ST.cur.c - acc; break; }
+      acc += len; node = t; off = len;
+    }
+    try {
+      if (node && node.nodeValue.length){
+        var rg = document.createRange(), past = false;
+        if (off < node.nodeValue.length){ rg.setStart(node, off); rg.setEnd(node, off + 1); }
+        else { rg.setStart(node, off - 1); rg.setEnd(node, off); past = true; }
+        var r = rg.getBoundingClientRect();
+        rect = {left:r.left + (past ? r.width : 0), top:r.top, w:r.width || cw, h:r.height || chH};
+      } else {
+        var cr = code.getBoundingClientRect();
+        rect = {left:cr.left, top:cr.top, w:cr.width || cw, h:cr.height || chH};
+      }
+    } catch (e){ rect = null; }
+    if (!rect){ caret.style.opacity = "0"; return null; }
+    var thin = (ST.mode === "insert" || ST.mode === "replace");
+    caret.style.left = (rect.left - sr.left) + "px";
+    caret.style.top = (rect.top - sr.top) + "px";
+    caret.style.width = (thin ? Math.max(2, rect.w * 0.16) : rect.w) + "px";
+    caret.style.height = rect.h + "px";
+    caret.style.opacity = (ST.mode === "command" || ST.mode === "search") ? "0.35" : "1";
+    caret.className = thin ? "ins" : "";
+
+    /* 拡大した行は画面幅をはみ出すので、カーソルが常に見えるよう横に追従する */
+    var x = rect.left - sr.left, padL = 44, padR = 90;
+    if (x < padL) docX = Math.min(0, docX + (padL - x));
+    else if (x + rect.w > sr.width - padR) docX -= (x + rect.w) - (sr.width - padR);
+    if (docX > 0) docX = 0;
+    return {rect:rect, sr:sr};
+  }
+
+  function drawSelection(){
+    if (ST.mode !== "visual" && ST.mode !== "vline"){ selLayer.innerHTML = ""; return; }
+    var r = visualRange(ST), sr = stage.getBoundingClientRect(), html = "";
+    for (var l = r.a.l; l <= r.b.l; l++){
+      var el = lineEls[l - winLo]; if (!el) continue;
+      var code = el.querySelector(".code");
+      var from = (l === r.a.l && !r.linewise) ? r.a.c : 0;
+      var to = (l === r.b.l && !r.linewise) ? r.b.c : (ST.lines[l] || "").length;
+      var box = charBox(code, from, to) || code.getBoundingClientRect();
+      html += '<div class="selbox" style="left:' + (box.left - sr.left) + "px;top:" + (box.top - sr.top) +
+              "px;width:" + Math.max(4, box.width) + "px;height:" + box.height + 'px"></div>';
+    }
+    selLayer.innerHTML = html;
+  }
+  function charBox(code, from, to){
+    if (to <= from) to = from + 1;
+    var walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT, null, false);
+    var acc = 0, sN = null, sO = 0, eN = null, eO = 0, t;
+    while ((t = walker.nextNode())){
+      var len = t.nodeValue.length;
+      if (!sN && acc + len > from){ sN = t; sO = from - acc; }
+      if (acc + len >= to){ eN = t; eO = Math.min(len, to - acc); break; }
+      acc += len; eN = t; eO = len;
+    }
+    if (!sN) return null;
+    try {
+      var rg = document.createRange();
+      rg.setStart(sN, sO); rg.setEnd(eN || sN, eO);
+      var b = rg.getBoundingClientRect();
+      return b.width ? b : null;
+    } catch (e){ return null; }
+  }
+
+  /* ── FX キャンバス ──
+     左端の「イベントレール」。処理中のイベントが、対象行の高さに
+     光点として並び、種別の色で減衰していきます。揺れも破片もありません。 */
+  function sizeCanvas(cv){
+    var w = stage.clientWidth, h = stage.clientHeight;
+    if (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR)){
+      cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+    }
+    return {w:w, h:h};
+  }
+  function drawFx(now){
+    var d = sizeCanvas(fx);
+    fxc.setTransform(DPR, 0, 0, DPR, 0, 0);
+    fxc.clearRect(0, 0, d.w, d.h);
+
+    /* レールの軸 */
+    var railX = 5;
+    fxc.fillStyle = "rgba(255,255,255,.05)";
+    fxc.fillRect(railX - 1, 0, 2, d.h);
+
+    var alive = [], sr = stage.getBoundingClientRect();
+    for (var i = 0; i < live.length; i++){
+      var c = live[i], t = (now - c.t0) / FLASH_MS;
+      if (t >= 1) continue;
+      alive.push(c);
+      var ff = flashFrame(t, c.mag);
+      if (ff.env <= 0.004) continue;
+
+      /* 対象行の画面上の位置 (画面外のイベントも端に寄せて見せる) */
+      var el = lineEls[c.line - winLo], y;
+      if (el){ var bb = el.getBoundingClientRect(); y = bb.top - sr.top + bb.height / 2; }
+      else y = (c.line < winLo) ? 6 : d.h - 6;
+      y = Math.max(4, Math.min(d.h - 4, y));
+
+      fxc.save();
+      fxc.globalCompositeOperation = "lighter";
+      /* 光点 */
+      var r = 2.5 + 7 * ff.env;
+      var g = fxc.createRadialGradient(railX, y, 0, railX, y, r * 3.2);
+      g.addColorStop(0, "hsla(" + c.hue + ",95%,72%," + (ff.env * 0.95).toFixed(3) + ")");
+      g.addColorStop(1, "hsla(" + c.hue + ",95%,72%,0)");
+      fxc.fillStyle = g;
+      fxc.fillRect(railX - r * 3.2, y - r * 3.2, r * 6.4, r * 6.4);
+      fxc.fillStyle = "hsla(" + c.hue + ",95%,78%," + Math.min(1, ff.env * 1.4).toFixed(3) + ")";
+      fxc.beginPath(); fxc.arc(railX, y, r * 0.55, 0, Math.PI * 2); fxc.fill();
+      /* 行へ向かう細い導線 */
+      fxc.strokeStyle = "hsla(" + c.hue + ",92%,68%," + (ff.env * 0.35).toFixed(3) + ")";
+      fxc.lineWidth = 1;
+      fxc.beginPath(); fxc.moveTo(railX, y);
+      fxc.lineTo(railX + 26 + 40 * (1 - ff.env), y); fxc.stroke();
+      fxc.restore();
+    }
+    live = alive;
+
+    /* 全画面フラッシュ */
+    if (blastMag > 0){
+      var bt = (now - blastT0) / 620;
+      if (bt >= 1){ blastMag = 0; blast.style.opacity = "0"; }
+      else blast.style.opacity = (flashFrame(bt, blastMag).env * 0.55).toFixed(3);
+    }
+    return alive.length > 0;
+  }
+
+  /* ── イベントバス HUD ── */
+  function drawBus(now){
+    /* スループット: 直近 1 秒のディスパッチ数 */
+    while (rate.length && now - rate[0] > 1000) rate.shift();
+    if (!ST.opts.bus){
+      if (!busEl.classList.contains("hide")){ busEl.classList.add("hide"); meterEl.classList.add("hide"); }
+      return;
+    }
+    busEl.classList.remove("hide"); meterEl.classList.remove("hide");
+
+    if (busDirty){
+      var h = "";
+      for (var i = 0; i < busLog.length; i++){
+        var e = busLog[i];
+        h += '<div class="ev" data-t0="' + e.t0 + '" style="--eh:' + e.hue + '">' +
+             '<span class="tag">' + e.label + "</span>" +
+             '<span class="at">' + (e.line + 1) + "L</span>" +
+             '<span class="dt">' + escHtml(String(e.what).slice(0, 18)) + "</span></div>";
+      }
+      busEl.innerHTML = h;
+      busDirty = false;
+    }
+    /* 処理中のものを光らせる */
+    var rows = busEl.children;
+    for (var k = 0; k < rows.length; k++){
+      var t0 = parseFloat(rows[k].dataset.t0);
+      rows[k].classList.toggle("hot", (now - t0) < FLASH_MS * 0.55);
+    }
+    meterEl.innerHTML = "<b>" + rate.length + "</b> ev/s &nbsp; 総 <b>" + ST.dispatched + "</b>" +
+                        "<br>処理中 <b>" + live.length + "</b>";
+  }
+
+  /* ── 映画のカウントダウン (アカデミー・リーダー) ── */
+  function drawLeader(now){
+    if (!CD) return false;
+    var d = sizeCanvas(leader);
+    var elapsed = (now - CD.t0) / 1000;
+    var cs = countdownState(elapsed, CD.total);
+    ldc.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ldc.clearRect(0, 0, d.w, d.h);
+
+    /* 秒の刻み — 1 秒ごとに TICK イベントをバスへ投入する */
+    if (!cs.done && cs.n !== CD.lastTick){
+      CD.lastTick = cs.n;
+      beep(1000, 0.08);
+      ST.dispatched++;
+      dispatch({type:"tick", line:ST.cur.l, what:"T-" + cs.n,
+                mag:0.45 + (CD.total - cs.n) * 0.07});
+    }
+    if (cs.done && !CD.zeroDone){
+      CD.zeroDone = true; CD.zeroAt = now;
+      beep(440, 0.35);
+      ST.dispatched++;
+      dispatch({type:"tick", line:ST.cur.l, what:"T-0", mag:1});
+      blastFlash(1);
+      ST.msg = "✨ T-0 — " + (ST.cur.l + 1) + " 行目へ最終ディスパッチ";
+      paintStatus();
+    }
+
+    var cx = d.w / 2, cy = d.h / 2, R = Math.min(d.w, d.h) * 0.32;
+    ldc.save();
+    /* 暗幕 */
+    ldc.fillStyle = "rgba(3,5,10,0.55)"; ldc.fillRect(0, 0, d.w, d.h);
+    /* 掃引ウェッジ */
+    if (!cs.done){
+      ldc.beginPath(); ldc.moveTo(cx, cy);
+      ldc.arc(cx, cy, R * 2.4, -Math.PI / 2, -Math.PI / 2 + cs.sweep);
+      ldc.closePath();
+      ldc.fillStyle = "rgba(255,255,255,0.055)"; ldc.fill();
+    }
+    /* 同心円 */
+    ldc.strokeStyle = "rgba(232,236,247,0.30)"; ldc.lineWidth = 1.5;
+    ldc.beginPath(); ldc.arc(cx, cy, R, 0, Math.PI * 2); ldc.stroke();
+    ldc.beginPath(); ldc.arc(cx, cy, R * 1.55, 0, Math.PI * 2); ldc.stroke();
+    /* 十字の走査線 */
+    ldc.strokeStyle = "rgba(232,236,247,0.22)"; ldc.lineWidth = 1;
+    ldc.beginPath(); ldc.moveTo(0, cy); ldc.lineTo(d.w, cy);
+    ldc.moveTo(cx, 0); ldc.lineTo(cx, d.h); ldc.stroke();
+    /* 指針 */
+    if (!cs.done){
+      ldc.save(); ldc.translate(cx, cy); ldc.rotate(cs.sweep);
+      ldc.strokeStyle = "rgba(255,77,126,0.85)"; ldc.lineWidth = 2.5;
+      ldc.beginPath(); ldc.moveTo(0, 0); ldc.lineTo(0, -R * 1.55); ldc.stroke();
+      ldc.restore();
+    }
+    /* 数字 */
+    var zt = CD.zeroDone ? (now - CD.zeroAt) / 900 : 0;
+    var num = cs.done ? "0" : cs.label;
+    var pop = cs.done ? (1 + 0.8 * Math.max(0, 1 - zt)) : (1 + 0.22 * (1 - cs.phase));
+    ldc.save();
+    ldc.translate(cx, cy); ldc.scale(pop, pop);
+    ldc.font = "800 " + Math.round(R * 1.25) + 'px "Cascadia Mono",Consolas,monospace';
+    ldc.textAlign = "center"; ldc.textBaseline = "middle";
+    ldc.shadowColor = "rgba(90,215,232,0.85)"; ldc.shadowBlur = 40;
+    ldc.fillStyle = cs.done ? "#ff4d7e" : "#e8ecf7";
+    ldc.globalAlpha = cs.done ? Math.max(0, 1 - zt) : 1;
+    ldc.fillText(num, 0, 0);
+    ldc.restore();
+    /* フィルムグレイン + キズ */
+    ldc.globalAlpha = 0.09;
+    for (var g = 0; g < 140; g++){
+      ldc.fillStyle = Math.random() < 0.5 ? "#fff" : "#000";
+      ldc.fillRect(Math.random() * d.w, Math.random() * d.h, 1.6, 1.6);
+    }
+    if (Math.random() < 0.22){
+      ldc.globalAlpha = 0.16; ldc.fillStyle = "#fff";
+      var sx = Math.random() * d.w;
+      ldc.fillRect(sx, 0, 1, d.h);
+    }
+    ldc.restore();
+
+    if (CD.zeroDone && (now - CD.zeroAt) > 1000){
+      CD = null; leader.style.display = "none"; hud.classList.remove("show");
+      return false;
+    }
+    hudNum.textContent = cs.done ? "0" : cs.label;
+    hudLbl.textContent = cs.done ? "IMPACT" : "T-MINUS";
+    return true;
+  }
+
+  function startCountdown(sec){
+    CD = {total:sec, t0:performance.now(), lastTick:-1, zeroDone:false, zeroAt:0};
+    leader.style.display = "block"; hud.classList.add("show");
+    $("btnCount").classList.add("on");
+    audio();
+  }
+
+  /* ═══ 文章ビュー (多段落 · 行 · セグメント) ═══ */
+  var paras = [], rows = [], proseDirty = true;
+  /* 焦点は「行」と「その行の中の自然位置 x(px)」。どちらも滑らかに追う */
+  var focusRow = 0, focusX = 0, aimRow = 0, aimX = 0;
+  var rowH = [], rowW = [], segW = [], segCenters = [], segLefts = [], segC0 = [];
+  var lastScales = [], lastVOffsets = [], lastRowScales = [], rowTop = [], lastHTotal = [];
+
+  function buildProse(){
+    fitColumn();
+    paras = splitParagraphs(ST.lines);
+    rows = [];
+    var html = [], i, k;
+    for (i = 0; i < paras.length; i++){
+      var pa = paras[i];
+      if (pa.kind === "gap"){
+        rows.push({line:pa.from, para:i, gap:true, segs:[]});
+        html.push('<div class="gap" data-r="' + (rows.length - 1) + '" data-p="' + i + '">' +
+                  '<span class="row" data-l="' + pa.from + '">' +
+                  '<span class="seg src" data-l="' + pa.from + '" data-c0="0"></span></span></div>');
+        continue;
+      }
+      var open = '<p class="para" data-p="' + i + '">';
+      for (k = 0; k < pa.lines.length; k++){
+        var l = pa.from + k;
+        var segs = segmentLine(pa.lines[k]);
+        if (!segs.length) segs = [{from:0, to:0, text:""}];
+        rows.push({line:l, para:i, gap:false, segs:segs});
+        var h = '<span class="row" data-r="' + (rows.length - 1) + '" data-l="' + l + '">';
+        for (var q = 0; q < segs.length; q++){
+          h += '<span class="seg src" data-l="' + l + '" data-c0="' + segs[q].from + '">' +
+               escHtml(segs[q].text) + "</span>";
+        }
+        open += h + "</span>";
+      }
+      html.push(open + "</p>");
+    }
+    page.innerHTML = html.join("");
+    proseDirty = false;
+    measureRows();
+  }
+
+  /* 段組の幅を、いちばん拡大したときでも収まるように決める */
+  function fitColumn(){
+    var sw = stage.clientWidth;
+    if (!sw) return;
+    var gutter = Math.min(72, Math.max(14, sw * 0.05));
+    page.style.width = Math.max(220, sw - gutter * 2) + "px";
+  }
+
+  /* 自然な (拡大していないときの) 寸法を測っておく。
+     横の距離はこの自然位置で測る — 拡大後の位置で測ると、焦点が
+     自分の作った拡大に追われて暴れるため。 */
+  function measureRows(){
+    rowH = []; rowW = []; segW = []; segCenters = []; segLefts = []; segC0 = [];
+    rowTop = []; lastScales = []; lastVOffsets = []; lastRowScales = []; lastHTotal = [];
+    var rowEls = page.querySelectorAll(".row");
+    for (var i = 0; i < rowEls.length; i++){
+      var segs = rowEls[i].querySelectorAll(".seg"), ws = [], cs = [];
+      for (var j = 0; j < segs.length; j++){
+        segs[j].style.transform = "";
+        ws.push(segs[j].offsetWidth || 1);
+        cs.push(parseInt(segs[j].dataset.c0 || "0", 10));
+      }
+      rowEls[i].style.transform = "";
+      var m = segmentCenters(ws);
+      segW.push(ws); segCenters.push(m.centers); segLefts.push(m.lefts); segC0.push(cs);
+      rowW.push(m.total);
+      rowH.push(rowEls[i].offsetHeight || 1);
+      rowTop.push(rowEls[i].offsetTop);
+    }
+  }
+
+  /* 行と桁 -> その桁を含むセグメントの添字 */
+  function segIndexAt(ri, col){
+    var cs = segC0[ri]; if (!cs || !cs.length) return 0;
+    for (var i = cs.length - 1; i >= 0; i--) if (col >= cs[i]) return i;
+    return 0;
+  }
+  function rowIndexOfLine(l){
+    for (var i = 0; i < rows.length; i++) if (rows[i].line === l) return i;
+    return Math.min(focusRow, Math.max(0, rows.length - 1));
+  }
+  /* カーソル位置を焦点の目標にする (h / l で左右へ動かすとどアップも滑る) */
+  function aimAtCursor(){
+    var ri = rowIndexOfLine(ST.cur.l);
+    var si = segIndexAt(ri, ST.cur.c);
+    aimRow = ri;
+    aimX = (segCenters[ri] && segCenters[ri][si] !== undefined) ? segCenters[ri][si] : 0;
+  }
+  /* 表示位置 (画面座標) -> 自然な行番号。拡大で行が動くので、
+     当たり判定ではなく前フレームの写像を逆に解いて求める。 */
+  function rowAtDisplayY(cy){
+    if (!rowTop.length) return -1;
+    var pr = page.getBoundingClientRect();
+    var dy = cy - pr.top;
+    for (var i = 0; i < rowTop.length; i++){
+      var sc = lastRowScales[i] === undefined ? 1 : lastRowScales[i];
+      var off = lastVOffsets[i] === undefined ? 0 : lastVOffsets[i];
+      var top = rowTop[i] + off - rowH[i] * (sc - 1) / 2;
+      if (dy < top + rowH[i] * sc) return i;
+    }
+    return rowTop.length - 1;
+  }
+
+  function aimAtPoint(cx, cy){
+    var ri = rowAtDisplayY(cy);
+    if (ri < 0) return false;
+    var rowEl = page.querySelector('.row[data-r="' + ri + '"]');
+    if (!rowEl) return false;
+    aimRow = ri;
+    /* 表示位置 -> 自然位置。拡大後の DOM を当たり判定に使うと、
+       拡大が自分の焦点を押しのけて焦点が暴れるため。 */
+    var rr = rowEl.getBoundingClientRect();
+    var dx = cx - rr.left;
+    var ws = segW[ri] || [], sc = lastScales[ri] || [], lf = segLefts[ri] || [];
+    if (ws.length){
+      var j = displayToNatural(lf, ws, sc.length === ws.length ? sc : ws.map(function(){ return 1; }), dx);
+      aimX = segCenters[ri][j];
+    } else aimX = 0;
+    return true;
+  }
+
+  /* ═══ 二軸の魚眼 — 縦は行の距離、横は px の距離 ═══ */
+  function styleRows(now){
+    var rowEls = page.querySelectorAll(".row");
+    if (!rowEls.length) return;
+    if (rowH.length !== rowEls.length){ measureRows(); }
+
+    /* 焦点をなめらかに追う (右へ左へ動かすと、どアップが滑っていく) */
+    var ease = ST.opts.zoom ? 0.28 : 1;
+    focusRow += (aimRow - focusRow) * ease;
+    focusX += (aimX - focusX) * ease;
+    if (Math.abs(aimRow - focusRow) < 0.002) focusRow = aimRow;
+    if (Math.abs(aimX - focusX) < 0.4) focusX = aimX;
+
+    var peak = ST.opts.zoom ? ST.opts.zpeak : 1;
+    var vs = ST.opts.vspread, hs = ST.opts.hspread;
+    var i, j, rowScales = [], perRow = [];
+
+    var so = {peak:peak, vspread:vs, hspread:hs, vmix:ST.opts.vmix};
+    for (i = 0; i < rowEls.length; i++){
+      var ws = segW[i] || [], cs = segCenters[i] || [];
+      var scales = [], maxS = 1;
+      for (j = 0; j < ws.length; j++){
+        /* 縦は行の距離、横は自然位置での px 距離 */
+        var sc = segScale(i - focusRow, cs[j] - focusX, so);
+        scales.push(sc);
+        if (sc > maxS) maxS = sc;
+      }
+      /* 空行など、セグメントが無い行にも縦の効きは与えておく
+         (上下に動かしたときに間延びしないように) */
+      if (!ws.length) maxS = segScale(i - focusRow, 0, so);
+      perRow.push(scales);
+      rowScales.push(maxS);
+    }
+
+    var vlay = blockLayout(rowH, rowScales);
+    var hitRow = Math.round(focusRow);
+    for (i = 0; i < rowEls.length; i++){
+      rowEls[i].style.transform = "translateY(" + vlay.offsets[i].toFixed(2) + "px)";
+      var d = Math.abs(i - hitRow);
+      rowEls[i].classList.toggle("hit", i === hitRow);
+      rowEls[i].classList.toggle("near", d === 1);
+
+      var segs = rowEls[i].children, scales = perRow[i];
+      var hlay = blockLayout(segW[i] || [], scales, 0);   /* 横は左端が基準 */
+      lastHTotal[i] = hlay.total;
+      var hitSeg = (i === hitRow) ? nearestIndex(segCenters[i] || [], focusX) : -1;
+      for (j = 0; j < segs.length && j < scales.length; j++){
+        segs[j].style.transform = "translateX(" + hlay.offsets[j].toFixed(2) +
+                                  "px) scale(" + scales[j].toFixed(4) + ")";
+        segs[j].classList.toggle("hit", j === hitSeg);
+      }
+    }
+    lastScales = perRow; lastVOffsets = vlay.offsets; lastRowScales = rowScales;
+    page.classList.toggle("dim", !!ST.opts.dim);
+    followFocus(rowEls[hitRow], vlay, hitRow);
+  }
+
+  /* 焦点を画面の中ほどへ。横は、拡大で伸びた行の中の焦点位置を追う。 */
+  function followFocus(rowEl, vlay, hitRow){
+    if (!rowEl) return;
+    var sr = stage.getBoundingClientRect();
+    var rb = rowEl.getBoundingClientRect();
+    var dy = (rb.top + rb.height / 2) - (sr.top + sr.height * 0.45);
+    if (Math.abs(dy) > 1) pageTop -= dy * 0.18;
+
+    /* 焦点セグメントを画面の中に保つ。
+       .row は display:block なので box の幅では内容の広がりが測れない。
+       自然な幅 + 拡大で増えたぶん (hlay.total) が実際の内容幅になる。 */
+    var segs = rowEl.children;
+    var hitSeg = nearestIndex(segCenters[hitRow] || [], focusX);
+    var target = segs[hitSeg];
+    var contentW = (rowW[hitRow] || 0) + (lastHTotal[hitRow] || 0);
+    if (target){
+      if (contentW <= sr.width - 48){
+        /* 行がまるごと収まるなら、横はずらさない */
+        pageX += (0 - pageX) * 0.15;
+      } else {
+        var tb = target.getBoundingClientRect(), pad = 28, dx = 0;
+        if (tb.right > sr.right - pad) dx = tb.right - (sr.right - pad);
+        else if (tb.left < sr.left + pad) dx = tb.left - (sr.left + pad);
+        if (dx) pageX -= dx * 0.25;
+      }
+    }
+    applyPageTop();
+  }
+
+  /* 文章ビューのカーソル / 選択 */
+  function proseFrag(l, c){
+    var list = page.querySelectorAll('.src[data-l="' + l + '"]');
+    if (!list.length) return null;
+    for (var i = list.length - 1; i >= 0; i--){
+      var c0 = parseInt(list[i].dataset.c0 || "0", 10);
+      if (c >= c0) return {el:list[i], c0:c0};
+    }
+    return {el:list[0], c0:parseInt(list[0].dataset.c0 || "0", 10)};
+  }
+
+  function placeCaretProse(){
+    var f = proseFrag(ST.cur.l, ST.cur.c);
+    if (!f){ caret.style.opacity = "0"; return; }
+    var sr = stage.getBoundingClientRect();
+    var rel = ST.cur.c - f.c0;
+    var box = charBox(f.el, rel, rel + 1);
+    if (!box){
+      var past = charBox(f.el, Math.max(0, rel - 1), rel);
+      if (past) box = {left:past.right, top:past.top, width:past.width, height:past.height};
+    }
+    if (!box){
+      var sb = f.el.getBoundingClientRect();
+      box = {left:sb.left, top:sb.top, width:Math.max(6, sb.width || 8), height:sb.height || 20};
+    }
+    var thin = (ST.mode === "insert" || ST.mode === "replace");
+    caret.style.left = (box.left - sr.left) + "px";
+    caret.style.top = (box.top - sr.top) + "px";
+    caret.style.width = (thin ? Math.max(2, (box.width || 8) * 0.16) : (box.width || 8)) + "px";
+    caret.style.height = (box.height || 20) + "px";
+    caret.style.opacity = (ST.mode === "command" || ST.mode === "search") ? "0.35" : "1";
+    caret.className = thin ? "ins" : "";
+  }
+
+  function drawSelectionProse(){
+    if (ST.mode !== "visual" && ST.mode !== "vline"){ selLayer.innerHTML = ""; return; }
+    var r = visualRange(ST), sr = stage.getBoundingClientRect(), html = "";
+    for (var l = r.a.l; l <= r.b.l; l++){
+      var list = page.querySelectorAll('.src[data-l="' + l + '"]');
+      for (var i = 0; i < list.length; i++){
+        var c0 = parseInt(list[i].dataset.c0 || "0", 10), len = list[i].textContent.length;
+        var from = (l === r.a.l && !r.linewise) ? r.a.c : 0;
+        var to = (l === r.b.l && !r.linewise) ? r.b.c : (ST.lines[l] || "").length;
+        var a2 = Math.max(0, from - c0), b2 = Math.min(len, to - c0);
+        if (b2 <= a2) continue;
+        var box = charBox(list[i], a2, b2) || list[i].getBoundingClientRect();
+        html += '<div class="selbox" style="left:' + (box.left - sr.left) + "px;top:" + (box.top - sr.top) +
+                "px;width:" + Math.max(4, box.width) + "px;height:" + box.height + 'px"></div>';
+      }
+    }
+    selLayer.innerHTML = html;
+  }
+
+  /* イベントフラッシュ — 対象行のセグメントを光らせる */
+  function styleProse(now){
+    var fx2 = {}, i;
+    for (i = 0; i < live.length; i++){
+      var c = live[i], t = (now - c.t0) / FLASH_MS;
+      if (t >= 1) continue;
+      var ff = flashFrame(t, c.mag);
+      var cur = fx2[c.line];
+      if (!cur || ff.env > cur.env) fx2[c.line] = {env:ff.env, glow:ff.glow, wash:ff.wash, sweep:ff.sweep, hue:c.hue};
+    }
+    var lit = page.querySelectorAll(".src.flash");
+    for (i = 0; i < lit.length; i++){
+      var l0 = parseInt(lit[i].dataset.l, 10);
+      if (!fx2[l0] || fx2[l0].env <= 0.004){
+        lit[i].classList.remove("flash");
+        lit[i].style.removeProperty("--fh"); lit[i].style.removeProperty("--fw");
+        lit[i].style.removeProperty("--fg"); lit[i].style.removeProperty("--fs");
+      }
+    }
+    for (var key in fx2){
+      var f = fx2[key]; if (f.env <= 0.004) continue;
+      var list = page.querySelectorAll('.src[data-l="' + key + '"]');
+      for (i = 0; i < list.length; i++){
+        list[i].classList.add("flash");
+        list[i].style.setProperty("--fh", f.hue.toFixed(0));
+        list[i].style.setProperty("--fw", f.wash.toFixed(3));
+        list[i].style.setProperty("--fg", f.glow.toFixed(1) + "px");
+        list[i].style.setProperty("--fs", f.sweep.toFixed(3));
+      }
+    }
+  }
+
+  var pageTop = 0, pageX = 0;
+  function applyPageTop(){
+    var maxUp = -(page.scrollHeight - stage.clientHeight * 0.5);
+    pageTop = Math.max(maxUp, Math.min(0, pageTop));
+    page.style.transform = "translateX(calc(-50% + " + pageX.toFixed(1) + "px)) translateY(" +
+                           pageTop.toFixed(1) + "px)";
+  }
+
+  /* ビューの切り替え */
+  function setView(v){
+    ST.opts.view = v;
+    var prose = (v === "prose");
+    page.style.display = prose ? "" : "none";
+    doc.style.display = prose ? "none" : "";
+    $("btnView").textContent = prose ? "📄 文章" : "💻 コード";
+    $("btnView").classList.toggle("on", prose);
+    $("btnFocus").disabled = prose;
+    if (prose){ proseDirty = true; pageTop = 0; pageX = 0; }
+    else { page.classList.remove("dim"); }
+    dirtyDom = true;
+  }
+
+  /* ── メインループ ── */
+  function frame(now){
+    var prose = ST.opts.view === "prose";
+    if (prose){
+      if (dirtyDom || proseDirty){
+        buildProse(); applyPageTop(); dirtyDom = false;
+        /* 組み直すと行・セグメントの番号が変わるので、カーソルから取り直す */
+        aimAtCursor();
+      }
+      styleRows(now);
+      styleProse(now);
+      placeCaretProse();
+      drawSelectionProse();
+    } else {
+      if (dirtyDom) rebuild();
+      styleLines(now);
+      placeCaret();
+      drawSelection();
+    }
+    drawFx(now);
+    drawBus(now);
+    var cdBusy = drawLeader(now);
+    if (!cdBusy && !CD) $("btnCount").classList.remove("on");
+
+    /* カーソル点滅 (挿入モードのみ) */
+    if (ST.mode === "insert" || ST.mode === "replace"){
+      if (now - blinkT > 530){ caret.classList.toggle("blink"); blinkT = now; }
+    } else caret.classList.remove("blink");
+
+    if (!isTouch) grabInput();
+  requestAnimationFrame(frame);
+  }
+
+  /* ── ステータスライン ── */
+  var MODE_LABEL = {normal:"NORMAL", insert:"INSERT", visual:"VISUAL", vline:"V-LINE",
+                    command:"COMMAND", search:"SEARCH", replace:"REPLACE"};
+  function paintStatus(){
+    var mEl = $("mode");
+    mEl.textContent = MODE_LABEL[ST.mode] || ST.mode.toUpperCase();
+    mEl.className = "m-" + ST.mode;
+    $("fname").textContent = ST.fname + (ST.dirty ? " [+]" : "");
+    $("pos").textContent = (ST.cur.l + 1) + ":" + (ST.cur.c + 1) + "  " + ST.lines.length + "L";
+    var msgEl = $("msg"), cmdEl = $("cmdline");
+    if (ST.mode === "command" || ST.mode === "search"){
+      msgEl.textContent = "";
+      cmdEl.classList.add("show");
+      cmdEl.innerHTML = escHtml(ST.cmdline) + '<span class="cc"> </span>';
+    } else {
+      cmdEl.classList.remove("show"); cmdEl.textContent = "";
+      msgEl.textContent = ST.msg + (ST.pending ? "   " + ST.pending : "");
+      msgEl.className = ST.msgErr ? "err" : "";
+    }
+    $("btnFocus").classList.toggle("on", !!ST.opts.focus);
+    $("btnFlash").classList.toggle("on", !!ST.opts.flash);
+    $("btnZoom").classList.toggle("on", !!ST.opts.zoom);
+  }
+
+  /* ── 出力パネル ── */
+  /* 狭い画面では出力パネルがエディタに重なるため、開閉できるようにする */
+  function showSide(on){
+    if (on){ side.classList.remove("hide"); side.classList.add("force"); }
+    else { side.classList.add("hide"); side.classList.remove("force"); }
+    $("btnOut").classList.toggle("on", on);
+  }
+  function sideOpen(){ return !side.classList.contains("hide"); }
+  function printOut(rows, clear, reveal){
+    if (clear) out.innerHTML = "";
+    var h = "";
+    for (var i = 0; i < rows.length; i++){
+      h += '<div class="' + (rows[i].cls || "") + '">' + escHtml(rows[i].text) + "</div>";
+    }
+    out.innerHTML += h;
+    out.scrollTop = out.scrollHeight;
+    if (reveal) showSide(true);
+  }
+  function runQuantum(){
+    var t0 = performance.now();
+    var r;
+    try { r = quantumRun(vimText(ST), 0x5EED); }
+    catch (e){ r = {out:[{cls:"o-err", text:"内部エラー: " + e.message}], err:e.message}; }
+    printOut([{cls:"o-dim", text:"── " + new Date().toLocaleTimeString() + " ──"}], true, true);
+    printOut(r.out, false);
+    printOut([{cls:"o-dim", text:"(" + (performance.now() - t0).toFixed(1) + " ms)"}], false);
+    ST.msg = r.err ? "⚠ " + r.err : "✔ 量子 Bada 実行完了";
+    ST.msgErr = !!r.err;
+    ST.dispatched++;
+    dispatch({type: r.err ? "error" : "run", line:ST.cur.l,
+              what: r.err ? "quantum-error" : "quantum-ok"});
+    if (!r.err) blastFlash(0.55);
+    paintStatus();
+  }
+
+  /* ── エンジンイベントの処理 ── */
+  /* エンジンが発行したイベントを順にディスパッチする。
+     副作用を伴うもの (run / write / open / …) はここでハンドラを呼び、
+     それ以外は「処理された」という表示 (フラッシュ + バス) だけを行う。 */
+  var SIDE_EFFECT = {countdown:1, run:1, write:1, open:1, print:1, quit:1, help:1, opts:1, view:1};
+  function drainEvents(){
+    for (var i = 0; i < ST.events.length; i++){
+      var e = ST.events[i];
+      switch (e.type){
+        case "countdown": dispatch({type:"tick", line:e.line, what:"T-" + e.seconds}); startCountdown(e.seconds); break;
+        case "run":       runQuantum(); break;
+        case "write":     dispatch({type:"io", line:e.line, what:"write " + (e.name || "")}); saveFile(e.name); break;
+        case "open":      dispatch({type:"io", line:e.line, what:"open"}); fileIn.click(); break;
+        case "print":     dispatch({type:"io", line:e.line, what:"pdf"}); printDoc(); break;
+        case "quit":      dispatch({type:"ex", line:e.line, what:"quit"}); ST.msg = "🎬 カット。(:e で再開 / :demo でデモ)"; break;
+        case "help":      dispatch({type:"ex", line:e.line, what:"help"}); showHelp(true); break;
+        case "opts":      dirtyDom = true; break;
+        case "view":      setView(e.to); dispatch({type:"ex", line:e.line, what:"view " + e.to}); break;
+        case "jump":      dispatch({type:"search", line:e.line, what:"jump"}); break;
+        default:
+          if (!SIDE_EFFECT[e.type]) dispatch(e);
+      }
+    }
+    ST.events.length = 0;
+  }
+
+  /* ── ファイル入出力 ── */
+  function saveFile(name){
+    name = name || ST.fname || "quantum.bada";
+    var blob = new Blob([vimText(ST)], {type:"text/plain;charset=utf-8"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }
+  /* 読み込んだ行をバッファへ入れる (テキストでも PDF でも共通) */
+  function loadLines(lines, name, note){
+    snapshot(ST);
+    ST.lines = lines.length ? lines : [""];
+    ST.cur = {l:0, c:0}; ST.fname = name; ST.dirty = false;
+    ST.msg = '"' + name + '" ' + ST.lines.length + " 行を読み込みました" + (note ? " (" + note + ")" : "");
+    ST.msgErr = false;
+    dirtyDom = true; paintStatus(); ST.dispatched++; dispatch({type:"io", line:0, what:"read " + name});
+  }
+  function loadFail(text){
+    ST.msg = "⚠ " + text; ST.msgErr = true; paintStatus();
+    dispatch({type:"error", line:ST.cur.l, what:"read-error"});
+  }
+
+  /* ── PDF 読み込み (pdf.js) ──
+     まず同梱の pdf/ を使い (オフラインで動く)、index.html だけを単体で
+     開いていて pdf/ が無いときは CDN から取得する。CMap (日本語などの
+     文字対応表) も一緒に読むので、ToUnicode の無い PDF でも化けない。 */
+  var PDFJS_LOCAL = "pdf/";
+  var PDFJS_CDN = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/";
+  var PDFJS_SRI = {
+    "pdf.min.js": "sha384-OemFRmhjDZwhIKuUld0HJozkF2YErsgDaCL41trxGQZt4/WgnopJQqQl2DvDZ07Z",
+    "pdf.worker.min.js": "sha384-sS8B4COeBqzQV9DaPpp5cbpF+xz2jPcFbN3L8FL3/dx0RMC6WLUwTUOFm0iFb1lw"
+  };
+  var pdfJsReady = null;
+  function loadScript(src, integrity){
+    return new Promise(function(resolve, reject){
+      var el = document.createElement("script");
+      el.src = src;
+      if (integrity){ el.integrity = integrity; el.crossOrigin = "anonymous"; }
+      el.onload = function(){ resolve(); };
+      el.onerror = function(){ el.remove(); reject(new Error("読み込めません: " + src)); };
+      document.head.appendChild(el);
+    });
+  }
+  function pdfJsLib(){ return window.pdfjsLib || window["pdfjs-dist/build/pdf"]; }
+  function ensurePdfJs(){
+    if (pdfJsReady) return pdfJsReady;
+    /* 解析部 (worker) も <script> で読み、メインスレッドで動かす。
+       file:// では Web Worker を起動できないため。 */
+    pdfJsReady = loadScript(PDFJS_LOCAL + "pdf.min.js")
+      .then(function(){ return loadScript(PDFJS_LOCAL + "pdf.worker.min.js"); })
+      .then(function(){ return loadScript(PDFJS_LOCAL + "cmaps.js"); })
+      .then(function(){ return PDFJS_LOCAL; })
+      .catch(function(){
+        return loadScript(PDFJS_CDN + "legacy/build/pdf.min.js", PDFJS_SRI["pdf.min.js"])
+          .then(function(){ return loadScript(PDFJS_CDN + "legacy/build/pdf.worker.min.js", PDFJS_SRI["pdf.worker.min.js"]); })
+          .then(function(){ return PDFJS_CDN + "legacy/build/"; })
+          .catch(function(){
+            throw new Error("PDF エンジンがありません。index.html と同じ場所に pdf/ フォルダを置くか、ネットに接続してください");
+          });
+      })
+      .then(function(base){
+        var lib = pdfJsLib();
+        if (!lib) throw new Error("pdf.js を初期化できません");
+        lib.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
+        return lib;
+      });
+    pdfJsReady.catch(function(){ pdfJsReady = null; });    /* 失敗したら次回やり直す */
+    return pdfJsReady;
+  }
+  /* 同梱した CMap (base64) を pdf.js へ渡す。fetch を使わないので file:// でも動く */
+  function BundledCMaps(){}
+  BundledCMaps.prototype.fetch = function(q){
+    var b64 = window.__CINEVIM_CMAPS__[q.name];
+    if (!b64) return Promise.reject(new Error("CMap がありません: " + q.name));
+    var bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return Promise.resolve({cMapData:u8, compressionType:pdfJsLib().CMapCompressionType.BINARY});
+  };
+  function readPdf(buf, name){
+    ST.msg = "PDF を解析しています…"; ST.msgErr = false; paintStatus();
+    var doc = null;
+    ensurePdfJs().then(function(lib){
+      var opt = {data:new Uint8Array(buf), isEvalSupported:false, disableFontFace:true, useSystemFonts:true};
+      if (window.__CINEVIM_CMAPS__) opt.CMapReaderFactory = BundledCMaps;
+      else { opt.cMapUrl = PDFJS_CDN + "cmaps/"; opt.cMapPacked = true; }
+      return lib.getDocument(opt).promise;
+    }).then(function(d){
+      doc = d;
+      var pages = [], n = d.numPages;
+      function next(i){
+        if (i > n) return pages;
+        ST.msg = "PDF を読み込み中… " + i + " / " + n + " ページ"; paintStatus();
+        return d.getPage(i)
+          .then(function(pg){ return pg.getTextContent(); })
+          .then(function(tc){ pages.push(tc.items); return next(i + 1); });
+      }
+      return next(1);
+    }).then(function(pages){
+      var lines = pdfPagesToLines(pages);
+      if (!lines.length){
+        loadFail('"' + name + '" には文字情報がありません (スキャン画像だけの PDF は読めません)');
+      } else {
+        if (ST.opts.view !== "prose") setView("prose");
+        loadLines(lines, pdfTextName(name), "PDF " + pages.length + " ページ");
+      }
+    }).catch(function(e){
+      var why = e && e.name === "PasswordException" ? "パスワードつきの PDF は開けません"
+              : e && e.name === "InvalidPDFException" ? "PDF として壊れています"
+              : (e && e.message) || String(e);
+      loadFail('"' + name + '" を PDF として読めません: ' + why);
+    }).then(function(){ if (doc) doc.destroy(); });
+  }
+
+  fileIn.addEventListener("change", function(){
+    var f = fileIn.files && fileIn.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      var u8 = new Uint8Array(rd.result);
+      /* 拡張子ではなく中身で PDF かどうかを決める */
+      if (isPdfBytes(u8)){ readPdf(rd.result, f.name); return; }
+      var r = decodeTextBytes(u8, TextDecoder);
+      var text = r.text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+      loadLines(text.split("\n"), f.name, r.encoding === "utf-8" ? "" : r.encoding);
+    };
+    rd.onerror = function(){ loadFail('"' + f.name + '" を読み込めません'); };
+    rd.readAsArrayBuffer(f);
+    fileIn.value = "";
+  });
+
+  /* ── PDF 書き出し (:pdf) ──
+     本文を素の文字として印刷用の領域へ流し、ブラウザの印刷機能に渡す。
+     文字はフォントごと埋め込まれるので、書き出した PDF も文字化けしない。 */
+  function printDoc(){
+    var el = $("printDoc");
+    el.className = ST.opts.view === "prose" ? "" : "code";
+    el.textContent = vimText(ST);
+    var title = document.title;
+    document.title = String(ST.fname || "document").replace(/\.[^.]*$/, "");
+    setTimeout(function(){
+      try { window.print(); }
+      catch (e){ ST.msg = "⚠ この環境では印刷できません"; ST.msgErr = true; paintStatus(); }
+      document.title = title;
+    }, 60);
+  }
+
+  /* ── キー入力 ── */
+  function keyName(e){
+    var k = e.key;
+    if (e.ctrlKey || e.metaKey){
+      if (k.length === 1) return "<C-" + k.toLowerCase() + ">";
+      return null;
+    }
+    switch (k){
+      case "Escape": return "<Esc>";
+      case "Enter": return "<CR>";
+      case "Backspace": return "<BS>";
+      case "Delete": return "<Del>";
+      case "Tab": return "<Tab>";
+      case " ": return (ST.mode === "insert" || ST.mode === "replace" ||
+                        ST.mode === "command" || ST.mode === "search") ? " " : "<Space>";
+    }
+    if (k.length === 1) return k;
+    return null;
+  }
+  function arrowMove(dx, dy){
+    var prev = ST.cur.l;
+    if (dy){ ST.cur.l = Math.max(0, Math.min(ST.lines.length - 1, ST.cur.l + dy)); ST.cur.c = Math.min(ST.desired, _maxCol(ST, ST.cur.l)); }
+    if (dx){ ST.cur.c = Math.max(0, Math.min(_maxCol(ST, ST.cur.l), ST.cur.c + dx)); ST.desired = ST.cur.c; }
+    clampCur(ST);
+    if (ST.cur.l !== prev){ ST.dispatched++; dispatch({type:"motion", line:ST.cur.l, what:"arrow"}); }
+    after();
+  }
+  function after(){
+    var txt = vimText(ST);
+    if (txt !== lastText){ dirtyDom = true; proseDirty = true; }
+    else if (ST.cur.l !== lastCurL){ dirtyDom = true; }
+    var moved = ST.cur.l !== lastCurL;
+    lastText = txt; lastCurL = ST.cur.l;
+    drainEvents();
+    paintStatus();
+    /* 文章ビューでは、カーソルの位置がそのまま どアップ の焦点になる。
+       h / l で左右へ動かせば、どアップもその位置へ滑っていく。 */
+    if (ST.opts.view === "prose" && !proseDirty && rows.length) aimAtCursor();
+  }
+  /* 1 キー = 1 ディスパッチ。feedKey が key / motion / edit / mode を
+     すべてイベントとして積むので、ここでは drain するだけでよい。 */
+  function send(key){
+    feedKey(ST, key);
+    after();
+  }
+
+  document.addEventListener("keydown", function(e){
+    /* IME 変換中のキーは触らない。確定文字は #hidden の input で受け取る */
+    if (e.isComposing || e.keyCode === 229) return;
+    if (helpEl.classList.contains("show")){
+      if (e.key === "Escape" || e.key === "?" || e.key === "q"){ showHelp(false); e.preventDefault(); }
+      return;
+    }
+    if (e.key === "ArrowLeft"){ e.preventDefault(); return arrowMove(-1, 0); }
+    if (e.key === "ArrowRight"){ e.preventDefault(); return arrowMove(1, 0); }
+    if (e.key === "ArrowUp"){ e.preventDefault(); return arrowMove(0, -1); }
+    if (e.key === "ArrowDown"){ e.preventDefault(); return arrowMove(0, 1); }
+    if (e.key === "PageUp"){ e.preventDefault(); return arrowMove(0, -20); }
+    if (e.key === "PageDown"){ e.preventDefault(); return arrowMove(0, 20); }
+    if ((e.ctrlKey || e.metaKey) && ["c", "v", "a", "x"].indexOf(e.key) >= 0 && ST.mode !== "normal") return;
+    var k = keyName(e);
+    if (k === null) return;
+    e.preventDefault();
+    audio();                       /* 初回キーで音声コンテキストを解錠 */
+    send(k);
+  });
+
+  /* IME / ソフトキーボード対策 —
+     日本語は keydown では文字が取れない (変換確定は input で届く)。
+     隠し input を焦点に置いておき、そこへ入った文字を流し込む。
+     keydown 側で処理したキーは preventDefault 済みなので二重に入らない。 */
+  hidden.addEventListener("input", function(){
+    var v = hidden.value; hidden.value = "";
+    for (var i = 0; i < v.length; i++) send(v.charAt(i));
+  });
+  hidden.addEventListener("compositionend", function(){
+    var v = hidden.value; hidden.value = "";
+    for (var i = 0; i < v.length; i++) send(v.charAt(i));
+  });
+  function grabInput(){
+    if (helpEl.classList.contains("show")) return;
+    try { hidden.focus({preventScroll:true}); } catch (e){ hidden.focus(); }
+  }
+  /* ボタンを押したあとも入力を取り戻す (押しっぱなしで日本語が打てなくならないように) */
+  document.querySelectorAll("header button").forEach(function(btn){
+    btn.addEventListener("click", function(){ setTimeout(grabInput, 0); });
+  });
+  /* ポインタが指した位置が焦点になる。右へ左へ動かすと、どアップが
+     その位置に沿って滑っていく (拡大鏡は要らない)。 */
+  var hoverRaf = 0;
+  stage.addEventListener("pointermove", function(e){
+    if (ST.opts.view !== "prose") return;
+    if (hoverRaf) return;
+    var cx = e.clientX, cy = e.clientY;
+    hoverRaf = requestAnimationFrame(function(){ hoverRaf = 0; aimAtPoint(cx, cy); });
+  }, {passive:true});
+
+  /* ホイール: そのままスクロール、Ctrl + ホイールでどアップの倍率 */
+  stage.addEventListener("wheel", function(e){
+    if (ST.opts.view !== "prose") return;
+    if (e.ctrlKey){
+      e.preventDefault();
+      ST.opts.zpeak = peakStep(ST.opts.zpeak, e.deltaY < 0 ? 1 : -1);
+      ST.msg = "🔎 どアップ " + ST.opts.zpeak + "×";
+      paintStatus();
+    } else {
+      pageTop -= e.deltaY; applyPageTop();
+    }
+  }, {passive:false});
+
+  stage.addEventListener("pointerdown", function(e){
+    if (ST.opts.view === "prose"){
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var seg = el && el.closest ? el.closest(".seg") : null;
+      if (seg){
+        var l = parseInt(seg.dataset.l, 10), c0 = parseInt(seg.dataset.c0 || "0", 10);
+        ST.cur.l = l;
+        ST.cur.c = Math.min(c0, Math.max(0, (ST.lines[l] || "").length - 1));
+        ST.desired = ST.cur.c; clampCur(ST);
+        ST.dispatched++; dispatch({type:"motion", line:l, what:"point"});
+        after();
+      }
+      aimAtPoint(e.clientX, e.clientY);
+      grabInput();
+      return;
+    }
+    /* タップした行へカーソルを移動 (どアップの焦点が移る) */
+    var el = e.target.closest ? e.target.closest(".ln") : null;
+    if (el && el.dataset && el.dataset.l !== undefined){
+      var l = parseInt(el.dataset.l, 10);
+      if (l !== ST.cur.l){
+        ST.cur.l = l; ST.cur.c = Math.min(ST.desired, _maxCol(ST, l));
+        clampCur(ST); ST.dispatched++; dispatch({type:"motion", line:l, what:"tap"}); after();
+      } else {
+        ST.dispatched++; dispatch({type:"signal", line:l, what:"tap"}); after();
+      }
+    }
+    grabInput();
+  });
+
+  /* ── タッチ用キーバー ── */
+  var isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+  var KEYS = [
+    ["Esc", "<Esc>"], ["i", "i"], ["a", "a"], ["o", "o"], ["：", ":"], ["/", "/"],
+    ["h", "h"], ["j", "j"], ["k", "k"], ["l", "l"], ["w", "w"], ["b", "b"],
+    ["0", "0"], ["$", "$"], ["gg", "gg"], ["G", "G"], ["x", "x"], ["dd", "dd"],
+    ["yy", "yy"], ["p", "p"], ["u", "u"], ["✨", "<Space>"], ["⏎", "<CR>"], ["⌫", "<BS>"]
+  ];
+  function buildKeys(){
+    var h = "";
+    for (var i = 0; i < KEYS.length; i++){
+      h += '<button data-k="' + KEYS[i][1].replace(/"/g, "&quot;") + '">' + KEYS[i][0] + "</button>";
+    }
+    h += '<button data-k="__kbd">⌨</button>';
+    keysBar.innerHTML = h;
+    keysBar.addEventListener("click", function(e){
+      var b = e.target.closest("button"); if (!b) return;
+      var k = b.dataset.k;
+      if (k === "__kbd"){ hidden.focus(); return; }
+      if (k.length > 1 && k.charAt(0) !== "<"){
+        for (var i = 0; i < k.length; i++) send(k.charAt(i));
+      } else send(k);
+    });
+    if (isTouch) keysBar.classList.add("show");
+  }
+
+  /* ── ヘルプ ── */
+  var HELP_ROWS = [
+    ["§", "モード"],
+    ["i a I A o O", "挿入モードへ (o / O は EDIT イベントを発行)"],
+    ["v  V", "ビジュアル / ビジュアル行"],
+    ["R", "置換モード"],
+    ["Esc", "ノーマルモードへ戻る"],
+    ["§", "移動"],
+    ["h j k l", "左 下 上 右 (矢印キーも可)"],
+    ["w W b B e E", "単語単位の前後移動"],
+    ["0 ^ $", "行頭 / 最初の非空白 / 行末"],
+    ["gg  G  42G", "先頭 / 末尾 / 42 行目"],
+    ["{ }", "段落 (空行) 単位で移動"],
+    ["%", "対応する括弧へジャンプ"],
+    ["f x  t x  F x  T x", "行内で文字 x を検索 ( ; , で繰り返し)"],
+    ["/pat  ?pat  n  N", "検索 (JavaScript 正規表現)"],
+    ["Ctrl-D Ctrl-U", "半画面 下 / 上"],
+    ["§", "編集"],
+    ["x X  r c", "一文字削除 / 一文字置換"],
+    ["d{motion}  dd  D", "削除 (3dd, dw, d$ など)"],
+    ["c{motion}  cc  C", "変更して挿入モードへ"],
+    ["y{motion}  yy  Y  p P", "ヤンクと貼り付け"],
+    [">> <<", "インデント / アンインデント"],
+    ["J  ~", "行連結 / 大小文字反転"],
+    ['"a yy   "a p', "名前付きレジスタ"],
+    ["u  Ctrl-R  .", "取り消し / やり直し / 直前の変更を繰り返し"],
+    ["§", "🔎 ポイント位置のどアップ (文章ビュー)"],
+    ["ポインタを動かす", "指した位置がその場でどアップ。右へ左へ動かすと追ってくる"],
+    ["h l  w b", "カーソルを左右へ。行の中で、指した位置がさらに大きくなる"],
+    ["j k  } {", "行と段落を上下へ。その行がまるごと持ち上がる"],
+    ["クリック / タップ", "そこへカーソルを移す"],
+    ["Ctrl + ホイール", "どアップの倍率 (1.4× 〜 4.4×)"],
+    ["ホイール", "文章をスクロール"],
+    [":mag", "どアップの ON / OFF"],
+    [":prose  :code", "文章ビュー / コードビュー (等幅)"],
+    [":set zpeak=2.8", "どアップの最大倍率"],
+    [":set vspread=2", "縦の効き (行数)"],
+    [":set hspread=140", "横の効き (px)"],
+    [":set vmix=0.7", "縦の効きのうち行全体に及ぶ割合 (0=指した一点だけ / 1=行単位)"],
+    [":set nodim", "まわりの行を暗くしない"],
+    ["§", "🎬 シネマ演出 / ✨ イベント処理"],
+    ["Space", "現在行へ SIGNAL イベントをディスパッチ"],
+    ["行をタップ / クリック", "その行へ焦点を移して MOTION イベント"],
+    [":focus", "コードビューのどアップ (被写界深度) の ON / OFF"],
+    [":flash", "イベント処理フラッシュの ON / OFF"],
+    [":bus", "イベントバス HUD の表示切替"],
+    [":emit [名前]", "現在行へ手動で SIGNAL を発行"],
+    [":countdown 5", "映画のカウントダウン (毎秒 TICK、T-0 で全画面フラッシュ)"],
+    ["イベント種別", "KEY / MOTION / EDIT / MODE / EX / SEARCH / SIGNAL / TICK / RUN / IO / ERROR"],
+    [":set peak=3.2", "どアップの最大倍率 (既定 2.6)"],
+    [":set spread=1.4", "焦点の狭さ = 被写界深度 (既定 2.2)"],
+    [":set maxBlur=5", "背景のぼかし量 (既定 3.2)"],
+    [":set nosound", "効果音を切る"],
+    ["§", "⚛ 量子 Bada"],
+    [":run", "バッファを量子 Bada として実行"],
+    ["qubit q[3];", "量子レジスタの確保"],
+    ["H q[0];  X  Y  Z  S  T", "1 量子ビットゲート"],
+    ["CNOT q[0], q[1];", "もつれ (CZ / SWAP も可)"],
+    ["RX q[0], 1.57;", "回転ゲート (RY / RZ)"],
+    ["let s = measure q;", "観測して collapse"],
+    ["let z = 4.0 <- 2.0;", "非可換左作用 π(χ,x)"],
+    ["let a = 2.0 -< 12.0;", "多様体積分 ∬1/(x·log x)²"],
+    ["let g = 1.0 >- 0.5;", "量子作用素右作用 ⊕(iℏ∇)^⊕L"],
+    ["print beta(2,3);", "β(p,q) = Γ(p)Γ(q)/Γ(p+q)"],
+    ["§", "ファイル"],
+    [":w [name]  :wq  :q  :q!", "保存 / 保存して終了 / 終了"],
+    [":e", "ファイルを開く (テキスト / PDF。文字コードは自動判定)"],
+    [":pdf", "PDF に書き出す / 印刷"],
+    [":demo  :new", "デモを読み込む / 新規バッファ"],
+    [":%s/pat/rep/g", "全体置換 (:3,9s/// で範囲指定)"],
+    [":set number / :set nonumber", "行番号"],
+    [":help", "このヘルプ (Esc で閉じる)"]
+  ];
+  function showHelp(on){
+    if (on){
+      var h = '<button class="tb close" id="helpClose">✕ 閉じる (Esc)</button>' +
+              '<h3 style="margin-top:0">Bada CineVim — キーバインド</h3><table>';
+      for (var i = 0; i < HELP_ROWS.length; i++){
+        if (HELP_ROWS[i][0] === "§"){ h += '<tr><td colspan="2"><h3>' + HELP_ROWS[i][1] + "</h3></td></tr>"; continue; }
+        h += "<tr><td>" + escHtml(HELP_ROWS[i][0]) + "</td><td>" + escHtml(HELP_ROWS[i][1]) + "</td></tr>";
+      }
+      h += "</table>";
+      helpEl.querySelector(".inner").innerHTML = h;
+      helpEl.classList.add("show");
+      helpEl.querySelector("#helpClose").onclick = function(){ showHelp(false); };
+    } else helpEl.classList.remove("show");
+  }
+
+  /* ── ツールバー ── */
+  $("btnFocus").onclick = function(){ ST.opts.focus = !ST.opts.focus; ST.msg = "シネマフォーカス: " + (ST.opts.focus ? "ON" : "OFF"); paintStatus(); };
+  $("btnFlash").onclick = function(){
+    ST.opts.flash = !ST.opts.flash;
+    ST.msg = "イベントフラッシュ: " + (ST.opts.flash ? "ON" : "OFF");
+    paintStatus();
+    if (ST.opts.flash) dispatch({type:"mode", line:ST.cur.l, what:"flash on"});
+  };
+  $("btnCount").onclick = function(){ audio(); startCountdown(5); ST.msg = "⏱ T-5 カウントダウン開始"; paintStatus(); };
+  $("btnRun").onclick = function(){ runQuantum(); };
+  $("btnOpen").onclick = function(){ fileIn.click(); };
+  $("btnSave").onclick = function(){ saveFile(ST.fname); ST.dirty = false; paintStatus(); };
+  $("btnPdf").onclick = function(){ printDoc(); };
+  $("btnHelp").onclick = function(){ showHelp(!helpEl.classList.contains("show")); };
+  $("btnOut").onclick = function(){ showSide(!sideOpen()); };
+  $("btnZoom").onclick = function(){
+    ST.opts.zoom = !ST.opts.zoom;
+    $("btnZoom").classList.toggle("on", ST.opts.zoom);
+    ST.msg = "🔎 どアップ: " + (ST.opts.zoom ? "ON" : "OFF");
+    paintStatus();
+  };
+  $("btnView").onclick = function(){ setView(ST.opts.view === "prose" ? "code" : "prose"); paintStatus(); };
+  $("sideClose").onclick = function(){ showSide(false); };
+  window.addEventListener("resize", function(){
+    docX = 0; pageX = 0; dirtyDom = true; proseDirty = true; fitOpts();
+  });
+
+  /* ── 画面幅に応じた演出量 ── */
+  function fitOpts(){
+    var w = window.innerWidth;
+    if (w < 560){
+      ST.opts.peak = 1.75; ST.opts.spread = 2.6; ST.opts.maxZ = 16;
+      ST.opts.zpeak = 1.8; ST.opts.hspread = 70;   /* 電話では効きを狭く */
+    } else if (w < 900){
+      ST.opts.peak = 2.1; ST.opts.spread = 2.4; ST.opts.maxZ = 20;
+      ST.opts.zpeak = 2.0; ST.opts.hspread = 90;
+    }
+    BASE_H = w < 560 ? 26 : 30;
+    document.documentElement.style.setProperty("--base-h", BASE_H + "px");
+    document.documentElement.style.setProperty("--prose-size", (w < 560 ? 17 : 19) + "px");
+  }
+
+  /* ── 起動 ── */
+  fitOpts();
+  buildKeys();
+  setView(ST.opts.view);
+  lastText = vimText(ST); lastCurL = ST.cur.l;
+  ST.msg = "上下で行ごと・左右で指した位置がどアップ ・ Ctrl+ホイールで倍率 ・ :help";
+  dirtyDom = true;
+  paintStatus();
+  printOut([
+    {cls:"o-dim", text:"Bada CineVim — 文章ビュー (ポイント位置のどアップ)"},
+    {cls:"o-key", text:"▶ 実行 または :run でバッファを実行します"},
+    {cls:"o-dim", text:"⏱ カウントダウン または :countdown 5 で映画の秒読み (毎秒 TICK イベント)"}
+  ], true, false);
+  requestAnimationFrame(frame);
+  setTimeout(function(){ dispatch({type:"io", line:0, what:"buffer ready"}); }, 420);
+}
+
+if (typeof window !== "undefined" && !window.__ENGINE_TEST__) boot();
+</script>
+</body>
+</html>
