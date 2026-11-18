@@ -19,6 +19,9 @@
  *  10. サイレントトーク (口形 → 口形素 → 走行コマンド) と安全ゲート
  *  11. 目的地リンク (AEAD 封筒 / 地名・座標の解析 / 改ざん拒否)
  *  12. 完全自動走行ミッション (受理 → 計画 → 封鎖・再計画 → 到着 → 次へ / 緊急停止)
+ *  13. ⚛ 量子コンピューター (状態ベクトル / 量子 Bada / トポロジー写像 φ の単射 /
+ *      量子ディスパッチ / 量子アービタの経路選択)
+ *  14. 🚘 EV-OS リンク (BB84 鍵配送 → OTP 暗号通信 / 盗聴検出 / 改ざん・再送拒否 / テレメトリ)
  */
 "use strict";
 const fs = require("fs");
@@ -188,9 +191,12 @@ sess.feed("41 0D 28\r>");                       /* 40 km/h */
 sess.feed("41 0C 0F A0\r>");                    /* 1000 rpm */
 sess.feed("41 05 46\r>");                       /* 30°C */
 sess.feed("41 46 3C\r>");                       /* 外気温 20°C */
+sess.feed("41 5B C0\r>");                       /* EV バッテリー残量 75% */
 sess.feed("12.4V\r>");
-assert(writes[writes.length - 1] === "010D" && writes.length === 11,
-       "ELM session: poll cycle wraps around (010D 010C 0105 0146 ATRV -> 010D)");
+assert(writes[writes.length - 1] === "010D" && writes.length === 12,
+       "ELM session: poll cycle wraps around (010D 010C 0105 0146 015B ATRV -> 010D)");
+const socEv = telemetry.filter(function(e){ return e.type === "soc"; });
+assert(socEv.length === 1 && socEv[0].pct === 75, "ELM session: EV battery state of charge (PID 015B) 75% delivered");
 const amb = telemetry.filter(function(e){ return e.type === "ambient"; });
 assert(amb.length === 1 && amb[0].c === 20, "ELM session: ambient air temperature (PID 0146, the car's thermometer) 20°C delivered");
 const spd = telemetry.filter(function(e){ return e.type === "speed"; });
@@ -345,5 +351,69 @@ assert(mu.queue.length === 0, "mission: off-road cells never enter the queue");
 const mb = new M(); mb.accept({ x: 11, y: 0, label: "駅" }, 0); mb.blocked["11,0"] = 1e12;
 const nb = mb.next([0, 0], 0);
 assert(!nb.ok && nb.skipped.length === 1 && mb.state === "IDLE", "mission: an unreachable destination is skipped and reported");
+
+/* 13. ⚛ 量子コンピューター */
+const QV = G("QVM");
+const bell = new QV(2, 1).H(0).CNOT(0, 1);
+const bp = bell.probs();
+assert(Math.abs(bp[0] - 0.5) < 1e-12 && Math.abs(bp[3] - 0.5) < 1e-12 && bp[1] < 1e-12, "QVM: H + CNOT prepares the Bell state (|00⟩,|11⟩ at 1/2)");
+const ghz = G("qRun")("qubit q0 q1 q2\nH q0\nCNOT q0 q1\nCNOT q1 q2\nmeasure", 5);
+assert(ghz.measured === 0 || ghz.measured === 7, "quantum Bada: GHZ measurement collapses to |000⟩ or |111⟩ (" + ghz.vm.ket(ghz.measured) + ")");
+let hits = { }; for (let i = 0; i < 200; i++){ const r = G("qRun")("qubit q0\nH q0\nmeasure", i); hits[r.measured] = (hits[r.measured] || 0) + 1; }
+assert(hits[0] > 60 && hits[1] > 60, "quantum Bada: H then measure is ~50/50 over seeds (" + hits[0] + "/" + hits[1] + ")");
+const QF = G("QT_FUNCS");
+const keys = {}; let inj = true;
+for (const f of QF){ const k = G("qtInvariant")(f.knot).key; if (keys[k]) inj = false; keys[k] = f.id; }
+assert(QF.length === 16 && inj, "topology: all 16 tablet functions have distinct (crossings, writhe) → injective φ");
+const kets = {}; for (const f of QF){ const m = G("qtMap")(f.id); if (kets[m.ket]) inj = false; kets[m.ket] = 1; }
+assert(inj && Object.keys(kets).length === 16, "topology: 16 functions map to 16 distinct 4-qubit basis states");
+const mStop = G("qtMap")("STOP");
+assert(mStop.ket === "|0010⟩" && /^qubit q0 q1 q2 q3\nX q2\nmeasure$/.test(mStop.program) && mStop.invariant.bracket === "(−A⁻³)^1", "topology: STOP = knot [-1] → ⟨K⟩=(−A⁻³)^1 → |0010⟩ prepared by X q2");
+const rt = G("qtRoute")("START", "STOP");
+assert(rt.hamming === 2 && rt.steps.join(",") === "X q2,X q3", "topology: START→STOP is a 2-step hypercube deformation (X q2, X q3)");
+let fired = 0;
+const qd = G("qtDispatch")("RIGHT", function(){ fired++; return 42; }, 9);
+assert(qd.ok && fired === 1 && qd.result === 42 && qd.observed === G("qtMap")("RIGHT").ket, "quantum dispatch: measuring the prepared circuit yields φ(RIGHT) and fires the handler once");
+assert(G("qtDispatch")("NOPE", function(){ fired++; }).ok === false && fired === 1, "quantum dispatch: an unmapped function is refused and never fires");
+const ch = G("qChoose")([0, 1, 0, 0], 3);
+assert(ch.index === 1 && ch.ket === "|01⟩" && ch.probs[0] === 0, "quantum arbiter: a zero-weight candidate has probability 0; the only live candidate is measured");
+let cnt = [0, 0, 0]; for (let i = 0; i < 300; i++){ cnt[G("qChoose")([3, 1, 0], i).index]++; }
+assert(cnt[2] === 0 && cnt[0] > cnt[1] && cnt[1] > 20, "quantum arbiter: measurement frequencies follow the encoded weights (" + cnt.join("/") + ")");
+const alts = G("altRoutes")([0, 0], [11, 8], {}, 4);
+assert(alts.length >= 2 && alts[0].length <= alts[1].length, "alt routes: at least two distinct candidates, shortest first");
+const chooser = G("qRouteChooser")(11);
+const pick = chooser([0, 0], [11, 8], {}, null);
+assert(pick && pick.routes.length >= 2 && pick.path === pick.routes[pick.index] && pick.q.probs.length === pick.routes.length, "route chooser: encodes all candidates and returns the measured one");
+const mq = new M(); mq.chooser = chooser; mq.accept({ x: 11, y: 8, label: "空港", seq: 1 }, 0);
+const nq = mq.next([0, 0], 0);
+assert(nq.ok && nq.choice && nq.choice.q.ket && mq.path === nq.path, "mission: with a quantum chooser next() records the measured route choice");
+
+/* 14. 🚘 EV-OS リンク */
+const ES = G("EvosSession");
+function pair(opts){
+  const q = { a: [], b: [] }, log = { a: [], b: [] };
+  const A = new ES("tablet", function(l){ q.b.push(l); }, Object.assign({ seed: 1, n: 120, onMessage: function(t){ log.a.push(t); } }, opts || {}));
+  const B = new ES("ev", function(l){ q.a.push(l); }, { seed: 2, onMessage: function(t){ log.b.push(t); } });
+  function pump(){ let n = 0; while ((q.a.length || q.b.length) && n++ < 50){ while (q.a.length) A.feed(q.a.shift() + "\n"); while (q.b.length) B.feed(q.b.shift() + "\n"); } }
+  return { A: A, B: B, pump: pump, log: log };
+}
+const P1 = pair(); P1.A.start(); P1.pump();
+assert(P1.A.state === "secure" && P1.B.state === "secure", "EV-OS link: BB84 over the link reaches 'secure' on both ends");
+assert(P1.A.key && P1.B.key && P1.A.key.join("") === P1.B.key.join("") && P1.A.key.length > 20 && P1.A.qber === 0, "EV-OS link: both ends hold the same sifted key (" + P1.A.key.length + " bit), QBER 0");
+assert(P1.A.message("MSN|DRIVING|空港|42|11|8|17") && P1.pump() === undefined && P1.log.b[P1.log.b.length - 1] === "MSN|DRIVING|空港|42|11|8|17", "EV-OS link: a mission frame survives OTP encryption and decrypts on the EV side");
+assert(P1.B.message(G("evosTelemetry")({ kmh: 48, soc: 71, rangeKm: 298, regen: true, gear: "D" })) && (P1.pump(), G("evosParse")(P1.log.a[P1.log.a.length - 1]).soc === 71), "EV-OS link: EV telemetry (SOC 71%) round-trips to the tablet");
+const sealed2 = P1.A.seal("CMD|STOP"); const parts = sealed2.replace("ENC|", "").split(".");
+const tam = "ENC|" + (parts[0].slice(0, 2) === "00" ? "ff" : "00") + parts[0].slice(2) + "." + parts[1] + "." + parts[2];
+const bfr = P1.log.b.length; P1.B.feed(tam + "\n");
+assert(P1.log.b.length === bfr && P1.B.events.indexOf("reject") >= 0, "EV-OS link: a tampered ciphertext fails the key-dependent MAC and is rejected");
+P1.B.feed(sealed2 + "\n"); const after1 = P1.log.b.length; P1.B.feed(sealed2 + "\n");
+assert(after1 === bfr + 1 && P1.log.b.length === after1 && P1.B.events.indexOf("replay") >= 0, "EV-OS link: a replayed frame is delivered once and then rejected (sequence number)");
+const P2 = pair({ eavesdrop: true }); P2.A.start(); P2.pump();
+assert(P2.B.state === "eve" && P2.A.state === "eve" && P2.A.key === null && P2.B.qber > 0.1, "EV-OS link: intercept-resend eavesdropping raises QBER above 10% → both ends discard the key (QBER " + (P2.B.qber * 100).toFixed(0) + "%)");
+assert(P2.A.message("MSN|x") === false, "EV-OS link: nothing can be sent without an established quantum key");
+const P3 = pair(); P3.A.start(); P3.pump();
+const foreign = P3.A.seal("CMD|GO"); const b4 = P1.log.b.length; P1.B.feed(foreign + "\n");
+assert(P1.log.b.length === b4, "EV-OS link: a frame sealed under another session's key is rejected");
+assert(G("evosParse")("MSN|DRIVING|駅|30|11|0|12").x === 11 && G("evosParse")("CMD|STOP").cmd === "STOP" && G("evosParse")("HELLO|ev|Car").name === "Car", "EV-OS link: frame parser");
 
 console.log("\nALL ENGINE TESTS PASSED");

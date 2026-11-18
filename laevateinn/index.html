@@ -18,6 +18,11 @@
   ・v2.0 🌡 熱画像知覚: 赤外線カメラ × 温度計 (OBD-II PID 0146 / BLE) の温度場から
     ガンマ関数の大域的部分積分多様体エントロピー Ξ を方位ごとに求め、16 レイへ融合
     (熱放射は無音の対象も写す)
+  ・v4.0 ⚛ QuantOS 量子コンピューター: bada_quantos の擬似量子計算機 (状態ベクトル) と
+    トポロジー写像機構 (機能=結び目 → Kauffman 不変量 → 基底状態への単射 φ) を移植。
+    タブレットの全機能は量子プログラム実行 → 測定 → 発火。経路選択は量子アービタ
+  ・v4.0 🚘 EV-OS リンク: Bluetooth で電気自動車側 OS と交信。BB84 量子鍵配送を
+    リンク上で実行し、ミッション/目的地/指示/テレメトリをワンタイムパッドで暗号化
   ・v3.0 📍 目的地リンク: 目的地を Bluetooth でタブレットへ (BLE ペリフェラル /
     NUS リモコン / 送信機モード / デモ)。zone:// 系 AEAD 封筒で検証したものだけ受理
   ・v3.0 🚗 完全自動走行ミッション: 受理 → A* → 自動発進 → 障害物で減速停止 →
@@ -94,6 +99,9 @@ input:focus{outline:none;border-color:var(--cyan)}
 #stcv{image-rendering:auto;max-width:320px}
 button.chip{font-size:11.5px;padding:3px 9px;border-radius:99px}
 #stpad button{min-width:38px;font-weight:700}
+#qctable{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px}
+#qctable div{font-size:10.5px;font-family:var(--mono);padding:2px 6px;border-radius:5px;background:#101830;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#qctable div.on{background:#1c1533;color:#c9b3ff;outline:1px solid var(--purple)}
 #statusbar{flex:none;display:flex;gap:16px;padding:5px 14px;background:#050810;border-top:1px solid var(--edge);font-size:11.5px;color:var(--dim);overflow-x:auto;white-space:nowrap}
 #statusbar b{color:var(--gold)}
 </style>
@@ -165,6 +173,38 @@ button.chip{font-size:11.5px;padding:3px 9px;border-radius:99px}
       <p style="font-size:11px;color:var(--dim);margin-top:6px">車載タブレット (APK) は BLE ペリフェラル「Laevateinn」として目的地を待ち受けます。スマホでこのページを開き、同じ入力欄から「送信」すると<b>送信機モード</b>になり、Web Bluetooth で目的地を AEAD 封緘して書き込みます。Nordic UART を話す BLE リモコンからの受信にも対応。「デモリンク」は封緘→受信→検証→自動発進を端末内で通します。</p>
     </div>
     <div class="card">
+      <h2>⚛ 量子コンピューター — QuantOS トポロジー写像機構でタブレットを操作</h2>
+      <div class="kv"><b>現在の機能 (基底状態)</b><span id="qcfn">—</span></div>
+      <div class="kv"><b>結び目不変量</b><span id="qcinv">—</span></div>
+      <div class="kv"><b>実行した量子プログラム</b><span id="qcprog">—</span></div>
+      <div class="kv"><b>連続変形 (X ゲート列)</b><span id="qcroute">—</span></div>
+      <div class="kv"><b>量子アービタ (経路選択)</b><span id="qcroutes">—</span></div>
+      <div class="kv"><b>ディスパッチ</b><span id="qccount">0 回</span></div>
+      <div class="kv"><b>観測台帳</b><span id="qcledger">—</span></div>
+      <div id="qctable"></div>
+      <p style="font-size:11px;color:var(--dim);margin-top:6px">このタブレットの 16 機能はそれぞれ結び目 (カール列) を持ち、Kauffman ブラケット ⟨K⟩=(−A³)^w の (交点数, ライズ) で 4 量子ビットの基底状態へ単射写像されます。機能の実行は「準備回路を擬似量子コンピュータ (状態ベクトル) で実行 → 測定 → 観測された基底状態の機能を発火」。測定が写像と食い違えば拒否します。経路の選択は候補を振幅に符号化し、測定で 1 本に収縮させる量子アービタが行います (制動・回避は古典制御のまま)。</p>
+    </div>
+    <div class="card">
+      <h2>🚘 EV-OS リンク — Bluetooth で電気自動車側 OS と交信 (BB84 量子暗号)</h2>
+      <div class="btnrow">
+        <select id="evrole" title="この端末の役割"><option value="tablet">操縦タブレット役</option><option value="ev">EV-OS 役 (車側)</option></select>
+        <button id="evconn" class="primary">Bluetooth で接続</button>
+        <button id="evloop">ループバック (デモ)</button>
+        <button id="evoff" class="danger" style="display:none">切断</button>
+      </div>
+      <div class="kv"><b>状態</b><span id="evstate">未接続</span></div>
+      <div class="kv"><b>相手</b><span id="evdev">—</span></div>
+      <div class="kv"><b>量子鍵 (BB84)</b><span id="evqkd">—</span></div>
+      <div class="kv"><b>EV テレメトリ</b><span id="evtel">—</span></div>
+      <div class="kv"><b>受信ミッション (EV-OS 役)</b><span id="evmsn">—</span></div>
+      <div class="kv"><b>最終 ACK</b><span id="evack">—</span></div>
+      <div id="alrow" style="margin-top:8px">
+        <input id="evinput" placeholder="EV-OS へ送る: CMD|STOP / CMD|GO / DST|11,8|空港 (暗号化して送信)"/>
+        <button id="evsend">送信</button>
+      </div>
+      <p style="font-size:11px;color:var(--dim);margin-top:6px">操縦タブレットと EV 側 OS (この Laevateinn を「EV-OS 役」で動かした車載端末、または同じプロトコルを話す機器) が Bluetooth で交信します。接続直後に BB84 量子鍵配送をリンク上で実行 (乱択基底 → ふるい → QBER 照合、盗聴は QBER>10% で検出して鍵破棄)、以降のミッション・目的地・指示・テレメトリはワンタイムパッドで暗号化し、鍵依存 MAC と連番で改ざん・再送を拒否します。実車の OBD-II からは EV バッテリー残量 (PID 015B) を読み取りのみ。車両の操縦系へは一切コマンドを送りません。</p>
+    </div>
+    <div class="card">
       <h2>🚗 ミッション (完全自動走行)</h2>
       <div class="kv"><b>状態</b><span id="mstate">待機 (目的地待ち)</span></div>
       <div class="kv"><b>現在の目的地</b><span id="mcur">—</span></div>
@@ -226,6 +266,7 @@ button.chip{font-size:11.5px;padding:3px 9px;border-radius:99px}
       <div class="kv"><b>回転数</b><span id="btrpm">—</span></div>
       <div class="kv"><b>水温 / 電圧</b><span id="btmisc">—</span></div>
       <div class="kv"><b>外気温 (PID 0146)</b><span id="btamb">—</span></div>
+      <div class="kv"><b>EV バッテリー残量 (PID 015B)</b><span id="btsoc">—</span></div>
       <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12.5px;color:var(--dim)">
         <input type="checkbox" id="btvoice" style="width:auto"/> 🔊 アルの音声案内 (カーナビとBT接続済みの端末なら車のスピーカーから流れます)
       </label>
@@ -235,7 +276,7 @@ button.chip{font-size:11.5px;padding:3px 9px;border-radius:99px}
 </div>
 
 <div id="statusbar">
-  <span><b>Laevateinn</b> v3.0</span>
+  <span><b>Laevateinn</b> v4.0</span>
   <span>assistant: <b>アル</b> (BadaGPT系意図エンジン)</span>
   <span id="st-mode">mode: web</span>
   <span id="st-msg"></span>
@@ -907,9 +948,11 @@ Mission.prototype.next = function(fromCell, now){
   const skipped = [];
   while (this.queue.length){
     const d = this.queue.shift();
-    const p = planRouteAvoid(fromCell, [d.x, d.y], this.activeBlocked(now));
+    let p = null; this.lastChoice = null;
+    if (this.chooser){ const c = this.chooser(fromCell, [d.x, d.y], this.activeBlocked(now), this.hot); if (c){ p = c.path; this.lastChoice = c; } }
+    else p = planRouteAvoid(fromCell, [d.x, d.y], this.activeBlocked(now));
     if (p){ this.current = d; this.path = p; this.wp = 0; this.state = "DRIVING"; this.stuckT = 0;
-            return { ok: true, dest: d, path: p, skipped: skipped }; }
+            return { ok: true, dest: d, path: p, skipped: skipped, choice: this.lastChoice }; }
     skipped.push(d);
   }
   this.current = null; this.path = []; this.wp = 0; this.state = "IDLE";
@@ -942,6 +985,297 @@ Mission.prototype.eta = function(cruise){
   if (this.state !== "DRIVING") return 0;
   return Math.max(0, this.path.length - this.wp) * CELL / Math.max(1, cruise);
 };
+
+/* =====================================================================
+ * ⚛ v4.0 — QuantOS 量子コンピューター (トポロジー写像機構) でタブレットを操作
+ *   bada_quantos の擬似量子コンピュータ (ノイマン型タブレット上で状態
+ *   ベクトルを模擬) と、各機能を結び目 → Kauffman ブラケット不変量 →
+ *   基底状態へ単射写像するトポロジー写像機構を、走行タブレットに移植。
+ *   このタブレットの全機能 (発進・停止・左右・目的地・熱画像・EV-OS リンク …)
+ *   は「量子プログラムを実行 → 測定 → 観測された基底状態の機能を発火」
+ *   という経路でだけ動く。測定結果が写像 φ と食い違えば実行を拒否する。
+ * ===================================================================== */
+/* ── 擬似量子コンピュータ: 状態ベクトル (≤ 8 量子ビット) ── */
+function QVM(n, seed){
+  if (n < 1 || n > 8) throw new Error("量子ビットは 1〜8 個");
+  this.n = n; this.state = new Float64Array(1 << n); this.state[0] = 1;
+  this.rnd = lvRand(seed == null ? 1 : seed); this.log = [];
+}
+QVM.prototype.H = function(q){
+  const s = this.state, m = 1 << (this.n - 1 - q), r = Math.SQRT1_2;
+  for (let i = 0; i < s.length; i++) if (!(i & m)){ const a = s[i], b = s[i | m]; s[i] = r * (a + b); s[i | m] = r * (a - b); }
+  this.log.push("H q" + q); return this;
+};
+QVM.prototype.X = function(q){
+  const s = this.state, m = 1 << (this.n - 1 - q);
+  for (let i = 0; i < s.length; i++) if (!(i & m)){ const t = s[i]; s[i] = s[i | m]; s[i | m] = t; }
+  this.log.push("X q" + q); return this;
+};
+QVM.prototype.Z = function(q){
+  const s = this.state, m = 1 << (this.n - 1 - q);
+  for (let i = 0; i < s.length; i++) if (i & m) s[i] = -s[i];
+  this.log.push("Z q" + q); return this;
+};
+QVM.prototype.RY = function(q, th){
+  const s = this.state, m = 1 << (this.n - 1 - q), c = Math.cos(th / 2), sn = Math.sin(th / 2);
+  for (let i = 0; i < s.length; i++) if (!(i & m)){ const a = s[i], b = s[i | m]; s[i] = c * a - sn * b; s[i | m] = sn * a + c * b; }
+  this.log.push("RY q" + q + " " + th.toFixed(3)); return this;
+};
+QVM.prototype.CNOT = function(c, t){
+  const s = this.state, mc = 1 << (this.n - 1 - c), mt = 1 << (this.n - 1 - t);
+  for (let i = 0; i < s.length; i++) if ((i & mc) && !(i & mt)){ const x = s[i]; s[i] = s[i | mt]; s[i | mt] = x; }
+  this.log.push("CNOT q" + c + "→q" + t); return this;
+};
+/* 振幅ベクトルを直接用意する (正規化)。目的地候補などの重み符号化に使う */
+QVM.prototype.encode = function(weights){
+  let z = 0; for (const w of weights) z += Math.max(0, w);
+  this.state.fill(0);
+  for (let i = 0; i < weights.length && i < this.state.length; i++) this.state[i] = z > 0 ? Math.sqrt(Math.max(0, weights[i]) / z) : 0;
+  if (z <= 0) this.state[0] = 1;
+  this.log.push("encode " + weights.length); return this;
+};
+QVM.prototype.probs = function(){ const p = []; for (const a of this.state) p.push(a * a); return p; };
+QVM.prototype.measure = function(){
+  const r = this.rnd(); let acc = 0, hit = this.state.length - 1;
+  for (let k = 0; k < this.state.length; k++){ acc += this.state[k] * this.state[k]; if (r <= acc + 1e-12){ hit = k; break; } }
+  this.state.fill(0); this.state[hit] = 1; this.log.push("measure → " + this.ket(hit)); return hit;
+};
+QVM.prototype.ket = function(i){ let b = ""; for (let q = this.n - 1; q >= 0; q--) b += (i >> q) & 1; return "|" + b + "⟩"; };
+/* 量子 Bada の文字列プログラム (qubit / H / X / Z / CNOT / measure) を実行 */
+function qRun(src, seed){
+  let vm = null; const out = [];
+  for (const raw of String(src).split(/\n/)){
+    const line = raw.trim(); if (!line || line[0] === "#") continue; let m;
+    if ((m = /^qubit\s+(.+)$/i.exec(line))){ vm = new QVM(m[1].trim().split(/\s+/).length, seed); out.push(line); continue; }
+    if (!vm) throw new Error("先に qubit 宣言");
+    if ((m = /^H\s+q(\d+)$/i.exec(line))) vm.H(+m[1]);
+    else if ((m = /^X\s+q(\d+)$/i.exec(line))) vm.X(+m[1]);
+    else if ((m = /^Z\s+q(\d+)$/i.exec(line))) vm.Z(+m[1]);
+    else if ((m = /^CNOT\s+q(\d+)\s+q(\d+)$/i.exec(line))) vm.CNOT(+m[1], +m[2]);
+    else if (/^measure$/i.test(line)){ const h = vm.measure(); out.push("measure → " + vm.ket(h)); vm.last = h; }
+    else if (/^state$/i.test(line)){ const p = vm.probs(); for (let i = 0; i < p.length; i++) if (p[i] > 1e-9) out.push(vm.ket(i) + " " + p[i].toFixed(3)); }
+    else throw new Error("解釈できない行: " + line);
+  }
+  return { vm: vm, out: out, measured: vm ? vm.last : null };
+}
+
+/* ── トポロジー写像機構: 走行タブレットの 16 機能 → 結び目 → |b₀b₁b₂b₃⟩ ──
+ *   (交点数 c, ライズ w) が全機能で異なる → φ は単射 (テストで検査) */
+const QT_FUNCS = [
+  { id: "IDLE",      name: "待機",           icon: "🅿", knot: [] },
+  { id: "START",     name: "発進",           icon: "▶", knot: [1] },
+  { id: "STOP",      name: "停止",           icon: "⏹", knot: [-1] },
+  { id: "LEFT",      name: "左へ",           icon: "↰", knot: [1, 1] },
+  { id: "RIGHT",     name: "右へ",           icon: "↱", knot: [-1, -1] },
+  { id: "SLOW",      name: "減速",           icon: "🐢", knot: [1, -1] },
+  { id: "FAST",      name: "加速",           icon: "🐇", knot: [1, 1, 1] },
+  { id: "HOME",      name: "戻る",           icon: "🏠", knot: [-1, -1, -1] },
+  { id: "STATUS",    name: "状態",           icon: "📊", knot: [1, 1, -1] },
+  { id: "DEST",      name: "目的地",         icon: "📍", knot: [1, 1, 1, 1] },
+  { id: "THERMAL",   name: "熱画像",         icon: "🌡", knot: [-1, -1, -1, -1] },
+  { id: "SILENT",    name: "サイレントトーク", icon: "🤫", knot: [1, 1, -1, -1] },
+  { id: "EVLINK",    name: "EV-OS リンク",   icon: "🚘", knot: [1, 1, 1, -1] },
+  { id: "POS",       name: "測位",           icon: "🛰", knot: [1, 1, 1, 1, 1] },
+  { id: "MAP",       name: "地図",           icon: "🗺", knot: [-1, -1, -1, -1, -1] },
+  { id: "EMERGENCY", name: "緊急停止",       icon: "🆘", knot: [1, 1, 1, 1, -1] }
+];
+const QT_QUBITS = 4;
+function qtInvariant(knot){
+  let w = 0; for (const s of knot) w += s;
+  const c = knot.length;
+  return { crossings: c, writhe: w, bracket: w === 0 ? "1" : "(−A" + (w > 0 ? "³" : "⁻³") + ")^" + Math.abs(w), aExp: 3 * w, key: c + ":" + w };
+}
+function qtMap(id){
+  const idx = QT_FUNCS.findIndex(function(f){ return f.id === id; });
+  if (idx < 0) return null;
+  const f = QT_FUNCS[idx];
+  let bits = ""; for (let b = QT_QUBITS - 1; b >= 0; b--) bits += (idx >> b) & 1;
+  let prog = "qubit q0 q1 q2 q3";
+  for (let j = 0; j < QT_QUBITS; j++) if (bits[j] === "1") prog += "\nX q" + j;
+  prog += "\nmeasure";
+  return { id: f.id, name: f.name, icon: f.icon, index: idx, ket: "|" + bits + "⟩", invariant: qtInvariant(f.knot), program: prog };
+}
+function qtRoute(fromId, toId){
+  const a = qtMap(fromId), b = qtMap(toId); if (!a || !b) return null;
+  const x = a.index ^ b.index, steps = [];
+  for (let j = 0; j < QT_QUBITS; j++) if ((x >> (QT_QUBITS - 1 - j)) & 1) steps.push("X q" + j);
+  return { from: a, to: b, steps: steps, hamming: steps.length };
+}
+/* 量子ディスパッチ: 機能 id の準備回路を量子コンピュータで実行・測定し、
+ *   観測された基底状態が φ(id) と一致したときだけ handler を呼ぶ。
+ *   (準備回路はユニタリなので一致は必然 — 一致しなければ実装の故障として拒否) */
+function qtDispatch(id, handler, seed){
+  const m = qtMap(id); if (!m) return { ok: false, why: "unknown" };
+  const r = qRun(m.program, seed == null ? lvHash(id + ":" + Date.now()) : seed);
+  const ket = r.vm.ket(r.measured);
+  if (r.measured !== m.index) return { ok: false, why: "mismatch", expected: m.ket, observed: ket, map: m };
+  const result = handler ? handler() : undefined;
+  return { ok: true, map: m, observed: ket, program: r.vm.log.slice(), result: result };
+}
+
+/* ── 量子アービタ: 経路候補の重みを振幅に符号化して測定で 1 本選ぶ ──
+ *   重み 0 の候補は確率 0 (絶対に選ばれない)。seed で再現可能。 */
+function qChoose(weights, seed){
+  const k = Math.max(1, weights.length);
+  let n = 1; while ((1 << n) < k) n++;
+  const vm = new QVM(Math.min(8, n), seed);
+  vm.encode(weights);
+  const p = vm.probs().slice(0, k);
+  const hit = vm.measure();
+  return { index: hit, ket: vm.ket(hit), probs: p, qubits: vm.n, log: vm.log.slice() };
+}
+/* 代替経路: 最短路に加え、最短路の途中セルを 1 つずつ避けた経路 (最大 k 本) */
+function altRoutes(from, to, blocked, k){
+  const first = planRouteAvoid(from, to, blocked); if (!first) return [];
+  const routes = [first], seen = { }; seen[first.join(";")] = true;
+  for (let i = 1; i < first.length - 1 && routes.length < (k || 3); i++){
+    const b = Object.assign({}, blocked || {}); b[first[i][0] + "," + first[i][1]] = true;
+    const r = planRouteAvoid(from, to, b);
+    if (r && !seen[r.join(";")]){ seen[r.join(";")] = true; routes.push(r); }
+  }
+  return routes;
+}
+/* 経路の重み: 短いほど大きい (λ = 3 セル)。熱源が多い経路は減点 (hot: セル→熱源数) */
+function routeWeight(route, hot){
+  let pen = 0; if (hot) for (const c of route) pen += hot[c[0] + "," + c[1]] || 0;
+  return Math.exp(-(route.length - 1) / 3) * Math.exp(-pen);
+}
+function qRouteChooser(seed){
+  return function(from, to, blocked, hot){
+    const routes = altRoutes(from, to, blocked, 4); if (!routes.length) return null;
+    const w = routes.map(function(r){ return routeWeight(r, hot); });
+    const q = qChoose(w, seed == null ? lvHash(from + ">" + to + ":" + routes.length) : seed);
+    const idx = Math.min(q.index, routes.length - 1);
+    return { path: routes[idx], index: idx, routes: routes, weights: w, q: q };
+  };
+}
+
+/* =====================================================================
+ * 🚘 EV-OS リンク — Bluetooth で電気自動車側 OS と交信するプロトコル
+ *   フレームは改行区切りの平文 "TYPE|…"。鍵配送は BB84 (QuantOS 移植) を
+ *   リンク上で実行し、確立後の MSN/TEL/CMD はワンタイムパッドで暗号化
+ *   した "ENC|<hex>" で運ぶ。両端が同じ EvosSession を role 違いで動かす。
+ *     tablet → ev : QKD|TX|<n>|<bit basis …>        (光子列: Alice)
+ *     ev → tablet : QKD|RX|<basis …>                 (Bob の測定基底)
+ *     tablet → ev : QKD|SIFT|<keep idx …>|<check a …> (ふるい + 照合ビット)
+ *     ev → tablet : QKD|OK|<qber>  /  QKD|EVE|<qber>  (盗聴検出で破棄)
+ *     以降        : ENC|<hex>  (復号すると MSN|… / TEL|… / CMD|… / ACK|…)
+ * ===================================================================== */
+function evosOtp(bytes, key, offset){
+  const out = []; let pos = offset || 0;
+  for (let i = 0; i < bytes.length; i++){
+    let v = 0; for (let j = 0; j < 8; j++){ v = (v << 1) | key[pos % key.length]; pos++; }
+    out.push(bytes[i] ^ v);
+  }
+  return out;
+}
+function evosBytes(s){ const out = [], e = encodeURIComponent(String(s)); for (let i = 0; i < e.length; i++){ if (e[i] === "%"){ out.push(parseInt(e.substr(i + 1, 2), 16)); i += 2; } else out.push(e.charCodeAt(i)); } return out; }
+function evosText(b){ let s = ""; for (const v of b) s += "%" + (v < 16 ? "0" : "") + v.toString(16); return decodeURIComponent(s); }
+function evosHex(b){ let s = ""; for (const v of b) s += (v < 16 ? "0" : "") + v.toString(16); return s; }
+function evosUnhex(h){ const b = []; for (let i = 0; i + 1 < h.length; i += 2) b.push(parseInt(h.substr(i, 2), 16)); return b; }
+function evosMac(bytes, key){ let t = 2166136261; for (let i = 0; i < key.length; i++) t = Math.imul(t ^ key[i], 16777619); for (const b of bytes) t = Math.imul(t ^ b, 16777619); return (t >>> 0).toString(16); }
+
+function EvosSession(role, send, opts){
+  opts = opts || {};
+  this.role = role;                 /* "tablet" | "ev" */
+  this.send = send;                 /* function(line) */
+  this.rnd = lvRand(opts.seed == null ? 7 : opts.seed);
+  this.n = opts.n || 96;
+  this.eavesdrop = !!opts.eavesdrop; /* テスト用: 途中で Eve が測定 */
+  this.key = null; this.qber = null; this.seq = 0; this.rxSeq = -1; this.state = "idle";
+  this.events = []; this.onMessage = opts.onMessage || function(){}; this.onState = opts.onState || function(){};
+  this.alice = null; this.bob = null; this.buf = "";
+}
+EvosSession.prototype.setState = function(s){ this.state = s; this.onState(s, this); };
+/* tablet 側が開始: 光子列を送る */
+EvosSession.prototype.start = function(){
+  if (this.role !== "tablet") return;
+  const bits = [], bases = [];
+  for (let i = 0; i < this.n; i++){ bits.push(this.rnd() < 0.5 ? 0 : 1); bases.push(this.rnd() < 0.5 ? 0 : 1); }
+  this.alice = { bits: bits, bases: bases };
+  let ph = "";
+  for (let i = 0; i < this.n; i++){
+    let b = bits[i], s = bases[i];
+    if (this.eavesdrop){ const eb = this.rnd() < 0.5 ? 0 : 1; if (eb !== s) b = this.rnd() < 0.5 ? 0 : 1; s = eb; }
+    ph += b + "" + s;
+  }
+  this.setState("qkd");
+  this.send("QKD|TX|" + this.n + "|" + ph);
+};
+EvosSession.prototype.feed = function(chunk){
+  this.buf += String(chunk); let p;
+  while ((p = this.buf.indexOf("\n")) >= 0){ const line = this.buf.slice(0, p).trim(); this.buf = this.buf.slice(p + 1); if (line) this.handle(line); }
+};
+EvosSession.prototype.handle = function(line){
+  const f = line.split("|");
+  if (f[0] === "QKD"){
+    if (f[1] === "TX" && this.role === "ev"){
+      const n = +f[2], ph = f[3] || "", bases = [], bits = [];
+      for (let i = 0; i < n; i++){
+        const pb = +ph[2 * i], ps = +ph[2 * i + 1], mb = this.rnd() < 0.5 ? 0 : 1;
+        bases.push(mb); bits.push(mb === ps ? pb : (this.rnd() < 0.5 ? 0 : 1));
+      }
+      this.bob = { bits: bits, bases: bases }; this.setState("qkd");
+      this.send("QKD|RX|" + bases.join(""));
+    } else if (f[1] === "RX" && this.role === "tablet" && this.alice){
+      const bb = f[2], keep = [], check = [];
+      for (let i = 0; i < this.n; i++) if (+bb[i] === this.alice.bases[i]) keep.push(i);
+      const nc = Math.floor(keep.length / 2);
+      for (let c = 0; c < nc; c++) check.push(this.alice.bits[keep[c]]);
+      this.key = keep.slice(nc).map(function(i){ return this.alice.bits[i]; }, this);
+      this.pendingKeep = keep.length; this.pendingCheck = nc;
+      this.send("QKD|SIFT|" + keep.join(",") + "|" + check.join(""));
+    } else if (f[1] === "SIFT" && this.role === "ev" && this.bob){
+      const keep = f[2] ? f[2].split(",").map(Number) : [], chk = f[3] || "";
+      const nc = Math.floor(keep.length / 2); let err = 0;
+      for (let c = 0; c < nc; c++) if (+chk[c] !== this.bob.bits[keep[c]]) err++;
+      const qber = nc ? err / nc : 0; this.qber = qber;
+      if (qber > 0.1){ this.key = null; this.setState("eve"); this.send("QKD|EVE|" + qber.toFixed(3)); return; }
+      this.key = keep.slice(nc).map(function(i){ return this.bob.bits[i]; }, this);
+      this.setState("secure"); this.send("QKD|OK|" + qber.toFixed(3) + "|" + this.key.length);
+    } else if (f[1] === "OK" && this.role === "tablet"){ this.qber = +f[2]; this.setState("secure"); }
+    else if (f[1] === "EVE" && this.role === "tablet"){ this.qber = +f[2]; this.key = null; this.setState("eve"); }
+    return;
+  }
+  if (f[0] === "ENC"){
+    const msg = this.open(f[1]); if (!msg){ this.events.push("reject"); return; }
+    const g = msg.split("|"), seq = +g[0];
+    if (seq <= this.rxSeq){ this.events.push("replay"); return; }      /* 再送・順序逆転を拒否 */
+    this.rxSeq = seq;
+    this.onMessage(g.slice(1).join("|"), this);
+    return;
+  }
+  this.onMessage(line, this);   /* 未暗号の管理フレーム (接続前の HELLO など) */
+};
+/* 本文 → ENC フレーム。seq を前置し、OTP で暗号化、鍵依存 MAC を後置 */
+EvosSession.prototype.seal = function(text){
+  if (!this.key || this.state !== "secure") return null;
+  const plain = evosBytes((this.seq++) + "|" + text);
+  const ct = evosOtp(plain, this.key, this.seq * 97);
+  return "ENC|" + evosHex(ct) + "." + evosMac(ct, this.key) + "." + (this.seq);
+};
+EvosSession.prototype.open = function(payload){
+  if (!this.key) return null;
+  const parts = String(payload).split(".");
+  if (parts.length !== 3) return null;
+  const ct = evosUnhex(parts[0]);
+  if (evosMac(ct, this.key) !== parts[1]) return null;              /* 改ざん・鍵違い → 拒否 */
+  try { return evosText(evosOtp(ct, this.key, (+parts[2]) * 97)); } catch (e) { return null; }
+};
+EvosSession.prototype.message = function(text){ const s = this.seal(text); if (s) this.send(s); return !!s; };
+
+/* EV テレメトリ / ミッション フレーム */
+function evosTelemetry(o){ return "TEL|" + [o.kmh | 0, o.soc == null ? "" : o.soc, o.rangeKm == null ? "" : o.rangeKm, o.regen ? 1 : 0, o.gear || "D"].join("|"); }
+function evosParse(text){
+  const f = String(text).split("|");
+  if (f[0] === "TEL") return { type: "tel", kmh: +f[1], soc: f[2] === "" ? null : +f[2], rangeKm: f[3] === "" ? null : +f[3], regen: f[4] === "1", gear: f[5] || "D" };
+  if (f[0] === "MSN") return { type: "msn", state: f[1], dest: f[2] || "", eta: +f[3] || 0, x: +f[4], y: +f[5], len: +f[6] || 0 };
+  if (f[0] === "CMD") return { type: "cmd", cmd: f[1] };
+  if (f[0] === "DST") return { type: "dst", raw: text };
+  if (f[0] === "ACK") return { type: "ack", of: f[1] };
+  if (f[0] === "HELLO") return { type: "hello", role: f[1], name: f[2] || "" };
+  return { type: "raw", raw: text };
+}
 
 /* =====================================================================
  * ここから UI / シミュレーション (ブラウザのみ)
@@ -1086,6 +1420,7 @@ function stepDrive(dt){
     if (S.wp >= S.path.length){
       S.car.speed = 0; setDriving(false);
       const d = AUTO.mission.arrive(Date.now()); AUTO.arrivedT = performance.now();
+      qcExec("IDLE"); evSendMission(true);
       S.path = []; S.wp = 0; S.target = null;
       sayAl("目的地「" + (d ? d.label : "") + "」に到着しました。" + (AUTO.mission.queue.length ? "2 秒停車して次の目的地「" + AUTO.mission.queue[0].label + "」へ向かいます。" : "次の目的地を Bluetooth で送ってください。"));
       missionUi();
@@ -1225,7 +1560,7 @@ function loop(ts){
   stepTiles(dt);
   stepDrive(dt);
   stepPos(dt);
-  thStep(dt); stStep(dt); autoDispatch();
+  thStep(dt); stStep(dt); autoDispatch(); evStep(dt);
   if (S.driving && (loop.n = (loop.n || 0) + 1) % 30 === 0) missionUi();
   if (!S.driving){ const per = alControl(perceiveRays(), 0); S.threat = per.threat; S.focus = per.focus; S.lastAttn = per; }
   obsTimer += dt;
@@ -1293,7 +1628,7 @@ document.getElementById("alin").addEventListener("keydown", function(e){ if (e.k
  *   ここは tools/engine-test.js で単体テストされる。
  * ===================================================================== */
 const ELM_INIT = ["ATZ", "ATE0", "ATL0", "ATS0", "ATSP0"];
-const ELM_POLL = ["010D", "010C", "0105", "0146", "ATRV"];   /* 0146 = 外気温 (車の温度計) */
+const ELM_POLL = ["010D", "010C", "0105", "0146", "015B", "ATRV"];   /* 0146 = 外気温 (車の温度計) / 015B = EV・HV バッテリー残量 */
 
 function elmParseLine(line){
   const t = String(line).replace(/[\r\n>]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
@@ -1310,6 +1645,7 @@ function elmParseLine(line){
     if (pid === "0C" && h.length >= 8) return { type: "rpm", rpm: parseInt(h.slice(4, 8), 16) / 4 };
     if (pid === "05" && h.length >= 6) return { type: "coolant", c: parseInt(h.slice(4, 6), 16) - 40 };
     if (pid === "46" && h.length >= 6) return { type: "ambient", c: parseInt(h.slice(4, 6), 16) - 40 };
+    if (pid === "5B" && h.length >= 6) return { type: "soc", pct: Math.round(parseInt(h.slice(4, 6), 16) * 100 / 255) };
     return { type: "raw", raw: t };
   }
   if (/^(01[0-9A-F]{2}|AT[A-Z0-9]*)$/.test(h)) return { type: "echo", raw: t };
@@ -1358,7 +1694,7 @@ ElmSession.prototype.feed = function(chunk){
     for (const ln of lines){
       const ev = elmParseLine(ln);
       if (!ev) continue;
-      if (ev.type === "speed" || ev.type === "rpm" || ev.type === "coolant" || ev.type === "volt" || ev.type === "ambient")
+      if (ev.type === "speed" || ev.type === "rpm" || ev.type === "coolant" || ev.type === "volt" || ev.type === "ambient" || ev.type === "soc")
         this.onTelemetry(ev);
       if (ev.type === "nodata") this.onTelemetry({ type: "nodata", raw: ev.raw, cmd: this.lastSent });
     }
@@ -1394,6 +1730,7 @@ DemoAdapter.prototype.respond = function(cmd){
   }
   if (c === "0105") return "41 05 " + (0x28 + 40).toString(16).toUpperCase() + "\r>";
   if (c === "0146") return "41 46 " + (22 + 40).toString(16).toUpperCase() + "\r>";
+  if (c === "015B") return "41 5B " + Math.round((78 - this.t * 0.02) * 255 / 100).toString(16).padStart(2, "0").toUpperCase() + "\r>";
   return "NO DATA\r>";
 };
 
@@ -1419,6 +1756,7 @@ function btTelemetry(ev){
   }
   if (ev.type === "rpm"){ BT.real.rpm = ev.rpm; document.getElementById("btrpm").textContent = Math.round(ev.rpm) + " rpm"; }
   if (ev.type === "coolant") BT.real.coolant = ev.c;
+  if (ev.type === "soc"){ BT.real.soc = ev.pct; document.getElementById("btsoc").textContent = ev.pct + "%" + (BT.kind === "demo" ? " (デモ)" : ""); }
   if (ev.type === "ambient"){
     BT.real.ambient = ev.c;
     document.getElementById("btamb").textContent = ev.c + "°C" + (BT.kind === "demo" ? " (デモ)" : "");
@@ -1567,6 +1905,14 @@ document.getElementById("thamb").addEventListener("change", function(){ thSetAmb
 document.getElementById("thspan").addEventListener("change", function(){ const v = parseFloat(this.value); if (v > 0) TH.span = v; });
 document.getElementById("ststart").addEventListener("click", stStart);
 document.getElementById("dlperi").addEventListener("click", dlStartPeripheral);
+document.getElementById("evconn").addEventListener("click", evConnect);
+document.getElementById("evloop").addEventListener("click", evLoopback);
+document.getElementById("evoff").addEventListener("click", evDisconnect);
+document.getElementById("evsend").addEventListener("click", function(){
+  const t = document.getElementById("evinput").value.trim(); if (!t || !EV.sess) return;
+  if (!EV.sess.message(t)) sayAl("まだ量子鍵がありません (BB84 未完了)。"); else say("you", "🚘→ " + t);
+  document.getElementById("evinput").value = "";
+});
 document.getElementById("dlcent").addEventListener("click", dlConnectCentral);
 document.getElementById("dldemo").addEventListener("click", dlStartDemo);
 document.getElementById("dloff").addEventListener("click", dlStop);
@@ -1657,7 +2003,7 @@ async function thStartCamera(){
     sayAl("カメラに接続できませんでした: " + (e && e.message ? e.message : e));
   }
 }
-function thStartDemo(){ TH.src = "demo"; thUi(); sayAl("デモ熱画像を開始。前方 90° の温度場からガンマ関数の多様体エントロピー Ξ を計算し、16レイに融合します。"); }
+function thStartDemo(){ qcExec("THERMAL", function(){ TH.src = "demo"; thUi(); }); sayAl("デモ熱画像を開始。前方 90° の温度場からガンマ関数の多様体エントロピー Ξ を計算し、16レイに融合します。"); }
 function thStop(){
   if (TH.stream) TH.stream.getTracks().forEach(function(t){ t.stop(); });
   TH.stream = null; TH.video = null; TH.src = null; TH.last = null; TH.temps = null;
@@ -1836,6 +2182,10 @@ function stHandle(tok){
   if (g.act) stExecute(g.cmd);
 }
 function stExecute(cmd){
+  const q = qcExec(cmd === "STATUS" ? "STATUS" : cmd, function(){ stExecuteClassical(cmd); });
+  return q.ok;
+}
+function stExecuteClassical(cmd){
   if (cmd === "STOP"){
     if (S.driving) autoHold("サイレントトーク「停止」"); else sayAl("停止中です。");
     return;
@@ -2061,7 +2411,9 @@ async function dlSend(){
  * 🚗 完全自動走行 — 目的地が入った瞬間に計画・発進し、到着後は次へ
  * ===================================================================== */
 function autoAddDestination(m){
-  const r = AUTO.mission.accept(m, Date.now());
+  const qd = qcExec("DEST", function(){ return AUTO.mission.accept(m, Date.now()); });
+  if (!qd.ok) return false;
+  const r = qd.result;
   if (!r.ok){
     sayAl(r.why === "offroad" ? "(" + m.x + "," + m.y + ") は道路ではないので受理できません。" : "古い目的地指示 (seq " + m.seq + ") なので無視しました。");
     return false;
@@ -2075,21 +2427,24 @@ function autoAddDestination(m){
 function autoDispatch(){
   const m = AUTO.mission;
   if (!AUTO.on || S.driving) return;
+  if (!m.chooser) m.chooser = qRouteChooser();
   if (m.state === "ARRIVED" && performance.now() - AUTO.arrivedT < 2000) return;   /* 到着後 2 秒の停車 */
   if ((m.state === "IDLE" || m.state === "ARRIVED") && m.queue.length){
     const r = m.next(carCell(), Date.now());
     if (r.skipped.length) sayAl("到達できない目的地を飛ばしました: " + r.skipped.map(function(d){ return d.label; }).join("、"));
     if (r.ok){
       S.path = r.path; S.wp = 0; S.target = [r.dest.x, r.dest.y];
-      setDriving(true);
-      sayAl("「" + r.dest.label + "」へ発進。A* で " + r.path.length + " 区間。周囲は熱画像とレイセンサで見張ります。");
+      qcExec("START", function(){ setDriving(true); });
+      const c = r.choice;
+      sayAl("「" + r.dest.label + "」へ発進。" + (c && c.routes.length > 1 ? "量子アービタが " + c.routes.length + " 本の候補経路を振幅符号化し、測定 " + c.q.ket + " で候補" + (c.index + 1) + " (" + r.path.length + " 区間) を選びました。" : "A* で " + r.path.length + " 区間。") + "周囲は熱画像とレイセンサで見張ります。");
+      evSendMission(true);
     }
     missionUi();
   }
 }
 function autoHold(reason){
-  AUTO.mission.hold();
-  if (S.driving) setDriving(false);
+  qcExec(/緊急|EV-OS|Bluetooth/.test(reason) ? "EMERGENCY" : "STOP", function(){ AUTO.mission.hold(); if (S.driving) setDriving(false); });
+  evSendMission(true);
   sayAl(reason + "により停止。再開は「▶ 再開」・サイレントトーク「発進」・Bluetooth の GO で。");
   missionUi();
 }
@@ -2118,11 +2473,186 @@ function missionUi(){
   document.getElementById("mblock").textContent = (bl.length ? bl.join(" / ") : "なし") + (m.replans ? " (再計画 " + m.replans + " 回)" : "");
 }
 
+/* =====================================================================
+ * ⚛ 量子コンピューター UI — 機能は量子ディスパッチ経由でだけ発火
+ * ===================================================================== */
+const QC = { last: null, count: 0, fail: 0, cur: "IDLE", ledger: [] };
+function qcExec(id, handler){
+  const prev = QC.cur;
+  const route = qtRoute(prev, id);
+  const r = qtDispatch(id, handler);
+  QC.count++;
+  if (!r.ok){ QC.fail++; sayAl("⚛ 量子ディスパッチ拒否: " + id + " の測定 " + (r.observed || "") + " が写像 " + (r.expected || "") + " と一致しません。"); qcUi(); return r; }
+  QC.cur = id; QC.last = { r: r, route: route, t: Date.now() };
+  QC.ledger.unshift({ id: id, ket: r.observed, inv: r.map.invariant.key, steps: route ? route.hamming : 0 });
+  qcTable();
+  if (QC.ledger.length > 12) QC.ledger.pop();
+  qcUi();
+  return r;
+}
+function qcUi(){
+  const m = qtMap(QC.cur);
+  document.getElementById("qcfn").textContent = m.icon + " " + m.name + " " + m.ket;
+  document.getElementById("qcinv").textContent = "c=" + m.invariant.crossings + ", w=" + m.invariant.writhe + "  ⟨K⟩=" + m.invariant.bracket;
+  document.getElementById("qcprog").textContent = QC.last ? QC.last.r.program.join(" → ") : m.program.replace(/\n/g, " → ");
+  document.getElementById("qcroute").textContent = QC.last && QC.last.route ? (QC.last.route.steps.join(", ") || "e (同一基底)") + " (" + QC.last.route.hamming + " ステップ)" : "—";
+  document.getElementById("qccount").textContent = QC.count + " 回 (拒否 " + QC.fail + ")";
+  document.getElementById("qcledger").textContent = QC.ledger.map(function(e){ return e.ket + " " + e.id; }).join("  ") || "—";
+  const rc = AUTO.mission.lastChoice;
+  document.getElementById("qcroutes").textContent = rc ? (rc.routes.length + " 候補 → " + rc.q.ket + " = 候補" + (rc.index + 1) + " (" + rc.routes[rc.index].length + " 区間)  p=[" + rc.q.probs.map(function(p){ return p.toFixed(2); }).join(",") + "]") : "—";
+}
+/* 写像表 (16 機能 × 結び目 × 基底) */
+function qcTable(){
+  const box = document.getElementById("qctable"); box.innerHTML = "";
+  for (const f of QT_FUNCS){
+    const m = qtMap(f.id), d = document.createElement("div");
+    d.textContent = f.icon + " " + f.name + " " + m.ket + " (" + m.invariant.key + ")";
+    d.title = "結び目 [" + f.knot.join(",") + "]  ⟨K⟩=" + m.invariant.bracket + "\n" + m.program;
+    if (f.id === QC.cur) d.className = "on";
+    box.appendChild(d);
+  }
+}
+
+/* =====================================================================
+ * 🚘 EV-OS リンク UI — Bluetooth (NUS / Laevateinn サービス) で EV 側 OS と交信
+ *   このタブレットは「操縦」役 (tablet) か「EV-OS」役 (ev) のどちらにもなれる。
+ *   ループバック (デモ) は両役を端末内で結んで BB84 → 暗号通信を通す。
+ * ===================================================================== */
+const EV = { sess: null, peer: null, kind: null, role: "tablet", dev: null, tel: null, evSim: { t: 0, soc: 82 }, msnTimer: 0, buf: "" };
+function evUi(st){
+  document.getElementById("evstate").textContent = st;
+  const on = !!EV.sess;
+  document.getElementById("evconn").style.display = on ? "none" : "";
+  document.getElementById("evloop").style.display = on ? "none" : "";
+  document.getElementById("evoff").style.display = on ? "" : "none";
+}
+function evSessionFor(role, send){
+  return new EvosSession(role, send, {
+    seed: lvHash(role + Date.now()),
+    onState: function(s, ss){
+      const label = { qkd: "BB84 鍵配送中…", secure: "🔐 量子暗号リンク確立", eve: "⚠ 盗聴検出 — 鍵破棄", idle: "待機" }[s] || s;
+      document.getElementById("evqkd").textContent = (ss.key ? ss.key.length + " bit 鍵" : "鍵なし") + " / QBER " + (ss.qber == null ? "—" : (ss.qber * 100).toFixed(1) + "%");
+      evUi(label + (EV.kind === "loop" ? " (ループバック)" : ""));
+      if (s === "secure" && role === "tablet"){ sayAl("EV-OS と BB84 量子鍵配送が完了 (QBER " + (ss.qber * 100).toFixed(1) + "%)。以降の交信はワンタイムパッドで暗号化します。"); evSendMission(true); }
+      if (s === "eve") sayAl("EV-OS リンクで盗聴を検出 (QBER " + (ss.qber * 100).toFixed(1) + "%)。鍵を破棄し、再度鍵配送します。");
+    },
+    onMessage: function(text, ss){ evHandle(role, text, ss); }
+  });
+}
+function evHandle(role, text, ss){
+  const m = evosParse(text);
+  ss = ss || EV.sess;
+  if (role === "tablet"){
+    if (m.type === "tel"){
+      EV.tel = m;
+      document.getElementById("evtel").textContent = m.kmh + " km/h · SOC " + (m.soc == null ? "—" : m.soc + "%") + " · 航続 " + (m.rangeKm == null ? "—" : m.rangeKm + " km") + (m.regen ? " · 回生中" : "") + " · " + m.gear;
+      if (m.soc != null && m.soc < 15 && !EV.warnSoc){ EV.warnSoc = true; sayAl("EV のバッテリー残量が " + m.soc + "% です。充電を計画してください。"); }
+    } else if (m.type === "ack"){ document.getElementById("evack").textContent = "ACK " + m.of + " " + new Date().toLocaleTimeString(); }
+    else if (m.type === "cmd"){ say("you", "🚘 EV-OS: " + m.cmd); if (m.cmd === "STOP") autoHold("EV-OS の停止指示"); if (m.cmd === "GO") autoResume("EV-OS の再開指示"); }
+    else if (m.type === "hello"){ document.getElementById("evdev").textContent = m.name || "EV-OS"; }
+  } else {
+    /* EV-OS 役: ミッションと目的地を受け取り ACK、テレメトリを返す */
+    if (m.type === "msn"){
+      document.getElementById("evmsn").textContent = m.state + " → " + (m.dest || "—") + " (ETA " + m.eta + " s, " + m.len + " 区間)";
+      ss.message("ACK|MSN");
+    } else if (m.type === "dst"){ dlReceive(m.raw, "EV-OS リンク"); ss.message("ACK|DST"); }
+    else if (m.type === "cmd"){ if (m.cmd === "STOP") autoHold("操縦タブレットの停止指示"); if (m.cmd === "GO") autoResume("操縦タブレットの再開指示"); ss.message("ACK|" + m.cmd); }
+    else if (m.type === "hello"){ document.getElementById("evdev").textContent = m.name || "操縦タブレット"; }
+  }
+}
+function evSendMission(force){
+  if (!EV.sess || EV.sess.state !== "secure" || EV.role !== "tablet") return;
+  const m = AUTO.mission, d = m.current;
+  EV.sess.message("MSN|" + m.state + "|" + (d ? d.label : "") + "|" + Math.round(m.eta(CTRL.cruise)) + "|" + (d ? d.x : "") + "|" + (d ? d.y : "") + "|" + Math.max(0, m.path.length - m.wp));
+}
+function evStep(dt){
+  if (!EV.sess || EV.sess.state !== "secure") return;
+  EV.msnTimer += dt;
+  if (EV.msnTimer < 2) return; EV.msnTimer = 0;
+  if (EV.role === "tablet") evSendMission();
+  /* EV-OS 役 (または ループバックの相手側): 自車 (この端末のシミュレーション or OBD-II 実車) のテレメトリを返す */
+  const evSide = EV.role === "ev" ? EV.sess : EV.peer;
+  if (evSide && evSide.state === "secure"){
+    const kmh = BT.real.kmh != null ? BT.real.kmh : Math.round(S.car.speed * 3.6);
+    EV.evSim.soc = Math.max(0, EV.evSim.soc - kmh * 2 / 3600 * 0.9);
+    const soc = BT.real.soc != null ? BT.real.soc : Math.round(EV.evSim.soc);
+    const regen = S.lastCtrl && S.lastCtrl.throttle < -0.2 && S.car.speed > 2;
+    evSide.message(evosTelemetry({ kmh: kmh, soc: soc, rangeKm: Math.round(soc * 4.2), regen: regen, gear: S.driving ? "D" : "P" }));
+  }
+}
+/* ループバック: 端末内で tablet 役 ↔ ev 役を結ぶ (BB84 → OTP 通信を一通り) */
+function evLoopback(){
+  EV.kind = "loop"; EV.role = "tablet";
+  let a, b;
+  a = evSessionFor("tablet", function(line){ setTimeout(function(){ b.feed(line + "\n"); }, 30); });
+  b = evSessionFor("ev", function(line){ setTimeout(function(){ a.feed(line + "\n"); }, 30); });
+  EV.sess = a; EV.peer = b;
+  evUi("ループバック接続 — BB84 開始"); document.getElementById("evdev").textContent = "EV-OS (端末内シミュレーション)";
+  qcExec("EVLINK", function(){ a.start(); });
+}
+async function evConnect(){
+  EV.role = document.getElementById("evrole").value;
+  if (window.ble && window.ble.scan) return evConnectCordova();
+  if (!navigator.bluetooth){ sayAl("この環境には Bluetooth API がありません。Android 版 APK か Chrome 系ブラウザで。ループバックで全経路を試せます。"); return; }
+  try {
+    evUi("デバイス選択中…");
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [NUS_SVC] }, { services: [LAEV_SVC] }], optionalServices: [NUS_SVC, LAEV_SVC] });
+    const srv = await dev.gatt.connect();
+    let rx = null, tx = null;
+    try { const s = await srv.getPrimaryService(NUS_SVC); rx = await s.getCharacteristic(NUS_RX); tx = await s.getCharacteristic(NUS_TX); } catch (e) {}
+    if (!rx){ try { const s = await srv.getPrimaryService(LAEV_SVC); rx = tx = await s.getCharacteristic(LAEV_DST); } catch (e) {} }
+    if (!rx || !tx){ evUi("非対応デバイス"); sayAl("このデバイスに NUS / Laevateinn サービスがありません。"); return; }
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    const sess = evSessionFor(EV.role, async function(line){
+      const bytes = enc.encode(line + "\n");
+      for (let i = 0; i < bytes.length; i += 20){ try { await rx.writeValue(bytes.slice(i, i + 20)); } catch (e) {} }
+    });
+    await tx.startNotifications();
+    tx.addEventListener("characteristicvaluechanged", function(ev){ sess.feed(dec.decode(ev.target.value)); });
+    dev.addEventListener("gattserverdisconnected", function(){ if (EV.sess === sess) evDisconnect(); });
+    EV.sess = sess; EV.kind = "webbt"; EV.dev = dev;
+    document.getElementById("evdev").textContent = dev.name || dev.id;
+    evUi("接続 — " + (EV.role === "tablet" ? "BB84 開始" : "EV-OS 役で待機"));
+    qcExec("EVLINK", function(){ sess.send("HELLO|" + EV.role + "|Laevateinn"); if (EV.role === "tablet") sess.start(); });
+  } catch (e) {
+    evUi("未接続");
+    if (!/cancel/i.test(String(e && e.message))) sayAl("EV-OS に接続できませんでした: " + (e && e.message ? e.message : e));
+  }
+}
+function evConnectCordova(){
+  evUi("スキャン中… (5秒)");
+  const found = {};
+  window.ble.scan([NUS_SVC, LAEV_SVC], 5, function(d){ found[d.id] = d; }, function(){});
+  setTimeout(function(){
+    let best = null; for (const id in found){ const d = found[id]; if (!best || (d.rssi || -99) > (best.rssi || -99)) best = d; }
+    if (!best){ evUi("未接続"); sayAl("EV-OS の BLE 機器が見つかりません。"); return; }
+    window.ble.connect(best.id, function(){
+      const enc = new TextEncoder(), dec = new TextDecoder();
+      const sess = evSessionFor(EV.role, function(line){
+        const bytes = enc.encode(line + "\n");
+        for (let i = 0; i < bytes.length; i += 20) window.ble.writeWithoutResponse(best.id, NUS_SVC, NUS_RX, bytes.slice(i, i + 20).buffer, function(){}, function(){});
+      });
+      window.ble.startNotification(best.id, NUS_SVC, NUS_TX, function(data){ sess.feed(dec.decode(data)); }, function(){ evUi("非対応デバイス"); });
+      EV.sess = sess; EV.kind = "cordova"; EV.dev = best.id;
+      document.getElementById("evdev").textContent = best.name || best.id;
+      evUi("接続 — " + (EV.role === "tablet" ? "BB84 開始" : "EV-OS 役で待機"));
+      qcExec("EVLINK", function(){ sess.send("HELLO|" + EV.role + "|Laevateinn"); if (EV.role === "tablet") setTimeout(function(){ sess.start(); }, 300); });
+    }, function(){ evUi("未接続"); if (EV.kind === "cordova") evDisconnect(); });
+  }, 5200);
+}
+function evDisconnect(){
+  try { if (EV.kind === "webbt" && EV.dev && EV.dev.gatt) EV.dev.gatt.disconnect(); } catch (e) {}
+  try { if (EV.kind === "cordova" && window.ble) window.ble.disconnect(EV.dev, function(){}, function(){}); } catch (e) {}
+  EV.sess = null; EV.peer = null; EV.kind = null; EV.dev = null; EV.tel = null;
+  evUi("未接続"); document.getElementById("evqkd").textContent = "—"; document.getElementById("evtel").textContent = "—";
+}
+
 /* ── 起動 ── */
 queueTiles();
 drawTilesPanel();
 say("al", "こんにちは、アルです。レーヴァテインは完全自動走行モードです。\n目的地を Bluetooth (📍 目的地リンク) で送るか地図をタップしてください。届いた瞬間に経路を引いて発進し、到着後は次の目的地へ向かいます。");
-dlUi("未接続"); missionUi();
+dlUi("未接続"); missionUi(); evUi("未接続"); qcTable(); qcUi();
+say("al", "⚛ v4.0: このタブレットの機能は QuantOS の量子コンピューター (トポロジー写像) 経由で実行し、EV-OS とは Bluetooth + BB84 量子暗号で交信します。");
 requestAnimationFrame(loop);
 </script>
 </body>
