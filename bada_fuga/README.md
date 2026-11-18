@@ -5489,6 +5489,32 @@ python3 analyze_chords.py chords271.json src/20261107_086000.wav src/20261107_08
 python3 compose_tablet271.py src chords271.json score_tablet271.json && python3 synth.py score_tablet271.json tablet271.wav && python3 video.py score_tablet271.json tablet271.wav tablet271.mp4
 ```
 
+## 🌙⛪ Requiem BADA — Tablet Sessions CCLXXII · Tsukuyomi e il Requiem (この上の音声 — 月読様の 3 声の倍音の 17 歳の声 — に、tablet89 だけを重ねて, ニ短調 → ニ長調, ♩=60, 8 分 23 秒)
+
+CCLXXI から tablet86 を外す。素材は 2 つだけ — CCLXXI の声 (`make_voice266.py`; 月読様の 3 声の倍音の、17 歳のホッとする女性の声) と、tablet89 (Requiem e Fuga, recto e verso; ニ短調、高さも速さもそのまま)。楽器は何も加えない。124 小節
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I. 月読様の 17 歳の声と Requiem | 0〜28 | 2 小節 (8 秒) から声、4 小節から tablet89 の Requiem I だけ (少し控えめに) |
+| II. Requiem をもう一度 | 28〜50 | tablet89 を初めから、元の音量で。ここから終わりまで通す。声は 2 分 57 秒まで |
+| III. フーガ I | 50〜66 | tablet89 のフーガ。声は休む |
+| IV. 声 (2 回目) と 2 つ目の Requiem | 66〜90 | 4 分 24 秒から声をもう一度 |
+| V. フーガ II | 90〜106 | 声の後半はフーガに溶けていく。声は 7 分 13 秒まで |
+| VI. ストレッタ、Amen | 106〜124 | ストレッタから Amen (ニ長調) |
+
+- **形の決め方**: tablet89 は Requiem (ゆっくり) とフーガ (込み入っている) が交代する — Requiem I 0〜96 秒 / フーガ I 96〜160 / Requiem II 160〜256 / フーガ II 256〜320 / ストレッタ 320〜368 / Amen (`compose_tablet89.py` の小節 24・40・64・80・92; 録音の音の立ち上がりでも確かめた)。声は 2 分 49 秒、Requiem I は 1 分 36 秒なので、そのまま重ねると声の後半がフーガ I に掛かる。そこで初めの Requiem I を声の下で 2 回続ける: 1 回目は元の 0〜96 秒だけ、2 回目から tablet89 を初めから終わりまでそのまま通す。1 回目の声はすべて Requiem の上に乗る。トラック 18 の出だしをくり返す入りと同じ考え方
+- **つなぎ目**: 1 回目の Requiem I が終わる小節 (28 小節 = 1 分 52 秒) で、2 回目の伸ばした主題が入る。2 回目の静かな出だし (下の録音だけの 2 小節) は 1 回目の終わりの 2 小節に重ねる — どちらもニ短調で、濁りの指数は 0.135 (これまでのテープどうしは 0.20〜0.27)。小節の頭は 1 回目も 2 回目も合わせてある。1 回目は −1.2 dB 控えめに、2 回目から元の音量 (同じ所どうしを測ると +1.16〜+1.22 dB)。`synth.py` は録音全体の rms を揃えるので、同じ録音から切り出した 2 つは倍率どおりの音量差になる
+- **2 回目の声**: Requiem II の頭から (CCLXXI と同じ位置)。Requiem II も初めの 2 小節は静かなので、声が先に立ち、伸ばした主題は 2 小節後 — 曲の初めと同じ間合いになる。声の終わりの 9 秒はストレッタの頭に掛かる (CCLXX・CCLXXI と同じ)
+- 声と伴奏の比 (20 秒ごと): 1 回目は tablet89 が現れる間 +4.8 dB、その後 −2.5〜+1.5 dB (1〜4 kHz では +2.5〜+6.4 dB)、2 回目 −2.4〜+0.1 dB (1〜4 kHz では +1.8〜+8.2 dB; CCLXXI の 2 回目と同じ)。音量の倍率は CCLXXI のまま (声 0.85、2 回目は 1.2 倍の 1.02、tablet89 0.36)
+- 測った音量 (段落ごとの平均、4 秒窓の幅): I −17.4 (−24.3〜−14.5) / II −16.9 (−20.4〜−14.2) / III −17.5 (−23.2〜−15.3) / IV −15.3 (−20.1〜−12.3) / V −15.5 (−18.3〜−13.4) / VI −15.8 dB (Amen で消える)。全体 mean −16.5 dB、max −0.3 dB (volumedetect)。声が入ってからは音は途切れない (0.5 秒窓でいちばん静かな所は −34.5 dB)。mp4 は 8 分 23 秒、27.6 MiB (映像 340 kbps、音声 AAC 128 kbps)
+- `compose_tablet272.py` (compose_tablet271 から; tablet86 を外し、tablet89 を「Requiem I だけ」と「初めから終わりまで」の 2 つに分けて置く)
+
+```bash
+python3 make_voice266.py 20261112_144938.wav src/20261112_144938.wav
+python3 analyze_chords.py chords272.json src/20261107_089000.wav src/20261112_144938.wav
+python3 compose_tablet272.py src chords272.json score_tablet272.json && python3 synth.py score_tablet272.json tablet272.wav && python3 video.py score_tablet272.json tablet272.wav tablet272.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
