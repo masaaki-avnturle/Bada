@@ -5431,6 +5431,38 @@ python3 analyze_chords.py chords269.json src/20261107_180000.wav src/20261107_08
 python3 compose_tablet269.py src chords269.json score_tablet269.json && python3 synth.py score_tablet269.json tablet269.wav && python3 video.py score_tablet269.json tablet269.wav tablet269.mp4
 ```
 
+## 🎙️🌸⛪ Requiem BADA — Tablet Sessions CCLXX · La voce, il Fiore e il Requiem (11/12 14:49 の声・tablet89・tablet86 を重ねて, ニ短調 → ニ長調, ♩=60, 9 分 39 秒)
+
+3 つの素材、どれも初めから終わりまで。楽器は何も加えない。143 小節
+
+| 素材 | 使い方 |
+|---|---|
+| 声 | 届いた `20261112_144938.mp3` — 11/12 14:49 の録音そのもの (作曲者の声、基音の中央値 112 Hz)。作り換えない。帯域も削らず、残響も足さない。2 回 |
+| tablet86 | LXXXVI — Fiore dolce (ピアノだけ、ホ短調、4 分 5 秒)。2 半音下げてニ短調に (0.891 倍速、4 分 35 秒) — テープのように、速さごと |
+| tablet89 | LXXXIX — Requiem e Fuga, recto e verso (ニ短調、♩=60、6 分 31 秒)。そのまま |
+
+**調**: tablet86 はホ短調、tablet89 はニ短調 (全音ひとつ違う)。大きい方の tablet89 を動かさず、tablet86 を 2 半音下げて合わせる。濁りの指数は、移さずに重ねると 0.33、2 半音下げると 0.17〜0.24 (これまでのテープどうしは 0.20〜0.27)。3 半音上げ (ト短調) は 0.28。5 半音上げ (イ短調) は 0.19 だが、1.335 倍速になって Fiore dolce の歩みではなくなる
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I. 声と Fiore dolce | 0〜45 | 2 小節 (8 秒) から声、4 小節から tablet86 (静かな分散和音の出だし → Sweet → Flower)。声は 2 分 57 秒まで |
+| II. Fiore dolce の終わりと Requiem | 45〜69 | 3 分から tablet89 の Requiem。tablet86 の Fuga dolce・Sweet の戻り・Coda と重なる。tablet86 は 4 分 46 秒で消える |
+| III. フーガ I | 69〜85 | tablet89 のフーガ (08:09 の主題の 4 声) |
+| IV. 声 (2 回目) と 2 つ目の Requiem | 85〜109 | 5 分 40 秒から声をもう一度 |
+| V. フーガ II | 109〜125 | 声の後半は tablet89 のフーガ (08:53 の主題) に溶けていく。声は 8 分 29 秒まで |
+| VI. ストレッタ、Amen | 125〜143 | 6 つの主題のストレッタから Amen (ニ長調) |
+
+- 入りはいまの間合い: 初めの 2 小節は無音、声が先に立ち、曲は 2 小節後から (tablet86 の出だしは静かな分散和音なので、ゆっくり現れる)
+- 重ねる位置 (濁りの指数): tablet86 の 164 秒後 (遅くした速さで) から tablet89 (0.17; 109 秒の重なり — 4 秒ずつ動かした中でいちばん小さい)。ちょうど 1 回目の声が終わった所。重なりの間の音量は tablet86 −20.1 dB、tablet89 −20.9 dB
+- 音量の倍率: 声 1.0 (2 回目は 1.12)、tablet86 0.34、tablet89 0.36。声と伴奏の比 (20 秒ごと): 1 回目は tablet86 が現れる間 +11.3 dB、その後 −0.4〜+2.6 dB (1〜4 kHz では +0.2〜+6.4 dB)、2 回目 −1.6〜+1.0 dB (1〜4 kHz では −0.9〜+5.1 dB) — 録音のままの声は言葉の帯域が強いので、全体の比が 0 dB 前後でも言葉は前に出る
+- 測った音量 (段落ごとの平均、4 秒窓の幅): I −18.4 (−24.2〜−15.1) / II −17.2 (−21.0〜−14.6) / III −19.2 (−23.3〜−17.0) / IV −16.6 (−21.1〜−13.6) / V −16.8 (−19.3〜−14.8) / VI −17.9 dB (Amen で消える)。全体 mean −17.7 dB、max −0.5 dB (volumedetect)。声が入ってからは音は途切れない。mp4 は 9 分 39 秒、28.6 MiB (映像 290 kbps、音声 AAC 128 kbps)
+- `compose_tablet270.py` (テープだけ; 段は 3 つ: 声・tablet86・tablet89)
+
+```bash
+python3 analyze_chords.py chords270.json src/20261107_086000.wav src/20261107_089000.wav src/20261112_144938.wav
+python3 compose_tablet270.py src chords270.json score_tablet270.json && python3 synth.py score_tablet270.json tablet270.wav && python3 video.py score_tablet270.json tablet270.wav tablet270.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
