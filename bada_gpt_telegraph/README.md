@@ -200,7 +200,7 @@ Actions の監視は、偽の GitHub API を注入した単体テストと、API
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html (CI は --check で一致を検査)
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 234 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 235 件
 node bada_gpt_telegraph/tools/evaluate.js           # 論文 7.2 の評価 (--heldout で 7.3)
 cd bada_gpt_telegraph/app/electron && npm install && npm start   # デスクトップ版 (要 ../www/index.html)
 ```

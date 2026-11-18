@@ -201,7 +201,7 @@ function collectTags(ids) {
   return { mods: mods, feats: Object.keys(feats), entity: entity, theme: theme, accent: accent, mood: mood, platforms: platforms, volume: volume };
 }
 var MOD_PHRASE = {
-  records: "を記録・管理", timer: "タイマー", budget: "家計簿", notes: "メモ", todo: "ToDo リスト",
+  records: "の記録・管理", timer: "タイマー", budget: "家計簿", notes: "メモ", todo: "ToDo リスト",
   telegraph: "モールス電信", quantum: "量子回路", convert: "単位変換", quiz: "クイズ・単語帳",
   habit: "習慣トラッカー", draw: "お絵かき", random: "抽選・サイコロ", counter: "カウンター"
 };
@@ -216,7 +216,8 @@ function silentToRequest(ids, enc) {
   var parts = [];
   var want = [];
   tg.mods.forEach(function (m) {
-    if (m === "records") want.push((tg.entity || "データ") + MOD_PHRASE.records);
+    /* 対象が無い「記録」は「出来事」を対象にする (「データ」「記録」は全体把握が対象として扱わない語) */
+    if (m === "records") want.push((tg.entity || "出来事") + MOD_PHRASE.records);
     else want.push(MOD_PHRASE[m] || m);
   });
   parts.push(want.join("と") + "のアプリ" + (p[0] >= 0 ? "を作りたい" : "がほしい") + "。");

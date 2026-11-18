@@ -52,6 +52,8 @@ section("サイレント・トーク (非言語 → トランスフォーマー 
   ok(/本/.test(req.text) && /並べ替え/.test(req.text) && /Windows/.test(req.text), "言語変換: latent → 依頼文");
   const spec = call("comprehend", req.text);
   ok(spec.modules.some((m) => m.id === "records") && spec.coverage >= 0.5, "依頼文が全体把握に通る (下流と接続)");
+  const bare = call("comprehend", call("silentToRequest", ["records", "graph"], call("silentEncode", ["records", "graph"])).text);
+  ok(bare.modules.some((m) => m.id === "records") && !bare.modules.some((m) => m.id === "notes") && bare.features.chart, "対象のない「記録」も全体把握で記録・管理になる (メモ+ToDo に落ちない)");
   const short = call("latentToDocument", ids, enc1, { targetChars: 1200 });
   const long = call("latentToDocument", ids, enc1, { targetChars: 24000 });
   ok(short.markdown.startsWith("# ") && short.chars >= 400, "文章展開: Markdown の見出しと最小量");

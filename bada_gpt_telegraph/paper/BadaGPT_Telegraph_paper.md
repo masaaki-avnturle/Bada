@@ -103,7 +103,7 @@ GPT::paper                   # 論文
 | `src/autobuild.js` | 254 | 自動コンパイル (一式を GitHub へ 1 コミット → Actions が exe/apk をビルド → 監視) |
 | `src/paper.js` | 449 | 論文の自動執筆、ビルド一式、Claude (任意) |
 | `src/ui.js` | 1005 | 画面 |
-| `tools/engine-test.js` | 535 | 単体テスト 234 件 |
+| `tools/engine-test.js` | 535 | 単体テスト 235 件 |
 | `tools/evaluate.js` | 114 | 第 7 章の評価の再現 |
 
 `tools/build.js` がこれらを 1 枚の `index.html` に埋め込み、同じファイルを Cordova (Android) と Electron (Windows / Linux) に同梱する。
@@ -258,7 +258,7 @@ latent からは四つを決定的に復号する: (a) **本と同じ分量ま�
 
 ### 7.1 単体テスト
 
-`tools/engine-test.js` の 234 件 (位相核の大域的部分積分・N(T)・単位位相・位相融合の零保存と調子の読み出し・標識表・文献 17 本、Ω-Telephacy の口形認識と辞書往復、脳波 BCI の集中度・SSVEP・機器復号・スキャン選択、自動コンパイルの偽 GitHub API 検証、体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
+`tools/engine-test.js` の 235 件 (位相核の大域的部分積分・N(T)・単位位相・位相融合の零保存と調子の読み出し・標識表・文献 17 本、Ω-Telephacy の口形認識と辞書往復、脳波 BCI の集中度・SSVEP・機器復号・スキャン選択、自動コンパイルの偽 GitHub API 検証、体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
 
 ### 7.2 開発用の依頼集合 (24 件)
 
@@ -368,7 +368,7 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 234 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 235 件
 node bada_gpt_telegraph/tools/evaluate.js           # 7.2 開発用の依頼集合
 node bada_gpt_telegraph/tools/evaluate.js --heldout # 7.3 未見の依頼集合
 ```
