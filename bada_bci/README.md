@@ -31,9 +31,16 @@ Android アプリ。リポジトリの Bada / Yamaguchi 理論（レポートの
 
 GitHub Actions がビルドして公開します。
 
-- **Actions** タブ →「Build BadaBCI APK」の最新実行 → **Artifacts** →
-  `BadaBCI-apk` をダウンロード（zip内に `.apk`）。
-- `v` で始まるタグを push すると **Releases** に `BadaBCI-debug.apk` を添付。
+- **いちばん簡単（ログイン不要・直リンク）** — Releases の `bci-latest` から
+  `BadaBCI-debug.apk` を直接ダウンロード：
+  https://github.com/masaaki-avnturle/Bada/releases/download/bci-latest/BadaBCI-debug.apk
+  （Releases ページ: https://github.com/masaaki-avnturle/Bada/releases ）
+- **Actions のアーティファクト**（要ログイン・zip・90日で期限切れ）：
+  **Actions** タブ →「Build BadaBCI APK」の最新実行 → **Artifacts** →
+  `BadaBCI-apk`。
+
+**インストール**: 端末の「提供元不明のアプリ / 不明なアプリのインストール」を
+許可してから APK を開きます（署名済み debug APK）。
 
 ## ローカルビルド（Android SDK がある環境）
 
