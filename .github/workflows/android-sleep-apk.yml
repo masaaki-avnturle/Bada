@@ -1,0 +1,67 @@
+name: Build BadaSleep APK
+
+# Builds the BadaSleep quantum-wave sleep app and publishes the APK so it can be
+# downloaded from this repository:
+#   - rolling Release (tag sleep-latest): direct, login-free APK download
+#   - Actions Artifact (BadaSleep-apk) on every build
+
+on:
+  push:
+    branches: [ "main", "claude/biomedical-monitoring-app-SNqVR" ]
+    paths:
+      - "bada_sleep/**"
+      - ".github/workflows/android-sleep-apk.yml"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bada_sleep
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Install SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Stage APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk BadaSleep-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BadaSleep-apk
+          path: bada_sleep/BadaSleep-debug.apk
+          if-no-files-found: error
+
+      - name: Publish APK to a rolling Release (direct download, no login)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: sleep-latest
+          name: BadaSleep (latest build)
+          prerelease: true
+          files: bada_sleep/BadaSleep-debug.apk
