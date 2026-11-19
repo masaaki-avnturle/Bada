@@ -257,6 +257,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         # 録音の実音が流れる区間
         if meta.get('rec_lanes'):                           # テープごとに段を分け、名前と音量の波形を描く (テープだけの曲: 重なっても読める)
             nl = max(e.get('lane', 0) for e in recs) + 1; LH = min(100, (ROLL_Y1 - ROLL_Y0 - 50) // nl)
+            tagx = {}                                       # 段ごとに、この画面で名前を描いた右端 (同じ段で重なる名前は、先のものだけ描く)
             for e in recs:
                 x0 = NOW_X + (e['t'] - now) * PPS; x1 = NOW_X + (e['t'] + e['d'] - now) * PPS
                 if x1 < 0 or x0 > W: continue
@@ -274,7 +275,9 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
                         past = [(x, v) for x, v in up if x <= NOW_X]; fut = [(x, v) for x, v in up if x >= NOW_X - PPS * dt]
                         for pts, k in ((past, 0.95), (fut, 0.5)):                       # 鳴り終えた所は明るく、これから鳴る所は暗く
                             if len(pts) > 1: dr.polygon([(x, yc - 1 - v * hh) for x, v in pts] + [(x, yc + 1 + v * hh) for x, v in reversed(pts)], fill=dim(c, k))
-                if e.get('tag'): dr.text((max(x0, 0) + 6, yt), '♪ ' + e['tag'], font=f_small, fill=(230, 240, 250) if on else (150, 160, 170))
+                if e.get('tag') and max(x0, 0) + 6 >= tagx.get(e.get('lane', 0), -1e9):
+                    dr.text((max(x0, 0) + 6, yt), '♪ ' + e['tag'], font=f_small, fill=(230, 240, 250) if on else (150, 160, 170))
+                    tagx[e.get('lane', 0)] = max(x0, 0) + 6 + dr.textlength('♪ ' + e['tag'], font=f_small) + 12
         for e in ([] if meta.get('rec_lanes') else recs):
             x0 = NOW_X + (e['t'] - now) * PPS; x1 = NOW_X + (e['t'] + e['d'] - now) * PPS
             if x1 < 0 or x0 > W: continue
