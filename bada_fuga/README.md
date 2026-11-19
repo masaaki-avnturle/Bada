@@ -5698,6 +5698,31 @@ python3 analyze_chords.py chords277.json src/20261120_024046.wav src/20261108_14
 python3 compose_tablet277.py src chords277.json score_tablet277.json && python3 synth.py score_tablet277.json tablet277.wav && python3 video.py score_tablet277.json tablet277.wav tablet277.mp4
 ```
 
+## 🎹 Requiem BADA — Tablet Sessions CCLXXVIII · La tastiera sola (tablet276 のピアノの音だけに, 変ニ長調 → ハ長調, ♩=60, 9 分 27 秒)
+
+届いた依頼: 「tablet276 のピアノの音だけにしてください」(CCLXXVII を作っている間に届いた)。tablet276 (CCLXXVI — calma の声 + 11/20 02:40 の鍵盤の録音) から声を外して、ピアノ (鍵盤の録音) だけにする。楽器は何も加えない。140 小節
+
+- **ピアノの音は tablet276 と同じ**: `level273.py` で強弱の幅を 4 割にした鍵盤の録音を、これまでのテープと同じ重ね方 (60 Hz〜8 kHz、全体の残響、左右の遅れ) で、初めから終わりまで。左右の広がりも tablet276 のピアノと同じ (左右の相関 −0.10〜−0.36)。和音と波形の表示も tablet276 と同じ。録音のままの音 (実音) で声と重ねたものは CCLXXVII
+- **置く位置だけ変える**: tablet276 では声が先に立つように、鍵盤の最初の音を 13.5 秒に置いていた。声が無いので、初めの 2 小節を無音にして、鍵盤の最初の音を 2 小節 (8 秒) に置く
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I. 黒い鍵盤 | 0〜45 | 2 小節 (8 秒) から鍵盤。変ニ長調 / 変ロ短調、小さな音が 5〜6 秒ごとに |
+| II. 流れ始める | 45〜77 | 2 分 59 秒から途切れずに流れ、少しずつ大きくなり、山を築いて、止まる (5 分 7 秒) |
+| III. 白い鍵盤 | 77〜105 | 半音ひとつ下がって、5 分 9 秒から白い鍵盤 (ハ長調 / イ短調) |
+| IV. いちばん大きい所から終わりへ | 105〜140 | 7 分から。鍵盤は 9 分 19 秒に終わる |
+
+- 測った音量 (段落ごとの平均、4 秒窓の幅): I −22.0 (−34.9〜−15.3) / II −18.5 (−24.2〜−14.6) / III −16.0 (−23.0〜−11.1) / IV −14.2 dB (−24.6〜−10.8)。全体 mean −17.1 dB、max −0.6 dB (volumedetect)。mp4 は 9 分 27 秒、28.6 MiB (映像 295 kbps、音声 AAC 128 kbps)
+- **静かな所**: 声が無いので、録音そのものの音と音の間が聞こえる。0.5 秒窓で −39 dB を下回るのは 16 窓で、ほとんどは初めの 3 分 (小さな音が 5〜6 秒ごとの所)。いちばん静かなのは 2 分 50 秒 (−52.7 dB; 流れ始める前の休み)。tablet276 では、声がここを覆っていた
+- `compose_tablet278.py` (録音だけ; 段は 1 つ: 鍵盤。compose_tablet276 から — 声を外し、鍵盤の位置が違う)
+
+```bash
+# 鍵盤の録音は CCLXXIII・CCLXXVI と同じ (level273.py を通したもの)
+python3 level273.py 20261120_024046.wav src/20261120_024046.wav
+python3 analyze_chords.py chords278.json src/20261120_024046.wav
+python3 compose_tablet278.py src chords278.json score_tablet278.json && python3 synth.py score_tablet278.json tablet278.wav && python3 video.py score_tablet278.json tablet278.wav tablet278.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
