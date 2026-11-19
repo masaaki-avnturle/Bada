@@ -185,6 +185,15 @@ Actions の**アーティファクトは最長 90 日で消えます**が、**Gi
 
 ### 👉 [**laevateinn/index.html をダウンロード**](laevateinn/index.html)
 
+#### 📥 Actions からダウンロード (APK / EXE / AppImage / deb)
+
+1. [**Actions → Laevateinn app build**](https://github.com/masaaki-avnturle/Bada/actions/workflows/laevateinn-app-build.yml) を開く (GitHub にログインしておく)
+2. **Run workflow** を押す (`release_tag` は空欄のままで OK) か、一覧から ✅ のランをクリック
+3. ランのページを下へスクロールし、**Artifacts** 欄の **`laevateinn-all-platforms`** (全部入り) をクリックすると zip がダウンロードされます。個別には `laevateinn-android` (APK) / `laevateinn-windows` / `laevateinn-linux`
+4. zip を展開 → Android は `laevateinn-al-debug.apk` を端末へ入れて「提供元不明のアプリ」を許可してインストール
+
+ランの **Summary** にも同じ手順と中身の一覧が表示されます。Actions の成果物は保持 90 日・要ログイン。ログイン不要・無期限のファイルは下の Releases にあります。
+
 上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動。APK (`laevateinn-al-debug.apk`) / Windows EXE / Ubuntu 版は [Releases](https://github.com/masaaki-avnturle/Bada/releases) から([`laevateinn-app-build.yml`](.github/workflows/laevateinn-app-build.yml) が `laevateinn-v*` タグでビルド)。詳細は [`laevateinn/`](laevateinn/) を参照。
 
 ---

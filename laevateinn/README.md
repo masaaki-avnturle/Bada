@@ -15,6 +15,7 @@ zone:// 系 AEAD 暗号)を車載システムとして一つにまとめ、依�
 
 | 方法 | 手順 |
 |:---|:---|
+| **Actions から** | [Actions → Laevateinn app build](https://github.com/masaaki-avnturle/Bada/actions/workflows/laevateinn-app-build.yml) → *Run workflow* (または ✅ のラン) → ページ下部 **Artifacts** の **`laevateinn-all-platforms`** (APK + EXE + AppImage/deb 全部入り)。要ログイン・保持 90 日。ランの Summary に手順と中身が出ます |
 | **一番かんたん** | [`index.html`](index.html) を開き **「Download raw file」(⬇)** → 保存したファイルをダブルクリック(インストール不要・オフライン可) |
 | **Android APK** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) から `laevateinn-al-debug.apk` |
 | **Windows 10/11** | Releases から `Laevateinn-*-x64.exe`(NSIS インストーラ / ポータブル) |
