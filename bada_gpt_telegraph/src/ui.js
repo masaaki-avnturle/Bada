@@ -230,7 +230,9 @@
     });
   }
 
-  async function go() {
+  async function go(specOverride) {
+    /* specOverride: 会話台帳の投影 (ledger.js)。ボタンから呼ばれたときはクリックイベントが入るので、仕様の形のときだけ使う */
+    var override = specOverride && Array.isArray(specOverride.modules) ? specOverride : null;
     var text = $("thought").value.trim();
     if (!text) { $("specView").innerHTML = '<span class="err">依頼文 (思考入力) を書いてください。</span>'; return; }
     $("goBtn").disabled = true; $("goBtn").textContent = "電信中…";
@@ -253,7 +255,7 @@
         else if (cmd === "teleport") { $("m-fid").textContent = (M.fidelity * 100).toFixed(2) + "%"; await sleep(220); }
         else if (cmd === "graviton") { $("m-car").textContent = (M.carrierHz / 1e9).toFixed(3) + " GHz"; await sleep(160); }
         else if (cmd === "send") { for (var p = 0; p <= 1; p += 0.05) { anim.prog = p; await sleep(30); } anim.done = true; }
-        else if (cmd === "comprehend") { cur = { metrics: M, spec: comprehend(text) }; renderSpec(cur.spec); await sleep(150); }
+        else if (cmd === "comprehend") { cur = { metrics: M, spec: override || comprehend(text) }; renderSpec(cur.spec); await sleep(150); }
         else if (cmd === "plan") { blog("  → " + cur.spec.modules.map(function (m) { return m.id; }).join(" + ") + (cur.spec.fields.length ? " · fields " + cur.spec.fields.length : "")); await sleep(150); }
         else if (cmd === "generate") {
           $("genCard").classList.remove("hidden");
@@ -515,19 +517,53 @@
     d.innerHTML = (src ? '<span class="src">' + escHtml(src) + "</span>" : "") + escHtml(text);
     $("chat-log").appendChild(d); $("chat-log").scrollTop = $("chat-log").scrollHeight; return d;
   }
+  /* 会話台帳 (ledger.js): 追記のみ。localStorage に保存し、その投影が「いまの仕様」になる */
+  var conv = new Ledger(LS.get("ledger", []) || []);
+  function ledgerSave() { LS.set("ledger", conv.toJSON()); }
+  function ledgerRender(proj) {
+    $("ledger-sum").textContent = "事実 " + conv.size() + " 件 · 発話 " + conv.turns() + " 回" + (proj ? " · いまの仕様「" + proj.title + "」" : "");
+    var rows = [];
+    if (proj) {
+      var fx = Object.keys(proj.features).filter(function (k) { return !proj.features[k].assumed; });
+      rows.push({ label: "いまの仕様", value: proj.title, meant: proj.modules.map(function (m) { return m.icon + " " + (m.id === "records" ? proj.entity + "の管理" : m.label); }).join("・") + (fx.length ? " / 機能 " + fx.map(function (k) { return proj.features[k].label; }).join("・") : "") + (proj.fields.length && proj.modules.some(function (m) { return m.id === "records"; }) ? " / 項目 " + proj.fields.map(function (f) { return f.name; }).join("・") : "") + " / " + proj.platforms.join("・") });
+      rows.push({ label: "除外 (台帳に残る)", value: String(proj.ledger.excluded.length), meant: proj.ledger.excluded.map(function (e) { return e.label; }).join("・") || "なし" });
+      var pe = proj.ledger.priorEntropy;
+      rows.push({ label: "未知事前の H", value: pe[pe.length - 1].toFixed(2) + " bit", meant: "モジュールへの信念: 一様 " + pe[0].toFixed(2) + " bit から証拠で尖る → " + pe.slice(1).map(function (x) { return x.toFixed(2); }).join(" → ") });
+    }
+    $("ledger-spec").innerHTML = rows.length ? rows.map(function (r) { return '<div class="rrow"><i>' + escHtml(r.label) + '</i><b>' + escHtml(r.value) + '</b><span>' + escHtml(r.meant) + "</span></div>"; }).join("") : '<div class="muted">まだ発話がありません (「やり直し」の後は、その地平から先が投影されます)。</div>';
+    $("ledger-facts").innerHTML = conv.read().slice(-40).map(function (f) {
+      var s = "#" + f.t + " " + f.kind;
+      if (f.kind === "say") s += " [" + f.src + "] " + f.text;
+      else if (f.kind === "spec") { var fe = f.features.filter(function (x) { return !x.assumed; }); s += " +" + f.modules.map(function (m) { return m.id; }).join(",") + (fe.length ? " feat " + fe.map(function (x) { return x.id; }).join(",") : "") + (f.platforms.length ? " plat " + f.platforms.join(",") : "") + (f.fields.length ? " fields " + f.fields.length : ""); }
+      else if (f.kind === "exclude") s += " −" + f.target + ":" + f.id + " (「" + f.by + "」)";
+      else if (f.kind === "field") s += " " + (f.op === "add" ? "+" : "−") + "項目 " + f.name;
+      else if (f.kind === "forge") s += " 「" + f.title + "」 " + Math.round(f.coverage * 100) + "% " + (f.ok ? "合格" : "要確認");
+      return "<div>" + escHtml(s) + "</div>";
+    }).join("") || '<div class="muted">(空)</div>';
+  }
+  $("ledger-new").onclick = function () {
+    if (conv.size()) { var arc = LS.get("ledgerArchive", []) || []; arc.push({ at: Date.now(), facts: conv.toJSON() }); while (arc.length > 5) arc.shift(); LS.set("ledgerArchive", arc); }
+    conv = new Ledger([]); ledgerSave(); ledgerRender(null); chatAdd("bot", "新しい会話を始めました (前の台帳は保管しました)。");
+  };
   var chatBusy = false;
   async function chatHandle(text, src) {
     if (chatBusy) return;
     chatAdd("me", text, src || "文字");
-    var route = chatRoute(text);
-    if (route.intent === "forge") {
-      chatBusy = true; var thinking = chatAdd("bot", "承知しました。全体を把握して錬成します…");
-      $("thought").value = route.request; LS.set("draft", route.request);
-      try { await go(); thinking.textContent = chatReplyLocal({ intent: "forged" }, { spec: cur && cur.spec, ver: cur && cur.ver }); }
-      catch (e) { thinking.textContent = "錬成でエラー: " + (e.message || e); }
+    var route = chatRoute(text, conv.turns() > 0);
+    if (route.intent === "forge" || route.intent === "refine") {
+      chatBusy = true; var thinking = chatAdd("bot", route.intent === "refine" ? "台帳に積んで、仕様を研ぎ澄まします…" : "承知しました。全体を把握して錬成します…");
+      var said = ledgerSay(conv, text, src || "文字"); ledgerSave();
+      var proj = projectSpec(conv);
+      $("thought").value = proj.input; LS.set("draft", proj.input);
+      try {
+        await go(proj);
+        conv.append({ kind: "forge", turn: said.turn, title: cur.spec.title, modules: cur.spec.modules.map(function (m) { return m.id; }), coverage: cur.spec.coverage, ok: !!(cur.ver && cur.ver.ok) }); ledgerSave();
+        thinking.textContent = chatReplyLocal({ intent: route.intent === "refine" ? "refined" : "forged", change: describeTurn(said, cur.spec) }, { spec: cur && cur.spec, ver: cur && cur.ver, ledger: conv });
+      } catch (e) { thinking.textContent = "錬成でエラー: " + (e.message || e); }
+      ledgerRender(projectSpec(conv));
       chatBusy = false; return;
     }
-    if (route.intent === "reset") { tpClear(); $("thought").value = ""; }
+    if (route.intent === "reset") { conv.append({ kind: "reset" }); ledgerSave(); ledgerRender(null); tpClear(); $("thought").value = ""; }
     if (route.intent === "chat" && LS.get("apiKey", "")) {
       var thinking2 = chatAdd("bot", "…");
       try {
@@ -542,8 +578,9 @@
       } catch (e) { thinking2.textContent = chatReplyLocal(route) + " (Claude: " + (e.message || e) + ")"; }
       return;
     }
-    chatAdd("bot", chatReplyLocal(route));
+    chatAdd("bot", chatReplyLocal(route, { ledger: conv }));
   }
+  ledgerRender(projectSpec(conv));
   $("chat-send").onclick = function () { var t = $("chat-in").value.trim(); if (!t) return; $("chat-in").value = ""; chatHandle(t, "文字"); };
   $("chat-in").onkeydown = function (e) { if (e.key === "Enter") $("chat-send").click(); };
 

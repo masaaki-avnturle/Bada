@@ -177,12 +177,19 @@ function imageFeatures(rgba, w, h) {
 }
 
 /* ───────────── ChatGPT 風チャット: 意図の振り分けと内蔵の返答 ───────────── */
-function chatRoute(text) {
+/* hasContext: 会話台帳に発話があるとき、仕様に触れる発話は「研ぎ澄まし (refine)」として台帳に積む */
+function specBearing(t) {
+  var lc = lower(t);
+  return MODULE_DEFS.some(function (d) { return hasAny(lc, d.kw); }) || FEATURE_DEFS.some(function (d) { return hasAny(lc, d.kw); }) ||
+    PLATFORM_DEFS.some(function (d) { return hasAny(lc, d.kw); }) || COLOR_DEFS.some(function (c) { return c[0].test(t); }) || /項目|フィールド/.test(t);
+}
+function chatRoute(text, hasContext) {
   var t = String(text || "").trim();
   if (!t) return { intent: "empty" };
   if (/^(こんにちは|こんばんは|おはよう|やあ|hello|hi)/i.test(t)) return { intent: "greeting" };
   if (/何が(でき|出来)|できること|使い方|help|ヘルプ/i.test(t)) return { intent: "capabilities" };
   if (/やり直|リセット|最初から/.test(t)) return { intent: "reset" };
+  if (hasContext && (/(足し|追加|加え|付け|入れ|外し|はずし|いらない|要らない|不要|なしで|やめ|削除|消し|抜い|除い|変え|変更|にして|にする)/.test(t) || specBearing(t))) return { intent: "refine", request: t };
   if (/作っ|作り|作成|錬成|欲しい|ほしい|したい|アプリ|ツール|作れ|build|make|create/i.test(t)) return { intent: "forge", request: t };
   return { intent: "chat", text: t };
 }
@@ -194,7 +201,16 @@ function chatReplyLocal(route, ctx) {
   if (route.intent === "empty") return "何を作りましょう？ 口形・脳波・動き・文字のどれでも伝えられます。";
   if (route.intent === "forged" && ctx.spec) {
     var s = ctx.spec;
-    return "「" + s.title + "」を錬成しました。モジュール: " + s.modules.map(function (m) { return m.label; }).join("・") + " / 網羅率 " + Math.round(s.coverage * 100) + "% / 検証 " + (ctx.ver && ctx.ver.ok ? "合格" : "要確認") + "。下の ④ でアプリ、⑥ でソースコード、⑤ で論文 (PDF)、⑦ で exe / apk への自動コンパイルができます。";
+    return "「" + s.title + "」を錬成しました。モジュール: " + s.modules.map(function (m) { return m.label; }).join("・") + " / 網羅率 " + Math.round(s.coverage * 100) + "% / 検証 " + (ctx.ver && ctx.ver.ok ? "合格" : "要確認") + "。" +
+      (ctx.ledger ? "会話台帳は事実 " + ctx.ledger.size() + " 件 (追記のみ)。続けて「検索も足して」「タイマーは外して」のように話すと仕様が研ぎ澄まされます。" : "") +
+      "下の ④ でアプリ、⑥ でソースコード、⑤ で論文 (PDF)、⑦ で exe / apk への自動コンパイルができます。";
+  }
+  if (route.intent === "refined" && ctx.spec) {
+    var s2 = ctx.spec;
+    return "台帳に積みました (" + (route.change || "変更なし") + ")。いまの仕様「" + s2.title + "」: " + s2.modules.map(function (m) { return m.label; }).join("・") +
+      " / 網羅率 " + Math.round(s2.coverage * 100) + "% / 検証 " + (ctx.ver && ctx.ver.ok ? "合格" : "要確認") +
+      (s2.ledger && s2.ledger.excluded.length ? " / 除外 " + s2.ledger.excluded.map(function (e) { return e.label; }).join("・") + " (台帳には残ります)" : "") +
+      "。" + (ctx.ledger ? "事実 " + ctx.ledger.size() + " 件。" : "") + "さらに続けて話すと研ぎ澄まされます。「やり直し」で地平を進めます。";
   }
   return "承知しました。「作って」と伝えるか、口形で IOI (い→お→い) と発音すると、ここまでの内容でアプリを錬成します。";
 }

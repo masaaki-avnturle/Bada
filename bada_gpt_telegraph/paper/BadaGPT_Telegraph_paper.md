@@ -96,15 +96,17 @@ GPT::paper                   # 論文
 | `src/phasecore.js` | 148 | 位相核 (文献の検証できる数理: エントロピー位相融合・大域的部分積分・N(T)・ナッシュ・シャノン位相・標識表・文献一覧) |
 | `src/silent.js` | 507 | サイレント・トーク (ジェスチャー / 非言語アトム・トランスフォーマー・latent → 文章 / 画像 / Bada・チャネルの位相融合) |
 | `src/generate.js` | 779 | 14 種の実行時部品、HTML 組み立て、検証 |
-| `src/telephacy.js` | 200 | Ω-Telephacy (無音の口形認識・辞書・共鳴 7 帯・Jones 熱経路・イメージ入力・チャット) |
+| `src/telephacy.js` | 216 | Ω-Telephacy (無音の口形認識・辞書・共鳴 7 帯・Jones 熱経路・イメージ入力・チャット) |
 | `src/bio.js` | 124 | 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ) |
 | `src/bci.js` | 213 | 思考だけで (脳波 BCI: 集中度 / SSVEP・Muse / OpenBCI 復号・スキャン選択) |
 | `src/codegen.js` | 281 | ソースコード化 (仕様 → Python / Node / Bada の動くソース) |
 | `src/autobuild.js` | 254 | 自動コンパイル (一式を GitHub へ 1 コミット → Actions が exe/apk をビルド → 監視) |
 | `src/paper.js` | 449 | 論文の自動執筆、ビルド一式、Claude (任意) |
-| `src/ui.js` | 1005 | 画面 |
-| `tools/engine-test.js` | 535 | 単体テスト 235 件 |
+| `src/ledger.js` | 195 | 会話台帳 (追記のみの TupleSpace・発話の読み取り・投影・差分) — 第 2 版 |
+| `src/ui.js` | 1042 | 画面 |
+| `tools/engine-test.js` | 582 | 単体テスト 257 件 |
 | `tools/evaluate.js` | 114 | 第 7 章の評価の再現 |
+| `tools/evolve-eval.js` | 97 | 第 2 版 (会話台帳) の多ターン評価 (進化論文 [26] 表 2) |
 
 `tools/build.js` がこれらを 1 枚の `index.html` に埋め込み、同じファイルを Cordova (Android) と Electron (Windows / Linux) に同梱する。
 
@@ -252,13 +254,17 @@ latent からは四つを決定的に復号する: (a) **本と同じ分量ま�
 
 **標識表と、取り込まなかったもの.** 旧 Telegraph の Ξ = β(H+1, M+1)/log(N+2) と π(χ,x) = ∬(x log x)^{−2} dx_m = ½i ([14]) は文献集 [9] が「未検証・定義がない」と判定しているため、標識「未検証」を付けて思考実験の可視化のままとした。グラビトン↔電磁波変換も同じ扱いである。リーマン予想・深リーマン予想・統一場 ([9][17]) は文献自身が「予想・研究計画」としており、本システムは何も主張しない。[11][22] が明記する通り「ζ(s) = x log x」「x^{1/2+iy} = e^{x log x}」は恒等式として偽であり、本システムもそれらを用いない。Bada 言語の処理系の文献 ([21][23]–[25]) は参照にとどめ、本システムの Bada インタプリタは従来どおり `engine.js` のものである。
 
+## 6.12 拡張：会話台帳と仕様の研ぎ澄まし (第 2 版)
+
+ChatGPT のように続けて話すほど仕様が研ぎ澄まされるよう、対話面に**追記のみの会話台帳** (`src/ledger.js`) を置いた。発話・読み取った仕様の差分・除外・項目の増減・錬成・やり直しを凍結された事実として積み、いまの仕様は台帳の投影として再計算する (文献 [21][22] の `TupleSpace`: 事実は積み上がるだけで上書きされない)。「タイマーは外して」は投影から外すだけで事実は残り、「やり直し」は地平を進める事実である。モジュールへの信念は一様 (未知事前、log₂ 14 bit) から台帳の証拠で尖る。16 対話の多ターン評価で、投影は最終仕様の完全一致 93.8% (発話を連結して 1 回で把握する基準法は 62.5%)、投影した仕様からの生成アプリは静的検証にすべて合格した。設計・理論・第 3〜23 版への梯子は進化論文 [26] に述べる。
+
 ---
 
 ## 7. 評価
 
 ### 7.1 単体テスト
 
-`tools/engine-test.js` の 235 件 (位相核の大域的部分積分・N(T)・単位位相・位相融合の零保存と調子の読み出し・標識表・文献 17 本、Ω-Telephacy の口形認識と辞書往復、脳波 BCI の集中度・SSVEP・機器復号・スキャン選択、自動コンパイルの偽 GitHub API 検証、体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
+`tools/engine-test.js` の 257 件 (会話台帳の追記のみ・投影・除外・やり直し・未知事前、位相核の大域的部分積分・N(T)・単位位相・位相融合の零保存と調子の読み出し・標識表・文献 17 本、Ω-Telephacy の口形認識と辞書往復、脳波 BCI の集中度・SSVEP・機器復号・スキャン選択、自動コンパイルの偽 GitHub API 検証、体のサインの信号処理と不変条件、サイレント・トークのトランスフォーマー、ソースコード化 (Python/Node の構文検査と実行)、Bada インタプリタ、Ξ・Jones・モールス、FSK の往復・雑音下・256 バイト超、全体把握、14 部品の単独生成と全部入り、`</script>` を含む題名、検証器の検出能力、論文の章立て、ZIP / PDF の構造、Claude リクエストと SSE 解析) はすべて合格した。
 
 ### 7.2 開発用の依頼集合 (24 件)
 
@@ -361,6 +367,7 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 23. 山口 正明. Bada 拡張実装 — コンパイラ／インタープリタ・リバイザ・Bada製ライブラリ. `paper/references/15_bada_extended_sources.pdf`.
 24. M. Yamaguchi. Bada: A self-describing language for the Unknown-Prior Engine (Self-Hosting Project). `paper/references/16_bada_self_hosting_project.pdf`.
 25. M. Yamaguchi. Bada — The Unknown-Prior Engine Language (full source). `paper/references/17_bada_source.pdf`.
+26. 山口 雅旭. BadaGPT電信の進化論: 未知事前エンジンによる対話生成系を第 23 版まで育てる理論と工学. 2026-11. `paper/BadaGPT_Evolution_v23_paper.pdf`.
 
 ---
 
@@ -368,7 +375,8 @@ BADA グラビトン電信の電信エンジンの上に、依頼の全節を仕
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 235 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 257 件
+node bada_gpt_telegraph/tools/evolve-eval.js        # 第 2 版 (会話台帳) の多ターン評価
 node bada_gpt_telegraph/tools/evaluate.js           # 7.2 開発用の依頼集合
 node bada_gpt_telegraph/tools/evaluate.js --heldout # 7.3 未見の依頼集合
 ```

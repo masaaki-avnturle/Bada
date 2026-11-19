@@ -112,13 +112,19 @@ details summary{cursor:pointer;font-size:11px;letter-spacing:.14em;color:var(--a
 </header>
 
 <div class="card">
- <h2>💬 BadaGPT チャット — ChatGPT 版: 口形・脳波・動き・画像・文字で話しかける</h2>
+ <h2>💬 BadaGPT チャット — ChatGPT 版: 口形・脳波・動き・画像・文字で話しかける (第 2 版: 会話台帳)</h2>
  <div id="chat-log" class="chatlog"><div class="cmsg bot">こんにちは。BadaGPT です。声を出さず、口形 (Ω-Telephacy)・脳波・描いた動き・画像で、欲しいアプリを伝えてください。文章にして、アプリ・ソースコード・論文を錬成し、exe / apk に自動コンパイルします。</div></div>
  <div class="row">
   <input id="chat-in" placeholder="(文字でも話しかけられます — 口形や脳波で入力したときは自動で入ります)" style="flex:1;min-width:200px">
   <button class="main" id="chat-send" style="margin:0;width:auto;padding:10px 16px">送る</button>
  </div>
  <div class="muted" id="chat-stat"></div>
+ <details style="margin-top:8px"><summary>📒 会話台帳 (追記のみの TupleSpace) — <span id="ledger-sum">事実 0 件</span></summary>
+  <div class="muted" style="margin:6px 0">続けて話すほど仕様が研ぎ澄まされます: 「検索も足して」「タイマーは外して」「メールも項目に足して」「Windows で」。台帳は文献 13 / 14 の <code>Omega::DATABASE[tuplespace]</code> と同じく<b>追記のみ</b>で、何も上書きされません。「外して」は投影 (いまの仕様) から除くだけで事実は残り、「やり直し」は新しい地平を記す事実です。モジュールへの信念は一様 (最大エントロピー・未知事前) から始まり、台帳の証拠で尖ります。</div>
+  <div id="ledger-spec" class="sreadout"></div>
+  <div id="ledger-facts" class="mono" style="max-height:170px;overflow:auto;font-size:11px;margin-top:6px;background:rgba(0,0,0,.28);border-radius:9px;padding:6px 9px"></div>
+  <div class="row" style="margin-top:6px"><button class="btn" id="ledger-new">🆕 新しい会話 (いまの台帳を保管して空から)</button></div>
+ </details>
 </div>
 
 <div class="card">
@@ -1319,6 +1325,202 @@ function comprehend(input, opts) {
 }
 
 /*
+ * ledger.js — 会話台帳 (TupleSpace: 追記のみ) と、未知事前の仕様の研ぎ澄まし (第 2 版)
+ *
+ * 文献 13 (Bada engine full source) Module 1 と文献 14 (Unknown-Prior Engine) 定義 1–4 の
+ * 設計を、BadaGPT電信の対話に移したもの:
+ *
+ *   Omega::DATABASE[tuplespace] — 「事実は積み上がるだけで、何も上書きされない」
+ *     def append |fact| >> facts <- fact.frozen   # never mutate
+ *     def gc => projection.exclude ; facts.preserved
+ *
+ *   - 台帳 (Ledger) は追記のみ。発話・読み取った仕様・除外・錬成・やり直し を事実として積む。
+ *   - 「いまの仕様」は台帳の **投影** (projectSpec)。除外は投影から外すだけで、事実は残る。
+ *   - 「やり直し」も事実 (reset)。投影の地平 (horizon) が進むだけで、過去の事実は消えない。
+ *   - 未知事前 (定義 4): モジュールへの信念は一様 (最大エントロピー) から始まり、台帳の証拠で
+ *     尖る。除外されたモジュールは信念 0 (確信した零) で、後の発話が明示的に再び足すまで戻らない。
+ *
+ * 第 2 版 (対話) の中核: ChatGPT のように、続けて話すほど仕様が研ぎ澄まされる。
+ */
+"use strict";
+
+function Ledger(facts) {
+  this.facts = [];
+  var self = this;
+  (facts || []).forEach(function (f) { self.facts.push(Object.freeze(Object.assign({}, f))); });
+}
+/* 追記のみ。返り値は事実の番号 t。事実は凍結され、二度と変わらない。 */
+Ledger.prototype.append = function (fact) {
+  var f = Object.freeze(Object.assign({}, fact || {}, { t: this.facts.length, at: (fact && fact.at) || Date.now() }));
+  this.facts.push(f);
+  return f.t;
+};
+Ledger.prototype.read = function (pred) { return pred ? this.facts.filter(pred) : this.facts.slice(); };
+Ledger.prototype.size = function () { return this.facts.length; };
+Ledger.prototype.toJSON = function () { return this.facts.slice(); };
+/* 投影の地平: 最後の reset の次。それ以前の事実は保存されるが、投影には使わない。 */
+Ledger.prototype.horizon = function () { var h = 0; this.facts.forEach(function (f) { if (f.kind === "reset") h = f.t + 1; }); return h; };
+Ledger.prototype.turns = function () { var h = this.horizon(); return this.facts.filter(function (f) { return f.t >= h && f.kind === "say"; }).length; };
+
+/* ───────────── 発話の読み取り: 除外の節と、追加の節 ───────────── */
+var REMOVE_VERBS = /(外して|外す|はずして|いらない|要らない|不要|なしで|無しで|なしに|やめて|やめる|やめ|削除|消して|抜いて|除いて|取って|without|remove|drop)/i;
+var FIELD_ADD = /([^、。\s「」]+?)(?:も|を)?(?:項目|フィールド|列)(?:に|として)?(?:足|追加|加え|入れ)/;
+var FIELD_REMOVE = /([^、。\s「」]+?)(?:の|は|を)?(?:項目|フィールド|列)(?:は|を)?(?:外|いらない|要らない|不要|削除|消)/;
+
+function exclusionsIn(clause) {
+  var lc = lower(clause), out = [];
+  MODULE_DEFS.forEach(function (d) { var k = hasAny(lc, d.kw); if (k) out.push({ target: "module", id: d.id, label: d.label, by: k }); });
+  FEATURE_DEFS.forEach(function (d) { var k = hasAny(lc, d.kw); if (k) out.push({ target: "feature", id: d.id, label: d.label, by: k }); });
+  PLATFORM_DEFS.forEach(function (d) { var k = hasAny(lc, d.kw); if (k) out.push({ target: "platform", id: d.id, label: d.label, by: k }); });
+  return out;
+}
+
+/* 1 発話を、追加の仕様 (delta) と除外 (exclusions) と項目の増減に分ける */
+function analyzeTurn(text) {
+  var clauses = splitClauses(text), keep = [], excl = [], removedClauses = [], fieldAdds = [], fieldRemoves = [];
+  clauses.forEach(function (c) {
+    var fr = c.match(FIELD_REMOVE);
+    if (fr && REMOVE_VERBS.test(c)) { var rn = nounTail(fr[1]); if (rn) { fieldRemoves.push(rn); removedClauses.push({ text: c, hits: ["項目を除外: " + rn] }); return; } }
+    var fa = c.match(FIELD_ADD);
+    if (fa) { var an = nounTail(fa[1]); if (an && !FIELD_STOP.test(an)) { fieldAdds.push(an); removedClauses.push({ text: c, hits: ["項目を追加: " + an] }); return; } }
+    if (REMOVE_VERBS.test(c)) {
+      var e = exclusionsIn(c);
+      if (e.length) { excl = excl.concat(e); removedClauses.push({ text: c, hits: e.map(function (x) { return "除外: " + x.label; }) }); return; }
+    }
+    keep.push(c);
+  });
+  var delta = keep.length ? comprehend(keep.join("。") + "。") : null;
+  var flags = delta ? {
+    fallbackModules: delta.assumptions.some(function (a) { return /具体的な機能が読み取れなかった/.test(a); }),
+    fieldsAssumed: delta.assumptions.some(function (a) { return /項目の指定がないため/.test(a); }),
+    platformsAssumed: delta.assumptions.some(function (a) { return /対象プラットフォームの指定がない/.test(a); }),
+    titleExplicit: !!extractTitle(text),
+    themeMentioned: /ライト|明るい|白い背景|白背景|light|ダーク|暗い|黒い背景|黒背景|夜|dark/i.test(text),
+    accentMentioned: !!delta.theme.accentName
+  } : null;
+  return { text: text, delta: delta, flags: flags, exclusions: excl, fieldAdds: fieldAdds, fieldRemoves: fieldRemoves, extraClauses: removedClauses };
+}
+
+/* 発話を台帳に積む: 発話 → 読み取った仕様 → 除外 の順にすべて事実として追記 (上書きなし) */
+function ledgerSay(ledger, text, src) {
+  var a = analyzeTurn(text);
+  var turn = ledger.append({ kind: "say", src: src || "文字", text: String(text) });
+  if (a.delta) {
+    var d = a.delta;
+    ledger.append({ kind: "spec", turn: turn, flags: a.flags,
+      modules: a.flags.fallbackModules ? [] : d.modules.map(function (m) { return { id: m.id, label: m.label, icon: m.icon, reason: m.reason }; }),
+      fallback: a.flags.fallbackModules ? d.modules.map(function (m) { return { id: m.id, label: m.label, icon: m.icon, reason: m.reason }; }) : [],
+      entity: d.entity, fields: d.fields.map(function (f) { return { name: f.name, type: f.type }; }),
+      features: Object.keys(d.features).map(function (id) { return { id: id, label: d.features[id].label, reason: d.features[id].reason, assumed: !!d.features[id].assumed }; }),
+      theme: { mode: d.theme.mode, accent: d.theme.accent, accentName: d.theme.accentName },
+      platforms: a.flags.platformsAssumed ? [] : d.platforms.slice(),
+      title: a.flags.titleExplicit ? d.title : "", purpose: d.purpose,
+      clauses: d.clauses.map(function (c) { return { text: c.text, hits: c.hits.slice() }; }).concat(a.extraClauses),
+      unresolved: d.unresolved.slice(), assumptions: d.assumptions.slice() });
+  } else if (a.extraClauses.length) {
+    ledger.append({ kind: "spec", turn: turn, flags: null, modules: [], fallback: [], entity: "", fields: [], features: [], theme: null, platforms: [], title: "", purpose: "", clauses: a.extraClauses, unresolved: [], assumptions: [] });
+  }
+  a.exclusions.forEach(function (e) { ledger.append({ kind: "exclude", turn: turn, target: e.target, id: e.id, label: e.label, by: e.by }); });
+  a.fieldAdds.forEach(function (n) { ledger.append({ kind: "field", turn: turn, op: "add", name: n, type: fieldType(n) }); });
+  a.fieldRemoves.forEach(function (n) { ledger.append({ kind: "field", turn: turn, op: "remove", name: n }); });
+  return { turn: turn, delta: a.delta, flags: a.flags, exclusions: a.exclusions, fieldAdds: a.fieldAdds, fieldRemoves: a.fieldRemoves };
+}
+
+/* ───────────── 投影: 台帳 → いまの仕様 (comprehend と同じ形) ───────────── */
+function shannonBits(p) { var H = 0, s = 0, i; for (i = 0; i < p.length; i++) s += p[i]; for (i = 0; i < p.length; i++) if (p[i] > 0) { var q = p[i] / s; H -= q * Math.log2(q); } return H; }
+
+function projectSpec(ledger) {
+  var h = ledger.horizon(), facts = ledger.read(function (f) { return f.t >= h; });
+  var says = facts.filter(function (f) { return f.kind === "say"; });
+  if (!says.length) return null;
+  var mod = {}, modOrder = [], feat = {}, featOrder = [], plat = {}, platOrder = [];
+  var entity = "", fields = [], fieldsAssumed = true, fieldsTurn = -1, theme = { mode: "dark", accent: "#8fd0ff", accentName: "" };
+  var title = "", purpose = "", clauses = [], unresolved = [], fallback = [], turnsSpec = 0, evidence = {};
+  var prior = [], order = MODULE_DEFS.map(function (d) { return d.id; }).concat(["records"]);
+  function belief() {
+    var eps = 0.05, p = order.map(function (id) { var m = mod[id]; if (m && m.state === "off") return 0; return eps + (evidence[id] || 0); });
+    return shannonBits(p);
+  }
+  prior.push(belief()); /* 未知事前: 一様 (最大エントロピー) */
+  facts.forEach(function (f) {
+    if (f.kind === "spec") {
+      turnsSpec++;
+      f.modules.forEach(function (m) { if (!mod[m.id]) modOrder.push(m.id); mod[m.id] = { state: "on", turn: f.turn, label: m.label, icon: m.icon, reason: m.reason }; evidence[m.id] = (evidence[m.id] || 0) + 1; });
+      if (f.fallback && f.fallback.length && !fallback.length) fallback = f.fallback;
+      if (f.entity && f.modules.some(function (m) { return m.id === "records"; })) entity = f.entity;
+      if (f.flags && !f.flags.fieldsAssumed && f.fields.length) { fields = f.fields.map(function (x) { return { name: x.name, type: x.type }; }); fieldsAssumed = false; fieldsTurn = f.turn; }
+      else if (fieldsAssumed && f.fields.length && !fields.length) { fields = f.fields.map(function (x) { return { name: x.name, type: x.type }; }); fieldsTurn = f.turn; }
+      f.features.forEach(function (x) {
+        if (x.assumed) { if (!feat[x.id]) { featOrder.push(x.id); feat[x.id] = { state: "on", assumed: true, turn: f.turn, label: x.label, reason: x.reason }; } return; }
+        if (!feat[x.id]) featOrder.push(x.id); feat[x.id] = { state: "on", assumed: false, turn: f.turn, label: x.label, reason: x.reason };
+      });
+      if (f.theme && f.flags && f.flags.themeMentioned) theme.mode = f.theme.mode;
+      if (f.theme && f.flags && f.flags.accentMentioned) { theme.accent = f.theme.accent; theme.accentName = f.theme.accentName; }
+      f.platforms.forEach(function (p) { if (!plat[p]) platOrder.push(p); plat[p] = { state: "on", turn: f.turn }; });
+      if (f.title) title = f.title;
+      if (!purpose && f.purpose) purpose = f.purpose;
+      f.clauses.forEach(function (c) { clauses.push({ text: c.text, hits: c.hits.slice(), turn: f.turn }); });
+      f.unresolved.forEach(function (u) { if (unresolved.indexOf(u) < 0) unresolved.push(u); });
+      prior.push(belief());
+    } else if (f.kind === "exclude") {
+      if (f.target === "module") { if (!mod[f.id]) modOrder.push(f.id); mod[f.id] = Object.assign({}, mod[f.id] || { label: f.label, icon: "" }, { state: "off", turn: f.turn }); evidence[f.id] = 0; }
+      if (f.target === "feature") { if (!feat[f.id]) featOrder.push(f.id); feat[f.id] = Object.assign({}, feat[f.id] || { label: f.label, reason: "" }, { state: "off", turn: f.turn }); }
+      if (f.target === "platform") { if (!plat[f.id]) platOrder.push(f.id); plat[f.id] = { state: "off", turn: f.turn }; }
+      prior.push(belief());
+    } else if (f.kind === "field") {
+      if (f.op === "add") { if (!fields.some(function (x) { return x.name === f.name; })) fields.push({ name: f.name, type: f.type || fieldType(f.name) }); fieldsAssumed = false; fieldsTurn = f.turn; }
+      else fields = fields.filter(function (x) { return x.name !== f.name; });
+    }
+  });
+  var spec = { version: BGT_VERSION, input: says.map(function (s) { return s.text; }).join("\n"), turns: says.map(function (s) { return { t: s.t, src: s.src, text: s.text }; }),
+    title: "", purpose: purpose, modules: [], entity: "", fields: [], features: {}, theme: theme, platforms: [], clauses: [], coverage: 0, assumptions: [], unresolved: unresolved.slice(),
+    ledger: { facts: ledger.size(), horizon: h, turns: says.length, priorEntropy: prior, excluded: [] } };
+  modOrder.forEach(function (id) { var m = mod[id]; if (m.state === "on") spec.modules.push({ id: id, label: m.label, icon: m.icon, reason: m.reason + " (第 " + (says.findIndex(function (s) { return s.t === m.turn; }) + 1) + " 発話)", turn: m.turn }); else spec.ledger.excluded.push({ target: "module", id: id, label: m.label }); });
+  if (!spec.modules.length) {
+    if (fallback.length) { spec.modules = fallback.map(function (m) { return { id: m.id, label: m.label, icon: m.icon, reason: m.reason }; }); spec.assumptions.push("依頼から具体的な機能が読み取れなかったため、汎用の「メモ + ToDo」アプリとして構成しました。"); }
+    else { spec.modules = [{ id: "notes", label: "メモ", icon: "📝", reason: "モジュールがすべて除外されたため (仮定)" }]; spec.assumptions.push("モジュールがすべて除外されたため、メモだけのアプリとして構成しました。"); }
+  }
+  var hasRecords = spec.modules.some(function (m) { return m.id === "records"; });
+  if (hasRecords) {
+    spec.entity = entity || "データ";
+    spec.fields = fields.length ? fields.map(function (x) { return { name: x.name, type: x.type || fieldType(x.name) }; }) : [{ name: "名前", type: "string" }, { name: "日付", type: "date" }, { name: "メモ", type: "text" }];
+    if (fieldsAssumed) spec.assumptions.push("項目の指定がないため、「" + spec.entity + "」の一般的な項目 (" + spec.fields.map(function (f) { return f.name; }).join("・") + ") を用意しました。");
+  }
+  spec.fields.forEach(function (f, i) { f.key = "f" + i; });
+  featOrder.forEach(function (id) { var x = feat[id]; if (x.state === "on") spec.features[id] = { label: x.label, reason: x.reason, assumed: !!x.assumed }; else spec.ledger.excluded.push({ target: "feature", id: id, label: x.label }); });
+  var dataMods = spec.modules.some(function (m) { return ["records", "notes", "todo", "budget"].indexOf(m.id) >= 0; });
+  if (dataMods) ["search", "sort", "export"].forEach(function (id) { if (!feat[id]) { var d = FEATURE_DEFS.filter(function (x) { return x.id === id; })[0]; spec.features[id] = { label: d.label, reason: "データを扱うアプリの標準機能 (仮定)", assumed: true }; } });
+  if (spec.modules.some(function (m) { return m.id === "budget"; }) && !spec.features.chart && !(feat.chart && feat.chart.state === "off")) spec.features.chart = { label: "グラフ・集計", reason: "家計簿の標準機能 (仮定)", assumed: true };
+  platOrder.forEach(function (id) { var p = plat[id]; if (p.state === "on") spec.platforms.push(id); else spec.ledger.excluded.push({ target: "platform", id: id, label: id }); });
+  if (!spec.platforms.length) {
+    var offAll = platOrder.length && platOrder.every(function (id) { return plat[id].state === "off"; });
+    spec.platforms = PLATFORM_DEFS.map(function (p) { return p.id; }).filter(function (id) { return !(plat[id] && plat[id].state === "off"); });
+    if (!spec.platforms.length) spec.platforms = ["windows"];
+    spec.assumptions.push(offAll ? "対象プラットフォームがすべて除外されたため、Windows を対象にしました。" : "対象プラットフォームの指定がないため、Android (APK)・Windows 10/11・Linux の 3 種すべてを対象にしました。");
+  }
+  spec.title = title || (spec.modules.length === 1 ? (spec.modules[0].id === "records" ? spec.entity + "の管理" : spec.modules[0].label) + "アプリ"
+    : spec.modules.slice(0, 3).map(function (m) { return m.id === "records" ? spec.entity + "管理" : m.label; }).join("・") + " アプリ");
+  spec.clauses = clauses;
+  var covered = clauses.filter(function (c) { return c.hits.length; }).length;
+  spec.coverage = clauses.length ? covered / clauses.length : 1;
+  if (spec.unresolved.length) spec.assumptions.push("解釈できなかった節 " + spec.unresolved.length + " 件は、アプリ内「この依頼について」と論文の「限界」に原文のまま記載しました。");
+  spec.assumptions.push("この仕様は会話台帳 (事実 " + spec.ledger.facts + " 件・発話 " + spec.ledger.turns + " 回) の投影です。除外された要素 " + spec.ledger.excluded.length + " 件は台帳に残っています。");
+  return spec;
+}
+
+/* 1 ターンの差分を短く言う (チャットの返答用) */
+function describeTurn(said, spec) {
+  var parts = [];
+  if (said.delta && said.flags && !said.flags.fallbackModules && said.delta.modules.length) parts.push("+" + said.delta.modules.map(function (m) { return m.label; }).join("・"));
+  if (said.delta) { var fx = Object.keys(said.delta.features).filter(function (id) { return !said.delta.features[id].assumed; }); if (fx.length) parts.push("+" + fx.map(function (id) { return said.delta.features[id].label; }).join("・")); }
+  if (said.delta && said.flags && !said.flags.platformsAssumed && said.delta.platforms.length) parts.push("+" + said.delta.platforms.join("・"));
+  if (said.fieldAdds.length) parts.push("+項目 " + said.fieldAdds.join("・"));
+  if (said.exclusions.length) parts.push("−" + said.exclusions.map(function (e) { return e.label; }).join("・"));
+  if (said.fieldRemoves.length) parts.push("−項目 " + said.fieldRemoves.join("・"));
+  return parts.join(" ") || "(仕様の変更なし)";
+}
+
+/*
  * silent.js — BadaGPT電信「サイレント・トーク (非言語思考入力)」拡張
  *
  * 言葉を介さずに、頭の中のアイデアを **非言語のアトム** (無言のグリフ・
@@ -2006,12 +2208,19 @@ function imageFeatures(rgba, w, h) {
 }
 
 /* ───────────── ChatGPT 風チャット: 意図の振り分けと内蔵の返答 ───────────── */
-function chatRoute(text) {
+/* hasContext: 会話台帳に発話があるとき、仕様に触れる発話は「研ぎ澄まし (refine)」として台帳に積む */
+function specBearing(t) {
+  var lc = lower(t);
+  return MODULE_DEFS.some(function (d) { return hasAny(lc, d.kw); }) || FEATURE_DEFS.some(function (d) { return hasAny(lc, d.kw); }) ||
+    PLATFORM_DEFS.some(function (d) { return hasAny(lc, d.kw); }) || COLOR_DEFS.some(function (c) { return c[0].test(t); }) || /項目|フィールド/.test(t);
+}
+function chatRoute(text, hasContext) {
   var t = String(text || "").trim();
   if (!t) return { intent: "empty" };
   if (/^(こんにちは|こんばんは|おはよう|やあ|hello|hi)/i.test(t)) return { intent: "greeting" };
   if (/何が(でき|出来)|できること|使い方|help|ヘルプ/i.test(t)) return { intent: "capabilities" };
   if (/やり直|リセット|最初から/.test(t)) return { intent: "reset" };
+  if (hasContext && (/(足し|追加|加え|付け|入れ|外し|はずし|いらない|要らない|不要|なしで|やめ|削除|消し|抜い|除い|変え|変更|にして|にする)/.test(t) || specBearing(t))) return { intent: "refine", request: t };
   if (/作っ|作り|作成|錬成|欲しい|ほしい|したい|アプリ|ツール|作れ|build|make|create/i.test(t)) return { intent: "forge", request: t };
   return { intent: "chat", text: t };
 }
@@ -2023,7 +2232,16 @@ function chatReplyLocal(route, ctx) {
   if (route.intent === "empty") return "何を作りましょう？ 口形・脳波・動き・文字のどれでも伝えられます。";
   if (route.intent === "forged" && ctx.spec) {
     var s = ctx.spec;
-    return "「" + s.title + "」を錬成しました。モジュール: " + s.modules.map(function (m) { return m.label; }).join("・") + " / 網羅率 " + Math.round(s.coverage * 100) + "% / 検証 " + (ctx.ver && ctx.ver.ok ? "合格" : "要確認") + "。下の ④ でアプリ、⑥ でソースコード、⑤ で論文 (PDF)、⑦ で exe / apk への自動コンパイルができます。";
+    return "「" + s.title + "」を錬成しました。モジュール: " + s.modules.map(function (m) { return m.label; }).join("・") + " / 網羅率 " + Math.round(s.coverage * 100) + "% / 検証 " + (ctx.ver && ctx.ver.ok ? "合格" : "要確認") + "。" +
+      (ctx.ledger ? "会話台帳は事実 " + ctx.ledger.size() + " 件 (追記のみ)。続けて「検索も足して」「タイマーは外して」のように話すと仕様が研ぎ澄まされます。" : "") +
+      "下の ④ でアプリ、⑥ でソースコード、⑤ で論文 (PDF)、⑦ で exe / apk への自動コンパイルができます。";
+  }
+  if (route.intent === "refined" && ctx.spec) {
+    var s2 = ctx.spec;
+    return "台帳に積みました (" + (route.change || "変更なし") + ")。いまの仕様「" + s2.title + "」: " + s2.modules.map(function (m) { return m.label; }).join("・") +
+      " / 網羅率 " + Math.round(s2.coverage * 100) + "% / 検証 " + (ctx.ver && ctx.ver.ok ? "合格" : "要確認") +
+      (s2.ledger && s2.ledger.excluded.length ? " / 除外 " + s2.ledger.excluded.map(function (e) { return e.label; }).join("・") + " (台帳には残ります)" : "") +
+      "。" + (ctx.ledger ? "事実 " + ctx.ledger.size() + " 件。" : "") + "さらに続けて話すと研ぎ澄まされます。「やり直し」で地平を進めます。";
   }
   return "承知しました。「作って」と伝えるか、口形で IOI (い→お→い) と発音すると、ここまでの内容でアプリを錬成します。";
 }
@@ -4368,7 +4586,9 @@ function precompileChecks(spec, html, sources) {
     });
   }
 
-  async function go() {
+  async function go(specOverride) {
+    /* specOverride: 会話台帳の投影 (ledger.js)。ボタンから呼ばれたときはクリックイベントが入るので、仕様の形のときだけ使う */
+    var override = specOverride && Array.isArray(specOverride.modules) ? specOverride : null;
     var text = $("thought").value.trim();
     if (!text) { $("specView").innerHTML = '<span class="err">依頼文 (思考入力) を書いてください。</span>'; return; }
     $("goBtn").disabled = true; $("goBtn").textContent = "電信中…";
@@ -4391,7 +4611,7 @@ function precompileChecks(spec, html, sources) {
         else if (cmd === "teleport") { $("m-fid").textContent = (M.fidelity * 100).toFixed(2) + "%"; await sleep(220); }
         else if (cmd === "graviton") { $("m-car").textContent = (M.carrierHz / 1e9).toFixed(3) + " GHz"; await sleep(160); }
         else if (cmd === "send") { for (var p = 0; p <= 1; p += 0.05) { anim.prog = p; await sleep(30); } anim.done = true; }
-        else if (cmd === "comprehend") { cur = { metrics: M, spec: comprehend(text) }; renderSpec(cur.spec); await sleep(150); }
+        else if (cmd === "comprehend") { cur = { metrics: M, spec: override || comprehend(text) }; renderSpec(cur.spec); await sleep(150); }
         else if (cmd === "plan") { blog("  → " + cur.spec.modules.map(function (m) { return m.id; }).join(" + ") + (cur.spec.fields.length ? " · fields " + cur.spec.fields.length : "")); await sleep(150); }
         else if (cmd === "generate") {
           $("genCard").classList.remove("hidden");
@@ -4653,19 +4873,53 @@ function precompileChecks(spec, html, sources) {
     d.innerHTML = (src ? '<span class="src">' + escHtml(src) + "</span>" : "") + escHtml(text);
     $("chat-log").appendChild(d); $("chat-log").scrollTop = $("chat-log").scrollHeight; return d;
   }
+  /* 会話台帳 (ledger.js): 追記のみ。localStorage に保存し、その投影が「いまの仕様」になる */
+  var conv = new Ledger(LS.get("ledger", []) || []);
+  function ledgerSave() { LS.set("ledger", conv.toJSON()); }
+  function ledgerRender(proj) {
+    $("ledger-sum").textContent = "事実 " + conv.size() + " 件 · 発話 " + conv.turns() + " 回" + (proj ? " · いまの仕様「" + proj.title + "」" : "");
+    var rows = [];
+    if (proj) {
+      var fx = Object.keys(proj.features).filter(function (k) { return !proj.features[k].assumed; });
+      rows.push({ label: "いまの仕様", value: proj.title, meant: proj.modules.map(function (m) { return m.icon + " " + (m.id === "records" ? proj.entity + "の管理" : m.label); }).join("・") + (fx.length ? " / 機能 " + fx.map(function (k) { return proj.features[k].label; }).join("・") : "") + (proj.fields.length && proj.modules.some(function (m) { return m.id === "records"; }) ? " / 項目 " + proj.fields.map(function (f) { return f.name; }).join("・") : "") + " / " + proj.platforms.join("・") });
+      rows.push({ label: "除外 (台帳に残る)", value: String(proj.ledger.excluded.length), meant: proj.ledger.excluded.map(function (e) { return e.label; }).join("・") || "なし" });
+      var pe = proj.ledger.priorEntropy;
+      rows.push({ label: "未知事前の H", value: pe[pe.length - 1].toFixed(2) + " bit", meant: "モジュールへの信念: 一様 " + pe[0].toFixed(2) + " bit から証拠で尖る → " + pe.slice(1).map(function (x) { return x.toFixed(2); }).join(" → ") });
+    }
+    $("ledger-spec").innerHTML = rows.length ? rows.map(function (r) { return '<div class="rrow"><i>' + escHtml(r.label) + '</i><b>' + escHtml(r.value) + '</b><span>' + escHtml(r.meant) + "</span></div>"; }).join("") : '<div class="muted">まだ発話がありません (「やり直し」の後は、その地平から先が投影されます)。</div>';
+    $("ledger-facts").innerHTML = conv.read().slice(-40).map(function (f) {
+      var s = "#" + f.t + " " + f.kind;
+      if (f.kind === "say") s += " [" + f.src + "] " + f.text;
+      else if (f.kind === "spec") { var fe = f.features.filter(function (x) { return !x.assumed; }); s += " +" + f.modules.map(function (m) { return m.id; }).join(",") + (fe.length ? " feat " + fe.map(function (x) { return x.id; }).join(",") : "") + (f.platforms.length ? " plat " + f.platforms.join(",") : "") + (f.fields.length ? " fields " + f.fields.length : ""); }
+      else if (f.kind === "exclude") s += " −" + f.target + ":" + f.id + " (「" + f.by + "」)";
+      else if (f.kind === "field") s += " " + (f.op === "add" ? "+" : "−") + "項目 " + f.name;
+      else if (f.kind === "forge") s += " 「" + f.title + "」 " + Math.round(f.coverage * 100) + "% " + (f.ok ? "合格" : "要確認");
+      return "<div>" + escHtml(s) + "</div>";
+    }).join("") || '<div class="muted">(空)</div>';
+  }
+  $("ledger-new").onclick = function () {
+    if (conv.size()) { var arc = LS.get("ledgerArchive", []) || []; arc.push({ at: Date.now(), facts: conv.toJSON() }); while (arc.length > 5) arc.shift(); LS.set("ledgerArchive", arc); }
+    conv = new Ledger([]); ledgerSave(); ledgerRender(null); chatAdd("bot", "新しい会話を始めました (前の台帳は保管しました)。");
+  };
   var chatBusy = false;
   async function chatHandle(text, src) {
     if (chatBusy) return;
     chatAdd("me", text, src || "文字");
-    var route = chatRoute(text);
-    if (route.intent === "forge") {
-      chatBusy = true; var thinking = chatAdd("bot", "承知しました。全体を把握して錬成します…");
-      $("thought").value = route.request; LS.set("draft", route.request);
-      try { await go(); thinking.textContent = chatReplyLocal({ intent: "forged" }, { spec: cur && cur.spec, ver: cur && cur.ver }); }
-      catch (e) { thinking.textContent = "錬成でエラー: " + (e.message || e); }
+    var route = chatRoute(text, conv.turns() > 0);
+    if (route.intent === "forge" || route.intent === "refine") {
+      chatBusy = true; var thinking = chatAdd("bot", route.intent === "refine" ? "台帳に積んで、仕様を研ぎ澄まします…" : "承知しました。全体を把握して錬成します…");
+      var said = ledgerSay(conv, text, src || "文字"); ledgerSave();
+      var proj = projectSpec(conv);
+      $("thought").value = proj.input; LS.set("draft", proj.input);
+      try {
+        await go(proj);
+        conv.append({ kind: "forge", turn: said.turn, title: cur.spec.title, modules: cur.spec.modules.map(function (m) { return m.id; }), coverage: cur.spec.coverage, ok: !!(cur.ver && cur.ver.ok) }); ledgerSave();
+        thinking.textContent = chatReplyLocal({ intent: route.intent === "refine" ? "refined" : "forged", change: describeTurn(said, cur.spec) }, { spec: cur && cur.spec, ver: cur && cur.ver, ledger: conv });
+      } catch (e) { thinking.textContent = "錬成でエラー: " + (e.message || e); }
+      ledgerRender(projectSpec(conv));
       chatBusy = false; return;
     }
-    if (route.intent === "reset") { tpClear(); $("thought").value = ""; }
+    if (route.intent === "reset") { conv.append({ kind: "reset" }); ledgerSave(); ledgerRender(null); tpClear(); $("thought").value = ""; }
     if (route.intent === "chat" && LS.get("apiKey", "")) {
       var thinking2 = chatAdd("bot", "…");
       try {
@@ -4680,8 +4934,9 @@ function precompileChecks(spec, html, sources) {
       } catch (e) { thinking2.textContent = chatReplyLocal(route) + " (Claude: " + (e.message || e) + ")"; }
       return;
     }
-    chatAdd("bot", chatReplyLocal(route));
+    chatAdd("bot", chatReplyLocal(route, { ledger: conv }));
   }
+  ledgerRender(projectSpec(conv));
   $("chat-send").onclick = function () { var t = $("chat-in").value.trim(); if (!t) return; $("chat-in").value = ""; chatHandle(t, "文字"); };
   $("chat-in").onkeydown = function (e) { if (e.key === "Enter") $("chat-send").click(); };
 

@@ -147,7 +147,7 @@
 | **Windows 10 / 11** | `BadaGPTTelegraph-*-x64.exe` (インストーラ) / `BadaGPTTelegraph-*-portable.exe` |
 | **Linux** | `BadaGPTTelegraph-*-x86_64.AppImage` / `BadaGPTTelegraph-*-amd64.deb` |
 | **ブラウザ** | `BadaGPTTelegraph-web.html` (または [`bada_gpt_telegraph/index.html`](bada_gpt_telegraph/index.html)) |
-| **論文** | [`BadaGPT_Telegraph_paper.pdf`](bada_gpt_telegraph/paper/BadaGPT_Telegraph_paper.pdf) · 取り込んだ文献 17 本 [`paper/references/`](bada_gpt_telegraph/paper/references/) |
+| **論文** | [`BadaGPT_Telegraph_paper.pdf`](bada_gpt_telegraph/paper/BadaGPT_Telegraph_paper.pdf) (システム論文) · [`BadaGPT_Evolution_v23_paper.pdf`](bada_gpt_telegraph/paper/BadaGPT_Evolution_v23_paper.pdf) (進化論文: 第 2 版 会話台帳と第 3〜23 版の梯子) · 取り込んだ文献 17 本 [`paper/references/`](bada_gpt_telegraph/paper/references/) |
 
 ビルドは [`badagpt-telegraph-app-build.yml`](.github/workflows/badagpt-telegraph-app-build.yml) が実行します。**Actions の実行ページ → Artifacts → `badagpt-telegraph-all-platforms`** から全ビルドを 1 つの ZIP でも取れます。使い方・設計は [`bada_gpt_telegraph/`](bada_gpt_telegraph/) を参照。
 

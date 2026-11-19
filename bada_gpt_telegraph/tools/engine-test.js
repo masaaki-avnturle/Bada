@@ -21,7 +21,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const ctx = { console, TextEncoder, TextDecoder, atob, btoa, Uint8Array, Float32Array, Map };
 vm.createContext(ctx);
-for (const f of ["src/engine.js", "src/phasecore.js", "src/comprehend.js", "src/silent.js", "src/telephacy.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
+for (const f of ["src/engine.js", "src/phasecore.js", "src/comprehend.js", "src/ledger.js", "src/silent.js", "src/telephacy.js", "src/bio.js", "src/bci.js", "src/generate.js", "src/codegen.js", "src/paper.js", "src/autobuild.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, f), "utf8"), ctx, { filename: f });
 }
 const E = (expr) => vm.runInContext(expr, ctx);
@@ -117,6 +117,51 @@ section("体のサイン (本人の心拍・呼吸 → 気分のヒント)");
   const r0 = call("silentToRequest", base, call("silentEncode", base)), r1 = call("silentToRequest", withBio, call("silentEncode", withBio));
   ok(JSON.stringify(call("silentEncode", base).pooled) !== JSON.stringify(call("silentEncode", withBio).pooled), "気分アトムは latent に効く");
   ok(r0.tags.mods.join() === r1.tags.mods.join() && r0.tags.entity === r1.tags.entity, "気分アトムは依頼文のモジュール・対象を変えない");
+}
+
+/* 0.51 会話台帳 (第 2 版): 追記のみの TupleSpace → 投影 (いまの仕様) */
+section("会話台帳と仕様の研ぎ澄まし (第 2 版: 追記のみの TupleSpace → 投影)");
+{
+  const Ledger = E("Ledger");
+  const lg = new Ledger();
+  const t0 = lg.append({ kind: "say", src: "文字", text: "a" }), t1 = lg.append({ kind: "say", src: "文字", text: "b" });
+  ok(t0 === 0 && t1 === 1 && lg.size() === 2 && Object.isFrozen(lg.read()[0]) && lg.read((f) => f.text === "b").length === 1, "台帳は追記のみ (番号が増え、事実は凍結、述語で読める)");
+  let mutated = false; try { lg.read()[0].text = "x"; mutated = lg.read()[0].text === "x"; } catch (e) { /* strict */ }
+  ok(!mutated && lg.read()[0].text === "a", "事実は書き換えられない");
+  ok(new Ledger(lg.toJSON()).size() === 2 && new Ledger(lg.toJSON()).read()[1].text === "b", "JSON で往復できる (localStorage 保存)");
+  const run = (texts) => { const g = new Ledger(); texts.forEach((t) => { if (t === "@reset") g.append({ kind: "reset" }); else call("ledgerSay", g, t, "文字"); }); return { g, spec: call("projectSpec", g) }; };
+  const a = run(["読んだ本を管理したい。", "検索も足して。", "Windows で使いたい。", "評価順に並べ替え。"]);
+  ok(a.spec.modules.map((m) => m.id).join() === "records" && a.spec.entity === "本" && a.spec.features.search && !a.spec.features.search.assumed && a.spec.features.sort && !a.spec.features.sort.assumed && a.spec.platforms.join() === "windows", "4 発話で仕様が研ぎ澄まされる (本の管理 + 検索 + 並べ替え + Windows)");
+  ok(a.spec.fields.map((f) => f.name).join() === "タイトル,著者,読了日,評価,感想" && a.spec.title === "本の管理アプリ" && a.spec.input.split("\n").length === 4, "対象「本」の既定項目・題名・4 行の依頼文");
+  ok(a.spec.modules[0].turn === 0 && /第 1 発話/.test(a.spec.modules[0].reason) && a.spec.ledger.turns === 4, "来歴: どの発話が決めたか");
+  ok(a.spec.coverage === 1 && a.spec.clauses.length >= 4, "全発話の節が投影の網羅率に入る");
+  const b = run(["本の管理とタイマーのアプリ。", "タイマーは外して。"]);
+  ok(b.spec.modules.map((m) => m.id).join() === "records" && b.spec.ledger.excluded.some((e) => e.id === "timer") && b.g.read().some((f) => f.kind === "exclude" && f.id === "timer"), "除外は投影から外れ、事実は台帳に残る");
+  ok(b.g.read().filter((f) => f.kind === "spec")[0].modules.some((m) => m.id === "timer"), "最初の発話の timer の事実も残っている (上書きなし)");
+  const c = run(["本を管理したい。", "検索も足して。"]);
+  ok(!c.spec.modules.some((m) => m.id === "notes" || m.id === "todo") && c.spec.modules.length === 1, "補足の発話で汎用の「メモ+ToDo」が混ざらない");
+  const d = run(["お絵かきアプリ。", "@reset", "サイコロのアプリ。"]);
+  ok(d.spec.modules.map((m) => m.id).join() === "random" && d.g.size() >= 5 && d.g.horizon() > 0 && d.spec.ledger.turns === 1, "やり直しは地平を進める事実で、過去の事実は残る");
+  const e = run(["顧客を管理したい。名前、会社、電話。", "メールも項目に足して。", "会社の項目は外して。"]);
+  ok(e.spec.entity === "顧客" && e.spec.fields.map((f) => f.name).join() === "名前,電話,メール", "項目の追加と除外 (名前・電話・メール)");
+  const f = run(["本を管理。", "検索も足して。", "検索はやめて。", "検索をもう一度足して。"]);
+  ok(f.spec.features.search && !f.spec.features.search.assumed && f.g.read().filter((x) => x.kind === "exclude").length === 1, "除外のあとで明示的に足せば戻る (最後の事実が勝つ)");
+  const pe = a.spec.ledger.priorEntropy;
+  const nMods = E("MODULE_DEFS").length + 1;
+  ok(Math.abs(pe[0] - Math.log2(nMods)) < 1e-9 && pe[1] < pe[0] && pe[pe.length - 1] <= pe[1], "未知事前: 一様 (log2 " + nMods + " bit) から証拠で尖る");
+  const ex = b.spec.ledger.priorEntropy;
+  ok(ex[ex.length - 1] < ex[1], "除外は信念 0 (確信した零) でエントロピーを下げる");
+  ok(call("projectSpec", new Ledger()) === null, "空の台帳の投影は null");
+  ok(JSON.stringify(run(["家計簿。", "印刷したい。"]).spec.modules) === JSON.stringify(run(["家計簿。", "印刷したい。"]).spec.modules), "投影は決定的");
+  const gen = call("generateApp", a.spec), ver = call("verifyApp", gen.html, a.spec);
+  ok(ver.ok, "投影した仕様からアプリを生成し検証に合格する");
+  const pm = call("writePaper", a.spec, gen, ver, {});
+  ok(/本の管理アプリ/.test(pm) && /> 検索も足して。/.test(pm), "投影した仕様で論文が書け、全発話が依頼文として入る");
+  const said = call("ledgerSay", new Ledger(), "検索も足して。タイマーは外して。", "文字");
+  ok(/\+検索・絞り込み/.test(call("describeTurn", said, null)) && /−タイマー/.test(call("describeTurn", said, null)), "1 ターンの差分の言い方 (+検索 −タイマー)");
+  ok(call("chatRoute", "検索も足して", true).intent === "refine" && call("chatRoute", "検索も足して").intent === "chat" && call("chatRoute", "作って", true).intent === "forge" && call("chatRoute", "Windows で", true).intent === "refine" && call("chatRoute", "やり直し", true).intent === "reset", "チャットの振り分け: 文脈があれば仕様に触れる発話は研ぎ澄まし");
+  const rep = call("chatReplyLocal", { intent: "refined", change: "+検索" }, { spec: a.spec, ver: ver, ledger: a.g });
+  ok(/台帳に積みました \(\+検索\)/.test(rep) && /本の管理アプリ/.test(rep) && /事実 \d+ 件/.test(rep), "研ぎ澄ましの返答");
 }
 
 /* 0.52 位相核 — 文献 (paper/references/) の検証できる数理 */

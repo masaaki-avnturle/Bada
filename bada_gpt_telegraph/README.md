@@ -50,6 +50,21 @@ Artifacts のダウンロードには GitHub へのログインが必要です (
 3. ④ でアプリをプレビュー・操作し、**⬇ アプリ (HTML)**・**📦 ビルド一式 (ZIP)**・**📄 論文 PDF**・**📝 論文 Markdown** を保存。
 4. ZIP を GitHub リポジトリに置いて Actions を実行すると、**生成したアプリそのもの**の APK / EXE / AppImage・deb ができます。
 
+## 📒 第 2 版: 会話台帳 — 続けて話すほど仕様が研ぎ澄まされる (ChatGPT のように)
+
+チャットに**追記のみの会話台帳** ([`src/ledger.js`](src/ledger.js)) を置きました。「読んだ本を管理したい」→「検索も足して」→
+「タイマーも付けて。Windows で」→「タイマーは外して」のように続けて話すと、各発話が事実として積まれ、**いまの仕様は台帳の投影**
+として再計算されて、そのたびに錬成・検証されます。
+
+- 事実は 6 種 (発話・読み取った仕様・除外・項目の増減・錬成・やり直し) で、**何も上書きされません** (文献 13/14 の `TupleSpace`)。
+- 「外して」は投影から除くだけで事実は残り、「やり直し」は地平を進める事実、「新しい会話」は台帳を保管してから空にします。
+- モジュールへの信念は一様 (未知事前・log₂ 14 bit) から証拠で尖り、台帳パネルにエントロピーの列を表示します。
+- 台帳は端末内 (localStorage) に保存され、再読み込み後も続きから話せます。口形・脳波・動き・画像からの依頼も同じ台帳に積まれます。
+
+16 対話の多ターン評価 (`node bada_gpt_telegraph/tools/evolve-eval.js`) で、投影の最終仕様の完全一致 **93.8%** (発話を連結して 1 回で
+把握する基準法 62.5%)、投影した仕様からの生成アプリの検証合格 100%。設計と、第 3〜23 版への進化の梯子は
+[`paper/BadaGPT_Evolution_v23_paper.pdf`](paper/BadaGPT_Evolution_v23_paper.pdf) に述べています。
+
 ## 💬 BadaGPT チャット (ChatGPT 版) と ⓪-β Ω-Telephacy — 声を出さないサイレント・トーク音声認識
 
 **Ω-Telephacy** は、本リポジトリの `bada_silent_vim/silenttalk` (Python) を移植した**無音の口形 (viseme) 認識**です。
@@ -196,11 +211,14 @@ Actions の監視は、偽の GitHub API を注入した単体テストと、API
 「BadaGPT電信：思考入力の全体把握に基づくクロスプラットフォーム・アプリケーション生成」。
 設計・実装に加え、開発用 24 件 / 未見 10 件の依頼による評価 (未見で F1 81.5%) と、実ブラウザ・実パッケージでの動作確認を報告しています。
 
+**進化論文** [`paper/BadaGPT_Evolution_v23_paper.pdf`](paper/BadaGPT_Evolution_v23_paper.pdf) ([Markdown](paper/BadaGPT_Evolution_v23_paper.md)) — 版を「能力・検証電池・境界」の三つ組として定義し、零の保存・追記のみ・標識付き主張を不変条件に、第 2 版 (会話台帳) の実装と評価、第 3〜23 版の梯子 (対話・学習・自律・身体・自己記述) を述べます。「第 23 版」は本論文が定義する能力段階で、製品の版番号との対応は主張しません。
+
 ## 🧪 開発
 
 ```sh
 node bada_gpt_telegraph/tools/build.js              # src/ → index.html (CI は --check で一致を検査)
-node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 235 件
+node bada_gpt_telegraph/tools/engine-test.js        # 単体テスト 257 件
+node bada_gpt_telegraph/tools/evolve-eval.js        # 第 2 版 (会話台帳) の多ターン評価 (16 対話)
 node bada_gpt_telegraph/tools/evaluate.js           # 論文 7.2 の評価 (--heldout で 7.3)
 cd bada_gpt_telegraph/app/electron && npm install && npm start   # デスクトップ版 (要 ../www/index.html)
 ```
@@ -212,6 +230,7 @@ bada_gpt_telegraph/
 │   ├── engine.js           ← ZIP / PDF / Markdown・Bada インタプリタ・Ξ・Jones・モールス・FSK
 │   ├── phasecore.js        ← 位相核 (文献の検証できる数理: 位相融合・大域的部分積分・N(T)・e^{iβH}・標識表)
 │   ├── comprehend.js       ← 全体把握
+│   ├── ledger.js           ← 会話台帳 (追記のみの TupleSpace → 投影 = いまの仕様) — 第 2 版
 │   ├── silent.js           ← サイレント・トーク (非言語 → トランスフォーマー → latent → 文章・画像・Bada・チャネルの位相融合)
 │   ├── telephacy.js        ← Ω-Telephacy (無音の口形 viseme 認識・辞書・共鳴 7 帯・Jones 熱経路・イメージ入力・チャット)
 │   ├── bio.js              ← 体のサイン (本人の PPG 心拍・呼吸 → 気分の tone アトムのみ)
@@ -221,10 +240,10 @@ bada_gpt_telegraph/
 │   ├── generate.js         ← 14 部品・HTML 組み立て・検証
 │   ├── paper.js            ← 論文・ビルド一式・Claude (任意)
 │   ├── ui.js / shell.html  ← 画面
-├── tools/                  ← build.js / engine-test.js / evaluate.js
+├── tools/                  ← build.js / engine-test.js / evaluate.js / evolve-eval.js (多ターン評価)
 ├── app/electron/           ← Windows EXE / Linux AppImage・deb
 ├── app/cordova/config.xml  ← Android APK
-└── paper/                  ← 論文 (Markdown / PDF) と references/ (取り込んだ文献 17 本)
+└── paper/                  ← 論文 2 本 (システム論文・進化論文, Markdown / PDF) と references/ (取り込んだ文献 17 本)
 ```
 
 ## ⚠️ 正直な範囲
