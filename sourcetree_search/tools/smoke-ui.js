@@ -67,6 +67,7 @@ async function search(page, term){
 function fileButton(page, rel){
   return page.locator('.rfile:has(.rel:has-text("' + rel + '")) button[data-cine]');
 }
+async function cmd(page, line){ for (var i = 0; i < line.length; i++) await page.keyboard.press(line[i] === " " ? "Space" : line[i]); await page.keyboard.press("Enter"); }
 async function typeKeys(page, s){ for (var i = 0; i < s.length; i++) await page.keyboard.press(s[i] === " " ? "Space" : s[i]); }
 async function pvState(page){
   return page.evaluate(function(){
@@ -123,11 +124,11 @@ async function inkPixels(page){
   await page.mouse.move(box.x + 40, box.y + 50); await page.mouse.down();
   await page.mouse.move(box.x + 300, box.y + 80, { steps: 5 }); await page.mouse.up();
   /* ペン (p + ドラッグ) */
-  await page.keyboard.press("p");
+  await cmd(page, ":pen");
   await page.mouse.move(box.x + 60, box.y + 200); await page.mouse.down();
   await page.mouse.move(box.x + 120, box.y + 260, { steps: 6 }); await page.mouse.move(box.x + 200, box.y + 210, { steps: 6 }); await page.mouse.up();
   /* メモ (i + クリック + 入力 + Enter) — 日本語 */
-  await page.keyboard.press("i");
+  await cmd(page, ":note");
   await page.mouse.click(box.x + 80, box.y + 330);
   await page.waitForSelector(".pv-noteedit");
   await page.keyboard.type("量子メモ check");
@@ -138,7 +139,7 @@ async function inkPixels(page){
   ok((await page.locator(".badapdf-overlay .cv-flag").textContent()).indexOf("[+]") >= 0, "title shows [+] while unsaved");
   await page.keyboard.press("u"); s = await pvState(page);
   ok(s.n === 2, "u undoes the last annotation — n=" + s.n);
-  await page.keyboard.press("i");
+  await cmd(page, ":note");
   await page.mouse.click(box.x + 80, box.y + 330);
   await page.waitForSelector(".pv-noteedit");
   await page.keyboard.type("量子メモ check");

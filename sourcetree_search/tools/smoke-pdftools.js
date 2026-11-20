@@ -83,7 +83,7 @@ async function readPdf(bytes){
      await page.locator('.badapdf-overlay .pv-edit [data-act="flatten"]').count() === 1, "the dedicated PDF edit toolbar is shown");
 
   /* ── ✏ 文字修正: 既存の文字を書き換える ── */
-  await page.keyboard.press("e");
+  await keys(page, ":text"); await page.keyboard.press("Enter");
   var at = await locate(page, 0, "Kauffman");
   await page.mouse.click(at.x, at.y);
   await page.waitForSelector(".pv-noteedit");
@@ -122,7 +122,7 @@ async function readPdf(bytes){
   ok(await page.evaluate(function(){ return window.BadaPdfView.current.state.annots[0].text; }) === "The Alexander polynomial (1923).", "double-click re-edits a corrected text");
 
   /* ── ⬜ 消去 ── */
-  await page.keyboard.press("r");
+  await keys(page, ":erase"); await page.keyboard.press("Enter");
   var sec = await locate(page, 0, "Section");
   await page.mouse.move(sec.x - 60, sec.y - 16); await page.mouse.down(); await page.mouse.move(sec.x + 70, sec.y + 12, { steps: 4 }); await page.mouse.up();
   s = await st(page);
@@ -139,11 +139,13 @@ async function readPdf(bytes){
   await page.keyboard.press(">"); await idle(page);
   s = await st(page);
   ok(s.annots === "textedit@1,textedit@1,erase@1" && s.cur === 1, "> moves the page back by one and its edits travel with it — " + s.annots);
-  await page.keyboard.press("o"); await idle(page);
+  await keys(page, ":blank"); await page.keyboard.press("Enter"); await idle(page);
+  await page.waitForFunction(function(){ return window.BadaPdfView.current.state.pages.length === 4; });
   s = await st(page);
-  ok(s.pages === 4 && s.cur === 2, "o inserts a blank page after the current one — pages " + s.pages + " cur " + s.cur);
-  await page.keyboard.press("D"); await idle(page);
-  ok((await st(page)).pages === 3, "D deletes the current (blank) page");
+  ok(s.pages === 4 && s.cur === 2, ":blank inserts a blank page after the current one — pages " + s.pages + " cur " + s.cur);
+  await keys(page, ":delpage"); await page.keyboard.press("Enter");
+  await page.waitForFunction(function(){ return window.BadaPdfView.current.state.pages.length === 3; }); await idle(page);
+  ok((await st(page)).pages === 3, ":delpage deletes the current (blank) page");
   await page.setInputFiles(".badapdf-overlay .pv-mergein", extraPath); 
   await page.waitForFunction(function(){ return window.BadaPdfView.current.state.pages.length === 4; }, null, { timeout: 30000 });
   await idle(page);

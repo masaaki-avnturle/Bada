@@ -8,19 +8,25 @@
  * を付け、:w で PDF そのものに保存します (標準の PDF 注釈として書き込むので、
  * 他の PDF ビューアでも表示されます。書き込みは pdfedit.js + 同梱の pdf-lib)。
  *
- * キー操作 (CineVim と同じ Vim 流):
- *   j k / Ctrl-d Ctrl-u : スクロール      h l : 前/次のページ     gg G : 先頭/末尾
- *   n N : 次/前のヒットページ             + - : 拡大/縮小         :<数> : ページ移動
- *   v 選択  m マーカー  p ペン  i メモ    x 削除  u 取り消し      M ヒットをマーカー化
- *   /語 PDF 内検索   :w 保存   :q 閉じる (未保存なら :q!)   :wq   t テキスト表示へ
+ * 編集は Vim と同じ 3 つのモードで行います。ページ上の文字 (1 行ぶんのまとまり) の上に
+ * カーソルがあり、その行をその場で書き換えます (元の文字を隠して打ち直す「文字修正」)。
  *
- * PDF 専用の編集ツール (2 段目のツールバー):
- *   e ✏ 文字修正 … ページ上の文字をクリックして書き換える (元の文字を隠して打ち直す)。
- *                   何もない所をクリックすれば文字を追加。ダブルクリックで再編集。
- *   r ⬜ 消去     … ドラッグした範囲を背景色で塗りつぶして消す
- *   R 回転  < > ページを前へ/後ろへ  o 空白ページ  D ページ削除  :merge 別の PDF を結合
- *   F 📌 焼き込み … 書き込みをページ本体に確定する (以後は注釈ではなくページの一部)
- *   どの操作も u で取り消せます (ページ操作・焼き込みも含む)。
+ *   NORMAL  h l 文字 / j k 行 / w b 次・前のまとまり / 0 $ 行頭・行末 / gg G 先頭・末尾ページ
+ *           Ctrl-d Ctrl-u 半画面 / ] [ (← →) 次・前のページ / n N 次・前のヒット / + - 拡大縮小
+ *           x 1 字削除  dd 行を削除  D 行末まで削除  yy ヤンク  p 下に貼り付け  u 取り消し
+ *   INSERT  i a I A (カーソル位置 / 次 / 行頭 / 行末から入力)  o O (下 / 上に新しい行)
+ *           cc S (行を打ち直す) — 文字を打って Esc で確定 (Enter は改行)。日本語変換も可。
+ *   COMMAND :s/旧/新/[g][i]   カーソル行を置換      :%s/旧/新/g   全ページを置換
+ *           :d 行を削除   :note 文 … カーソル行にメモ   :hl … カーソル行にマーカー
+ *           :marker :pen :note :text :erase :select  … マウスで使うツールの切り替え
+ *           :rotate :delpage :blank :merge :move N :flatten  … ページ操作 / 焼き込み
+ *           :N ページ移動  /語 検索  :w 保存  :q 閉じる (未保存なら :q!)  :wq  :undo
+ *   その他  v 選択ツール  m マーカー  M ヒットをマーカー化  R 回転  < > ページ移動
+ *           F 焼き込み  t テキスト表示へ  (選択中の書き込みは x で削除)
+ *
+ * マウス用のツール (ツールバー): 🖍 マーカー / ✎ ペン / 💬 メモ / ✏ 文字修正 (文字をクリック
+ * して書き換え) / ⬜ 消去 / ページの回転・並べ替え・空白・結合・削除 / 📌 焼き込み。
+ * どの操作も u で取り消せます (ページ操作・焼き込みも含む)。
  *
  * ライブラリ (vendor/pdfjs, vendor/pdf-lib) は PDF を開いたときに初めて読み込みます。
  *
@@ -129,9 +135,9 @@
       '<div class="cv-frame pv-frame">' +
         '<div class="cv-bar cv-top"><span class="cv-name"></span><span class="cv-flag"></span>' +
           '<span class="cv-acts"></span><span class="cv-grow"></span>' +
-          '<button class="pv-b" data-act="prev" title="前のページ (h)">◀</button>' +
+          '<button class="pv-b" data-act="prev" title="前のページ ([)">◀</button>' +
           '<span class="pv-pageno">– / –</span>' +
-          '<button class="pv-b" data-act="next" title="次のページ (l)">▶</button>' +
+          '<button class="pv-b" data-act="next" title="次のページ (])">▶</button>' +
           '<button class="pv-b" data-act="zout" title="縮小 (-)">−</button>' +
           '<span class="pv-zoom">100%</span>' +
           '<button class="pv-b" data-act="zin" title="拡大 (+)">＋</button>' +
@@ -139,8 +145,8 @@
         '<div class="cv-bar pv-tools">' +
           '<button class="pv-t" data-tool="select" title="選択・移動 (v)">👆 選択</button>' +
           '<button class="pv-t" data-tool="highlight" title="ドラッグでマーカー (m)">🖍 マーカー</button>' +
-          '<button class="pv-t" data-tool="ink" title="手書き (p)">✎ ペン</button>' +
-          '<button class="pv-t" data-tool="note" title="クリックした場所に文字を書き込む (i)">💬 メモ</button>' +
+          '<button class="pv-t" data-tool="ink" title="手書き (:pen)">✎ ペン</button>' +
+          '<button class="pv-t" data-tool="note" title="クリックした場所にメモを書き込む (:note)">💬 メモ</button>' +
           '<span class="pv-colors"></span>' +
           '<button class="pv-b" data-act="hitmark" title="このページの検索ヒットをマーカーとして残す (M)">🔎→🖍</button>' +
           '<button class="pv-b" data-act="del" title="選択した注釈を削除 (x)">🗑</button>' +
@@ -148,22 +154,22 @@
           '<span class="cv-grow"></span>' +
           '<button class="pv-b pv-save" data-act="save" title="PDF に保存 (:w)">💾 保存</button></div>' +
         '<div class="cv-bar pv-tools pv-edit"><span class="pv-lab">PDF 編集</span>' +
-          '<button class="pv-t" data-tool="textedit" title="文字をクリックして書き換える / 何もない所をクリックして文字を追加 (e)">✏ 文字修正</button>' +
-          '<button class="pv-t" data-tool="erase" title="ドラッグした範囲を塗りつぶして消す (r)">⬜ 消去</button>' +
+          '<button class="pv-t" data-tool="textedit" title="文字をクリックして書き換える / 何もない所をクリックして文字を追加 (:text)">✏ 文字修正</button>' +
+          '<button class="pv-t" data-tool="erase" title="ドラッグした範囲を塗りつぶして消す (:erase)">⬜ 消去</button>' +
           '<span class="pv-sep"></span><span class="pv-lab">ページ</span>' +
           '<button class="pv-b" data-act="rot" title="このページを右に 90° 回転 (R)">⟳ 回転</button>' +
           '<button class="pv-b" data-act="pgup" title="このページを 1 つ前へ (<)">⬆ 前へ</button>' +
           '<button class="pv-b" data-act="pgdn" title="このページを 1 つ後ろへ (>)">⬇ 後ろへ</button>' +
-          '<button class="pv-b" data-act="blank" title="このページの後ろに空白ページを入れる (o)">➕ 空白</button>' +
+          '<button class="pv-b" data-act="blank" title="このページの後ろに空白ページを入れる (:blank)">➕ 空白</button>' +
           '<button class="pv-b" data-act="merge" title="別の PDF を末尾に結合 (:merge)">📎 結合</button>' +
-          '<button class="pv-b" data-act="pgdel" title="このページを削除 (D)">✂ 削除</button>' +
+          '<button class="pv-b" data-act="pgdel" title="このページを削除 (:delpage)">✂ 削除</button>' +
           '<span class="pv-sep"></span>' +
           '<button class="pv-b" data-act="flatten" title="書き込みをページ本体に焼き込んで確定する (F)">📌 焼き込み</button>' +
           '<input type="file" class="pv-mergein" accept=".pdf,application/pdf" style="display:none"/></div>' +
         '<div class="cv-body pv-body" tabindex="0"><div class="pv-pages"></div></div>' +
         '<div class="cv-bar cv-status"><span class="cv-mode">PDF</span><span class="cv-msg"></span>' +
           '<span class="cv-grow"></span>' +
-          '<span class="cv-hint">j k スクロール · h l ページ · m マーカー · p ペン · i メモ · e 文字修正 · r 消去 · u 取消 · :w 保存 · :q 閉じる</span>' +
+          '<span class="cv-hint">h j k l カーソル · i a o 挿入 (Esc 確定) · x dd 削除 · u 取消 · :s/旧/新/ 置換 · [ ] ページ · :w 保存 · :q 閉じる</span>' +
           '<input class="pv-cmdin" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="コマンド (:w :q /検索語)"/></div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -196,8 +202,8 @@
       elFlag.textContent = !st.editable ? " [RO]" : (st.dirty ? " [+]" : "");
       elPageNo.textContent = st.pages.length ? (st.cur + 1) + " / " + st.pages.length : "– / –";
       elZoom.textContent = Math.round(st.scale * 100) + "%";
-      elMode.textContent = st.mode === "command" ? "" : ({ select: "PDF", highlight: "-- マーカー --", ink: "-- ペン --", note: "-- メモ --", textedit: "-- 文字修正 --", erase: "-- 消去 --" })[st.tool];
-      elMode.className = "cv-mode " + (st.tool === "select" ? "" : "insert");
+      elMode.textContent = st.mode === "command" ? "" : st.mode === "insert" ? "-- 挿入 --" : ({ select: "NORMAL", highlight: "-- マーカー --", ink: "-- ペン --", note: "-- メモ --", textedit: "-- 文字修正 --", erase: "-- 消去 --" })[st.tool];
+      elMode.className = "cv-mode " + (st.tool === "select" && st.mode !== "insert" ? "" : "insert");
       Array.prototype.forEach.call(ov.querySelectorAll(".pv-t"), function (b) {
         b.classList.toggle("on", b.getAttribute("data-tool") === st.tool);
         b.disabled = !st.editable && b.getAttribute("data-tool") !== "select";
@@ -253,7 +259,7 @@
       st.annots = JSON.parse(u.a);
       st.sel = null; st.dirty = true;
       if (u.b !== st.baseBytes) { st.baseBytes = u.b; reloadDoc(st.cur).then(function () { setStatus("元に戻しました"); }); return; }
-      st.pages.forEach(function (_, i) { drawOverlay(i); });
+      refreshCursor().then(function () { st.pages.forEach(function (_, i) { drawOverlay(i); }); });
       setStatus("元に戻しました");
     }
     function moveAnnot(a, dx, dy) {
@@ -339,6 +345,17 @@
         }
         g.appendChild(grp);
       });
+      /* Vim カーソル (NORMAL モードで文字の上に載るブロック) */
+      var vc = st.vc, ln = st.vcLine;
+      if (vc && ln && vc.page === i && st.mode !== "insert") {
+        var first = String(ln.text).split("\n")[0], total = emOf(first) || 1, size = ln.size || 12;
+        var cx = ln.x + (first ? ln.width * emOf(first.slice(0, vc.c)) / total : 0);
+        var cw = first && vc.c < first.length ? ln.width * emOf(first.charAt(vc.c)) / total : size * 0.5;
+        var lr = viewRect(P, [ln.x - 1, ln.y - size * 0.27, ln.x + Math.max(ln.width, size * 0.5) + 1, ln.y + size * 0.92]);
+        g.appendChild(svg("rect", { x: lr.x, y: lr.y, width: lr.w, height: lr.h, "class": "pv-curline" }));
+        var cr = viewRect(P, [cx, ln.y - size * 0.27, cx + Math.max(cw, size * 0.25), ln.y + size * 0.92]);
+        g.appendChild(svg("rect", { x: cr.x, y: cr.y, width: cr.w, height: cr.h, "class": "pv-vimcur" }));
+      }
     }
 
     /* ───────── ページの生成と遅延描画 ───────── */
@@ -477,7 +494,7 @@
           if (rects.length) {
             st.hits[i] = rects; st.hitPages.push(i); st.hitCount += rects.length;
             drawOverlay(i);
-            if (jump && !jumped) { jumped = true; gotoHit(i); }
+            if (jump && !jumped) { jumped = true; gotoHit(i); cursorToHit(i); }
           }
         }, function () {});
       })(k);
@@ -493,6 +510,19 @@
       if (dir > 0) { for (i = 0; i < list.length; i++) if (list[i] > st.cur) { target = list[i]; break; } if (target == null) target = list[0]; }
       else { for (i = list.length - 1; i >= 0; i--) if (list[i] < st.cur) { target = list[i]; break; } if (target == null) target = list[list.length - 1]; }
       gotoHit(target);
+      cursorToHit(target);
+    }
+    /* ヒットのある行へカーソルを置く (そのまま i や :s で直せる) */
+    function cursorToHit(page) {
+      return linesOf(page).then(function (lines) {
+        for (var k = 0; k < lines.length; k++) {
+          var low = lines[k].text.toLowerCase();
+          for (var t = 0; t < st.terms.length; t++) {
+            var at = low.indexOf(st.terms[t]);
+            if (at >= 0) return setCursor(page, k, at, false);
+          }
+        }
+      });
     }
     function hitsToMarker() {
       var rects = st.hits[st.cur];
@@ -622,18 +652,29 @@
       P.wrap.appendChild(ta);
       var done = false;
       function close() { noteBox = null; if (ta.parentNode) ta.parentNode.removeChild(ta); elBody.focus(); }
-      function commit() { if (done) return; done = true; var text = ta.value.replace(/\s+$/, ""); close(); o.onCommit(text); }
-      function cancel() { if (done) return; done = true; close(); }
+      function finish() { if (typeof o.onEnd === "function") o.onEnd(); }
+      function commit() {
+        if (done) return; done = true;
+        var text = ta.value.replace(/\s+$/, ""), caret = ta.selectionStart || 0;
+        close(); finish(); o.onCommit(text, caret);
+      }
+      function cancel() { if (done) return; done = true; close(); finish(); }
       ta.addEventListener("keydown", function (e) {
         e.stopPropagation();
         if (e.isComposing || e.keyCode === 229) return;
+        if (o.vim) {
+          /* Vim の挿入モード: Esc (または Ctrl-[) で確定して NORMAL へ。Enter は改行 */
+          if (e.key === "Escape" || (e.ctrlKey && e.key === "[")) { e.preventDefault(); commit(); }
+          return;
+        }
         if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); }
         else if (e.key === "Escape") { e.preventDefault(); cancel(); }
       });
       ta.addEventListener("blur", function () { setTimeout(commit, 0); });
       noteBox = { commit: commit, cancel: cancel, el: ta };
       ta.focus();
-      if (o.value) { try { ta.select(); } catch (e) {} }
+      if (o.caret != null) { try { ta.setSelectionRange(o.caret, o.caret); } catch (e) {} }
+      else if (o.value) { try { ta.select(); } catch (e) {} }
       setTimeout(function () { if (!done && document.activeElement !== ta) ta.focus(); }, 0);
     }
     function editNote(P, pageIndex, existing, at) {
@@ -744,6 +785,7 @@
         if (st.closed) return;
         setupObserver();
         gotoPage(Math.max(0, Math.min(st.pages.length - 1, keepPage | 0)));
+        st.vc = null; st.vcLine = null;         /* ページ構成が変わったのでカーソルは置き直す */
         refreshChrome();
         if (query) scanHits(query, false, true);
       }, function (err) { st.busy = false; setStatus("PDF を表示できません: " + (err && err.message || err)); });
@@ -800,6 +842,238 @@
       f.arrayBuffer().then(function (buf) { return mergePdf(new Uint8Array(buf)); });
     });
 
+    /* ───────── Vim モード: 文字カーソルと行の編集 ─────────
+       「行」= PDF の文字のまとまり (pdf.js のテキスト片) に、自分の文字修正を重ねたもの。
+       直した行は textedit (cover つき) として持ち、元の文字と同じ内容に戻せば修正は消える。
+       o / O で足した行は cover なしの textedit。 */
+    function lineWidth(a) { var b = Edit.textBox(a); return b[2] - b[0]; }
+    function linesOf(pi) {
+      var P = st.pages[pi];
+      if (!P) return Promise.resolve([]);
+      return itemsOf(P).then(function (items) {
+        var used = {}, lines = items.map(function (it) {
+          var an = null;
+          for (var i = 0; i < st.annots.length; i++) {
+            var a = st.annots[i];
+            if (a.type === "textedit" && a.page === pi && a.cover && !used[a._id] &&
+                Math.abs(a.x - it.x) < 0.01 && Math.abs(a.y - it.y) < 0.01) { an = a; used[a._id] = 1; break; }
+          }
+          return { item: it, annot: an, x: it.x, y: it.y, size: it.size, font: it.font,
+                   text: an ? an.text : it.str.replace(/\s+$/, ""), width: an ? lineWidth(an) : it.width };
+        });
+        st.annots.forEach(function (a) {
+          if (a.type === "textedit" && a.page === pi && !a.cover)
+            lines.push({ item: null, annot: a, x: a.x, y: a.y, size: a.size, font: a.font, text: a.text, width: lineWidth(a) });
+        });
+        lines.sort(function (p, q) { return Math.abs(q.y - p.y) > Math.min(p.size, q.size) * 0.5 ? q.y - p.y : p.x - q.x; });
+        return lines;
+      });
+    }
+    function firstLine(ln) { return String(ln.text).split("\n")[0]; }
+    function showCursor(scroll) {
+      var vc = st.vc, P = vc && st.pages[vc.page], ln = st.vcLine;
+      st.pages.forEach(function (_, i) { drawOverlay(i); });
+      if (!scroll || !P || !ln) return;
+      var r = viewRect(P, [ln.x, ln.y - ln.size * 0.3, ln.x + ln.width, ln.y + ln.size]);
+      var top = P.wrap.offsetTop + r.y, bottom = top + r.h, pad = 60;
+      if (top - pad < elBody.scrollTop) elBody.scrollTop = Math.max(0, top - pad);
+      else if (bottom + pad > elBody.scrollTop + elBody.clientHeight) elBody.scrollTop = bottom + pad - elBody.clientHeight;
+      var left = P.wrap.offsetLeft + r.x;
+      if (left < elBody.scrollLeft || left > elBody.scrollLeft + elBody.clientWidth - 40) elBody.scrollLeft = Math.max(0, left - 80);
+      if (st.cur !== vc.page) { st.cur = vc.page; refreshChrome(); }
+    }
+    /* カーソルを (page, k 行目, c 文字目) へ。行が無いページでは false */
+    function setCursor(page, k, c, scroll) {
+      return linesOf(page).then(function (lines) {
+        if (!lines.length) return false;
+        k = Math.max(0, Math.min(lines.length - 1, k));
+        var len = firstLine(lines[k]).length;
+        st.vc = { page: page, k: k, c: Math.max(0, Math.min(Math.max(0, len - 1), c | 0)) };
+        st.vcLine = lines[k];
+        showCursor(scroll !== false);
+        return true;
+      });
+    }
+    /* いまのカーソル行で fn(行, 行の一覧) を実行。カーソルが無ければ表示中のページの先頭に置く */
+    function withCursor(fn) {
+      var vc = st.vc, page = (vc && st.pages[vc.page]) ? vc.page : st.cur;
+      return linesOf(page).then(function (lines) {
+        if (!lines.length) { setStatus("このページには文字がありません (:text でクリックした場所に文字を追加できます)"); return null; }
+        var k = (vc && vc.page === page) ? Math.max(0, Math.min(lines.length - 1, vc.k)) : 0;
+        if (!vc || vc.page !== page) st.vc = { page: page, k: k, c: 0 };
+        else st.vc.k = k;
+        st.vcLine = lines[k];
+        return fn(lines[k], lines, page, k);
+      });
+    }
+    function refreshCursor() { if (st.vc) return setCursor(st.vc.page, st.vc.k, st.vc.c, false); return Promise.resolve(); }
+    function moveCursor(what) {
+      return withCursor(function (ln, lines, page, k) {
+        var c = st.vc.c, len = firstLine(ln).length;
+        if (what === "h") { if (c > 0) return setCursor(page, k, c - 1); return stepLine(page, k, -1, "end"); }
+        if (what === "l") { if (c < len - 1) return setCursor(page, k, c + 1); return stepLine(page, k, 1, 0); }
+        if (what === "0") return setCursor(page, k, 0);
+        if (what === "$") return setCursor(page, k, len - 1);
+        if (what === "j") return stepLine(page, k, 1, c);
+        if (what === "k") return stepLine(page, k, -1, c);
+        if (what === "w") return stepLine(page, k, 1, 0);
+        if (what === "b") { if (c > 0) return setCursor(page, k, 0); return stepLine(page, k, -1, 0); }
+      });
+    }
+    /* 行を dir (+1/-1) へ。ページの端では文字のある隣のページへ続く */
+    function stepLine(page, k, dir, col) {
+      function place(pg, kk, lines) { return setCursor(pg, kk, col === "end" ? firstLine(lines[kk]).length - 1 : col); }
+      return linesOf(page).then(function (lines) {
+        var nk = k + dir;
+        if (nk >= 0 && nk < lines.length) return place(page, nk, lines);
+        function hop(pg) {
+          if (pg < 0 || pg >= st.pages.length) return false;
+          return linesOf(pg).then(function (ls) { return ls.length ? place(pg, dir > 0 ? 0 : ls.length - 1, ls) : hop(pg + dir); });
+        }
+        return hop(page + dir);
+      });
+    }
+    function cursorToPage(page) {
+      gotoPage(page);
+      return linesOf(st.cur).then(function (lines) {
+        if (lines.length) { st.vc = { page: st.cur, k: 0, c: 0 }; st.vcLine = lines[0]; }
+        else { st.vc = null; st.vcLine = null; }
+        st.pages.forEach(function (_, i) { drawOverlay(i); });
+      });
+    }
+    /* 行の文字を text にする (noUndo: 呼び出し側でまとめて 1 回の取り消しにする)。変わったら true */
+    function setLineText(page, ln, text, noUndo) {
+      var P = st.pages[page];
+      text = String(text).replace(/\s+$/, "");
+      if (text === ln.text) return false;
+      if (!noUndo) pushUndo();
+      if (ln.annot) {
+        if (ln.item && text === ln.item.str.replace(/\s+$/, "")) st.annots = st.annots.filter(function (x) { return x !== ln.annot; });   /* 元どおり → 修正を外す */
+        else if (!ln.item && !text.trim()) st.annots = st.annots.filter(function (x) { return x !== ln.annot; });
+        else ln.annot.text = text;
+      } else {
+        var it = ln.item, v = viewRect(P, it.rect);
+        var n = Edit.normalize({ type: "textedit", page: page, x: it.x, y: it.y, text: text, size: it.size, color: "#000000", font: it.font,
+                                 cover: [it.rect[0] - 1, it.rect[1], it.rect[2] + 1, it.rect[3]], bg: sampleBg(P, v.x - 3, v.y - 2) });
+        n._id = st.nextId++; st.annots.push(n);
+      }
+      st.sel = null; touch(page);
+      return true;
+    }
+    function needEdit() { if (!st.editable) { setStatus("読み取り専用のため編集できません"); return false; } return !st.busy; }
+
+    /* INSERT モード: 行の上に入力欄を重ねて直接打つ (Esc で確定)。kind = i a I A cc o O */
+    function startInsert(kind) {
+      if (!needEdit()) return;
+      withCursor(function (ln, lines, page, k) {
+        var P = st.pages[page], text = ln.text, c = st.vc.c, size = ln.size || 12;
+        var fresh = kind === "o" || kind === "O";
+        var y = fresh ? ln.y + (kind === "o" ? -1 : 1) * size * 1.35 : ln.y;
+        var v = viewRect(P, [ln.x, y - size * 0.27, ln.x + Math.max(ln.width, size * 6), y + size * 0.92]);
+        var caret = kind === "i" ? c : kind === "a" ? Math.min(text.length, c + 1) : kind === "I" ? 0 : text.length;
+        st.mode = "insert"; st.status = ""; showCursor(true); refreshChrome();
+        openEditor(P, {
+          vim: true, plain: true, vx: v.x, vy: v.y, fontPx: size * st.scale, width: v.w + 80,
+          value: fresh || kind === "cc" ? "" : text, caret: fresh || kind === "cc" ? 0 : caret,
+          onEnd: function () { st.mode = "normal"; },
+          onCommit: function (out, at) {
+            if (fresh) {
+              if (out.trim()) {
+                pushUndo();
+                var n = Edit.normalize({ type: "textedit", page: page, x: ln.x, y: y, text: out, size: size, color: "#000000", font: ln.font, cover: null });
+                n._id = st.nextId++; st.annots.push(n); touch(page);
+                setStatus("行を追加しました (:w で PDF に保存)");
+              }
+              return linesOf(page).then(function (ls) {
+                var nk = k;
+                for (var i = 0; i < ls.length; i++) if (ls[i].annot && Math.abs(ls[i].y - y) < 0.01 && Math.abs(ls[i].x - ln.x) < 0.01) nk = i;
+                return setCursor(page, nk, Math.max(0, at - 1));
+              });
+            }
+            if (setLineText(page, ln, out)) setStatus("文字を書き換えました (:w で PDF に保存)");
+            return setCursor(page, k, Math.max(0, at - 1));
+          }
+        });
+      });
+    }
+    function deleteChar() {
+      if (!needEdit()) return;
+      withCursor(function (ln, lines, page, k) {
+        var t = ln.text, c = st.vc.c;
+        if (!t.length) return;
+        setLineText(page, ln, t.slice(0, c) + t.slice(c + 1));
+        return setCursor(page, k, c);
+      });
+    }
+    function deleteToEnd() {
+      if (!needEdit()) return;
+      withCursor(function (ln, lines, page, k) { setLineText(page, ln, ln.text.slice(0, st.vc.c)); return setCursor(page, k, st.vc.c - 1); });
+    }
+    function deleteLine() {
+      if (!needEdit()) return;
+      withCursor(function (ln, lines, page, k) {
+        st.reg = ln.text;
+        if (setLineText(page, ln, "")) setStatus("行を削除しました (u で取り消し)");
+        return setCursor(page, k, 0);
+      });
+    }
+    function yankLine() { withCursor(function (ln) { st.reg = ln.text; setStatus("1 行ヤンクしました (p で下に貼り付け)"); }); }
+    function pasteLine() {
+      if (!needEdit()) return;
+      if (!st.reg) { setStatus("貼り付ける行がありません (yy でヤンク)"); return; }
+      withCursor(function (ln, lines, page, k) {
+        pushUndo();
+        var y = ln.y - ln.size * 1.35;
+        var n = Edit.normalize({ type: "textedit", page: page, x: ln.x, y: y, text: st.reg, size: ln.size, color: "#000000", font: ln.font, cover: null });
+        n._id = st.nextId++; st.annots.push(n); touch(page);
+        return linesOf(page).then(function (ls) {
+          var nk = k;
+          for (var i = 0; i < ls.length; i++) if (ls[i].annot === n) nk = i;
+          return setCursor(page, nk, 0);
+        });
+      });
+    }
+    /* :s/旧/新/[g][i] (カーソル行) と :%s/旧/新/[g][i] (全ページ)。旧は正規表現 (不正なら文字どおり) */
+    function substitute(all, pat, repl, flags) {
+      if (!needEdit()) return Promise.resolve(0);
+      var re, f = (/g/.test(flags) ? "g" : "") + (/i/.test(flags) ? "i" : "");
+      try { re = new RegExp(pat, f); } catch (e) { re = new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), f); }
+      var to = repl.replace(/\$/g, "$$$$").replace(/\\(\d)/g, "$$$1").replace(/\\&/g, "\u0000").replace(/&/g, "$$&").replace(/\u0000/g, "&");
+      var count = 0, pagesHit = {};
+      pushUndo();
+      function onPage(pg, only) {
+        return linesOf(pg).then(function (lines) {
+          lines.forEach(function (ln, k) {
+            if (only != null && k !== only) return;
+            var out = ln.text.replace(re, to);
+            if (out !== ln.text && setLineText(pg, ln, out, true)) { count++; pagesHit[pg] = 1; }
+          });
+        });
+      }
+      var chain;
+      if (all) { chain = Promise.resolve(); st.pages.forEach(function (_, pg) { chain = chain.then(function () { return onPage(pg, null); }); }); }
+      else chain = withCursor(function (ln, lines, page, k) { return onPage(page, k); });
+      return Promise.resolve(chain).then(function () {
+        if (!count) { st.undo.pop(); setStatus("パターンが見つかりません: " + pat); return 0; }
+        setStatus(count + " 行を置換しました" + (all ? " (" + Object.keys(pagesHit).length + " ページ)" : "") + " — u で取り消し / :w で保存");
+        return refreshCursor().then(function () { return count; });
+      });
+    }
+    function noteAtCursor(text) {
+      if (!needEdit()) return;
+      withCursor(function (ln, lines, page) {
+        addAnnot({ type: "note", page: page, x: ln.x, y: ln.y - ln.size * 0.5, text: text, size: 12, color: "#102030" });
+        setStatus("カーソル行にメモを付けました (:w で PDF に保存)");
+      });
+    }
+    function markCursorLine() {
+      if (!needEdit()) return;
+      withCursor(function (ln, lines, page) {
+        addAnnot({ type: "highlight", page: page, rects: [[ln.x, ln.y - ln.size * 0.27, ln.x + ln.width, ln.y + ln.size * 0.92]], color: st.color });
+        setStatus("カーソル行にマーカーを引きました (:w で PDF に保存)");
+      });
+    }
+
     /* ───────── 保存 ───────── */
     function save(thenClose) {
       if (!st.editable) { setStatus("この PDF は保存できません (読み取り専用)"); return Promise.resolve({ error: "readonly" }); }
@@ -833,7 +1107,29 @@
       if (c === "wq" || c === "x") { if (st.editable) save(true); else teardown(); return; }
       if (c === "q") { if (st.dirty && !opts.keepOnClose) setStatus("未保存の注釈があります (:w で保存 / :q! で破棄)"); else teardown(); return; }
       if (c === "q!") { teardown(); return; }
-      if (/^\d+$/.test(c)) { gotoPage(parseInt(c, 10) - 1); return; }
+      if (/^\d+$/.test(c)) { cursorToPage(parseInt(c, 10) - 1); return; }
+      var sub = /^(%?)s(.)/.exec(c);
+      if (sub && !/[A-Za-z0-9\s]/.test(sub[2])) {
+        /* 区切り文字で 旧 / 新 / フラグ に分ける (\ で区切り文字そのものを書ける) */
+        var d = sub[2], rest = c.slice(sub[0].length), parts = [""], esc = false;
+        for (var ci = 0; ci < rest.length; ci++) {
+          var ch = rest[ci];
+          if (esc) { parts[parts.length - 1] += (ch === d ? d : "\\" + ch); esc = false; }
+          else if (ch === "\\") esc = true;
+          else if (ch === d && parts.length < 3) parts.push("");
+          else parts[parts.length - 1] += ch;
+        }
+        if (!parts[0]) { setStatus("置換するパターンがありません (:s/旧/新/)"); return; }
+        substitute(sub[1] === "%", parts[0], parts[1] || "", parts[2] || "");
+        return;
+      }
+      if (c === "d" || c === "delete") { deleteLine(); return; }
+      if (c === "u" || c === "undo") { if (st.editable) undo(); return; }
+      if (c === "hl") { markCursorLine(); return; }
+      var nt = /^note\s+(.+)$/.exec(c);
+      if (nt) { noteAtCursor(nt[1]); return; }
+      var toolName = { marker: "highlight", pen: "ink", note: "note", text: "textedit", erase: "erase", select: "select" }[c];
+      if (toolName) { setTool(toolName); refreshChrome(); return; }
       if (c === "rotate") { rotatePage(); return; }
       if (c === "delpage") { deletePage(); return; }
       if (c === "blank") { blankPage(); return; }
@@ -855,39 +1151,58 @@
       if (noteBox) { if (document.activeElement !== noteBox.el) noteBox.el.focus(); return; }   /* メモ入力中はキーを奪わない */
       if (tag === "TEXTAREA" || tag === "INPUT") return;
       var k = e.key;
-      if (e.ctrlKey && (k === "d" || k === "u")) k = "Ctrl-" + k;
+      if (e.ctrlKey && (k === "d" || k === "u" || k === "f" || k === "b")) k = "Ctrl-" + k;
       else if (e.ctrlKey || e.metaKey || e.altKey) return;
       e.stopPropagation();
       st.closeArmed = false;
       var handled = true, half = elBody.clientHeight / 2;
-      if (st.pending === "g") { st.pending = ""; if (k === "g") { gotoPage(0); e.preventDefault(); return; } }
+      /* 2 ストローク (gg dd yy cc) */
+      if (st.pending) {
+        var pend = st.pending; st.pending = "";
+        if (pend === k) {
+          e.preventDefault();
+          if (k === "g") cursorToPage(0);
+          else if (k === "d") deleteLine();
+          else if (k === "y") yankLine();
+          else if (k === "c") startInsert("cc");
+          refreshChrome();
+          return;
+        }
+      }
       switch (k) {
-        case "j": case "ArrowDown": elBody.scrollTop += 70; break;
-        case "k": case "ArrowUp": elBody.scrollTop -= 70; break;
-        case "Ctrl-d": case "PageDown": case " ": elBody.scrollTop += half; break;
-        case "Ctrl-u": case "PageUp": elBody.scrollTop -= half; break;
-        case "l": case "ArrowRight": gotoPage(st.cur + 1); break;
-        case "h": case "ArrowLeft": gotoPage(st.cur - 1); break;
-        case "g": st.pending = "g"; break;
-        case "G": gotoPage(st.pages.length - 1); break;
+        case "h": moveCursor("h"); break;
+        case "l": moveCursor("l"); break;
+        case "j": moveCursor("j"); break;
+        case "k": moveCursor("k"); break;
+        case "w": moveCursor("w"); break;
+        case "b": moveCursor("b"); break;
+        case "0": moveCursor("0"); break;
+        case "$": moveCursor("$"); break;
+        case "ArrowDown": elBody.scrollTop += 70; break;
+        case "ArrowUp": elBody.scrollTop -= 70; break;
+        case "Ctrl-d": case " ": elBody.scrollTop += half; break;
+        case "Ctrl-u": elBody.scrollTop -= half; break;
+        case "]": case "ArrowRight": case "PageDown": case "Ctrl-f": cursorToPage(st.cur + 1); break;
+        case "[": case "ArrowLeft": case "PageUp": case "Ctrl-b": cursorToPage(st.cur - 1); break;
+        case "g": case "d": case "y": case "c": st.pending = k; break;
+        case "G": cursorToPage(st.pages.length - 1); break;
+        case "i": case "a": case "I": case "A": case "o": case "O": startInsert(k); break;
+        case "S": startInsert("cc"); break;
+        case "D": deleteToEnd(); break;
+        case "p": pasteLine(); break;
         case "n": nextHit(1); break;
         case "N": nextHit(-1); break;
         case "+": case "=": setScale(st.scale * 1.2); break;
         case "-": setScale(st.scale / 1.2); break;
         case "v": setTool("select"); break;
         case "m": setTool("highlight"); break;
-        case "p": setTool("ink"); break;
-        case "i": setTool("note"); break;
-        case "e": setTool("textedit"); break;
-        case "r": setTool("erase"); break;
         case "R": rotatePage(); break;
-        case "D": deletePage(); break;
         case "<": movePage(st.cur - 1); break;
         case ">": movePage(st.cur + 1); break;
-        case "o": blankPage(); break;
         case "F": flattenAll(); break;
         case "M": if (st.editable) hitsToMarker(); break;
-        case "x": case "Delete": if (st.editable) removeSelected(); break;
+        case "x": if (st.sel != null) { if (st.editable) removeSelected(); } else deleteChar(); break;
+        case "Delete": if (st.editable) removeSelected(); break;
         case "u": if (st.editable) undo(); break;
         case "t": case "Tab": if (typeof opts.onTextMode === "function") { if (st.dirty && !confirmDiscard()) break; teardown(); opts.onTextMode(); } break;
         case ":": startCmd(":"); break;
@@ -995,6 +1310,7 @@
         if (!st.status || /読み込み中/.test(st.status)) setStatus(msg);
         refreshChrome();
         if (opts.search) return scanHits(opts.search, true);
+        return setCursor(0, 0, 0, false);            /* 先頭の行にカーソルを置く */
       });
     }).then(function () { return ctl; }, function (err) {
       setStatus("PDF を表示できません: " + (err && err.message || err));
@@ -1007,6 +1323,7 @@
     var ctl = { state: st, ready: ready, close: teardown, save: save, addAnnot: addAnnot, gotoPage: gotoPage,
                 rotatePage: rotatePage, deletePage: deletePage, movePage: movePage, blankPage: blankPage,
                 mergePdf: mergePdf, flatten: flattenAll, undo: undo,
+                substitute: substitute, setCursor: setCursor, linesOf: linesOf, exec: function (line) { return execCmd(line); },
                 setScale: setScale, setTool: function (t) { setTool(t); refreshChrome(); }, scanHits: scanHits };
     BadaPdfView.current = ctl;
     return ctl;
@@ -1074,6 +1391,8 @@
       ".badapdf-overlay .pv-font-mono{font-family:Courier,'Courier New',monospace}",
       ".badapdf-overlay .pv-grabbox{fill:transparent}",
       ".badapdf-overlay .pv-plainedit{background:#fff;border-color:#ff7a00;padding:0 2px;min-height:1.3em;line-height:1.2}",
+      ".badapdf-overlay .pv-vimcur{fill:#19c463;fill-opacity:.55;stroke:#0a7a3a;stroke-width:1;pointer-events:none}",
+      ".badapdf-overlay .pv-curline{fill:#19c463;fill-opacity:.10;pointer-events:none}",
       ".badapdf-overlay .pv-selbox{fill:none;stroke:#1f6fff;stroke-width:1.5;stroke-dasharray:5 3;pointer-events:none}",
       ".badapdf-overlay .pv-noteedit{position:absolute;z-index:5;min-width:180px;min-height:2.2em;padding:2px 4px;border:2px solid #1f6fff;border-radius:3px;background:#fffbd0;color:#102030;font-family:'Noto Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,Helvetica,Arial,sans-serif;line-height:1.3;resize:both;outline:none;box-shadow:0 4px 18px #0006}"
     ].join("\n");

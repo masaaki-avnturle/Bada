@@ -60,7 +60,7 @@ function pv(page){
 
   /* VIM のキーが下の本文に漏れない */
   var before = await page.evaluate(function(){ return document.getElementById("pos").textContent; });
-  await keys(page, "jjj"); await page.keyboard.press("x");
+  await keys(page, "jjjw");
   ok(await page.evaluate(function(){ return document.getElementById("pos").textContent; }) === before, "keys typed in the page view do not reach the VIM buffer");
 
   /* マーカー / ペン / 日本語メモ */
@@ -68,9 +68,9 @@ function pv(page){
   var box = await page.locator('.pv-page[data-i="0"] svg').boundingBox();
   await page.keyboard.press("m");
   await page.mouse.move(box.x + 50, box.y + 70); await page.mouse.down(); await page.mouse.move(box.x + 300, box.y + 100, { steps: 4 }); await page.mouse.up();
-  await page.keyboard.press("p");
+  await keys(page, ":pen"); await page.keyboard.press("Enter");
   await page.mouse.move(box.x + 60, box.y + 200); await page.mouse.down(); await page.mouse.move(box.x + 160, box.y + 260, { steps: 6 }); await page.mouse.up();
-  await page.keyboard.press("i");
+  await keys(page, ":note"); await page.keyboard.press("Enter");
   await page.mouse.click(box.x + 80, box.y + 330);
   await page.waitForSelector(".pv-noteedit");
   await page.keyboard.insertText("量子メモ");
@@ -177,6 +177,15 @@ function pv(page){
 
   await p2.setInputFiles("#fileIn", pdfPath);
   await p2.waitForSelector(".badapdf-overlay .pv-page.ready", { timeout: 60000 });
+  /* Vim の挿入モード: A で行末に追記して Esc で確定 (単体アプリでも同じ操作) */
+  await p2.waitForFunction(function(){ return !!window.BadaPdfView.current.state.vc; });
+  await p2.keyboard.press("A");
+  await p2.waitForSelector(".pv-noteedit");
+  await p2.keyboard.insertText(" (edited)");
+  await p2.waitForFunction(function(){ return / \(edited\)$/.test(document.querySelector(".pv-noteedit").value); });
+  await p2.keyboard.press("Escape");
+  await p2.waitForFunction(function(){ var s = window.BadaPdfView.current.state; return s.mode === "normal" && s.annots.length === 1; });
+  ok(await p2.evaluate(function(){ var a = window.BadaPdfView.current.state.annots[0]; return a.type === "textedit" && / \(edited\)$/.test(a.text); }), "Vim INSERT mode (A … Esc) edits the PDF text in the standalone app too");
   await p2.evaluate(function(){ window.BadaPdfView.current.addAnnot({ type: "note", page: 1, x: 60, y: 300, text: "saved via dialog" }); });
   for (var r = 0; r < 2; r++) {
     await keys(p2, ":w"); await p2.keyboard.press("Enter");
@@ -188,7 +197,7 @@ function pv(page){
     return { bytes: Array.from(new Uint8Array(await (await (await d.getFileHandle("jones.pdf")).getFile()).arrayBuffer())), asked: window.__saveAsked };
   });
   var b2 = await Edit.extractAnnotations(L, new Uint8Array(out.bytes));
-  ok(b2.annots.length === 2 && out.asked === 1, "PDF saved to the chosen file; the save dialog is asked once, later saves reuse it — annots " + b2.annots.length + ", asked " + out.asked);
+  ok(b2.annots.length === 3 && out.asked === 1, "PDF saved to the chosen file; the save dialog is asked once, later saves reuse it — annots " + b2.annots.length + ", asked " + out.asked);
   await ctx2.close(); srv.close();
 
   await browser.close();
