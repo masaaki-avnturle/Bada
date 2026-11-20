@@ -80,6 +80,20 @@ function pv(page){
   ok(s.types === "highlight,ink,note" && s.dirty, "marker + pen + Japanese note added — " + s.types);
   if (shotDir) await page.screenshot({ path: path.join(shotDir, "cinevim-pdf.png") });
 
+  /* PDF 専用の編集ツール: ページを回転 → 文章ビューと行き来しても保たれ、u で戻せる */
+  ok(await page.locator('.badapdf-overlay .pv-edit [data-tool="textedit"]').count() === 1, "the PDF edit toolbar (text correction / erase / pages / flatten) is available");
+  await page.keyboard.press("R");
+  await page.waitForFunction(function(){ var s = window.BadaPdfView.current.state; return !s.busy && s.pages.length === 2 && s.pages[0].page.rotate === 90; }, null, { timeout: 30000 });
+  await page.keyboard.press("t");
+  await page.waitForFunction(function(){ return !document.querySelector(".badapdf-overlay"); });
+  await keys(page, ":page"); await page.keyboard.press("Enter");
+  await page.waitForFunction(function(){ var c = window.BadaPdfView && window.BadaPdfView.current; return c && !c.state.busy && c.state.pages.length === 2; }, null, { timeout: 60000 });
+  ok(await page.evaluate(function(){ var s = window.BadaPdfView.current.state; return s.pages[0].page.rotate === 90 && s.annots.length === 3 && s.dirty; }), "a page rotation survives leaving and re-entering the page view");
+  await page.evaluate(function(){ return window.BadaPdfView.current.rotatePage(); });
+  await page.evaluate(function(){ return window.BadaPdfView.current.rotatePage(); });
+  await page.evaluate(function(){ return window.BadaPdfView.current.rotatePage(); });
+  await page.waitForFunction(function(){ var s = window.BadaPdfView.current.state; return !s.busy && s.pages.length === 2 && s.pages[0].page.rotate === 0; }, null, { timeout: 30000 });
+
   /* テキスト表示へ (注釈は捨てない) → VIM が効く → :page で続きから */
   await page.keyboard.press("t");
   await page.waitForFunction(function(){ return !document.querySelector(".badapdf-overlay"); });

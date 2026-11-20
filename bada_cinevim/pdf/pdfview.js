@@ -14,6 +14,14 @@
  *   v 選択  m マーカー  p ペン  i メモ    x 削除  u 取り消し      M ヒットをマーカー化
  *   /語 PDF 内検索   :w 保存   :q 閉じる (未保存なら :q!)   :wq   t テキスト表示へ
  *
+ * PDF 専用の編集ツール (2 段目のツールバー):
+ *   e ✏ 文字修正 … ページ上の文字をクリックして書き換える (元の文字を隠して打ち直す)。
+ *                   何もない所をクリックすれば文字を追加。ダブルクリックで再編集。
+ *   r ⬜ 消去     … ドラッグした範囲を背景色で塗りつぶして消す
+ *   R 回転  < > ページを前へ/後ろへ  o 空白ページ  D ページ削除  :merge 別の PDF を結合
+ *   F 📌 焼き込み … 書き込みをページ本体に確定する (以後は注釈ではなくページの一部)
+ *   どの操作も u で取り消せます (ページ操作・焼き込みも含む)。
+ *
  * ライブラリ (vendor/pdfjs, vendor/pdf-lib) は PDF を開いたときに初めて読み込みます。
  *
  * このファイルは Bada Search (sourcetree_search/app/www) と単体アプリ Bada CineVim
@@ -139,10 +147,23 @@
           '<button class="pv-b" data-act="undo" title="取り消し (u)">↶</button>' +
           '<span class="cv-grow"></span>' +
           '<button class="pv-b pv-save" data-act="save" title="PDF に保存 (:w)">💾 保存</button></div>' +
+        '<div class="cv-bar pv-tools pv-edit"><span class="pv-lab">PDF 編集</span>' +
+          '<button class="pv-t" data-tool="textedit" title="文字をクリックして書き換える / 何もない所をクリックして文字を追加 (e)">✏ 文字修正</button>' +
+          '<button class="pv-t" data-tool="erase" title="ドラッグした範囲を塗りつぶして消す (r)">⬜ 消去</button>' +
+          '<span class="pv-sep"></span><span class="pv-lab">ページ</span>' +
+          '<button class="pv-b" data-act="rot" title="このページを右に 90° 回転 (R)">⟳ 回転</button>' +
+          '<button class="pv-b" data-act="pgup" title="このページを 1 つ前へ (<)">⬆ 前へ</button>' +
+          '<button class="pv-b" data-act="pgdn" title="このページを 1 つ後ろへ (>)">⬇ 後ろへ</button>' +
+          '<button class="pv-b" data-act="blank" title="このページの後ろに空白ページを入れる (o)">➕ 空白</button>' +
+          '<button class="pv-b" data-act="merge" title="別の PDF を末尾に結合 (:merge)">📎 結合</button>' +
+          '<button class="pv-b" data-act="pgdel" title="このページを削除 (D)">✂ 削除</button>' +
+          '<span class="pv-sep"></span>' +
+          '<button class="pv-b" data-act="flatten" title="書き込みをページ本体に焼き込んで確定する (F)">📌 焼き込み</button>' +
+          '<input type="file" class="pv-mergein" accept=".pdf,application/pdf" style="display:none"/></div>' +
         '<div class="cv-body pv-body" tabindex="0"><div class="pv-pages"></div></div>' +
         '<div class="cv-bar cv-status"><span class="cv-mode">PDF</span><span class="cv-msg"></span>' +
           '<span class="cv-grow"></span>' +
-          '<span class="cv-hint">j k スクロール · h l ページ · n N ヒット · m マーカー · p ペン · i メモ · :w 保存 · :q 閉じる</span>' +
+          '<span class="cv-hint">j k スクロール · h l ページ · m マーカー · p ペン · i メモ · e 文字修正 · r 消去 · u 取消 · :w 保存 · :q 閉じる</span>' +
           '<input class="pv-cmdin" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="コマンド (:w :q /検索語)"/></div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -175,13 +196,13 @@
       elFlag.textContent = !st.editable ? " [RO]" : (st.dirty ? " [+]" : "");
       elPageNo.textContent = st.pages.length ? (st.cur + 1) + " / " + st.pages.length : "– / –";
       elZoom.textContent = Math.round(st.scale * 100) + "%";
-      elMode.textContent = st.mode === "command" ? "" : ({ select: "PDF", highlight: "-- マーカー --", ink: "-- ペン --", note: "-- メモ --" })[st.tool];
+      elMode.textContent = st.mode === "command" ? "" : ({ select: "PDF", highlight: "-- マーカー --", ink: "-- ペン --", note: "-- メモ --", textedit: "-- 文字修正 --", erase: "-- 消去 --" })[st.tool];
       elMode.className = "cv-mode " + (st.tool === "select" ? "" : "insert");
       Array.prototype.forEach.call(ov.querySelectorAll(".pv-t"), function (b) {
         b.classList.toggle("on", b.getAttribute("data-tool") === st.tool);
         b.disabled = !st.editable && b.getAttribute("data-tool") !== "select";
       });
-      ["del", "undo", "save", "hitmark"].forEach(function (a) { q('[data-act="' + a + '"]').disabled = !st.editable; });
+      ["del", "undo", "save", "hitmark", "rot", "pgup", "pgdn", "blank", "merge", "pgdel", "flatten"].forEach(function (a) { q('[data-act="' + a + '"]').disabled = !st.editable; });
       ov.classList.toggle("pv-drawing", st.tool !== "select");
       renderColors();
     }
@@ -203,9 +224,10 @@
 
     /* ───────── 注釈モデル ───────── */
     function selected() { for (var i = 0; i < st.annots.length; i++) if (st.annots[i]._id === st.sel) return st.annots[i]; return null; }
+    /* 取り消し用の履歴。注釈に加えて PDF 本体 (ページ操作・焼き込みで変わる) も覚える */
     function pushUndo() {
-      st.undo.push(JSON.stringify(st.annots));
-      if (st.undo.length > 200) st.undo.shift();
+      st.undo.push({ a: JSON.stringify(st.annots), b: st.baseBytes });
+      if (st.undo.length > 100) st.undo.shift();
     }
     function touch(page) { st.dirty = true; st.closeArmed = false; drawOverlay(page); refreshChrome(); }
     function addAnnot(a) {
@@ -225,16 +247,23 @@
       st.sel = null; touch(a.page); setStatus("注釈を削除しました");
     }
     function undo() {
+      if (st.busy) return;
       if (!st.undo.length) { setStatus("これ以上戻せません"); return; }
-      st.annots = JSON.parse(st.undo.pop());
+      var u = st.undo.pop();
+      st.annots = JSON.parse(u.a);
       st.sel = null; st.dirty = true;
+      if (u.b !== st.baseBytes) { st.baseBytes = u.b; reloadDoc(st.cur).then(function () { setStatus("元に戻しました"); }); return; }
       st.pages.forEach(function (_, i) { drawOverlay(i); });
       setStatus("元に戻しました");
     }
     function moveAnnot(a, dx, dy) {
       var i, j;
       if (a.type === "note") { a.x += dx; a.y += dy; }
-      else if (a.type === "highlight") for (i = 0; i < a.rects.length; i++) { a.rects[i][0] += dx; a.rects[i][2] += dx; a.rects[i][1] += dy; a.rects[i][3] += dy; }
+      else if (a.type === "textedit") {
+        a.x += dx; a.y += dy;
+        if (a.cover) { a.cover[0] += dx; a.cover[2] += dx; a.cover[1] += dy; a.cover[3] += dy; }
+      }
+      else if (a.type === "highlight" || a.type === "erase") for (i = 0; i < a.rects.length; i++) { a.rects[i][0] += dx; a.rects[i][2] += dx; a.rects[i][1] += dy; a.rects[i][3] += dy; }
       else if (a.type === "ink") for (i = 0; i < a.paths.length; i++) for (j = 0; j + 1 < a.paths[i].length; j += 2) { a.paths[i][j] += dx; a.paths[i][j + 1] += dy; }
     }
 
@@ -264,6 +293,26 @@
             var v = viewRect(P, r);
             grp.appendChild(svg("rect", { x: v.x, y: v.y, width: v.w, height: v.h, fill: a.color, "class": "pv-mark" }));
           });
+        } else if (a.type === "erase") {
+          a.rects.forEach(function (r) {
+            var v = viewRect(P, r);
+            grp.appendChild(svg("rect", { x: v.x, y: v.y, width: v.w, height: v.h, fill: a.color }));
+          });
+        } else if (a.type === "textedit") {
+          if (a.cover) {
+            var cv = viewRect(P, a.cover);
+            grp.appendChild(svg("rect", { x: cv.x, y: cv.y, width: cv.w, height: cv.h, fill: a.bg }));
+          }
+          var o = toView(P, a.x, a.y), tfs = (a.size || 12) * st.scale;
+          var tt = svg("text", { x: o[0], y: o[1], fill: a.color, "font-size": tfs, "class": "pv-edittext pv-font-" + (a.font || "sans") });
+          String(a.text).split("\n").forEach(function (line, k) {
+            var ts = svg("tspan", { x: o[0], y: o[1] + k * tfs * 1.2 });
+            ts.textContent = line || " ";
+            tt.appendChild(ts);
+          });
+          grp.appendChild(tt);
+          var hb = viewRect(P, Edit.annotRect(a));      /* 文字の上のどこでも掴めるように透明の当たり判定 */
+          grp.appendChild(svg("rect", { x: hb.x, y: hb.y, width: hb.w, height: hb.h, "class": "pv-grabbox" }));
         } else if (a.type === "ink") {
           a.paths.forEach(function (p) {
             var pts = [];
@@ -294,12 +343,12 @@
 
     /* ───────── ページの生成と遅延描画 ───────── */
     var io = null;
-    function buildPages() {
+    function buildPages(fixedScale) {
       var n = st.pdf.numPages, chain = Promise.resolve();
       for (var k = 1; k <= n; k++) (function (num) {
         chain = chain.then(function () { return st.pdf.getPage(num); }).then(function (page) {
           if (st.closed) return;
-          if (num === 1) {
+          if (num === 1 && !fixedScale) {
             var w0 = page.getViewport({ scale: 1 }).width;
             st.scale = Math.max(0.5, Math.min(1.6, (elBody.clientWidth - 48) / w0));
           }
@@ -395,8 +444,9 @@
     elBody.addEventListener("scroll", onScroll);
 
     /* ───────── PDF 内の検索ヒット (検索語のあるページへジャンプ + 光らせる) ───────── */
-    function scanHits(query, jump) {
+    function scanHits(query, jump, quiet) {
       var token = ++st.scanToken;
+      st.lastQuery = String(query || "");
       st.terms = String(query || "").split(/\s+/).filter(Boolean).map(function (t) { return t.toLowerCase(); });
       st.hits = {}; st.hitPages = []; st.hitCount = 0;
       st.pages.forEach(function (_, i) { drawOverlay(i); });
@@ -432,7 +482,7 @@
         }, function () {});
       })(k);
       return chain.then(function () {
-        if (st.closed || token !== st.scanToken) return;
+        if (st.closed || token !== st.scanToken || quiet) return;   /* quiet: 再読み込み後の付け直し (操作結果の表示を消さない) */
         setStatus(st.hitCount ? ("「" + query + "」 " + st.hitCount + " 箇所 / " + st.hitPages.length + " ページ (n N で移動)")
                               : ("「" + query + "」はこの PDF のページ上では見つかりません"));
       });
@@ -470,6 +520,15 @@
           drag = { kind: "highlight", a: p, b: p, pid: e.pointerId,
                    el: svg("rect", { "class": "pv-mark pv-preview", fill: st.color }) };
           P.svg.appendChild(drag.el);
+        } else if (tool === "erase") {
+          drag = { kind: "erase", a: p, b: p, pid: e.pointerId, color: sampleBg(P, p[0] - 2, p[1] - 2),
+                   el: svg("rect", { "class": "pv-preview pv-erasing" }) };
+          drag.el.setAttribute("fill", drag.color);
+          P.svg.appendChild(drag.el);
+        } else if (tool === "textedit") {
+          e.preventDefault();
+          startTextEdit(P, pageIndex, p);
+          return;
         } else if (tool === "ink") {
           drag = { kind: "ink", pts: [p], pid: e.pointerId,
                    el: svg("polyline", { stroke: st.inkColor, "stroke-width": Math.max(1, 2 * st.scale), fill: "none",
@@ -485,7 +544,7 @@
       P.svg.addEventListener("pointermove", function (e) {
         if (!drag || drag.pid !== e.pointerId) return;
         var p = pos(e);
-        if (drag.kind === "highlight") {
+        if (drag.kind === "highlight" || drag.kind === "erase") {
           drag.b = p;
           drag.el.setAttribute("x", Math.min(drag.a[0], p[0])); drag.el.setAttribute("y", Math.min(drag.a[1], p[1]));
           drag.el.setAttribute("width", Math.abs(p[0] - drag.a[0])); drag.el.setAttribute("height", Math.abs(p[1] - drag.a[1]));
@@ -510,6 +569,10 @@
           if (Math.abs(d.b[0] - d.a[0]) < 4 || Math.abs(d.b[1] - d.a[1]) < 3) return;
           var c1 = toPdf(P, d.a[0], d.a[1]), c2 = toPdf(P, d.b[0], d.b[1]);
           addAnnot({ type: "highlight", page: pageIndex, rects: [[c1[0], c1[1], c2[0], c2[1]]], color: st.color });
+        } else if (d.kind === "erase") {
+          if (Math.abs(d.b[0] - d.a[0]) < 3 || Math.abs(d.b[1] - d.a[1]) < 3) return;
+          var e1 = toPdf(P, d.a[0], d.a[1]), e2 = toPdf(P, d.b[0], d.b[1]);
+          addAnnot({ type: "erase", page: pageIndex, rects: [[e1[0], e1[1], e2[0], e2[1]]], color: d.color });
         } else if (d.kind === "ink") {
           var flat = [];
           d.pts.forEach(function (pt) { var c = toPdf(P, pt[0], pt[1]); flat.push(c[0], c[1]); });
@@ -519,49 +582,48 @@
         }
       }
       /* メモ ツールでは既定のフォーカス移動を止め、入力欄がすぐ文字を受け取れるようにする */
-      P.svg.addEventListener("mousedown", function (e) { if (st.tool === "note" && st.editable) e.preventDefault(); });
+      P.svg.addEventListener("mousedown", function (e) { if ((st.tool === "note" || st.tool === "textedit") && st.editable) e.preventDefault(); });
       P.svg.addEventListener("pointerup", finish);
       P.svg.addEventListener("pointercancel", finish);
       P.svg.addEventListener("dblclick", function (e) {
         if (!st.editable) return;
-        var el = e.target.closest ? e.target.closest(".pv-note") : null;
+        /* ドラッグ用のポインタ捕捉でイベントの宛先が SVG 全体になるため、座標から要素を引き直す */
+        var hit = document.elementFromPoint(e.clientX, e.clientY) || e.target;
+        var el = hit.closest ? hit.closest(".pv-note,.pv-textedit") : null;
         if (!el) return;
         var id = parseInt(el.getAttribute("data-id"), 10);
         var a = st.annots.filter(function (x) { return x._id === id; })[0];
-        if (a) editNote(P, pageIndex, a, null);
+        if (!a) return;
+        if (a.type === "note") editNote(P, pageIndex, a, null); else editTextAnnot(P, pageIndex, a);
       });
     }
 
-    /* メモの入力欄 (Enter で確定 / Shift+Enter で改行 / Esc で取り消し。日本語変換中の Enter は確定しない) */
+    /* ページ画像の画素から背景色を拾う (消去・文字修正で元の文字を隠す色。取れなければ白) */
+    function sampleBg(P, vx, vy) {
+      try {
+        var c = P.canvas, k = c.width / P.viewport.width;
+        var x = Math.max(0, Math.min(c.width - 1, Math.round(vx * k))), y = Math.max(0, Math.min(c.height - 1, Math.round(vy * k)));
+        var d = c.getContext("2d").getImageData(x, y, 1, 1).data;
+        if (d[3] < 200) return "#ffffff";
+        return "#" + [d[0], d[1], d[2]].map(function (v) { return ("0" + v.toString(16)).slice(-2); }).join("");
+      } catch (e) { return "#ffffff"; }
+    }
+
+    /* ───────── 入力欄 (メモ / 文字修正 共通) ─────────
+       Enter で確定 / Shift+Enter で改行 / Esc で取り消し。日本語変換中の Enter は確定しない。 */
     var noteBox = null;
-    function editNote(P, pageIndex, existing, at) {
+    function openEditor(P, o) {
       if (noteBox) noteBox.commit();
-      var vx, vy, size = existing ? (existing.size || 12) : 12;
-      if (existing) { var v = toView(P, existing.x, existing.y); vx = v[0]; vy = v[1]; } else { vx = at[0]; vy = at[1]; }
       var ta = document.createElement("textarea");
-      ta.className = "pv-noteedit"; ta.value = existing ? existing.text : "";
-      ta.style.left = vx + "px"; ta.style.top = vy + "px"; ta.style.fontSize = (size * st.scale) + "px";
-      ta.placeholder = "メモ (Enter で確定)";
+      ta.className = "pv-noteedit" + (o.plain ? " pv-plainedit" : ""); ta.value = o.value || "";
+      ta.style.left = o.vx + "px"; ta.style.top = o.vy + "px"; ta.style.fontSize = o.fontPx + "px";
+      if (o.width) ta.style.width = Math.max(120, o.width) + "px";
+      ta.placeholder = o.placeholder || "";
       P.wrap.appendChild(ta);
       var done = false;
-      function commit() {
-        if (done) return; done = true; noteBox = null;
-        var text = ta.value.replace(/\s+$/, "");
-        if (ta.parentNode) ta.parentNode.removeChild(ta);
-        if (existing) {
-          if (text === existing.text) return;
-          pushUndo();
-          if (!text.trim()) { st.annots = st.annots.filter(function (x) { return x !== existing; }); st.sel = null; }
-          else existing.text = text;
-          touch(pageIndex);
-        } else if (text.trim()) {
-          var c = toPdf(P, vx, vy);
-          addAnnot({ type: "note", page: pageIndex, x: c[0], y: c[1], text: text, size: size, color: "#102030" });
-          st.tool = "select"; setStatus("");
-        }
-        elBody.focus();
-      }
-      function cancel() { if (done) return; done = true; noteBox = null; if (ta.parentNode) ta.parentNode.removeChild(ta); elBody.focus(); }
+      function close() { noteBox = null; if (ta.parentNode) ta.parentNode.removeChild(ta); elBody.focus(); }
+      function commit() { if (done) return; done = true; var text = ta.value.replace(/\s+$/, ""); close(); o.onCommit(text); }
+      function cancel() { if (done) return; done = true; close(); }
       ta.addEventListener("keydown", function (e) {
         e.stopPropagation();
         if (e.isComposing || e.keyCode === 229) return;
@@ -571,8 +633,172 @@
       ta.addEventListener("blur", function () { setTimeout(commit, 0); });
       noteBox = { commit: commit, cancel: cancel, el: ta };
       ta.focus();
+      if (o.value) { try { ta.select(); } catch (e) {} }
       setTimeout(function () { if (!done && document.activeElement !== ta) ta.focus(); }, 0);
     }
+    function editNote(P, pageIndex, existing, at) {
+      var vx, vy, size = existing ? (existing.size || 12) : 12;
+      if (existing) { var v = toView(P, existing.x, existing.y); vx = v[0]; vy = v[1]; } else { vx = at[0]; vy = at[1]; }
+      openEditor(P, { vx: vx, vy: vy, fontPx: size * st.scale, value: existing ? existing.text : "", placeholder: "メモ (Enter で確定)",
+        onCommit: function (text) {
+          if (existing) {
+            if (text === existing.text) return;
+            pushUndo();
+            if (!text.trim()) { st.annots = st.annots.filter(function (x) { return x !== existing; }); st.sel = null; }
+            else existing.text = text;
+            touch(pageIndex);
+          } else if (text.trim()) {
+            var c = toPdf(P, vx, vy);
+            addAnnot({ type: "note", page: pageIndex, x: c[0], y: c[1], text: text, size: size, color: "#102030" });
+            st.tool = "select"; setStatus("");
+          }
+        } });
+    }
+
+    /* ───────── ✏ 文字修正 ─────────
+       クリックした位置に (1) 自分が直した文字があれば再編集、(2) PDF の文字があれば
+       それを隠して打ち直す、(3) 何もなければその場所に文字を追加する。 */
+    function fontKind(family) { return /mono|courier/i.test(family || "") ? "mono" : (/sans|gothic|helvet|arial/i.test(family || "") ? "sans" : "serif"); }
+    function itemsOf(P) {
+      if (!P.items) {
+        P.items = P.page.getTextContent().then(function (tc) {
+          return tc.items.filter(function (it) { return it.str && it.str.trim(); }).map(function (it) {
+            var tx = it.transform, h = it.height || Math.hypot(tx[2], tx[3]) || 10;
+            return { str: it.str, x: tx[4], y: tx[5], size: h, width: it.width,
+                     rect: [tx[4], tx[5] - h * 0.27, tx[4] + it.width, tx[5] + h * 0.92],
+                     font: fontKind(tc.styles && tc.styles[it.fontName] && tc.styles[it.fontName].fontFamily) };
+          });
+        }, function () { return []; });
+      }
+      return P.items;
+    }
+    function inRect(r, x, y) { return x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]; }
+    function startTextEdit(P, pageIndex, p) {
+      var c = toPdf(P, p[0], p[1]);
+      for (var i = st.annots.length - 1; i >= 0; i--) {
+        var a = st.annots[i];
+        if (a.page === pageIndex && a.type === "textedit" && inRect(Edit.annotRect(a), c[0], c[1])) { editTextAnnot(P, pageIndex, a); return; }
+      }
+      itemsOf(P).then(function (items) {
+        if (st.closed || st.tool !== "textedit") return;
+        var hit = null;
+        for (var k = 0; k < items.length; k++) if (inRect(items[k].rect, c[0], c[1])) { hit = items[k]; break; }
+        if (hit) {
+          var v = viewRect(P, hit.rect), cover = [hit.rect[0] - 1, hit.rect[1], hit.rect[2] + 1, hit.rect[3]];
+          var bg = sampleBg(P, v.x - 3, v.y - 2);
+          openEditor(P, { vx: v.x, vy: v.y, fontPx: hit.size * st.scale, width: v.w + 30, value: hit.str, plain: true,
+            onCommit: function (text) {
+              if (text === hit.str.replace(/\s+$/, "")) return;          /* 変えていなければ何もしない */
+              addAnnot({ type: "textedit", page: pageIndex, x: hit.x, y: hit.y, text: text, size: hit.size,
+                         color: "#000000", font: hit.font, cover: cover, bg: bg });
+              setStatus(text.trim() ? "文字を書き換えました (:w で PDF に保存)" : "文字を消しました (:w で PDF に保存)");
+            } });
+        } else {
+          openEditor(P, { vx: p[0], vy: p[1] - 12 * st.scale, fontPx: 12 * st.scale, value: "", plain: true, placeholder: "文字を追加 (Enter で確定)",
+            onCommit: function (text) {
+              if (!text.trim()) return;
+              addAnnot({ type: "textedit", page: pageIndex, x: c[0], y: c[1], text: text, size: 12, color: "#000000", font: "sans", cover: null });
+              setStatus("文字を追加しました (:w で PDF に保存)");
+            } });
+        }
+      });
+    }
+    function editTextAnnot(P, pageIndex, a) {
+      var v = toView(P, a.x, a.y + (a.size || 12) * 0.92);
+      openEditor(P, { vx: v[0], vy: v[1], fontPx: (a.size || 12) * st.scale, value: a.text, plain: true,
+        onCommit: function (text) {
+          if (text === a.text) return;
+          pushUndo();
+          if (!text.trim() && !a.cover) { st.annots = st.annots.filter(function (x) { return x !== a; }); st.sel = null; }
+          else a.text = text;
+          touch(pageIndex);
+        } });
+    }
+
+    /* ───────── ページ操作 / 焼き込み (PDF 本体を書き換えるので、表示を読み込み直す) ───────── */
+    function docParams() {
+      var params = opts.docParams ? Object.assign({}, opts.docParams) : {
+        CMapReaderFactory: assetFactory(base, "cmap"), cMapUrl: "bundle/", cMapPacked: true,
+        StandardFontDataFactory: assetFactory(base, "font"), standardFontDataUrl: "bundle/"
+      };
+      params.data = st.baseBytes.slice();      /* pdf.js はバッファを占有するので複製を渡す */
+      params.isEvalSupported = false;          /* フォント経由のコード実行 (CVE-2024-4367) を封じる (上書き不可) */
+      return params;
+    }
+    function openDoc() {
+      return (typeof opts.loadPdfJs === "function" ? opts.loadPdfJs() : ensurePdfJs(base))
+        .then(function (pdfjs) { return pdfjs.getDocument(docParams()).promise; });
+    }
+    function reloadDoc(keepPage) {
+      st.busy = true;
+      var old = st.pdf, query = st.lastQuery;
+      if (io) { io.disconnect(); io = null; }
+      st.pages.forEach(function (P) { if (P.task) { try { P.task.cancel(); } catch (e) {} } });
+      st.pages = []; elPages.innerHTML = ""; st.hits = {}; st.hitPages = []; st.hitCount = 0; st.scanToken++;
+      return openDoc().then(function (pdf) {
+        if (old) { try { old.destroy(); } catch (e) {} }
+        st.pdf = pdf;
+        return buildPages(true);
+      }).then(function () {
+        st.busy = false;
+        if (st.closed) return;
+        setupObserver();
+        gotoPage(Math.max(0, Math.min(st.pages.length - 1, keepPage | 0)));
+        refreshChrome();
+        if (query) scanHits(query, false, true);
+      }, function (err) { st.busy = false; setStatus("PDF を表示できません: " + (err && err.message || err)); });
+    }
+    function pageOperation(op, done) {
+      if (!st.editable) { setStatus("読み取り専用のため編集できません"); return Promise.resolve(); }
+      if (st.busy || !st.pages.length) return Promise.resolve();
+      if (noteBox) noteBox.commit();
+      st.busy = true; setStatus("ページを編集中…");
+      var count = st.pages.length;
+      return ensurePdfLib(pdfLibUrl).then(function (L) { return Edit.pageOp(L, st.baseBytes, op); }).then(function (r) {
+        pushUndo();
+        st.baseBytes = r.bytes;
+        st.annots = Edit.remapAnnots(st.annots, op);
+        (r.annots || []).forEach(function (a) { a._id = st.nextId++; st.annots.push(a); });
+        st.sel = null; st.dirty = true; st.closeArmed = false;
+        var go = op.op === "move" ? op.to : op.op === "blank" ? op.at : op.op === "merge" ? count : Math.min(op.page | 0, count - 1);
+        return reloadDoc(go).then(function () { setStatus(done(r) + " (u で取り消し / :w で保存)"); });
+      }, function (err) { st.busy = false; setStatus("ページ操作エラー: " + (err && err.message || err)); });
+    }
+    function rotatePage() { return pageOperation({ op: "rotate", page: st.cur, delta: 90 }, function () { return (st.cur + 1) + " ページ目を回転しました"; }); }
+    function deletePage() {
+      if (st.pages.length <= 1) { setStatus("最後の 1 ページは削除できません"); return Promise.resolve(); }
+      var n = st.cur + 1;
+      return pageOperation({ op: "delete", page: st.cur }, function () { return n + " ページ目を削除しました"; });
+    }
+    function movePage(to) {
+      if (to < 0 || to >= st.pages.length || to === st.cur) { setStatus("これ以上は動かせません"); return Promise.resolve(); }
+      var from = st.cur + 1;
+      return pageOperation({ op: "move", page: st.cur, to: to }, function () { return from + " ページ目を " + (to + 1) + " ページ目へ移動しました"; });
+    }
+    function blankPage() { return pageOperation({ op: "blank", at: st.cur + 1 }, function () { return "空白ページを挿入しました"; }); }
+    function mergePdf(bytes) {
+      return pageOperation({ op: "merge", bytes: bytes }, function (r) { return "PDF を結合しました (+" + r.added + " ページ)"; });
+    }
+    function flattenAll() {
+      if (!st.editable) { setStatus("読み取り専用のため編集できません"); return Promise.resolve(); }
+      if (st.busy) return Promise.resolve();
+      if (noteBox) noteBox.commit();
+      var clean = st.annots.map(function (a) { return Edit.normalize(a); }).filter(Boolean);
+      if (!clean.length) { setStatus("焼き込む書き込みがありません"); return Promise.resolve(); }
+      st.busy = true; setStatus("焼き込み中…");
+      return ensurePdfLib(pdfLibUrl).then(function (L) { return Edit.flatten(L, st.baseBytes, clean); }).then(function (out) {
+        pushUndo();
+        st.baseBytes = out; st.annots = []; st.sel = null; st.dirty = true;
+        return reloadDoc(st.cur).then(function () { setStatus(clean.length + " 件をページ本体に焼き込みました (u で取り消し / :w で保存)"); });
+      }, function (err) { st.busy = false; setStatus("焼き込みエラー: " + (err && err.message || err)); });
+    }
+    var elMerge = q(".pv-mergein");
+    elMerge.addEventListener("change", function () {
+      var f = elMerge.files && elMerge.files[0];
+      elMerge.value = "";
+      if (!f) return;
+      f.arrayBuffer().then(function (buf) { return mergePdf(new Uint8Array(buf)); });
+    });
 
     /* ───────── 保存 ───────── */
     function save(thenClose) {
@@ -608,12 +834,20 @@
       if (c === "q") { if (st.dirty && !opts.keepOnClose) setStatus("未保存の注釈があります (:w で保存 / :q! で破棄)"); else teardown(); return; }
       if (c === "q!") { teardown(); return; }
       if (/^\d+$/.test(c)) { gotoPage(parseInt(c, 10) - 1); return; }
+      if (c === "rotate") { rotatePage(); return; }
+      if (c === "delpage") { deletePage(); return; }
+      if (c === "blank") { blankPage(); return; }
+      if (c === "flatten") { flattenAll(); return; }
+      if (c === "merge") { if (st.editable) elMerge.click(); return; }
+      var mv = /^move\s+(\d+)$/.exec(c);
+      if (mv) { movePage(parseInt(mv[1], 10) - 1); return; }
       setStatus("未対応のコマンド: :" + c);
     }
     function setTool(t) {
       if (!st.editable && t !== "select") { setStatus("読み取り専用のため編集できません"); return; }
       st.tool = t;
-      setStatus(({ select: "", highlight: "ドラッグした範囲にマーカーを引きます", ink: "ドラッグで手書きします", note: "書き込みたい場所をクリックしてください" })[t]);
+      setStatus(({ select: "", highlight: "ドラッグした範囲にマーカーを引きます", ink: "ドラッグで手書きします", note: "書き込みたい場所をクリックしてください",
+                   textedit: "直したい文字をクリックして書き換えます (何もない所をクリックすると文字を追加)", erase: "消したい範囲をドラッグします" })[t]);
     }
     function onKey(e) {
       if (st.closed) return;
@@ -644,6 +878,14 @@
         case "m": setTool("highlight"); break;
         case "p": setTool("ink"); break;
         case "i": setTool("note"); break;
+        case "e": setTool("textedit"); break;
+        case "r": setTool("erase"); break;
+        case "R": rotatePage(); break;
+        case "D": deletePage(); break;
+        case "<": movePage(st.cur - 1); break;
+        case ">": movePage(st.cur + 1); break;
+        case "o": blankPage(); break;
+        case "F": flattenAll(); break;
         case "M": if (st.editable) hitsToMarker(); break;
         case "x": case "Delete": if (st.editable) removeSelected(); break;
         case "u": if (st.editable) undo(); break;
@@ -693,6 +935,13 @@
       else if (act === "undo") undo();
       else if (act === "save") save(false);
       else if (act === "hitmark") hitsToMarker();
+      else if (act === "rot") rotatePage();
+      else if (act === "pgup") movePage(st.cur - 1);
+      else if (act === "pgdn") movePage(st.cur + 1);
+      else if (act === "blank") blankPage();
+      else if (act === "pgdel") deletePage();
+      else if (act === "flatten") flattenAll();
+      else if (act === "merge") elMerge.click();
       if (tool || act) elBody.focus();
     });
     q(".cv-x").addEventListener("click", function () { if (st.dirty && !confirmDiscard()) return; teardown(); });
@@ -734,15 +983,7 @@
         st.status = "既存の注釈を読み取れないため読み取り専用で開きます: " + (err && err.message || err);
       });
     }).then(function () {
-      return typeof opts.loadPdfJs === "function" ? opts.loadPdfJs() : ensurePdfJs(base);
-    }).then(function (pdfjs) {
-      var params = opts.docParams ? Object.assign({}, opts.docParams) : {
-        CMapReaderFactory: assetFactory(base, "cmap"), cMapUrl: "bundle/", cMapPacked: true,
-        StandardFontDataFactory: assetFactory(base, "font"), standardFontDataUrl: "bundle/"
-      };
-      params.data = st.baseBytes.slice();      /* pdf.js はバッファを占有するので複製を渡す */
-      params.isEvalSupported = false;          /* フォント経由のコード実行 (CVE-2024-4367) を封じる (上書き不可) */
-      return pdfjs.getDocument(params).promise;
+      return openDoc();
     }).then(function (pdf) {
       if (st.closed) { pdf.destroy(); return; }
       st.pdf = pdf;
@@ -764,6 +1005,8 @@
     refreshChrome();
     elBody.focus();
     var ctl = { state: st, ready: ready, close: teardown, save: save, addAnnot: addAnnot, gotoPage: gotoPage,
+                rotatePage: rotatePage, deletePage: deletePage, movePage: movePage, blankPage: blankPage,
+                mergePdf: mergePdf, flatten: flattenAll, undo: undo,
                 setScale: setScale, setTool: function (t) { setTool(t); refreshChrome(); }, scanHits: scanHits };
     BadaPdfView.current = ctl;
     return ctl;
@@ -821,6 +1064,16 @@
       ".badapdf-overlay .pv-notetext{font-family:'Noto Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,Helvetica,Arial,sans-serif;white-space:pre;user-select:none}",
       ".badapdf-overlay .pv-a{cursor:pointer}",
       ".badapdf-overlay.pv-drawing .pv-a{pointer-events:none}",
+      ".badapdf-overlay .pv-edit{background:#020d07;border-bottom:1px solid #15351f}",
+      ".badapdf-overlay .pv-lab{color:#ffcf4a;font-size:11.5px;letter-spacing:.05em}",
+      ".badapdf-overlay .pv-sep{width:1px;align-self:stretch;background:#15351f;margin:0 4px}",
+      ".badapdf-overlay .pv-erasing{stroke:#ff3b5c;stroke-width:1;stroke-dasharray:4 3}",
+      ".badapdf-overlay .pv-edittext{white-space:pre;user-select:none}",
+      ".badapdf-overlay .pv-font-sans{font-family:Helvetica,Arial,'Noto Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif}",
+      ".badapdf-overlay .pv-font-serif{font-family:'Times New Roman',Times,'Noto Serif JP','Hiragino Mincho ProN','Yu Mincho',serif}",
+      ".badapdf-overlay .pv-font-mono{font-family:Courier,'Courier New',monospace}",
+      ".badapdf-overlay .pv-grabbox{fill:transparent}",
+      ".badapdf-overlay .pv-plainedit{background:#fff;border-color:#ff7a00;padding:0 2px;min-height:1.3em;line-height:1.2}",
       ".badapdf-overlay .pv-selbox{fill:none;stroke:#1f6fff;stroke-width:1.5;stroke-dasharray:5 3;pointer-events:none}",
       ".badapdf-overlay .pv-noteedit{position:absolute;z-index:5;min-width:180px;min-height:2.2em;padding:2px 4px;border:2px solid #1f6fff;border-radius:3px;background:#fffbd0;color:#102030;font-family:'Noto Sans JP','Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,Helvetica,Arial,sans-serif;line-height:1.3;resize:both;outline:none;box-shadow:0 4px 18px #0006}"
     ].join("\n");

@@ -102,11 +102,85 @@ async function annotsOf(bytes){
   var oob = await Edit.applyAnnotations(L, base, [{ type: "note", page: 9, x: 1, y: 1, text: "x" }]);
   ok(!Edit.hasMarker(oob), "annotation on a non-existent page is ignored");
 
+  /* ══ PDF 専用の編集ツール ══ */
+  async function pageTexts(bytes){
+    var pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false, verbosity: 0 }).promise, out = [];
+    for (var i = 1; i <= pdf.numPages; i++){
+      var pg = await pdf.getPage(i), tc = await pg.getTextContent();
+      out.push({ text: tc.items.map(function(it){ return it.str; }).join(" "), rotate: pg.rotate, w: Math.round(pg.view[2]), ops: (await pg.getOperatorList()).fnArray.length });
+    }
+    await pdf.destroy();
+    return out;
+  }
+  /* ── 文字修正 / 消去 ── */
+  var edits = [
+    { type: "textedit", page: 0, x: 30, y: 250, text: "Alexander polynomial", size: 14, color: "#000000", font: "serif", cover: [28, 246, 330, 264], bg: "#ffffff" },
+    { type: "textedit", page: 1, x: 40, y: 120, text: "追記の一行", size: 12, color: "#000000", font: "sans", cover: null, bg: "#ffffff" },
+    { type: "erase", page: 1, rects: [[30, 240, 300, 265]], color: "#ffffff" }
+  ];
+  var es = await Edit.applyAnnotations(L, base, edits);
+  var eb = await Edit.extractAnnotations(L, es);
+  ok(JSON.stringify(eb.annots) === JSON.stringify(edits.map(Edit.normalize)), "text-edit / erase round-trip losslessly");
+  var eseen = await annotsOf(es);
+  ok(eseen[0][0].subtype === "FreeText" && eseen[0][0].contentsObj.str === "Alexander polynomial", "text edit is a standard FreeText annotation carrying the new text");
+  ok(eseen[1].map(function(a){ return a.subtype; }).sort().join(",") === "FreeText,Square", "erase is a filled Square annotation");
+  ok(Edit.normalize({ type: "textedit", page: 0, x: 1, y: 2, text: "", cover: null }) === null, "text edit with neither text nor cover is rejected");
+  ok(Edit.normalize({ type: "textedit", page: 0, x: 1, y: 2, text: "", cover: [1, 2, 30, 40] }).cover.join(",") === "1,2,30,40", "text edit with only a cover = deleting the original text");
+  var tb = Edit.textBox({ x: 10, y: 100, text: "ab\ncd", size: 10 });
+  ok(tb[0] === 10 && tb[3] > 100 && tb[1] < 100 - 10, "textBox covers ascender of line 1 down to the last line");
+
+  /* ── 焼き込み ── */
+  var before = await pageTexts(base);
+  var flat = await Edit.flatten(L, base, edits);
+  var fseen = await annotsOf(flat);
+  ok(fseen[0].length === 0 && fseen[1].length === 0 && !Edit.hasMarker(flat), "flatten leaves no annotations behind");
+  var after = await pageTexts(flat);
+  ok(after[0].ops > before[0].ops && after[1].ops > before[1].ops, "flatten draws the edits into the page content itself");
+  ok(/Alexander polynomial/.test(after[0].text), "flattened replacement text is part of the page text");
+  ok((await Edit.extractAnnotations(L, flat)).annots.length === 0, "a flattened PDF has nothing left to re-edit");
+
+  /* ── ページ操作 ── */
+  var three = await (async function(){
+    var d = await L.PDFDocument.create(), f = await d.embedFont(L.StandardFonts.Helvetica);
+    ["AAA", "BBB", "CCC"].forEach(function(t, i){ d.addPage([300 + i * 10, 300]).drawText("page " + t, { x: 20, y: 250, size: 14, font: f }); });
+    return d.save();
+  })();
+  function order(list){ return list.map(function(p){ return (/page (\w+)/.exec(p.text) || [0, "-"])[1]; }).join(","); }
+  var r1 = await Edit.pageOp(L, three, { op: "rotate", page: 1, delta: 90 });
+  var t1 = await pageTexts(r1.bytes);
+  ok(t1[1].rotate === 90 && t1[0].rotate === 0 && order(t1) === "AAA,BBB,CCC", "rotate turns only that page");
+  var r1b = await Edit.pageOp(L, r1.bytes, { op: "rotate", page: 1, delta: -90 });
+  ok((await pageTexts(r1b.bytes))[1].rotate === 0, "rotating back restores the page");
+  var r2 = await Edit.pageOp(L, three, { op: "delete", page: 0 });
+  ok(order(await pageTexts(r2.bytes)) === "BBB,CCC", "delete removes the page");
+  var r3 = await Edit.pageOp(L, three, { op: "move", page: 0, to: 2 });
+  ok(order(await pageTexts(r3.bytes)) === "BBB,CCC,AAA", "move reorders pages (first → last)");
+  var r3b = await Edit.pageOp(L, three, { op: "move", page: 2, to: 0 });
+  ok(order(await pageTexts(r3b.bytes)) === "CCC,AAA,BBB", "move reorders pages (last → first)");
+  var r4 = await Edit.pageOp(L, three, { op: "blank", at: 1 });
+  var t4 = await pageTexts(r4.bytes);
+  ok(order(t4) === "AAA,-,BBB,CCC" && t4[1].w === 300, "blank page inserted at the position, sized like its neighbour");
+  var r5 = await Edit.pageOp(L, three, { op: "merge", bytes: saved });
+  var t5 = await pageTexts(r5.bytes);
+  ok(t5.length === 5 && r5.added === 2 && /Kauffman/.test(t5[3].text), "merge appends the other PDF's pages");
+  ok(r5.annots.length === 4 && r5.annots[0].page === 3 && r5.annots[3].page === 4 && !Edit.hasMarker(r5.bytes), "merge carries over the other PDF's annotations onto the new page numbers");
+  var one = await Edit.pageOp(L, r2.bytes, { op: "delete", page: 0 });
+  var threw = false; try { await Edit.pageOp(L, one.bytes, { op: "delete", page: 0 }); } catch (e) { threw = true; }
+  ok(threw, "the last remaining page cannot be deleted");
+
+  function pagesOf(list){ return list.map(function(a){ return a.page; }).join(","); }
+  function mk(){ return [0, 1, 2, 3].map(function(p){ return { type: "erase", page: p, rects: [[0, 0, 1, 1]] }; }); }
+  ok(pagesOf(Edit.remapAnnots(mk(), { op: "delete", page: 1 })) === "0,1,2", "remap: deleting a page drops its annotations and shifts the rest");
+  ok(pagesOf(Edit.remapAnnots(mk(), { op: "move", page: 0, to: 2 })) === "2,0,1,3", "remap: moving a page forward");
+  ok(pagesOf(Edit.remapAnnots(mk(), { op: "move", page: 3, to: 1 })) === "0,2,3,1", "remap: moving a page backward");
+  ok(pagesOf(Edit.remapAnnots(mk(), { op: "blank", at: 2 })) === "0,1,3,4", "remap: inserting a blank page shifts later pages");
+  ok(pagesOf(Edit.remapAnnots(mk(), { op: "rotate", page: 1 })) === "0,1,2,3", "remap: rotation keeps page numbers");
+
   /* ── 実在の PDF で往復 ── */
   var real = path.join(__dirname, "..", "..", "Bada#.pdf");
   if (fs.existsSync(real)){
     var rb = new Uint8Array(fs.readFileSync(real));
-    var before = Core.extractPdfText(Buffer.from(rb));
+    var beforeReal = Core.extractPdfText(Buffer.from(rb));
     var rs = await Edit.applyAnnotations(L, rb, [{ type: "note", page: 0, x: 72, y: 700, text: "Bada 注釈テスト", size: 12 },
                                                  { type: "highlight", page: 0, rects: [[72, 600, 300, 620]] }]);
     var rseen = await annotsOf(rs);
@@ -115,7 +189,11 @@ async function annotsOf(bytes){
     ok(after.indexOf("〔注釈〕 Bada 注釈テスト") >= 0, "real-world PDF: note is indexed");
     var rback = await Edit.extractAnnotations(L, rs);
     var restored = Core.extractPdfText(Buffer.from(rback.bytes));
-    ok(rback.annots.length === 2 && restored === before, "real-world PDF: stripping annotations restores the exact original text");
+    ok(rback.annots.length === 2 && restored === beforeReal, "real-world PDF: stripping annotations restores the exact original text");
+    var rflat = await Edit.flatten(L, rb, [{ type: "textedit", page: 0, x: 72, y: 700, text: "修正後の題名", size: 14, cover: [70, 695, 300, 715] }]);
+    var rrot = await Edit.pageOp(L, rflat, { op: "move", page: 0, to: 1 });
+    var rt = await pageTexts(rrot.bytes);
+    ok(rt.length === 22 && /Artificial/.test(rt[1].text), "real-world PDF: flatten + page move keep all 22 pages readable");
   } else {
     console.log("SKIP  real-world PDF (Bada#.pdf not found)");
   }

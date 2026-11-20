@@ -13,6 +13,16 @@
  *   { type:"highlight", page, rects:[[x1,y1,x2,y2],…], color:"#ffe14a" }
  *   { type:"ink",       page, paths:[[x,y,x,y,…],…],   color:"#ff4a6a", width:2 }
  *   { type:"note",      page, x, y(上端), text, size:12, color:"#102030" }
+ *   { type:"textedit",  page, x, y(ベースライン), text, size, color, font:"sans|serif|mono",
+ *                       cover:[x1,y1,x2,y2]|null, bg:"#ffffff" }   ← 文字修正 (cover = 元の文字を隠す範囲)
+ *   { type:"erase",     page, rects:[[x1,y1,x2,y2],…], color:"#ffffff" }   ← 消去 (塗りつぶし)
+ *
+ * PDF 専用の編集ツール:
+ *   flatten(PDFLib, bytes, annots)   → 書き込みをページ本体に焼き込んだ PDF (注釈ではなくなる)
+ *   pageOp(PDFLib, bytes, op)        → ページ操作後の { bytes, annots(結合元の注釈) }
+ *        op: {op:"rotate",page,delta} {op:"delete",page} {op:"move",page,to}
+ *            {op:"blank",at} {op:"merge",bytes}
+ *   remapAnnots(annots, op, info)    → ページ操作に合わせて注釈のページ番号を付け替える
  *
  * 各注釈には /T (BadaCineVim) と /BadaData (モデルの JSON) を持たせるので、
  * 開き直しても同じ注釈をそのまま再編集できます (読み戻しは無損失)。
@@ -64,11 +74,23 @@
     var width = Math.max(1, w) * size + 8, height = lines.length * size * 1.3 + 6;
     return [a.x, a.y - height, a.x + width, a.y];
   }
+  /* 文字修正の文字が占める範囲 [x1,y1,x2,y2] (a.x, a.y は 1 行目のベースライン左端) */
+  function textBox(a) {
+    var size = a.size || 12, lines = noteLines(a), w = 0;
+    for (var i = 0; i < lines.length; i++) w = Math.max(w, lineEm(lines[i]));
+    return [a.x, a.y - size * 0.28 - (lines.length - 1) * size * 1.2, a.x + Math.max(0.5, w) * size, a.y + size * 0.92];
+  }
   function annotRect(a) {
     var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity, i, j;
     function add(x, y) { if (x < x1) x1 = x; if (x > x2) x2 = x; if (y < y1) y1 = y; if (y > y2) y2 = y; }
     if (a.type === "note") return noteRect(a);
-    if (a.type === "highlight") {
+    if (a.type === "textedit") {
+      var tb = textBox(a);
+      add(tb[0], tb[1]); add(tb[2], tb[3]);
+      if (a.cover) { add(a.cover[0], a.cover[1]); add(a.cover[2], a.cover[3]); }
+      return [x1, y1, x2, y2];
+    }
+    if (a.type === "highlight" || a.type === "erase") {
       for (i = 0; i < a.rects.length; i++) { add(a.rects[i][0], a.rects[i][1]); add(a.rects[i][2], a.rects[i][3]); }
       return [x1, y1, x2, y2];
     }
@@ -93,6 +115,27 @@
         rects.push([Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])]);
       }
       return rects.length ? { type: "highlight", page: page, rects: rects, color: a.color || "#ffe14a" } : null;
+    }
+    if (a.type === "erase") {
+      var er = [];
+      for (i = 0; i < (a.rects || []).length; i++) {
+        var q0 = a.rects[i];
+        if (!q0 || q0.length !== 4 || !q0.every(fin)) continue;
+        er.push([Math.min(q0[0], q0[2]), Math.min(q0[1], q0[3]), Math.max(q0[0], q0[2]), Math.max(q0[1], q0[3])]);
+      }
+      return er.length ? { type: "erase", page: page, rects: er, color: a.color || "#ffffff" } : null;
+    }
+    if (a.type === "textedit") {
+      var tx = String(a.text == null ? "" : a.text).replace(/\r\n?/g, "\n").replace(/\s+$/, "");
+      if (!fin(a.x) || !fin(a.y)) return null;
+      var cover = null;
+      if (a.cover && a.cover.length === 4 && a.cover.every(fin)) {
+        cover = [Math.min(a.cover[0], a.cover[2]), Math.min(a.cover[1], a.cover[3]), Math.max(a.cover[0], a.cover[2]), Math.max(a.cover[1], a.cover[3])];
+      }
+      if (!tx.trim() && !cover) return null;          /* 隠す範囲も文字も無ければ何もしない */
+      return { type: "textedit", page: page, x: a.x, y: a.y, text: tx, size: fin(a.size) && a.size > 0 ? a.size : 12,
+               color: a.color || "#000000", font: /^(serif|mono)$/.test(a.font) ? a.font : "sans",
+               cover: cover, bg: a.bg || "#ffffff" };
     }
     if (a.type === "ink") {
       var paths = [];
@@ -143,10 +186,37 @@
     return s + "ET\n";
   }
 
-  /* 日本語メモ用: 非埋め込みの CID フォント (Adobe-Japan1 / UniJIS-UTF16-H)。
+  function eraseStream(a) {
+    var s = rgbOp(a.color, "rg") + "\n";
+    for (var i = 0; i < a.rects.length; i++) {
+      var r = a.rects[i];
+      s += n2(r[0]) + " " + n2(r[1]) + " " + n2(r[2] - r[0]) + " " + n2(r[3] - r[1]) + " re\n";
+    }
+    return s + "f\n";
+  }
+  function textEditStream(a, ascii) {
+    var size = a.size || 12, lines = noteLines(a), s = "";
+    if (a.cover) {
+      s += rgbOp(a.bg, "rg") + "\n" + n2(a.cover[0]) + " " + n2(a.cover[1]) + " " +
+           n2(a.cover[2] - a.cover[0]) + " " + n2(a.cover[3] - a.cover[1]) + " re f\n";
+    }
+    if (!a.text.trim()) return s;
+    s += "BT /F1 " + n2(size) + " Tf " + n2(size * 1.2) + " TL " + rgbOp(a.color, "rg") + "\n" +
+         n2(a.x) + " " + n2(a.y) + " Td\n";
+    for (var i = 0; i < lines.length; i++) {
+      s += (ascii ? "(" + litEscape(lines[i]) + ")" : "<" + utf16Hex(lines[i]) + ">") + " Tj T*\n";
+    }
+    return s + "ET\n";
+  }
+  var LATIN_FONTS = { sans: "Helvetica", serif: "Times-Roman", mono: "Courier" };
+  function latinFont(kind) {
+    return { Type: "Font", Subtype: "Type1", BaseFont: LATIN_FONTS[kind] || "Helvetica", Encoding: "WinAnsiEncoding" };
+  }
+
+  /* 日本語用: 非埋め込みの CID フォント (Adobe-Japan1 / UniJIS-UTF16-H)。
      フォント本体は PDF に入れず、ビューア側の日本語フォントで描画されます。 */
-  function cjkFont(ctx, L) {
-    var name = "KozMinPr6N-Regular";
+  function cjkFont(ctx, L, kind) {
+    var name = kind === "serif" ? "KozMinPr6N-Regular" : (kind ? "KozGoPr6N-Medium" : "KozMinPr6N-Regular");
     return ctx.obj({
       Type: "Font", Subtype: "Type0", BaseFont: name, Encoding: "UniJIS-UTF16-H",
       DescendantFonts: [{
@@ -161,8 +231,9 @@
     });
   }
 
-  function buildAnnot(L, doc, a) {
-    var ctx = doc.context, rect = annotRect(a), res, body, extra;
+  /* 注釈 1 件ぶんの「見た目」(外観ストリーム = Form XObject) と注釈辞書の中身を作る */
+  function buildParts(L, doc, a) {
+    var ctx = doc.context, rect = annotRect(a), res, body, extra, ascii;
     if (a.type === "note") rect = [rect[0] - 1, rect[1] - 1, rect[2] + 1, rect[3] + 1];   /* 枠線が切れないよう 1pt 広げる */
     if (a.type === "highlight") {
       var qp = [];
@@ -177,11 +248,19 @@
       res = {};
       body = inkStream(a);
       extra = { Subtype: "Ink", InkList: a.paths, C: rgb(a.color), BS: { W: a.width || 2 } };
+    } else if (a.type === "erase") {
+      res = {};
+      body = eraseStream(a);
+      extra = { Subtype: "Square", C: rgb(a.color), IC: rgb(a.color), BS: { W: 0 } };
+    } else if (a.type === "textedit") {
+      ascii = isAscii(a.text);
+      res = { Font: { F1: ascii ? latinFont(a.font) : cjkFont(ctx, L, a.font) } };
+      body = textEditStream(a, ascii);
+      extra = { Subtype: "FreeText", DA: L.PDFString.of(rgbOp(a.color, "rg") + " /Helv " + n2(a.size || 12) + " Tf") };
+      if (a.text.trim()) extra.Contents = L.PDFHexString.fromText(a.text);
     } else {
-      var ascii = isAscii(a.text);
-      res = { Font: { F1: ascii
-        ? { Type: "Font", Subtype: "Type1", BaseFont: "Helvetica", Encoding: "WinAnsiEncoding" }
-        : cjkFont(ctx, L) } };
+      ascii = isAscii(a.text);
+      res = { Font: { F1: ascii ? latinFont("sans") : cjkFont(ctx, L) } };
       body = noteStream(a, ascii);
       extra = {
         Subtype: "FreeText", Contents: L.PDFHexString.fromText(a.text),
@@ -193,11 +272,15 @@
     var ap = ctx.register(ctx.stream(body, {
       Type: "XObject", Subtype: "Form", FormType: 1, BBox: rect, Resources: res, BadaAP: true
     }));
+    return { ap: ap, rect: rect, extra: extra };
+  }
+  function buildAnnot(L, doc, a) {
+    var ctx = doc.context, parts = buildParts(L, doc, a);
     var model = {};
     for (var k in a) if (k !== "page" && Object.prototype.hasOwnProperty.call(a, k)) model[k] = a[k];
-    var dict = { Type: "Annot", Rect: rect, F: 4, T: L.PDFString.of(MARK),
-                 BadaData: L.PDFHexString.fromText(JSON.stringify(model)), AP: { N: ap } };
-    for (var e in extra) dict[e] = extra[e];
+    var dict = { Type: "Annot", Rect: parts.rect, F: 4, T: L.PDFString.of(MARK),
+                 BadaData: L.PDFHexString.fromText(JSON.stringify(model)), AP: { N: parts.ap } };
+    for (var e in parts.extra) dict[e] = parts.extra[e];
     return ctx.register(ctx.obj(dict));
   }
 
@@ -259,8 +342,85 @@
     });
   }
 
+  /* ───────── 焼き込み: 書き込みをページ本体 (コンテンツ) に確定する ─────────
+     注釈ではなくページの一部になるので、どのビューアでも必ず同じに表示・印刷され、
+     以後は動かしたり消したりできなくなる。 */
+  function flatten(L, bytes, annots) {
+    return L.PDFDocument.load(bytes, { updateMetadata: false }).then(function (doc) {
+      stripDoc(L, doc);
+      var pages = doc.getPages(), n = 0;
+      (annots || []).forEach(function (raw) {
+        var a = normalize(raw);
+        if (!a || a.page < 0 || a.page >= pages.length) return;
+        var page = pages[a.page], parts = buildParts(L, doc, a);
+        var name = page.node.newXObject("BadaFx", parts.ap);
+        page.pushOperators(L.pushGraphicsState(), L.drawObject(name), L.popGraphicsState());
+        n++;
+      });
+      return doc.save(SAVE);
+    });
+  }
+
+  /* ───────── ページ操作 (回転 / 削除 / 並べ替え / 空白ページ / 結合) ─────────
+     bytes は注釈を外した PDF。戻り値の annots は、結合した PDF に入っていた
+     BadaCineVim の注釈 (ページ番号は結合後のもの)。 */
+  function pageOp(L, bytes, op) {
+    return L.PDFDocument.load(bytes, { updateMetadata: false }).then(function (doc) {
+      var count = doc.getPageCount(), i = op.page | 0;
+      function inRange(k) { return k >= 0 && k < count; }
+      if (op.op === "rotate") {
+        if (!inRange(i)) throw new Error("ページがありません");
+        var pg = doc.getPage(i), cur = pg.getRotation().angle || 0;
+        pg.setRotation(L.degrees(((cur + (op.delta || 90)) % 360 + 360) % 360));
+      } else if (op.op === "delete") {
+        if (!inRange(i)) throw new Error("ページがありません");
+        if (count <= 1) throw new Error("最後の 1 ページは削除できません");
+        doc.removePage(i);
+      } else if (op.op === "move") {
+        var to = op.to | 0;
+        if (!inRange(i) || !inRange(to)) throw new Error("移動先がありません");
+        if (to !== i) { var moving = doc.getPage(i); doc.removePage(i); doc.insertPage(to, moving); }
+      } else if (op.op === "blank") {
+        var at = Math.max(0, Math.min(count, op.at | 0));
+        var ref = doc.getPage(Math.max(0, Math.min(count - 1, at - 1))).getSize();
+        doc.insertPage(at, [ref.width, ref.height]);
+      } else if (op.op === "merge") {
+        return L.PDFDocument.load(op.bytes, { updateMetadata: false }).then(function (other) {
+          return doc.copyPages(other, other.getPageIndices());
+        }).then(function (copied) {
+          copied.forEach(function (p) { doc.addPage(p); });
+          var extra = stripDoc(L, doc).filter(function (a) { return a.page >= count; });
+          return doc.save(SAVE).then(function (out) { return { bytes: out, annots: extra, added: copied.length }; });
+        });
+      } else {
+        throw new Error("未対応のページ操作: " + op.op);
+      }
+      return doc.save(SAVE).then(function (out) { return { bytes: out, annots: [] }; });
+    });
+  }
+  /* ページ操作に合わせて、手元の注釈のページ番号を付け替える (削除したページの注釈は消える) */
+  function remapAnnots(annots, op) {
+    var out = [], p = op.page | 0, to = op.to | 0, at = op.at | 0;
+    (annots || []).forEach(function (a) {
+      var k = a.page;
+      if (op.op === "delete") { if (k === p) return; if (k > p) k--; }
+      else if (op.op === "move") {
+        if (k === p) k = to;
+        else if (p < to && k > p && k <= to) k--;
+        else if (p > to && k >= to && k < p) k++;
+      }
+      else if (op.op === "blank") { if (k >= at) k++; }
+      a.page = k; out.push(a);
+    });
+    return out;
+  }
+
   var API = {
     MARK: MARK,
+    textBox: textBox,
+    flatten: flatten,
+    pageOp: pageOp,
+    remapAnnots: remapAnnots,
     hasMarker: hasMarker,
     normalize: normalize,
     noteRect: noteRect,
