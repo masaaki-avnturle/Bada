@@ -409,6 +409,7 @@
   <button class="tb on" id="btnOut" title="量子 Bada 出力パネルの表示切替">⚛ 出力</button>
   <button class="tb" id="btnOpen" title="ファイルを開く (:e) — テキスト / PDF">📂 開く</button>
   <button class="tb" id="btnSave" title="保存 (:w)">💾 保存</button>
+  <button class="tb" id="btnPages" title="開いた PDF をページとして表示し、マーカー・手書き・メモを書き込む (:page)">📕 ページ</button>
   <button class="tb" id="btnPdf" title="PDF に書き出す / 印刷 (:pdf)">🖨 PDF</button>
   <button class="tb" id="btnHelp" title="キーバインド一覧 (:help)">？</button>
 </header>
@@ -1595,6 +1596,8 @@ function execEx(st, cmd){
       emit(st, "quit", {}); st.msg = "終了"; return;
     case "e": case "edit":
       emit(st, "open", {name:arg}); st.msg = "ファイルを開きます…"; return;
+    case "page": case "pages": case "pdfview":
+      emit(st, "pages", {}); return;
     case "pdf": case "print": case "hardcopy": case "ha":
       emit(st, "print", {}); st.msg = "PDF に書き出します (印刷ダイアログで「PDF に保存」)"; return;
     case "new": case "enew":
@@ -3294,7 +3297,7 @@ function boot(){
   /* エンジンが発行したイベントを順にディスパッチする。
      副作用を伴うもの (run / write / open / …) はここでハンドラを呼び、
      それ以外は「処理された」という表示 (フラッシュ + バス) だけを行う。 */
-  var SIDE_EFFECT = {countdown:1, run:1, write:1, open:1, print:1, quit:1, help:1, opts:1, view:1};
+  var SIDE_EFFECT = {countdown:1, run:1, write:1, open:1, print:1, pages:1, quit:1, help:1, opts:1, view:1};
   function drainEvents(){
     for (var i = 0; i < ST.events.length; i++){
       var e = ST.events[i];
@@ -3302,7 +3305,8 @@ function boot(){
         case "countdown": dispatch({type:"tick", line:e.line, what:"T-" + e.seconds}); startCountdown(e.seconds); break;
         case "run":       runQuantum(); break;
         case "write":     dispatch({type:"io", line:e.line, what:"write " + (e.name || "")}); saveFile(e.name); break;
-        case "open":      dispatch({type:"io", line:e.line, what:"open"}); fileIn.click(); break;
+        case "open":      dispatch({type:"io", line:e.line, what:"open"}); openPicker(); break;
+        case "pages":     dispatch({type:"io", line:e.line, what:"pdf pages"}); openPdfPages(); break;
         case "print":     dispatch({type:"io", line:e.line, what:"pdf"}); printDoc(); break;
         case "quit":      dispatch({type:"ex", line:e.line, what:"quit"}); ST.msg = "🎬 カット。(:e で再開 / :demo でデモ)"; break;
         case "help":      dispatch({type:"ex", line:e.line, what:"help"}); showHelp(true); break;
@@ -3317,14 +3321,35 @@ function boot(){
   }
 
   /* ── ファイル入出力 ── */
-  function saveFile(name){
-    name = name || ST.fname || "quantum.bada";
-    var blob = new Blob([vimText(ST)], {type:"text/plain;charset=utf-8"});
+  function downloadBlob(name, blob){
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = name;
     document.body.appendChild(a); a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }
+  function writeHandle(handle, blob){
+    return handle.createWritable().then(function(w){
+      return w.write(blob).then(function(){ return w.close(); });
+    });
+  }
+  /* :w — 「📂 開く」で選んだファイルそのものを開いているなら、その場に上書きする
+     (File System Access API に対応した環境のみ)。別名での保存や、対応していない
+     環境・書き込みを許可されなかった場合は、これまでどおりダウンロードとして保存。 */
+  var OPENED = null;                       /* { handle, name } — 開いているテキストファイル */
+  function saveFile(name){
+    name = name || ST.fname || "quantum.bada";
+    var blob = new Blob([vimText(ST)], {type:"text/plain;charset=utf-8"});
+    if (OPENED && OPENED.handle && OPENED.name === name && OPENED.handle.createWritable){
+      writeHandle(OPENED.handle, blob).then(function(){
+        ST.msg = '"' + name + '" に上書き保存しました'; ST.msgErr = false; paintStatus();
+      }, function(){
+        downloadBlob(name, blob);
+        ST.msg = '"' + name + '" をダウンロードとして保存しました (上書きは許可されませんでした)'; ST.msgErr = false; paintStatus();
+      });
+      return;
+    }
+    downloadBlob(name, blob);
   }
   /* 読み込んだ行をバッファへ入れる (テキストでも PDF でも共通) */
   function loadLines(lines, name, note){
@@ -3396,13 +3421,77 @@ function boot(){
     for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     return Promise.resolve({cMapData:u8, compressionType:pdfJsLib().CMapCompressionType.BINARY});
   };
-  function readPdf(buf, name){
+  /* ── PDF のページ表示と編集 (:page / 📕 ページ) ──
+     開いた PDF をそのままのレイアウトで表示し、マーカー・手書き・メモを付けて PDF に保存する。
+     表示と編集の本体は Bada Search と共通の pdf/pdfview.js + pdf/pdfedit.js
+     (PDF への書き込みは pdf/pdf-lib.min.js)。文章ビューには同じ PDF の文字が入っているので、
+     「⌨ テキスト」で行き来できる。 */
+  var PDF = null;          /* { name, bytes, annots, dirty, handle } — いま開いている PDF */
+  function pdfViewOpen(){ return !!(window.BadaPdfView && window.BadaPdfView.current); }
+  function pdfGetOptions(){
+    var opt = {disableFontFace:false, useSystemFonts:true};
+    if (window.__CINEVIM_CMAPS__) opt.CMapReaderFactory = BundledCMaps;
+    else { opt.cMapUrl = PDFJS_CDN + "cmaps/"; opt.cMapPacked = true; }
+    return opt;
+  }
+  /* 注釈入りの PDF を保存する。初回は保存先を選んでもらい (元の PDF を黙って上書きしない)、
+     2 回目以降は同じ場所へ。保存ダイアログの無い環境ではダウンロードになる。 */
+  function savePdfBytes(out){
+    var blob = new Blob([out], {type:"application/pdf"});
+    function viaHandle(h){ return writeHandle(h, blob).then(function(){ return {ok:true, note:'"' + h.name + '" に保存'}; }); }
+    if (PDF.handle) return viaHandle(PDF.handle).catch(function(e){ PDF.handle = null; return {error:(e && e.message) || String(e)}; });
+    if (typeof window.showSaveFilePicker === "function"){
+      return window.showSaveFilePicker({suggestedName:PDF.name,
+          types:[{description:"PDF", accept:{"application/pdf":[".pdf"]}}]})
+        .then(function(h){ PDF.handle = h; return viaHandle(h); })
+        .catch(function(e){
+          if (e && e.name === "AbortError") return {error:"保存を取り消しました"};
+          downloadBlob(PDF.name, blob); return {ok:true, note:"ダウンロードとして保存しました"};
+        });
+    }
+    downloadBlob(PDF.name, blob);
+    return Promise.resolve({ok:true, note:"ダウンロードとして保存しました"});
+  }
+  function openPdfPages(){
+    if (pdfViewOpen()) return;
+    if (!PDF){
+      ST.msg = "PDF を開いていません (📂 開く / :e で PDF を選ぶと、ページ表示と書き込みができます)";
+      ST.msgErr = true; paintStatus(); return;
+    }
+    ST.msg = "PDF のページを開いています…"; ST.msgErr = false; paintStatus();
+    loadScript(PDFJS_LOCAL + "pdfedit.js").then(function(){ return loadScript(PDFJS_LOCAL + "pdfview.js"); }).then(function(){
+      var cur = PDF;
+      window.BadaPdfView.open({
+        name: cur.name, bytes: cur.bytes, annots: cur.annots, dirty: cur.dirty,
+        search: (ST.search && ST.search.pat) || "", keepOnClose: true,
+        loadPdfJs: ensurePdfJs, docParams: pdfGetOptions(),
+        pdfLibUrl: PDFJS_LOCAL + "pdf-lib.min.js",
+        onSave: function(out){
+          return savePdfBytes(out).then(function(r){ if (r && r.ok) cur.dirty = false; return r; });
+        },
+        onTextMode: function(){},
+        onClose: function(state){
+          /* 閉じても注釈は捨てない (もう一度 :page で開けば続きから編集できる) */
+          cur.bytes = state.baseBytes; cur.annots = state.annots; cur.dirty = state.dirty;
+          ST.msg = state.dirty ? "PDF の書き込みは未保存です (:page で戻り :w で保存)"
+                               : "文章ビューに戻りました (:page で PDF のページ表示)";
+          ST.msgErr = false; paintStatus(); grabInput();
+        }
+      });
+      ST.msg = ""; paintStatus();
+    }).catch(function(){
+      ST.msg = "⚠ PDF 表示の部品がありません (index.html と同じ場所に pdf/ フォルダを置いてください)";
+      ST.msgErr = true; paintStatus();
+    });
+  }
+
+  function readPdf(buf, name, thenPages){
     ST.msg = "PDF を解析しています…"; ST.msgErr = false; paintStatus();
+    var keep = new Uint8Array(buf).slice();      /* ページ表示・編集用に元のバイト列を残す */
     var doc = null;
     ensurePdfJs().then(function(lib){
-      var opt = {data:new Uint8Array(buf), isEvalSupported:false, disableFontFace:true, useSystemFonts:true};
-      if (window.__CINEVIM_CMAPS__) opt.CMapReaderFactory = BundledCMaps;
-      else { opt.cMapUrl = PDFJS_CDN + "cmaps/"; opt.cMapPacked = true; }
+      var opt = pdfGetOptions();
+      opt.data = new Uint8Array(buf); opt.isEvalSupported = false; opt.disableFontFace = true;
       return lib.getDocument(opt).promise;
     }).then(function(d){
       doc = d;
@@ -3417,12 +3506,16 @@ function boot(){
       return next(1);
     }).then(function(pages){
       var lines = pdfPagesToLines(pages);
+      PDF = {name:name, bytes:keep, annots:null, dirty:false, handle:null};
+      OPENED = null;
       if (!lines.length){
-        loadFail('"' + name + '" には文字情報がありません (スキャン画像だけの PDF は読めません)');
+        /* 文字情報の無い PDF (スキャン画像) も、ページとしてなら表示・書き込みできる */
+        loadFail('"' + name + '" には文字情報がありません (ページ表示では読めます)');
       } else {
         if (ST.opts.view !== "prose") setView("prose");
-        loadLines(lines, pdfTextName(name), "PDF " + pages.length + " ページ");
+        loadLines(lines, pdfTextName(name), "PDF " + pages.length + " ページ — :page でページ表示");
       }
+      if (thenPages !== false) openPdfPages();
     }).catch(function(e){
       var why = e && e.name === "PasswordException" ? "パスワードつきの PDF は開けません"
               : e && e.name === "InvalidPDFException" ? "PDF として壊れています"
@@ -3431,8 +3524,8 @@ function boot(){
     }).then(function(){ if (doc) doc.destroy(); });
   }
 
-  fileIn.addEventListener("change", function(){
-    var f = fileIn.files && fileIn.files[0]; if (!f) return;
+  /* 選ばれたファイルを読み込む。handle (File System Access API) があれば :w で上書きできる */
+  function readPicked(f, handle){
     var rd = new FileReader();
     rd.onload = function(){
       var u8 = new Uint8Array(rd.result);
@@ -3440,12 +3533,29 @@ function boot(){
       if (isPdfBytes(u8)){ readPdf(rd.result, f.name); return; }
       var r = decodeTextBytes(u8, TextDecoder);
       var text = r.text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+      PDF = null;
+      OPENED = handle ? {handle:handle, name:f.name} : null;
       loadLines(text.split("\n"), f.name, r.encoding === "utf-8" ? "" : r.encoding);
     };
     rd.onerror = function(){ loadFail('"' + f.name + '" を読み込めません'); };
     rd.readAsArrayBuffer(f);
+  }
+  fileIn.addEventListener("change", function(){
+    var f = fileIn.files && fileIn.files[0]; if (!f) return;
+    readPicked(f, null);
     fileIn.value = "";
   });
+  /* 📂 開く / :e — 対応環境ではファイルのハンドルごと受け取り、:w でその場に上書きできるようにする */
+  function openPicker(){
+    if (typeof window.showOpenFilePicker !== "function"){ fileIn.click(); return; }
+    window.showOpenFilePicker({multiple:false}).then(function(hs){
+      var h = hs && hs[0]; if (!h) return;
+      return h.getFile().then(function(f){ readPicked(f, h); });
+    }).catch(function(e){
+      if (e && e.name === "AbortError") return;      /* 取り消し */
+      fileIn.click();                                /* 使えない環境では従来の選択ダイアログ */
+    });
+  }
 
   /* ── PDF 書き出し (:pdf) ──
      本文を素の文字として印刷用の領域へ流し、ブラウザの印刷機能に渡す。
@@ -3510,6 +3620,7 @@ function boot(){
   }
 
   document.addEventListener("keydown", function(e){
+    if (pdfViewOpen()) return;       /* PDF のページ表示中は、キーはそちらが受け取る */
     /* IME 変換中のキーは触らない。確定文字は #hidden の input で受け取る */
     if (e.isComposing || e.keyCode === 229) return;
     if (helpEl.classList.contains("show")){
@@ -3543,7 +3654,7 @@ function boot(){
     for (var i = 0; i < v.length; i++) send(v.charAt(i));
   });
   function grabInput(){
-    if (helpEl.classList.contains("show")) return;
+    if (helpEl.classList.contains("show") || pdfViewOpen()) return;
     try { hidden.focus({preventScroll:true}); } catch (e){ hidden.focus(); }
   }
   /* ボタンを押したあとも入力を取り戻す (押しっぱなしで日本語が打てなくならないように) */
@@ -3696,6 +3807,7 @@ function boot(){
     ["§", "ファイル"],
     [":w [name]  :wq  :q  :q!", "保存 / 保存して終了 / 終了"],
     [":e", "ファイルを開く (テキスト / PDF。文字コードは自動判定)"],
+    [":page", "開いた PDF をページ表示 (マーカー・手書き・メモを書き込み :w で PDF に保存)"],
     [":pdf", "PDF に書き出す / 印刷"],
     [":demo  :new", "デモを読み込む / 新規バッファ"],
     [":%s/pat/rep/g", "全体置換 (:3,9s/// で範囲指定)"],
@@ -3727,7 +3839,8 @@ function boot(){
   };
   $("btnCount").onclick = function(){ audio(); startCountdown(5); ST.msg = "⏱ T-5 カウントダウン開始"; paintStatus(); };
   $("btnRun").onclick = function(){ runQuantum(); };
-  $("btnOpen").onclick = function(){ fileIn.click(); };
+  $("btnOpen").onclick = function(){ openPicker(); };
+  $("btnPages").onclick = function(){ openPdfPages(); };
   $("btnSave").onclick = function(){ saveFile(ST.fname); ST.dirty = false; paintStatus(); };
   $("btnPdf").onclick = function(){ printDoc(); };
   $("btnHelp").onclick = function(){ showHelp(!helpEl.classList.contains("show")); };

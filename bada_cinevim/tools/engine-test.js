@@ -895,6 +895,15 @@ console.log("13. PDF と文字コード (文字化けさせない)");
     eq(st.events[0].type, "print", ":pdf が print イベントを発行");
     eq(txt(st), "a", ":pdf は本文を変えない");
   }
+  {
+    const st = ed("a");
+    E.execEx(st, "page");
+    eq(st.events[0].type, "pages", ":page が pages イベントを発行 (PDF のページ表示・編集)");
+    eq(txt(st), "a", ":page は本文を変えない");
+    const st2 = ed("a");
+    E.execEx(st2, "pdfview");
+    eq(st2.events[0].type, "pages", ":pdfview は :page の別名");
+  }
 }
 
 /* ═════ 結果 ═════ */

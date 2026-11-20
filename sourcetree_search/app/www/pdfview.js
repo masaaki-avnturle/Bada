@@ -15,6 +15,16 @@
  *   /語 PDF 内検索   :w 保存   :q 閉じる (未保存なら :q!)   :wq   t テキスト表示へ
  *
  * ライブラリ (vendor/pdfjs, vendor/pdf-lib) は PDF を開いたときに初めて読み込みます。
+ *
+ * このファイルは Bada Search (sourcetree_search/app/www) と単体アプリ Bada CineVim
+ * (bada_cinevim/pdf) で同じものを使います (CI が一致を検証)。アプリごとの違いは
+ * open() のオプションで渡します:
+ *   loadPdfJs()  … pdf.js を用意して返す関数 (省略時は vendorBase から読み込む)
+ *   docParams    … pdf.js の getDocument に足す設定 (CMap の供給方法など)
+ *   pdfLibUrl    … pdf-lib の場所 (省略時は vendorBase + "pdf-lib/pdf-lib.min.js")
+ *   annots/dirty … 前回閉じたときの注釈を引き継ぐ (bytes は注釈を外した PDF を渡す)。
+ *                  keepOnClose:true なら未保存でも確認なしで閉じ、onClose に
+ *                  { annots, dirty, baseBytes } を渡すので、呼び出し側で保持できる。
  */
 (function (global) {
   "use strict";
@@ -44,9 +54,9 @@
       return global.pdfjsLib;
     });
   }
-  function ensurePdfLib(base) {
+  function ensurePdfLib(url) {
     if (global.PDFLib) return Promise.resolve(global.PDFLib);
-    return loadScript(base + "pdf-lib/pdf-lib.min.js").then(function () { return global.PDFLib; });
+    return loadScript(url).then(function () { return global.PDFLib; });
   }
 
   /* pdf.js へ CMap (日本語など CID フォントの文字コード表) と標準フォントを供給する。
@@ -94,6 +104,7 @@
     if (typeof document === "undefined") return null;
     var Edit = global.BadaPdfEdit;
     var base = opts.vendorBase || "vendor/";
+    var pdfLibUrl = opts.pdfLibUrl || (base + "pdf-lib/pdf-lib.min.js");
     var canSave = typeof opts.onSave === "function" && !opts.readonly;
 
     var st = {
@@ -546,7 +557,7 @@
         } else if (text.trim()) {
           var c = toPdf(P, vx, vy);
           addAnnot({ type: "note", page: pageIndex, x: c[0], y: c[1], text: text, size: size, color: "#102030" });
-          st.tool = "select"; refreshChrome();
+          st.tool = "select"; setStatus("");
         }
         elBody.focus();
       }
@@ -570,7 +581,7 @@
       if (noteBox) noteBox.commit();
       st.busy = true; setStatus("PDF に保存中…");
       var clean = st.annots.map(function (a) { return Edit.normalize(a); }).filter(Boolean);
-      return ensurePdfLib(base).then(function (L) {
+      return ensurePdfLib(pdfLibUrl).then(function (L) {
         return Edit.applyAnnotations(L, st.baseBytes, clean);
       }).then(function (out) {
         return Promise.resolve(opts.onSave(out, { annotations: clean.length }));
@@ -594,7 +605,7 @@
       var c = line.slice(1);
       if (c === "w") { save(false); return; }
       if (c === "wq" || c === "x") { if (st.editable) save(true); else teardown(); return; }
-      if (c === "q") { if (st.dirty) setStatus("未保存の注釈があります (:w で保存 / :q! で破棄)"); else teardown(); return; }
+      if (c === "q") { if (st.dirty && !opts.keepOnClose) setStatus("未保存の注釈があります (:w で保存 / :q! で破棄)"); else teardown(); return; }
       if (c === "q!") { teardown(); return; }
       if (/^\d+$/.test(c)) { gotoPage(parseInt(c, 10) - 1); return; }
       setStatus("未対応のコマンド: :" + c);
@@ -663,6 +674,7 @@
     elCmd.addEventListener("blur", function () { if (st.mode === "command") setTimeout(function () { if (st.mode === "command" && document.activeElement !== elCmd) endCmd(); }, 0); });
 
     function confirmDiscard() {
+      if (opts.keepOnClose) return true;          /* 注釈は呼び出し側が保持するので破棄にならない */
       if (st.closeArmed) return true;
       st.closeArmed = true; setStatus("未保存の注釈があります — もう一度押すと破棄します (:w で保存)");
       return false;
@@ -694,7 +706,10 @@
       if (st.pdf) { try { st.pdf.destroy(); } catch (e) {} }
       if (ov.parentNode) ov.parentNode.removeChild(ov);
       if (BadaPdfView.current === ctl) BadaPdfView.current = null;
-      if (typeof opts.onClose === "function") opts.onClose();
+      if (typeof opts.onClose === "function") {
+        opts.onClose({ annots: st.annots.map(function (a) { return Edit.normalize(a); }).filter(Boolean),
+                       dirty: st.dirty, baseBytes: st.baseBytes });
+      }
     }
     document.addEventListener("keydown", onKey, true);
 
@@ -705,8 +720,13 @@
     var ready = Promise.resolve().then(function () {
       /* 以前 BadaCineVim で付けた注釈があれば、編集できる形で取り出す
          (ページ画像からは外し、注釈レイヤに載せ直す) */
+      if (opts.annots) {                           /* 引き継ぎ: bytes は注釈を外した PDF */
+        opts.annots.forEach(function (raw) { var a = Edit.normalize(raw); if (a) { a._id = st.nextId++; st.annots.push(a); } });
+        st.dirty = !!opts.dirty;
+        return null;
+      }
       if (!Edit.hasMarker(bytes)) return null;
-      return ensurePdfLib(base).then(function (L) { return Edit.extractAnnotations(L, bytes); }).then(function (r) {
+      return ensurePdfLib(pdfLibUrl).then(function (L) { return Edit.extractAnnotations(L, bytes); }).then(function (r) {
         st.baseBytes = r.bytes;
         r.annots.forEach(function (a) { a._id = st.nextId++; st.annots.push(a); });
       }, function (err) {
@@ -714,14 +734,15 @@
         st.status = "既存の注釈を読み取れないため読み取り専用で開きます: " + (err && err.message || err);
       });
     }).then(function () {
-      return ensurePdfJs(base);
+      return typeof opts.loadPdfJs === "function" ? opts.loadPdfJs() : ensurePdfJs(base);
     }).then(function (pdfjs) {
-      return pdfjs.getDocument({
-        data: st.baseBytes.slice(),            /* pdf.js はバッファを占有するので複製を渡す */
+      var params = opts.docParams ? Object.assign({}, opts.docParams) : {
         CMapReaderFactory: assetFactory(base, "cmap"), cMapUrl: "bundle/", cMapPacked: true,
-        StandardFontDataFactory: assetFactory(base, "font"), standardFontDataUrl: "bundle/",
-        isEvalSupported: false                 /* フォント経由のコード実行 (CVE-2024-4367) を封じる */
-      }).promise;
+        StandardFontDataFactory: assetFactory(base, "font"), standardFontDataUrl: "bundle/"
+      };
+      params.data = st.baseBytes.slice();      /* pdf.js はバッファを占有するので複製を渡す */
+      params.isEvalSupported = false;          /* フォント経由のコード実行 (CVE-2024-4367) を封じる (上書き不可) */
+      return pdfjs.getDocument(params).promise;
     }).then(function (pdf) {
       if (st.closed) { pdf.destroy(); return; }
       st.pdf = pdf;
@@ -753,6 +774,23 @@
     var css = document.createElement("style");
     css.id = "badapdf-style";
     css.textContent = [
+      /* 枠の基本スタイル (Bada Search では cinevim.js と同じ見た目。単体アプリではこれだけで完結) */
+      ".badapdf-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.86);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}",
+      ".badapdf-overlay .cv-frame{background:#000;border:2px solid #1f6f3f;border-radius:14px;box-shadow:0 30px 120px #000,0 0 40px #0f54;display:flex;flex-direction:column;overflow:hidden;font-family:'SFMono-Regular',Consolas,'Noto Sans Mono CJK JP',monospace}",
+      ".badapdf-overlay .cv-bar{display:flex;align-items:center;gap:10px;padding:8px 14px;font-size:13px;color:#8fe8ab;background:#041a0e;border-bottom:1px solid #15351f}",
+      ".badapdf-overlay .cv-status{border-bottom:none;border-top:1px solid #15351f;color:#5f8f6a}",
+      ".badapdf-overlay .cv-grow{flex:1}",
+      ".badapdf-overlay .cv-name{color:#3cff8e;font-weight:bold;text-shadow:0 0 10px #0f5}",
+      ".badapdf-overlay .cv-flag{color:#ffcf4a}",
+      ".badapdf-overlay .cv-hint{color:#4a6e55;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}",
+      ".badapdf-overlay .cv-x{margin-left:6px;background:#06160d;color:#9fe8b6;border:1px solid #15351f;border-radius:7px;padding:3px 10px;cursor:pointer;font:inherit}",
+      ".badapdf-overlay .cv-x:hover{border-color:#3cff8e}",
+      ".badapdf-overlay .cv-body{flex:1}",
+      ".badapdf-overlay .cv-mode{font-weight:bold;color:#5f8f6a}",
+      ".badapdf-overlay .cv-mode.insert{color:#3cff8e;text-shadow:0 0 8px #0f5}",
+      ".badapdf-overlay .cv-acts{display:flex;gap:6px}",
+      ".badapdf-overlay .cv-act{background:#06160d;color:#4fe8ff;border:1px solid #15351f;border-radius:7px;padding:3px 10px;cursor:pointer;font:inherit;font-size:12px;white-space:nowrap}",
+      ".badapdf-overlay .cv-act:hover{border-color:#4fe8ff}",
       ".badapdf-overlay .pv-frame{width:min(1240px,98vw);height:min(94vh,1100px)}",
       ".badapdf-overlay .cv-bar{flex-wrap:wrap;row-gap:6px}",
       ".badapdf-overlay .pv-tools{background:#03120a}",

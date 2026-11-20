@@ -47,6 +47,7 @@ on:
     branches:
       - 'claude/bada-countdown-editor-**'
       - 'ccr-0422a438-**'
+      - 'ccr-6b582856-**'
     # タグを打つと同じ成果物を GitHub Release にも添付する
     tags:
       - 'cinevim-v*'
@@ -66,7 +67,13 @@ jobs:
         run: |
           set -e
           test -f bada_cinevim/index.html
-          for f in pdf.min.js pdf.worker.min.js cmaps.js; do test -s "bada_cinevim/pdf/$f"; done
+          for f in pdf.min.js pdf.worker.min.js cmaps.js pdfview.js pdfedit.js pdf-lib.min.js; do test -s "bada_cinevim/pdf/$f"; done
+          # PDF 表示・編集の部品は Bada Search と同じものを使う (片方だけ直してずれるのを防ぐ)
+          if [ -d sourcetree_search/app/www ]; then
+            diff sourcetree_search/app/www/pdfview.js bada_cinevim/pdf/pdfview.js
+            diff sourcetree_search/app/www/pdfedit.js bada_cinevim/pdf/pdfedit.js
+            diff sourcetree_search/app/www/vendor/pdf-lib/pdf-lib.min.js bada_cinevim/pdf/pdf-lib.min.js
+          fi
           node -e '
             const fs = require("fs");
             const src = fs.readFileSync("bada_cinevim/index.html", "utf8");
@@ -91,6 +98,7 @@ jobs:
                                   "function eventMag",
                                   "function isPdfBytes", "function decodeTextBytes",
                                   "function pdfItemsToLines", "function pdfPagesToLines",
+                                  "function openPdfPages", "function savePdfBytes",
                                   "function countdownState", "function boot"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
@@ -101,6 +109,29 @@ jobs:
         run: |
           set -e
           node bada_cinevim/tools/engine-test.js
+
+  # 実ブラウザ (Chromium) で PDF のページ表示 → 書き込み → 保存 → 開き直し を通しで確認
+  pdf-smoke:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright (Chromium)
+        run: |
+          set -e
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y > /dev/null
+          npm install playwright@1.49.1
+          npx playwright install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+      - name: PDF page view / annotate / save smoke (file://)
+        run: |
+          set -e
+          node bada_cinevim/tools/smoke-pdf.js | tee /tmp/cv.out
+          grep -q "ALL CINEVIM PDF SMOKE CHECKS PASSED" /tmp/cv.out
 
   android-apk:
     runs-on: ubuntu-latest

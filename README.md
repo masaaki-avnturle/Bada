@@ -225,6 +225,10 @@
 
 詳しくは [`sourcetree_search/README.md`](sourcetree_search/README.md)。
 
+単体アプリの **Bada CineVim**([`bada_cinevim/`](bada_cinevim/) — 映画的 VIM エディタ、APK / Windows / Ubuntu)でも
+同じ機能が使えます。PDF を開くとページ表示になり、`:page` でいつでも開いてマーカー・手書き・メモを書き込み、
+`:w` で PDF に保存します。詳しくは [`bada_cinevim/README.md`](bada_cinevim/README.md)。
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):
