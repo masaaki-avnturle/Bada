@@ -213,6 +213,18 @@
 
 ---
 
+## 🔎 Bada Search + BadaCineVim — 論文(PDF)・ソースコード検索 & 編集
+
+[`sourcetree_search/`](sourcetree_search/) — リポジトリを丸ごと索引して論文(PDF)とソースコードを単語補完つきで横断検索し、
+ヒットを付属エディタ **BadaCineVim** で開いて編集します。
+
+- **ソース / `.tex`** … Vim スタイルのエディタで編集して `:w` 保存(undo・yank/paste・日本語入力対応)
+- **PDF** … **ページとして表示**し、検索語のあるページへジャンプ。**マーカー・手書き・メモ**を付けて `:w` で PDF に保存
+  (標準の PDF 注釈なので他のビューアでも表示され、メモは検索対象になります)
+- Windows EXE(SourceTree のカスタム操作に付属)/ Android APK / ブラウザで動作
+
+詳しくは [`sourcetree_search/README.md`](sourcetree_search/README.md)。
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):

@@ -1,0 +1,181 @@
+name: Bada Search app build (SourceTree companion, Windows EXE + Android APK)
+
+# sourcetree_search/ の「Bada Search」— SourceTree (Windows 10/11) に
+# カスタム操作 ($REPO) で付属させる PDF・ソースコード検索エンジン。
+# プログラミング言語のソースと PDF (FlateDecode テキスト抽出) を
+# リポジトリ丸ごとインデックスして横断検索し、結果を付属の BadaCineVim で開いて
+# 編集します (ソースは Vim エディタ、PDF はページ表示 + 注釈を PDF に保存)。
+# Windows 10/11 向け EXE (NSIS インストーラ + ポータブル) をビルドし、
+# Actions アーティファクト、および (stsearch-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: stsearch-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'stsearch-v*'
+    branches:
+      - main
+      - 'claude/quantum-crypto-multiplatform-303qm2'
+      - 'ccr-6b582856-xye1v1'
+    paths:
+      - 'sourcetree_search/**'
+      - '.github/workflows/sourcetree-search-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Search core self-check (index / PDF extraction / AND / regex / filters / completion)
+        run: |
+          set -e
+          node sourcetree_search/tools/test-search.js | tee /tmp/st.out
+          grep -q "ALL SEARCH TESTS PASSED" /tmp/st.out
+      - name: BadaCineVim engine self-check (vim motions / edit / search / ex)
+        run: |
+          set -e
+          node sourcetree_search/tools/test-cinevim.js | tee /tmp/cv.out
+          grep -q "ALL CINEVIM TESTS PASSED" /tmp/cv.out
+      - name: BadaCineVim PDF edit engine self-check (annotations write / read back / search index)
+        run: |
+          set -e
+          node sourcetree_search/tools/test-pdfedit.js | tee /tmp/pe.out
+          grep -q "ALL PDFEDIT TESTS PASSED" /tmp/pe.out
+      - name: EXE IPC self-check (PDF bytes / save with .bak / writes confined to the indexed folder)
+        run: |
+          set -e
+          node sourcetree_search/tools/test-electron-ipc.js | tee /tmp/ipc.out
+          grep -q "ALL ELECTRON IPC TESTS PASSED" /tmp/ipc.out
+      - name: Engine copy is in sync (core == www, browser/APK uses the www copy)
+        run: |
+          set -e
+          diff sourcetree_search/core/searchcore.js sourcetree_search/app/www/searchcore.js
+          echo "searchcore.js: core and www copies are byte-identical"
+
+  # 実ブラウザ (Chromium) で 索引→検索→PDF ページ表示→注釈→保存→再編集 と日本語入力を通しで確認
+  ui-smoke:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright (Chromium)
+        run: |
+          set -e
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y > /dev/null
+          npm install playwright@1.49.1
+          npx playwright install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+      - name: UI smoke (search → PDF view → annotate → save → re-edit, IME input, folder overwrite, file://)
+        run: |
+          set -e
+          node sourcetree_search/tools/smoke-ui.js | tee /tmp/ui.out
+          grep -q "ALL UI SMOKE CHECKS PASSED" /tmp/ui.out
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Assemble app (core + www into electron dir)
+        shell: bash
+        run: |
+          set -e
+          cp -r sourcetree_search/core sourcetree_search/app/electron/core
+          cp -r sourcetree_search/app/www sourcetree_search/app/electron/www
+      - name: Build Windows EXE (Electron)
+        working-directory: sourcetree_search/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badasearch-windows
+          path: sourcetree_search/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: sourcetree_search/app/electron/dist/*.exe
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        # setup-android@v3 の既定 packages ('tools' 等) は現行 SDK から
+        # 削除され sdkmanager が exit 1 になるため既定インストールを無効化。
+        # 必要なパッケージは次の明示ステップで導入する。
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Build debug APK (Cordova; browser search + BadaCineVim, start=complete.html)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="sourcetree_search"
+          cordova create cordova-build io.github.masaaki_avnturle.badasearch BadaSearch
+          rm -rf cordova-build/www
+          cp -r "$APP/app/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          # config.xml の <plugin> (cordova-plugin-file: 編集結果の保存に使用) が入ったことを確認
+          cordova plugin ls | tee /tmp/plugins.out
+          grep -q "cordova-plugin-file" /tmp/plugins.out || cordova plugin add cordova-plugin-file@8.1.3
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/badasearch-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badasearch-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
