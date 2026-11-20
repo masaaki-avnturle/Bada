@@ -5760,6 +5760,41 @@ python3 analyze_chords.py chords279.json src/20261120_024046.wav src/20261107_08
 python3 compose_tablet279.py src chords279.json score_tablet279.json && python3 synth.py score_tablet279.json tablet279.wav && python3 video.py score_tablet279.json tablet279.wav tablet279.mp4
 ```
 
+## 🎼⛪🎹🌙 Requiem BADA — Tablet Sessions CCLXXX · Fuga che si fa Requiem (tablet117・tablet89・11/20 02:40 の鍵盤の録音の 3 曲を、フーガにレクイエムを醸すように, 変ロ短調 → 変ロ長調, ♩=60, 6 分 31 秒)
+
+届いたもの: `tablet117.mp4` (CXVII — Ninna nanna 10/03、眠りへの曲、12 分 59 秒)、`tablet89.mp4` (LXXXIX — Requiem e Fuga)、`20261120_024046.mp3` (11/20 02:40 の鍵盤の録音)。tablet89 と鍵盤は前に届いたものと同じ。楽器は何も加えない。96 小節
+
+**3 曲を、フーガの 3 つの声部のように順に入れる**:
+
+| 声部 | 素材 | 入り |
+|---|---|---|
+| 1 つ目 | tablet89 のフーガ I・フーガ II・ストレッタ。**4 半音下げて** (テープのように速さごと、0.794 倍速) 変ロ短調に — ゆっくり深いフーガ。フーガ I は主題が 1 声だけで始まる、本物のフーガの提示部 | 2 小節 (8 秒) |
+| 2 つ目 | 鍵盤の録音の前半 (黒い鍵盤、変ロ短調)。tablet276 と同じ音 (`level273.py` で強弱の幅を 4 割に)。高さも速さもそのまま | 26 秒 (最初の小さな音) |
+| 3 つ目 | tablet117 の後半 — 眠りの段 (変ロ短調、10/03 13:27 の実音のピアノ) から、変ロ長調の共鳴で閉じる所まで (元の 575〜778 秒)。そのまま | 2 分 54 秒 (ストレッタ; 元の 575 秒の静けさから 2 分 49 秒に立ち上がる) |
+
+- **調**: 3 曲とも変ロ短調にそろう。tablet117 は変ロ短調で始まり変ロ長調で閉じる、鍵盤の前半は黒い鍵盤 (変ロ短調 / 変ニ長調)、tablet89 (ニ短調) は 4 半音下げて変ロ短調、その Amen (ニ長調) は変ロ長調になる。鍵盤の後半 (白い鍵盤、イ短調) は tablet117 と濁る (どう移しても濁りの指数 0.34 以上) ので使わない
+- **レクイエムを醸す**: tablet89 の段落を「フーガ → レクイエム」の順に並べ直す (どれも段落の切れ目で切り、継ぎ目は 1 秒ずつ重ねて渡す): フーガ I → フーガ II → ストレッタ (ここまで元の順で、フーガ II とストレッタは元でも続いている) → Requiem I → Amen。フーガが進むにつれて声部が増え、ストレッタで 3 つがそろい、そのままレクイエムに変わって、Amen で閉じる
+
+| 段落 | 小節 | 鳴っているもの |
+|---|---|---|
+| I. フーガ I | 0〜22 | 2 小節から tablet89 のフーガ I (主題が 1 声で)。26 秒から鍵盤が 2 つ目の声部として |
+| II. フーガ II | 22〜42 | 別の主題 (09/24 08:53) の 4 声フーガ。鍵盤は黒い鍵盤のまま |
+| III. ストレッタ | 42〜57 | 6 つの主題が次々に。tablet117 が 3 つ目の声部として入る |
+| IV. Requiem I | 57〜88 | 伸ばした主題がゆっくり。鍵盤が山を築いて止まり (5 分 25 秒)、tablet117 は変ロ長調の共鳴へ |
+| V. Amen | 88〜96 | 変ロ長調。tablet117 の変ロ長調の終わりと一緒に閉じる |
+
+- **重ねる位置** (濁りの指数): 並べ方 6 通りと、鍵盤・tablet117 の入りを 4 秒ずつ (段落の継ぎ目を決めてからは 1 秒ずつ) 動かして、3 組 (tablet89 と鍵盤、tablet89 と tablet117、鍵盤と tablet117) の重みつきの平均がいちばん小さい所 (0.20; これまでのテープどうしは 0.15〜0.27)。この並べ方だけ、3 つが 157 秒そろって鳴る (Requiem I を後ろに 2 つ並べると 0.20〜0.22 で同じくらいだが、鍵盤と tablet117 の重なりが 40〜80 秒しかない)。段落ごとには、鍵盤と: フーガ I 0.28 / フーガ II 0.19 / ストレッタ 0.22 / Requiem I 0.19。tablet117 と: ストレッタ 0.15 / Requiem I 0.23 / Amen 0.12。鍵盤と tablet117: 0.21
+- 音量の倍率: tablet89 0.30、鍵盤 0.35 (tablet276 より 1 dB 大きく — 1 声で始まるフーガに並ぶように)、tablet117 0.42。入りの大きさは、フーガ I の主題 −23.2 dB、鍵盤 −21.8 dB、tablet117 −22.0 dB とそろう。3 つがそろう Requiem I では tablet89 −18.7 / 鍵盤 −18.5 / tablet117 −19.7 dB
+- 測った音量 (段落ごとの平均、4 秒窓の幅): I −17.3 (−25.4〜−14.5) / II −15.9 (−21.5〜−11.5) / III −13.1 (−15.6〜−11.7) / IV −14.2 (−18.9〜−10.7) / V −24.6 dB (Amen で消えていく)。全体 mean −15.5 dB、max −0.5 dB (volumedetect)。音が途切れる所はない (−39 dB を下回るのは、Amen の最後の和音が消えていく 6 分 11 秒から後だけ)。mp4 は 6 分 31 秒、26.9 MiB (映像 460 kbps、音声 AAC 128 kbps)
+- `compose_tablet280.py` (録音だけ; 段は 3 つ: tablet89・鍵盤・tablet117)
+
+```bash
+# tablet89・tablet117 の音は mp4 から、鍵盤の録音は CCLXXIII・CCLXXVI と同じ (level273.py を通したもの)
+python3 level273.py 20261120_024046.wav src/20261120_024046.wav
+python3 analyze_chords.py chords280.json src/20261107_089000.wav src/20261107_117000.wav src/20261120_024046.wav
+python3 compose_tablet280.py src chords280.json score_tablet280.json && python3 synth.py score_tablet280.json tablet280.wav && python3 video.py score_tablet280.json tablet280.wav tablet280.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
