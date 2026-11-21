@@ -269,6 +269,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
                     eo = e.get('env_off', e.get('off', 0.0))        # 包絡の中の始まり (移調したテープは速さが変わるので、出力の秒で env_off と env_dt を渡す)
                     ta, tb = max(e['t'], now - back), min(e['t'] + e['d'], now + ahead); ka, kb = int((ta - e['t'] + eo) / dt), int((tb - e['t'] + eo) / dt) + 1
                     fi_, fo_ = max(e.get('fin') or 0.0, 1e-3), max(e.get('fout') or 0.0, 1e-3); te = e['t'] + e['d']       # 入りと終わりのフェードも波形に映す
+                    if e.get('env_faded'): fi_ = fo_ = 1e-3             # 包絡にもう音量のつまみの動きが入っている (同じ録音どうしをクロスフェードでつなぐ時): 波形にフェードを掛けない
                     up = [(tt, env[k] * min(1.0, max(0.0, (tt - e['t']) / fi_), max(0.0, (te - tt) / fo_))) for k in range(max(ka, 0), min(kb, len(env))) for tt in (e['t'] - eo + k * dt,)]
                     up = [(NOW_X + (tt - now) * PPS, v) for tt, v in up]
                     if len(up) > 1:

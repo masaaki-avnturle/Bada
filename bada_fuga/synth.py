@@ -1248,8 +1248,14 @@ def main(score='score.json', out='fuga.wav'):
     peak = np.abs(st).max()
     norm = float(d.get('meta', {}).get('fixed_peak') or peak)     # 長い曲を分割して合成するときは、同じ基準で正規化する
     st = st / norm * 0.89
-    # soft knee
-    st = np.tanh(st * 1.15) / np.tanh(1.15)
+    if d.get('meta', {}).get('linear_master'):
+        # 歪ませない仕上げ (meta の linear_master): 柔らかい頭打ちを通さず、小さな音が頭打ちを通った時と同じ倍率だけ掛ける — 声と曲が掛け合わさる歪みを作らない。
+        # 山が 1 を超えると割れるので、fixed_peak は「peak × 1.2515 が 1 より小さい」ように決める (超えたら知らせる)
+        st = st * (1.15 / np.tanh(1.15))
+        if np.abs(st).max() > 1.0: print('WARNING: linear_master の山が 1 を超えた (%.3f) — fixed_peak を大きく' % np.abs(st).max())
+    else:
+        # soft knee
+        st = np.tanh(st * 1.15) / np.tanh(1.15)
     # fade out tail
     tail = int((5.0 if (requiem or piano or symphony or mantra or recs) else 2.5) * SR)
     if not d.get('meta', {}).get('no_fade'): st[-tail:] *= np.linspace(1, 0, tail)[:, None]
