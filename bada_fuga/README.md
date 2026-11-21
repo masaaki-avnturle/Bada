@@ -6555,6 +6555,36 @@ python3 extract_voice209.py stem score_tablet209.json score209_M.json && python3
 python3 extract_voice209.py tablet209.wav M_stem.wav tablet209_voce_sola.wav     # → tablet209_voce_sola.wav (響きを外した声) と tablet209_voce_sola_nel_brano.wav (曲の中のままの声)
 ```
 
+## 🎤🕊️🎧 tablet233 (CCXXXIII) の声だけ (calma の声 — 拾わずに、元の声のファイルと楽譜から; 声だけ、3 分 18 秒)
+
+届いたもの: 無し。依頼は「tablet233 も同じく、お願いします」で、動画は付いていなかった。「同じく」は、前の節 (tablet209) と同じ 3 つを tablet233 でも、と読んだ: 声だけ、曲の中で鳴っているままの声、曲の音
+
+**拾う必要が無かった**。tablet233 (CCXXXIII) は tablet209 と同じ組み立て (声 2 回 + トラック 18 + トラック 8) で、声は「安心するドエロの光輪様の声」。その声は、これまで何度も届いている `20261108_145525_aureola_sensuale_calma.mp3` (calma の声) そのもの: CCXXXII〜CCXXXVII の時に、声だけの音声として作った 1 ファイル。声の元のファイルが手元にあるので、曲の音から伴奏を引く (tablet209 のやり方) より、ずっときれいにできる。伴奏の残りも、圧縮の雑音も入らない
+
+| ファイル | 中身 | 作り方 | 長さ | 音量 (mean / max) | 大きさ |
+|---|---|---|---|---|---|
+| `tablet233_voce_sola.mp3` | 声だけ | 届いている calma の声のファイルそのもの (1 バイトも変えていない; モノラル) | 3 分 18.5 秒 | −25.3 / −7.5 dB | 4.54 MiB |
+| `tablet233_voce_sola_nel_brano.mp3` | 曲の中で鳴っているままの声 | 楽譜から声の 1 回目だけを残して、synth.py で鳴らす (60 Hz〜8 kHz、曲の 5 秒の残響、右が 9 ms 遅い) | 3 分 25.5 秒 | −24.5 / −7.7 dB | 4.70 MiB |
+| `tablet233_audio.mp3` | 曲の音 (声 + トラック 18 + トラック 8) | 動画が無いので、同じ楽譜から作り直す (`compose_tablet233.py`) | 11 分 51 秒 | −16.5 / −0.7 dB | 16.27 MiB |
+
+- **曲の中で鳴っているままの声** (`voice_in_piece.py`): tablet209 の 2 つ目のファイルと同じ形にそろえた。入りと終わりの 6 秒のフェードは外す。話し始め (声の 5.4 秒) の前は無音に (そこにあった音は、話している所より 37.9 dB 下; 曲の中では入りのフェードの下で聞こえない所)。声の後の響きは 7 秒。話している所の rms を −24 dB に。仕上げの頭打ちは通さない。声の前 (曲の 0〜8 秒) の山は 0.00003 (16 bit の最小の桁): 声のほかには何も鳴っていない
+- **確かめ**:
+  - 声の段は、tablet209 の試しで「本当の声」として使った声の段 (同じ声、同じ経路) と、相関 1.000000、差 −67.7 dB (声の 10〜190 秒)
+  - 作り直した曲の音は rms −16.3 dB。当時の tablet233 の記録 (mean −16.3 dB) と同じ。山は 0.943 (synth.py の仕上げがそう決める; 当時の max 0.0 dB は、圧縮した後の mp4 で測った値)
+  - 声の形: 声だけ = 基音の中央値 201 Hz、重心 504 Hz、10 kHz から上も −35 dB で残っている。曲の中のままの声 = 重心 441 Hz、8 kHz から上は −38 dB 以下 (曲の中で帯域が削られている)、左右の相関 0.00。話している間 (5.5〜198 秒) に、0.5 秒窓が −45 dB を下回る所は無い (いちばん静かな窓 −37.1 dB)
+- **mp3 の音量**: mp3 192 kbps にすると、音量が 0.27 dB 下がる (倍率 0.9699; 曲の音でも声でも同じ値。mp3 のエンコーダがこの速さで掛ける倍率とみられる)。上の表は、できた mp3 を測った値。曲の音の wav は −16.3 dB・山 0.943、mp3 は −16.5 dB・−0.7 dB。前の節の `tablet209_audio.mp3` (−16.9 dB) が当時の記録 (−16.6 dB) より 0.3 dB 小さいのも、これ
+- **限り**: 声の元は、当時の wav ではなく、届いた mp3 192 kbps を wav に戻したもの。動画そのものは届いていないので、3 つ目は当時の mp4 の音とは比べていない (音量の記録が合うことだけ)
+- 確かめは測定だけ (耳では聞いていない)
+- `voice_in_piece.py` (新しい; 声の元の wav が手元にある曲なら、どれにも使える)。synth.py・compose_tablet233.py は変えていない
+
+```bash
+# 声は届いた calma の声の mp3 をモノラルの wav にしたもの (src/20261108_145525.wav)。トラック 18・トラック 8 は届いた wma をそのまま wav にしたもの
+echo '{"recordings": {}, "samples": []}' > bank_empty.json
+python3 compose_tablet233.py bank_empty.json src score_tablet233.json && python3 synth.py score_tablet233.json tablet233.wav     # 曲の音
+python3 voice_in_piece.py score score_tablet233.json score233_V.json && python3 synth.py score233_V.json V_stem.wav
+python3 voice_in_piece.py cut V_stem.wav score233_V.json tablet233_voce_sola_nel_brano.wav                                       # 曲の中で鳴っているままの声
+```
+
 ## 作り方 (再現)
 
 ```bash
