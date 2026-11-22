@@ -65,6 +65,26 @@ def cmd_check(a):
     return 0 if ok else 1
 
 
+def cmd_guard(a):
+    from .patchguard import check
+    stages = []
+    for path in a.files:
+        with open(path, encoding="utf-8") as f:
+            stages.append(json.load(f))
+    rep = check(stages, recompute=a.recompute)
+    print(f"── 証明書 PatchGuard ──  段数 {len(stages)}  変更 {len(rep['net_patch'])} 箇所")
+    for f in rep["findings"]:
+        print(f"  [{f['severity']}] {f['id']} {f['why']}")
+    for f in rep["cancelled"]:
+        print(f"  (相殺) {f['id']} {f['why']}")
+    print(f"判定: {rep['verdict']}")
+    if a.out:
+        with open(a.out, "a", encoding="utf-8") as f:
+            for t in rep["tuples"]:
+                f.write(json.dumps(t, ensure_ascii=False) + "\n")
+    return {"ACCEPT": 0, "REVIEW": 1, "REJECT": 2}[rep["verdict"]]
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="riemann_prover")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -79,6 +99,11 @@ def main(argv=None):
     c.add_argument("file")
     c.add_argument("--braid", type=int, nargs="+")
     c.set_defaults(fn=cmd_check)
+    g = sub.add_parser("guard", help="証明書（またはその書き換え 基→後…）を門で検査")
+    g.add_argument("files", nargs="+", help="証明書 JSON。複数なら時系列で折り畳む")
+    g.add_argument("--recompute", action="store_true", help="零点総数 N(T) を再計算して照合")
+    g.add_argument("--out", help="タプル台帳 (JSONL, 追記) の出力先")
+    g.set_defaults(fn=cmd_guard)
     a = p.parse_args(argv)
     return a.fn(a) or 0
 

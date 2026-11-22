@@ -58,5 +58,50 @@ class TestCertificate(unittest.TestCase):
         self.assertFalse(check_seal(forged))
 
 
+class TestPatchGuard(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.cert = seal(build_certificate(verify_rh_to_height(50.0), schoenfeld_check(10 ** 4),
+                                          [drh_evidence("chi_-3", 0.0, 10 ** 3)]), [1, 1, 1])
+
+    def test_honest_certificate_accepted(self):
+        from riemann_prover.patchguard import check
+        rep = check([self.cert], recompute=True)
+        self.assertEqual(rep["verdict"], "ACCEPT")
+        self.assertEqual(rep["tuples"][-1][-1], "ACCEPT")
+
+    def test_claiming_a_proof_is_rejected(self):
+        from riemann_prover.patchguard import check
+        forged = copy.deepcopy(self.cert)
+        forged["verdicts"]["riemann_hypothesis"] = "proved"
+        rep = check([self.cert, seal(forged, [1, 1, 1])])   # even when re-sealed
+        self.assertEqual(rep["verdict"], "REJECT")
+        self.assertIn("RG01", [f["id"] for f in rep["findings"]])
+
+    def test_forged_zero_count_caught_by_recompute(self):
+        from riemann_prover.patchguard import check
+        forged = copy.deepcopy(self.cert)
+        forged["rh_bounded"]["zeros_in_strip_argument_principle"] += 1
+        forged["rh_bounded"]["zeros_on_critical_line_sign_changes"] += 1
+        rep = check([self.cert, seal(forged, [1, 1, 1])], recompute=True)
+        self.assertIn("RG03", [f["id"] for f in rep["findings"]])
+        self.assertEqual(rep["verdict"], "REJECT")
+
+    def test_fold_cancels_reverted_stage(self):
+        from riemann_prover.patchguard import check
+        bad = copy.deepcopy(self.cert)
+        bad["drh_evidence"][0]["status"] = "proved"
+        rep = check([self.cert, bad, self.cert])
+        self.assertEqual(rep["verdict"], "ACCEPT")
+        self.assertEqual(rep["net_patch"], {})
+        self.assertTrue(rep["cancelled"])
+
+    def test_shrinking_height_needs_review(self):
+        from riemann_prover.patchguard import check
+        small = seal(build_certificate(verify_rh_to_height(30.0), schoenfeld_check(10 ** 4),
+                                       [drh_evidence("chi_-3", 0.0, 10 ** 3)]), [1, 1, 1])
+        self.assertEqual(check([self.cert, small])["verdict"], "REVIEW")
+
+
 if __name__ == "__main__":
     unittest.main()

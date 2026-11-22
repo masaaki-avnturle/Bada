@@ -13,7 +13,7 @@
 | ゼータ関数 `bada_webos/apps/discover/lib/zeta.bada`, `bada_ruby/lib/bada/special.rb` | 実数 s > 1 の級数だった ζ を、Euler–Maclaurin 展開で複素平面全体（臨界線上）へ拡張 |
 | ミレニアム分解 `bada_ruby/lib/bada/millennium.rb` | RH を対象問題として実際に数値検証する部分を担当 |
 | 量子暗号 `jones_quantum_crypto/` | 検証結果の証明書を、組みひもの Jones 多項式から導出した鍵で封印・改ざん検知 |
-| BadaPatchGarde | リポジトリ内に該当する名前のコードは見つからなかったため、未接続 |
+| BadaPatchGuard `bada_patchguard/`（ブランチ `ccr-fd691112-eo2fdo`） | 「基と後を SHA-256 でタプル台帳に置き、差分を不変量で検査して ACCEPT / REVIEW / REJECT」という門を、証明書の書き換え検査として `patchguard.py` に移植（PHP 解析部は使わない） |
 
 ## 何を検証するか
 
@@ -28,11 +28,31 @@
    Dirichlet 指標 χ に対し、臨界線上のオイラー積 `Π_{p≤x}(1 − χ(p)p^{-s})^{-1}` が
    `L(s,χ)`（`s = 1/2` かつ `χ² = 1` のときは `√2·L(s,χ)`）へ近づく様子を表にする。
 
+## 証明書 PatchGuard（書き換えの門）
+
+証明書を書き換えるとき、基と後を比べて次の不変量を検査する。高以上は REJECT、中は REVIEW。
+
+| ID | 検査 | 重大度 |
+|:--|:--|:--|
+| RG01 | RH / DRH の判定を「未解決」以外へ書き換える | 致命的 |
+| RG02 | 「検証済み」なのに零点総数と線上の個数が一致しない | 致命的 |
+| RG03 | `--recompute` で再計算した N(T) が記載と違う | 致命的 |
+| RG04 | Schoenfeld 不等式が検証済みなのに最大比が 1 以上 | 高 |
+| RG05 | DRH の証拠（有限の部分積）を「未解決」以外にする | 致命的 |
+| RG06 | 健全性の注記の削除・変更 | 高 |
+| RG07 | 封印がない（中）／封印が内容と不一致（高） | 中 / 高 |
+| RG08 | 検証の高さ・上限の縮小 | 中 |
+| RG09 | DRH の証拠の削除 | 中 |
+
+複数回の書き換えは折り畳み、正味の 基 → 最終 で判定する（途中の段だけの指摘は「相殺」として記録）。
+
 ## 使い方
 
 ```bash
 python3 -m riemann_prover.cli run --height 1000 --out certificate.json
 python3 -m riemann_prover.cli check certificate.json           # 封印の検査
+python3 -m riemann_prover.cli guard certificate.json --recompute   # 単体を門で検査
+python3 -m riemann_prover.cli guard base.json after.json --out tuples.jsonl   # 書き換えを検査 (終了コード 0/1/2)
 python3 -m unittest riemann_prover.tests.test_riemann_prover
 ```
 
