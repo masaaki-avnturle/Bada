@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BadaGPT</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#131824; --line:#232b3d; --fg:#e6e9f0; --mut:#8b95a8; --acc:#6ea8ff; --ok:#5fd38d; --ng:#ff7b7b; --warn:#f2c14e; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+         display: flex; flex-direction: column; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .02em; }
+  header .sub { color: var(--mut); font-size: 12px; flex: 1 1 200px; }
+  header button, header label.btn { font: inherit; font-size: 13px; color: var(--fg); background: var(--panel); border: 1px solid var(--line);
+         border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  header button:disabled { opacity: .45; cursor: default; }
+  #log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 920px; width: 100%; margin: 0 auto; }
+  .msg.user { text-align: right; }
+  .msg.user .bubble { display: inline-block; background: #1d3154; border-radius: 14px 14px 2px 14px; padding: 8px 12px; text-align: left; }
+  .msg.bot .bubble { background: var(--panel); border: 1px solid var(--line); border-radius: 2px 14px 14px 14px; padding: 10px 12px; }
+  .steps { color: var(--mut); font-size: 12px; margin-bottom: 6px; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 13px/1.55 ui-monospace, "SFMono-Regular", Menlo, Consolas, "Noto Sans Mono CJK JP", monospace; }
+  .l-ok { color: var(--ok); } .l-ng { color: var(--ng); } .l-open { color: var(--warn); } .l-head { color: var(--acc); }
+  #chips { display: flex; gap: 8px; padding: 0 16px 8px; overflow-x: auto; }
+  #chips button { flex: none; font: inherit; font-size: 13px; color: var(--fg); background: transparent; border: 1px solid var(--line);
+         border-radius: 999px; padding: 5px 12px; cursor: pointer; white-space: nowrap; }
+  form { display: flex; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+  form input { flex: 1; min-width: 0; font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  form button { font: inherit; color: #06101f; background: var(--acc); border: 0; border-radius: 10px; padding: 0 18px; cursor: pointer; font-weight: 600; }
+  input:focus-visible, button:focus-visible, label.btn:focus-within { outline: 2px solid var(--acc); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>BadaGPT</h1>
+  <span class="sub">数学の予想を、計算で確かめられる範囲で調べます。未解決の予想は「未解決」と答えます。</span>
+  <label class="btn">基を読込<input id="loadBase" type="file" accept=".json,application/json" hidden></label>
+  <label class="btn">証明書を読込<input id="loadCert" type="file" accept=".json,application/json" hidden></label>
+  <button id="save" disabled>保存</button>
+</header>
+<div id="log" aria-live="polite"></div>
+<div id="chips"></div>
+<form id="form" autocomplete="off">
+  <input id="q" placeholder="例: リーマン予想を高さ 1000 まで調べて" aria-label="メッセージ">
+  <button>送信</button>
+</form>
+<script>
+/*__ENGINE__*/
+/*__CHAT__*/
+(function () {
+  "use strict";
+  var log = document.getElementById("log"), form = document.getElementById("form"), q = document.getElementById("q");
+  var save = document.getElementById("save"), state = {};
+  var CHIPS = ["リーマン予想を高さ 1000 まで調べて", "深リーマン予想の証拠を見せて", "Σ k^2 = n(n+1)(2n+1)/5",
+               "コラッツ予想を 14 ビットで", "未解決問題の反例を 12 量子ビットで探して", "証明書を作って", "証明書を検査して"];
+
+  function cls(line) {
+    if (/判定: (ACCEPT)|∎/.test(line)) return "l-ok";
+    if (/✗|REJECT|\[(critical|high)\]/.test(line)) return "l-ng";
+    if (/\? 未解決|REVIEW|…/.test(line)) return "l-open";
+    if (/^【|^──/.test(line)) return "l-head";
+    return "";
+  }
+  function add(kind, lines, steps) {
+    var m = document.createElement("div"); m.className = "msg " + kind;
+    var b = document.createElement("div"); b.className = "bubble";
+    if (steps && steps.length) { var s = document.createElement("div"); s.className = "steps"; s.textContent = steps.join("  →  "); b.appendChild(s); }
+    var pre = document.createElement("pre");
+    lines.forEach(function (line, i) {
+      var span = document.createElement("span"); span.className = cls(line); span.textContent = line + (i < lines.length - 1 ? "\n" : "");
+      pre.appendChild(span);
+    });
+    b.appendChild(pre); m.appendChild(b); log.appendChild(m); log.scrollTop = log.scrollHeight;
+    return m;
+  }
+  function ask(text) {
+    text = text.trim(); if (!text) return;
+    add("user", [text]);
+    var wait = add("bot", ["計算中…"]);
+    setTimeout(function () {                      // 描画してから重い計算を始める
+      var r = BadaGPTChat.reply(text, state);
+      wait.remove(); add("bot", r.lines, r.steps);
+      save.disabled = !state.cert;
+    }, 30);
+  }
+  form.addEventListener("submit", function (e) { e.preventDefault(); ask(q.value); q.value = ""; });
+  CHIPS.forEach(function (c) {
+    var b = document.createElement("button"); b.type = "button"; b.textContent = c;
+    b.addEventListener("click", function () { ask(c); });
+    document.getElementById("chips").appendChild(b);
+  });
+  function loader(id, key, label) {
+    document.getElementById(id).addEventListener("change", function (e) {
+      var file = e.target.files[0]; if (!file) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        try { state[key] = JSON.parse(rd.result); add("bot", [label + "を読み込みました: " + file.name, "「証明書を検査して」で門にかけられます。"]); save.disabled = !state.cert; }
+        catch (err) { add("bot", ["JSON として読めませんでした: " + err.message]); }
+      };
+      rd.readAsText(file); e.target.value = "";
+    });
+  }
+  loader("loadBase", "base", "書き換えの基");
+  loader("loadCert", "cert", "証明書");
+  save.addEventListener("click", function () {
+    if (!state.cert) return;
+    if (/; wv\)/.test(navigator.userAgent)) {   // Android WebView はファイル保存に対応しないことがあるので本文を表示する
+      add("bot", ["証明書 (JSON)。長押しでコピーできます:", JSON.stringify(state.cert)]); return;
+    }
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(state.cert, null, 2)], { type: "application/json" }));
+    a.download = "badagpt-certificate.json"; document.body.appendChild(a); a.click(); a.remove();
+  });
+  add("bot", BadaGPTChat.HELP);
+})();
+</script>
+</body>
+</html>
