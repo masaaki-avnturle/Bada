@@ -1,0 +1,252 @@
+
+# ═══════════════════════════════════════════════════════════════════════
+# semantic.bada — 言語生成の意味認識システム
+#
+# レポート "Entropy on manifold and differential of equation" (system_transport.pdf) に
+# 繰り返し現れるエントロピー方程式群を、文の統計量に対応させて使う。
+#
+#   (E1)  x log x                              エントロピー密度  →  S(p) = −Σ p log p
+#   (E2)  log(x log x) ≥ 2 (y log y)^{1/2}     意味の門: x = e^{H} (文の情報量),  y = e^{D} (文脈とのずれ)
+#   (E3)  ∫∫ 1/(x log x)² dx_m                 語の順位 r に対する事前分布  p0(r) ∝ 1/((r+1) log(r+1))²
+#   (E4)  F = ∫ (R + ∇i∇j f)² / −(R + Δf) dm   情報の流れ: f = 驚き (−log p) の勾配二乗を e^{−f} で重み付け
+#
+# 注意: レポートは物理・幾何の文脈でこれらの式を述べており、言語については何も定めていない。
+# 上の対応づけ (どの量を x, y, f とみなすか) は本アプリの設計上の選択であり、
+# レポートから導かれた定理ではない。意味認識は語の分布の統計であって、内容の真偽は判定しない。
+# ═══════════════════════════════════════════════════════════════════════
+SEM_VERSION := "1.0.0"
+SEM := {ready: false, cf: {}, rank: {}, total: 0, V: 0, Z: 1, tail: 0}
+SEM_LAMBDA := 0.1          # 事前分布 (E3) の混合比
+
+# (E1) エントロピー密度
+fn sem_density(x) {
+  if x <= 0 { return 0 }
+  return x * log(x)
+}
+
+# (E3) 順位 r の核 1/((r+1) log(r+1))²  — 総和が収束するので正規化できる
+fn sem_kernel(r) {
+  d := sem_density(r + 1)
+  return 1 / (d * d)
+}
+
+# コーパス (論文 + 方程式) の語の頻度と順位。初回だけ計算する
+fn sem_boot() {
+  if SEM.ready { return SEM.V }
+  cf := {}
+  total := 0
+  for t, plist in IDX {
+    n := 0
+    for p in plist { n = n + p[1] }
+    cf[t] = n
+    total = total + n
+  }
+  ranked := sortby(keys(cf), |t| -cf[t])
+  rank := {}
+  Z := 0
+  for t, i in ranked {
+    rank[t] = i + 1
+    Z = Z + sem_kernel(i + 1)
+  }
+  V := len(ranked)
+  # 未知語の質量: ∫_{a}^{∞} dx / (x log x)² ≤ 1 / (a log² a),  a = V + 2
+  tail := 1 / ((V + 2) * log(V + 2) * log(V + 2))
+  SEM.cf = cf
+  SEM.rank = rank
+  SEM.total = total
+  SEM.V = V
+  SEM.Z = Z + tail
+  SEM.tail = tail
+  SEM.ready = true
+  Omega >> ["semantic.boot", SEM_VERSION, V, total]
+  return V
+}
+
+# 語 w の確率 (頻度と事前分布 E3 の混合) と驚き I(w) = −log p(w)
+fn sem_prob(w) {
+  sem_boot()
+  if has(SEM.rank, w) {
+    return (1 - SEM_LAMBDA) * SEM.cf[w] / SEM.total + SEM_LAMBDA * sem_kernel(SEM.rank[w]) / SEM.Z
+  }
+  return SEM_LAMBDA * SEM.tail / SEM.Z
+}
+
+fn sem_surprisal(w) {
+  return -log(sem_prob(w))
+}
+
+# 文 → 語の分布 (不要語を除く)
+fn sem_bag(text) {
+  tf := {}
+  n := 0
+  for t in tokens(text) {
+    if not contains(STOP, t) {
+      tf[t] = get(tf, t, 0) + 1
+      n = n + 1
+    }
+  }
+  return {tf: tf, n: n}
+}
+
+# (E1) S(p) = −Σ p log p  と  x = e^{S}
+fn sem_entropy(bag) {
+  if bag.n == 0 { return 0 }
+  h := 0
+  for t, c in bag.tf { h = h - sem_density(c / bag.n) }
+  return h
+}
+
+# 意味の担い手: 頻度 × 驚き が大きい語
+fn sem_carriers(bag, k) {
+  ks := sortby(keys(bag.tf), |t| -(bag.tf[t] * sem_surprisal(t)))
+  return slice(ks, 0, k)
+}
+
+# 2 つの分布のずれ: Jensen–Shannon ダイバージェンス (0 〜 log 2)。これも −Σ m log m (E1) の差で書ける
+fn sem_divergence(a, b) {
+  if a.n == 0 or b.n == 0 { return log(2) }
+  hm := 0
+  for t, c in a.tf {
+    m := 0.5 * c / a.n + 0.5 * get(b.tf, t, 0) / b.n
+    hm = hm - sem_density(m)
+  }
+  for t, c in b.tf {
+    if not has(a.tf, t) { hm = hm - sem_density(0.5 * c / b.n) }
+  }
+  d := hm - 0.5 * sem_entropy(a) - 0.5 * sem_entropy(b)
+  return max(0, d)
+}
+
+# (E2) 意味の門:  log(x log x) ≥ 2 (y log y)^{1/2},  x = e^{H}, y = e^{D}
+fn sem_gate(H, D) {
+  x := exp(H)
+  y := exp(D)
+  xl := sem_density(x)
+  lhs := -inf
+  if xl > 0 { lhs = log(xl) }
+  rhs := 2 * sqrt(sem_density(y))
+  return {x: x, y: y, lhs: lhs, rhs: rhs, margin: lhs - rhs, pass: lhs >= rhs}
+}
+
+# (E4) 情報の流れ: 文字 n-gram の驚き f_i の勾配二乗を e^{−f_i} で重み付けした平均。小さいほど滑らか
+fn sem_flow(text) {
+  lm_train()
+  cs := chars(replace(text, "\n", ""))
+  fs := []
+  for i in range(LM_N - 1, len(cs)) {
+    ctx := join(slice(cs, i - LM_N + 1, i), "")
+    p := 0.0001
+    if has(LM, ctx) {
+      row := LM[ctx]
+      tot := sum(values(row))
+      p = max(p, get(row, cs[i], 0) / tot)
+    }
+    fs <- -log(p)
+  }
+  if len(fs) < 2 { return {F: 0, mean: 0, n: len(fs)} }
+  num_ := 0
+  den := 0
+  for i in range(0, len(fs) - 1) {
+    w := exp(-fs[i])
+    g := fs[i + 1] - fs[i]
+    num_ = num_ + w * g * g
+    den = den + w
+  }
+  return {F: num_ / den, mean: sum(fs) / len(fs), n: len(fs)}
+}
+
+# 文脈 (検索で得た文書) の語の分布
+fn sem_context(hits) {
+  buf := ""
+  for h in slice(hits, 0, 6) {
+    if h.doc.kind == "chunk" { buf = buf + " " + h.doc.body } else { buf = buf + " " + h.doc.text }
+  }
+  return sem_bag(buf)
+}
+
+# 文の意味認識: 情報量・担い手・文脈とのずれ・門・流れ
+fn sem_recognize(text, ctx) {
+  bag := sem_bag(text)
+  H := sem_entropy(bag)
+  D := sem_divergence(bag, ctx)
+  g := sem_gate(H, D)
+  fl := sem_flow(text)
+  return {tokens: bag.n, H: H, x: g.x, D: D, y: g.y, lhs: g.lhs, rhs: g.rhs, margin: g.margin, pass: g.pass,
+          F: fl.F, mean_surprisal: fl.mean, carriers: sem_carriers(bag, 5), score: -D - 0.02 * fl.F}
+}
+
+fn sem_row(r) {
+  ok := "✗"
+  if r.pass { ok = "✓" }
+  return fixed(r.H, 3) + " | " + fixed(r.x, 2) + " | " + fixed(r.D, 3) + " | " + fixed(r.lhs, 3) + " | " + fixed(r.rhs, 3) + " | " + ok + " | " + fixed(r.F, 3)
+}
+
+SEM_NOTE := "\n\n_意味認識は語の分布の統計 (エントロピー) によるもので、内容の真偽は判定しません。式と量の対応づけは本アプリの設計上の選択です。_"
+
+# ─── 道具: 文の意味を認識する ───
+fn tool_semantic(text) {
+  body := text
+  cut := match(text, "[:：]\\s*([\\s\\S]+)$")
+  if cut != nil { body = trim(cut[1]) }
+  hits := retrieve(body, 0)
+  r := sem_recognize(body, sem_context(hits))
+  md := "**意味認識** — 対象: 「" + slice(body, 0, 60) + "」\n\n"
+  md = md + "| 量 | 値 | 使った式 |\n|:--|:--|:--|\n"
+  md = md + "| 情報量 H = −Σ p log p | " + fixed(r.H, 4) + " nat (" + str(r.tokens) + " 語) | (E1) x log x |\n"
+  md = md + "| x = e^H (語の実効的な種類数) | " + fixed(r.x, 3) + " | |\n"
+  md = md + "| 文脈とのずれ D (Jensen–Shannon) | " + fixed(r.D, 4) + " / " + fixed(log(2), 4) + " | (E1) |\n"
+  md = md + "| 意味の門 log(x log x) ≥ 2(y log y)^{1/2} | " + fixed(r.lhs, 3) + " ≥ " + fixed(r.rhs, 3) + " → " + (r.pass and "**成立**" or "**不成立**") + " | (E2) |\n"
+  md = md + "| 情報の流れ F (小さいほど滑らか) | " + fixed(r.F, 4) + " | (E4) |\n"
+  md = md + "| 文字あたりの平均の驚き | " + fixed(r.mean_surprisal, 3) + " nat | |\n\n"
+  md = md + "**意味の担い手** (頻度 × 驚き −log p(w) が大きい語。p(w) は頻度と事前分布 (E3) の混合): "
+  md = md + join(map(r.carriers, |w| "`" + w + "` (" + fixed(sem_surprisal(w), 2) + ")"), ", ")
+  near := []
+  for h in slice(hits, 0, 4) {
+    if h.doc.kind == "chunk" { near <- h.doc.src + " p." + str(h.doc.page) } else { near <- "方程式 " + h.doc.id }
+  }
+  if len(near) > 0 { md = md + "\n\n**最も近い文脈**: " + join(unique(near), " / ") }
+  Omega >> ["semantic", fixed(r.H, 4), fixed(r.D, 4), r.pass]
+  return {md: md + SEM_NOTE, tool: "semantic", files: [], r: r}
+}
+
+# ─── 道具: 意味認識つきの言語生成 ───
+# 門 (E2) で情報量の足りない候補を落とし、残りを「文脈とのずれ D が小さい順 (同程度なら流れ F が滑らかな順)」で選ぶ
+fn sem_generate(query, hits, count) {
+  ctx := sem_context(hits)
+  qbag := sem_bag(query)
+  seeds := sem_carriers(qbag, 3)
+  if len(seeds) == 0 { seeds = ["ゼータ関数"] }
+  temps := [0.6, 0.8, 1.0]
+  cands := []
+  for i in range(count) {
+    s := lm_generate(slice(seeds[i % len(seeds)], 0, 6), 120, temps[i % len(temps)])
+    r := sem_recognize(s, ctx)
+    r.text = s
+    cands <- r
+  }
+  passing := filter(cands, |c| c.pass)
+  pool := passing
+  if len(pool) == 0 { pool = cands }
+  best := pool[argmax(map(pool, |c| c.score))]
+  return {best: best, cands: cands, passed: len(passing), seeds: seeds}
+}
+
+fn tool_generate(text, hits) {
+  seedw := trim(replace(replace(replace(replace(text, "で文章を生成", ""), "生成", ""), "して", ""), "文章", ""))
+  if seedw == "" { seedw = "ゼータ関数" }
+  g := sem_generate(seedw, hits, 8)
+  md := g.best.text + "\n\n"
+  if g.passed == 0 { md = md + "⚠ 意味の門 (E2) を通った候補がありませんでした。スコアが最も高い候補を表示しています。\n\n" }
+  md = md + "**意味認識による選別** — 候補 " + str(len(g.cands)) + " 個のうち門を通過 " + str(g.passed) + " 個。選んだ文の担い手: " + join(map(g.best.carriers, |w| "`" + w + "`"), ", ") + "\n\n"
+  md = md + "| # | H | x = e^H | D | log(x log x) | 2(y log y)^½ | 門 | F |\n|:--|:--|:--|:--|:--|:--|:--|:--|\n"
+  for c, i in g.cands {
+    mark := ""
+    if c.text == g.best.text { mark = " ◀" }
+    md = md + "| " + str(i + 1) + mark + " | " + sem_row(c) + " |\n"
+  }
+  md = md + "\n_候補の文は論文コーパスで学習した文字 " + str(LM_N) + "-gram モデルが作ります。意味認識は、門 (E2) を通った候補のうち文脈とのずれ D が最も小さいもの (同程度なら流れ F が滑らかなもの) を選ぶだけで、内容の正しさは保証しません。_"
+  Omega >> ["generate", len(g.cands), g.passed, fixed(g.best.score, 4)]
+  return {md: md + SEM_NOTE, tool: "lm+semantic", files: [], g: g}
+}
+
+Omega >> ["semantic.load", SEM_VERSION]

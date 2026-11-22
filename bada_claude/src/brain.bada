@@ -106,7 +106,7 @@ fn retrieve(q, off) {
 }
 
 # ─── ② 意図推定: Unknown-Prior Engine ────────────────────────────────
-INTENTS := ["greet", "identity", "help", "calc", "eqid", "stats", "quantum", "code", "blueprint", "open_problem", "generate", "more", "explain", "prove", "paper", "codegen", "crypto"]
+INTENTS := ["greet", "identity", "help", "calc", "eqid", "stats", "quantum", "code", "blueprint", "open_problem", "generate", "more", "explain", "prove", "paper", "codegen", "crypto", "semantic"]
 CUES := {
   greet: ["こんにちは", "こんばんは", "おはよう", "hello", "hi", "やあ", "はじめまして"],
   identity: ["あなた", "君", "誰", "だれ", "何者", "claude", "chatgpt", "gpt", "who", "自己紹介"],
@@ -124,7 +124,8 @@ CUES := {
   prove: ["帰納法", "反例", "証明書", "コラッツ", "ゴールドバッハ", "ルジャンドル", "grover", "グローバー"],
   paper: ["latex", "tex"],
   codegen: ["ソースコード", "厳密"],
-  crypto: ["暗号化", "復号", "encrypt", "decrypt", "暗号文"]
+  crypto: ["暗号化", "復号", "encrypt", "decrypt", "暗号文"],
+  semantic: ["意味認識", "意味解析"]
 }
 
 fn cue_count(text, cues) {
@@ -157,6 +158,9 @@ fn classify(text, hits) {
     }
     if match(low, "(ソースコード|source code|厳密|実装)[^。]*(生成|作って|書いて|出力|にして|化)") != nil or match(low, "(python|javascript|ruby|java|rust|go言語|c言語)[^。]*(で|の)[^。]*(生成|作って|書いて|出力|コード)") != nil {
       z[index_of(INTENTS, "codegen")] = z[index_of(INTENTS, "codegen")] + 14
+    }
+    if match(low, "意味(を|の)?(認識|解析|分析)") != nil {
+      z[index_of(INTENTS, "semantic")] = z[index_of(INTENTS, "semantic")] + 15
     }
     if match(low, "(暗号化|復号|encrypt|decrypt)") != nil {
       z[index_of(INTENTS, "crypto")] = z[index_of(INTENTS, "crypto")] + 16
@@ -351,7 +355,7 @@ fn honesty_note(text) {
   return ""
 }
 
-HELP_MD := "私は **BadaClaude** — 量子プログラミング言語 **Bada** で書かれた対話エンジンです。できること:\n\n| 例 | 動作 |\n|:--|:--|\n| `ゼータ関数とベータ関数の関係は?` | 論文と方程式レジストリを検索して根拠つきで回答 |\n| `ACAFE.17` | 方程式 ID で直接参照 |\n| `計算 zeta(2)` / `beta(1/2, 1/2)` / `rs_Z(14.1347)` | Bada で数値計算 (Γ・β・ζ・Lambert W・Riemann–Siegel Z・Jones) |\n| `ベル状態を作って` / `GHZ` / `reviser` | Q# 型量子副言語で回路を実行 |\n| ` ```bada … ``` ` | 送ったコードを Bada で実行 |\n| `方程式は全部で何本?` | レジストリの統計 |\n| `輸送機の設計図` | CONTACT TRANSPORTER の設計パラメータ |\n| `ゼータで文章を生成` | 論文コーパスで学習した文字 n-gram で生成 |\n| `リーマン予想を高さ 1000 まで調べて` / `コラッツ予想を 14 ビットで` | 未知事前エンジン: 数値検証・降下補題・擬似量子コンピュータでの反例探索 (判定は 証明完了 / 反証 / 未解決) |\n| `Σ k^2 = n(n+1)(2n+1)/6` | 数学的帰納法で判定 (誤りなら修正) |\n| `論文を作成して` | 直前の証明の論文 (Markdown + LaTeX)。未解決問題は「計算的証拠の報告」になります |\n| `厳密なソースコードを生成して` / `rust で` | リバイザ (@reviser RIGOR) が 8 言語の厳密化されたソースコードを生成 |\n| `[1,1,1] で暗号化: 本文` / `復号 [1,1,1] <暗号文>` | Jones 多項式量子暗号 |\n\n右上の ⚙ で **Claude API キー** を設定すると、同じ Bada パイプラインが検索・計算した文脈を Claude (claude-opus-5-5) に渡して回答させます。"
+HELP_MD := "私は **BadaClaude** — 量子プログラミング言語 **Bada** で書かれた対話エンジンです。できること:\n\n| 例 | 動作 |\n|:--|:--|\n| `ゼータ関数とベータ関数の関係は?` | 論文と方程式レジストリを検索して根拠つきで回答 |\n| `ACAFE.17` | 方程式 ID で直接参照 |\n| `計算 zeta(2)` / `beta(1/2, 1/2)` / `rs_Z(14.1347)` | Bada で数値計算 (Γ・β・ζ・Lambert W・Riemann–Siegel Z・Jones) |\n| `ベル状態を作って` / `GHZ` / `reviser` | Q# 型量子副言語で回路を実行 |\n| ` ```bada … ``` ` | 送ったコードを Bada で実行 |\n| `方程式は全部で何本?` | レジストリの統計 |\n| `輸送機の設計図` | CONTACT TRANSPORTER の設計パラメータ |\n| `ゼータで文章を生成` | 論文コーパスで学習した文字 n-gram で生成 |\n| `リーマン予想を高さ 1000 まで調べて` / `コラッツ予想を 14 ビットで` | 未知事前エンジン: 数値検証・降下補題・擬似量子コンピュータでの反例探索 (判定は 証明完了 / 反証 / 未解決) |\n| `Σ k^2 = n(n+1)(2n+1)/6` | 数学的帰納法で判定 (誤りなら修正) |\n| `論文を作成して` | 直前の証明の論文 (Markdown + LaTeX)。未解決問題は「計算的証拠の報告」になります |\n| `厳密なソースコードを生成して` / `rust で` | リバイザ (@reviser RIGOR) が 8 言語の厳密化されたソースコードを生成 |\n| `意味を認識して: 文` / `ゼータ関数で文章を生成して` | エントロピー方程式群による意味認識 (情報量・文脈とのずれ・意味の門・流れ) と、それで選別する言語生成 |\n| `[1,1,1] で暗号化: 本文` / `復号 [1,1,1] <暗号文>` | Jones 多項式量子暗号 |\n\n右上の ⚙ で **Claude API キー** を設定すると、同じ Bada パイプラインが検索・計算した文脈を Claude (claude-opus-5-5) に渡して回答させます。"
 
 IDENTITY_MD := "私は **BadaClaude** です。Claude や ChatGPT の「応答する仕組み」— 字句化・意図推定・検索・道具使用・生成・記録 — を、量子プログラミング言語 Bada で書き直した対話エンジンです (頭脳のソースは「brain.bada」タブで読めます)。\n\n正直にお伝えすると、Anthropic の Claude や OpenAI の ChatGPT の**学習済みの重み (数千億パラメータ) は含まれていません**。ローカルモードでの私の知識は、同梱した論文 10 本と方程式 2111 本、そして Bada の数値核だけです。汎用の会話力が必要なときは ⚙ 設定で Claude API キーを入れてください。その場合も、何を検索し何を計算して Claude に渡すかは Bada の頭脳が決めます。"
 
@@ -380,7 +384,7 @@ fn respond(text) {
   sources := []
   files := []
   lab := nil
-  if intent == "prove" { lab = tool_prove(text) } elif intent == "paper" { lab = tool_paper(text) } elif intent == "codegen" { lab = tool_codegen(text) } elif intent == "crypto" { lab = tool_crypto(text) }
+  if intent == "prove" { lab = tool_prove(text) } elif intent == "paper" { lab = tool_paper(text) } elif intent == "codegen" { lab = tool_codegen(text) } elif intent == "crypto" { lab = tool_crypto(text) } elif intent == "semantic" { lab = tool_semantic(text) } elif intent == "generate" { lab = tool_generate(text, hits) }
   if intent == "prove" and lab == nil { intent = "explain" }
   q := text
   if intent == "more" {

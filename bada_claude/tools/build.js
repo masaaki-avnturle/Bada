@@ -16,7 +16,7 @@ const rd = f => fs.readFileSync(path.join(ROOT, "src", f), "utf8");
 
 function build() {
   const kb = JSON.stringify(JSON.parse(rd("kb.json"))).replace(/<\//g, "<\\/");
-  const brain = rd("brain.bada") + rd("lab.bada");      // lab.bada (証明ラボ) は頭脳の続きとして読み込まれる
+  const brain = rd("brain.bada") + rd("lab.bada") + rd("semantic.bada");      // lab.bada (証明ラボ) は頭脳の続きとして読み込まれる
   if (/<\/script/i.test(brain)) throw new Error("brain.bada must not contain </script");
   const engine = rd("engine.js"), app = rd("app.js");
   // 証明ラボ: BadaGPT の計算エンジンと対話層 (bada_gpt/src) + lab.js

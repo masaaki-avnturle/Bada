@@ -53,6 +53,7 @@
 | [`tools/engine-test.js`](tools/engine-test.js) | 単体テスト 75 件 |
 | [`src/lab.bada`](src/lab.bada) | **証明ラボ** (Bada)。`@reviser RIGOR` の規則・義務と、証明 / 論文 / コード生成 / 暗号の道具 |
 | [`src/lab.js`](src/lab.js) | 証明ラボのネイティブ組込み: 仕様の作成、8 言語の発行器、論文、Jones 暗号 |
+| [`src/semantic.bada`](src/semantic.bada) / [`tools/semantic-test.js`](tools/semantic-test.js) | **意味認識システム** (Bada) とそのテスト 25 件 |
 | [`tools/lab-test.js`](tools/lab-test.js) / [`tools/codegen-test.js`](tools/codegen-test.js) | 証明ラボのテスト 48 件 / 生成コードの実コンパイル・実行 59 件 |
 
 アプリの **🧠 brain.bada** タブで、動いている頭脳のソースをそのまま読めます。**Ω 台帳** タブには、頭脳が行った commit (起動・各ターン・学習・Claude 応答) が追記されていきます。
@@ -124,6 +125,35 @@ obligation "RS01", "主張が数学的帰納法で証明済みである", |s| s.
 
 証明ラボの計算部分は [`bada_gpt/src/`](../bada_gpt/src/) (BadaGPT のエンジン) を `build.js` が取り込みます。
 
+## 🧩 言語生成の意味認識システム (v1.2.0)
+
+レポート *Entropy on manifold and differential of equation* (`system_transport.pdf`) に繰り返し現れるエントロピー方程式群を、文の統計量に対応させて使います ([`src/semantic.bada`](src/semantic.bada)、すべて Bada)。
+
+| 式 (レポート) | 対応させた量 | 使い道 |
+|:--|:--|:--|
+| (E1) `x log x` | エントロピー密度。`S(p) = −Σ p log p` | 文の情報量 H、文脈とのずれ D (Jensen–Shannon) |
+| (E2) `log(x log x) ≥ 2 (y log y)^{1/2}` | `x = e^H`、`y = e^D` | **意味の門**: ずれが大きい文ほど多くの情報量を要求する足切り |
+| (E3) `∫∫ 1/(x log x)² dx_m` | 語の順位 r の事前分布 `p0(r) ∝ 1/((r+1) log(r+1))²` | 未知語にも有限の驚き `−log p(w)` を与える平滑化 |
+| (E4) `F = ∫ (R + ∇i∇j f)² / −(R + Δf) dm` | `f` = 文字 n-gram の驚き。勾配二乗を `e^{−f}` で重み付け | **情報の流れ**の滑らかさ |
+
+(E2) で `D = 0` とすると門のしきい値は `x log x = 1`、つまり `x = e^{W(1)} ≈ 1.763` (既存の組込み `xlogx_root()`) になります。
+
+| 送る文 | 動作 |
+|:---|:---|
+| `意味を認識して: 文` | 情報量・意味の担い手 (頻度 × 驚きが大きい語)・最も近い文脈・ずれ・門・流れを表示 |
+| `ゼータ関数で文章を生成して` | 文字 5-gram モデルで候補を 8 個作り、門 (E2) で足切りしてから、文脈とのずれ D が最も小さい候補を選ぶ。全候補の表つき |
+
+**実測** (`tools/semantic-test.js`):
+- 文書の照合: 60 文書について、前半の語の分布から同じ文書の後半を当てる課題で、1 位正解 27/60 (45%)、3 位以内 40/60 (67%)。まぐれ当たりは 1.7% です。
+- 生成の選別: 6 つの話題の平均で、選んだ文のずれ D は 0.527、候補全体の平均は 0.594 でした (小さいほど文脈に近い)。
+
+**限界**:
+- レポートは物理・幾何の文脈でこれらの式を述べており、言語については定めていません。どの量を x, y, f とみなすかは**本アプリの設計上の選択**で、レポートから導かれた定理ではありません。
+- 意味認識は語の分布の統計です。文の内容が正しいかどうかは判定しません。
+- 門 (E2) は通常の長さの文をほぼ通します (情報量の無い文だけを落とす弱い足切り)。選別の大半はずれ D の順位付けが担っています。
+- 生成される文は文字 5-gram の出力なので、選別しても文として不自然なことがあります。自然な文章が必要なときは Claude API モードを使ってください (意味認識の結果は文脈として Claude に渡されます)。
+- レポート自体は知識ベース (`kb.json`) には追加していません。
+
 ## 🔑 Claude API モード (任意)
 
 ⚙ 設定で **Claude API** を選び、Anthropic の API キーを入れると、Bada の頭脳が検索・計算した結果 (`<bada_context>`) をシステムプロンプトに入れて Claude に送り、ストリーミングで回答を表示します。
@@ -148,6 +178,7 @@ python3 bada_claude/tools/build_kb.py     # PDF → src/kb.json (pip install pyp
 node bada_claude/tools/build.js           # src/ → index.html
 node bada_claude/tools/engine-test.js     # 75 件のテスト
 node bada_claude/tools/lab-test.js        # 証明ラボ 48 件
+node bada_claude/tools/semantic-test.js   # 意味認識 25 件
 node bada_claude/tools/codegen-test.js    # 生成コードを各言語でコンパイル・実行
 ```
 
