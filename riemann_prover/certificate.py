@@ -13,7 +13,8 @@ SOUNDNESS = (
 
 
 def build_certificate(rh: dict, schoenfeld: dict, drh: list[dict],
-                      quantum: list[dict] | None = None) -> dict:
+                      quantum: list[dict] | None = None,
+                      induction: list[dict] | None = None) -> dict:
     cert = {
         "engine": "riemann_prover (未知事前エンジン規約: proved / disproved / open)",
         "verdicts": {
@@ -29,6 +30,8 @@ def build_certificate(rh: dict, schoenfeld: dict, drh: list[dict],
     }
     if quantum is not None:
         cert["quantum_search"] = quantum
+    if induction is not None:
+        cert["induction"] = induction
     return cert
 
 

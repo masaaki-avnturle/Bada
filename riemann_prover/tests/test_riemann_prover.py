@@ -143,5 +143,59 @@ class TestQuantumSearch(unittest.TestCase):
             self.assertIn("RG10", [f["id"] for f in rep["findings"]])
 
 
+class TestInduction(unittest.TestCase):
+    def test_sum_identities(self):
+        from riemann_prover.induction import prove_sum
+        self.assertEqual(prove_sum([0, 1], [0, "1/2", "1/2"])["status"], "proved")
+        bad = prove_sum([0, 1], [0, "1/2", "1/3"])
+        self.assertEqual((bad["status"], bad["counterexample"]), ("disproved", 1))
+        # agrees with the truth at n = 0, 1 but not beyond
+        self.assertEqual(prove_sum([0, 1], [0, 1])["counterexample"], 2)
+
+    def test_repair_projects_onto_invariant(self):
+        from riemann_prover.induction import repair_sum
+        r = repair_sum([0, 0, 1], [0, "1/5", "3/5", "2/5"])
+        self.assertEqual(r["original"]["status"], "disproved")
+        self.assertEqual(r["status"], "proved")
+        self.assertEqual(r["repaired"]["g"], ["0", "1/6", "1/2", "1/3"])
+        self.assertEqual(r["drift_after"], "0")
+
+    def test_collatz_descent_lemma(self):
+        from riemann_prover.induction import collatz_descent
+        self.assertEqual(collatz_descent(2)["survivors_head"], [3])
+        self.assertEqual(collatz_descent(4)["survivors_head"], [7, 11, 15])
+        d = collatz_descent(10)
+        self.assertEqual((d["status"], d["conjecture_status"]), ("proved", "open"))
+        # matches the known count of surviving residues mod 2^k (OEIS A076227)
+        self.assertEqual([collatz_descent(k)["survivor_count"] for k in range(1, 11)],
+                         [1, 1, 2, 3, 4, 8, 13, 19, 38, 64])
+        # every excluded class really does drop below itself within 6 steps
+        surv = set(collatz_descent(6)["survivors_head"])
+        for n in range(65, 64 * 40):
+            if n % 64 not in surv:
+                m = n
+                for _ in range(6):
+                    m = m // 2 if m % 2 == 0 else (3 * m + 1) // 2
+                    if m < n:
+                        break
+                self.assertLess(m, n)
+
+    def test_gate_rechecks_induction(self):
+        from riemann_prover.patchguard import check
+        from riemann_prover.induction import induction_report
+        cert = seal(build_certificate(verify_rh_to_height(50.0), schoenfeld_check(10 ** 4),
+                                      [drh_evidence("chi_-3", 0.0, 10 ** 3)],
+                                      induction=induction_report(8)), [1, 1, 1])
+        self.assertEqual(check([cert])["verdict"], "ACCEPT")
+        for mutate in (lambda c: c["induction"][3].update(conjecture_status="proved"),
+                       lambda c: c["induction"][4].update(status="proved"),
+                       lambda c: c["induction"][0].update(g=["0", "1", "1"])):
+            bad = copy.deepcopy(cert)
+            mutate(bad)
+            rep = check([cert, seal(bad, [1, 1, 1])])
+            self.assertEqual(rep["verdict"], "REJECT")
+            self.assertIn("RG11", [f["id"] for f in rep["findings"]])
+
+
 if __name__ == "__main__":
     unittest.main()

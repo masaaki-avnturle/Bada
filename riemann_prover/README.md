@@ -17,6 +17,8 @@
 
 | 擬似量子コンピュータ `bada_webos/quantum/shor9.py`（QuantOS `bada_quantos/` のカーネルと同方式の状態ベクトルシミュレータ） | `qsim.py` がこの `StateVector` 上で Grover 探索を回し、未解決問題の反例をさがす |
 
+| コマの可積分系エラー修正 `bio_medicine/omega_apriori_injector/plugins/integrable_top.js` | 「保存量の等位集合へ射影して誤りを直す」原理を、誤った閉形式の修正として `induction.py` に移植（JS 本体は呼ばない） |
+
 ## 何を検証するか
 
 1. **高さ T までの RH**（判定: 数値検証完了）
@@ -48,6 +50,20 @@
 - シミュレーションではオラクルを作るために 2^k 個すべてを古典的に評価しているので、
   量子的な高速化は得られない。高速化は実機でのみ意味を持つ。
 
+## 数学的帰納法・証明の修正・補集合の解析（`induction.py`）
+
+1. **帰納法（厳密）** — `Σ_{k=1}^n f(k) = g(n)`（f, g は多項式）を、基底 `g(0)=0` と
+   段 `g(n+1) − g(n) − f(n+1) ≡ 0` で判定する。有理数の厳密演算なので、成り立てば
+   本当に**証明完了**、成り立たなければ最小の反例を返す。
+2. **証明の修正** — `I(n) = g(n) − Σ f(k)` を保存量とみなし、段の残差をそのドリフトとして
+   測る。誤った g を `I ≡ 0` の等位集合へ射影して正しい閉形式に直し、あらためて帰納法で
+   証明する（コマの誤り訂正が軌道を |L|² の等位集合へ戻すのと同じ形）。
+3. **補集合の解析** — 反例の集合（真である n の補集合）が空であることと帰納法は同値
+   （整列性）。コラッツ予想について「最小反例は 2^k 以上で、特定の剰余類に属する」を
+   降下補題として証明する（生き残る剰余類の個数は既知の数列 1, 1, 2, 3, 4, 8, 13, 19, …
+   と一致）。**予想そのものは未解決のまま**。
+4. **限界の明示** — RH・DRH・ゴールドバッハには既知の帰納の段がないことを記録する。
+
 ## 証明書 PatchGuard（書き換えの門）
 
 証明書を書き換えるとき、基と後を比べて次の不変量を検査する。高以上は REJECT、中は REVIEW。
@@ -63,6 +79,7 @@
 | RG07 | 封印がない（中）／封印が内容と不一致（高） | 中 / 高 |
 | RG08 | 検証の高さ・上限の縮小 | 中 |
 | RG09 | DRH の証拠の削除 | 中 |
+| RG11 | 帰納法の項目の判定が再導出と一致しない（予想を「証明済み」にする等） | 致命的 |
 | RG10 | 量子探索の結果を「証明」とする／再検査を通らない反例で「反証」とする | 致命的 |
 
 複数回の書き換えは折り畳み、正味の 基 → 最終 で判定する（途中の段だけの指摘は「相殺」として記録）。
@@ -72,6 +89,7 @@
 ```bash
 python3 -m riemann_prover.cli run --height 1000 --qubits 12 --out certificate.json
 python3 -m riemann_prover.cli check certificate.json           # 封印の検査
+python3 -m riemann_prover.cli induct --f 0 0 1 --g 0 1/5 3/5 2/5   # Σk² の誤った式を判定して修正
 python3 -m riemann_prover.cli guard certificate.json --recompute   # 単体を門で検査
 python3 -m riemann_prover.cli guard base.json after.json --out tuples.jsonl   # 書き換えを検査 (終了コード 0/1/2)
 python3 -m unittest riemann_prover.tests.test_riemann_prover

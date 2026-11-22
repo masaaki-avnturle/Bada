@@ -9,7 +9,7 @@ from .verify import verify_rh_to_height, schoenfeld_check
 from .drh import drh_evidence, CHARACTERS
 from .certificate import build_certificate, seal, check_seal, SOUNDNESS
 
-SYMBOL = {"verified": "∎ 数値検証完了", "disproved": "✗ 反証（反例あり）",
+SYMBOL = {"proved": "∎ 証明完了 (QED)", "verified": "∎ 数値検証完了", "disproved": "✗ 反証（反例あり）",
           "open": "? 未解決（経験的証拠のみ）", "inconclusive": "… 判定不能"}
 
 
@@ -44,6 +44,23 @@ def render(cert: dict) -> str:
                  f"  判定: {SYMBOL['open']}  この範囲に反例なし（全数検査）"
                  if q["bounded_status"] == "verified" else
                  f"  判定: {SYMBOL['inconclusive']}  {q['shots']} 回の測定で反例を観測できず"), ""]
+    for e in cert.get("induction", []):
+        k = e["kind"]
+        if k == "sum_identity":
+            out += [f"【帰納法】{e['claim']}", f"  判定: {SYMBOL[e['status']]}"] + [f"    {x}" for x in e["steps"]] + [""]
+        elif k == "repair":
+            o, r = e["original"], e["repaired"]
+            out += [f"【帰納法＋修正】{o['claim']}",
+                    f"  元の主張: {SYMBOL[o['status']]}  {o['steps'][0]}",
+                    f"  保存量のドリフト: {e['drift_before']}  →  {e['drift_after']}",
+                    f"  修正後: {r['claim']}", f"  判定: {SYMBOL[r['status']]}", ""]
+        elif k == "collatz_descent":
+            out += [f"【補集合の解析】{e['claim']}",
+                    f"  判定: {SYMBOL[e['status']]}  （手法: {e['method']}）",
+                    f"    剰余類の {e['excluded_fraction'] * 100:.2f}% を最小反例の候補から除外。"
+                    f"コラッツ予想そのものは {SYMBOL['open']}", ""]
+        else:
+            out += [f"【帰納法の限界】{e['problem']}: {e['note']}", ""]
     out += ["【リーマン予想】      判定: " + SYMBOL["open"],
             "【深リーマン予想】    判定: " + SYMBOL["open"], "",
             "※ " + SOUNDNESS]
@@ -60,7 +77,9 @@ def cmd_run(a):
     drh = [drh_evidence(name, 0.0, a.primes) for name in CHARACTERS]
     drh.append(drh_evidence("chi_-4", 1.0, a.primes))
     from .qsim import quantum_search_all
-    cert = seal(build_certificate(rh, sch, drh, quantum_search_all(a.qubits, a.seed)), a.braid)
+    from .induction import induction_report
+    cert = seal(build_certificate(rh, sch, drh, quantum_search_all(a.qubits, a.seed),
+                                  induction_report(a.sieve_bits)), a.braid)
     print(render(cert))
     if a.out:
         with open(a.out, "w", encoding="utf-8") as f:
@@ -96,6 +115,19 @@ def cmd_guard(a):
     return {"ACCEPT": 0, "REVIEW": 1, "REJECT": 2}[rep["verdict"]]
 
 
+def cmd_induct(a):
+    from .induction import prove_sum, repair_sum
+    res = prove_sum(a.f, a.g)
+    print(f"主張: {res['claim']}\n判定: {SYMBOL[res['status']]}")
+    for x in res["steps"]:
+        print("  " + x)
+    if res["status"] == "disproved":
+        rep = repair_sum(a.f, a.g)
+        print(f"保存量のドリフト: {rep['drift_before']}  →  {rep['drift_after']}")
+        print(f"修正後: {rep['repaired']['claim']}\n判定: {SYMBOL[rep['status']]}")
+    return 0 if res["status"] == "proved" else 2
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="riemann_prover")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -105,6 +137,7 @@ def main(argv=None):
     r.add_argument("--primes", type=int, default=10 ** 6, help="DRH オイラー積の素数上限")
     r.add_argument("--braid", type=int, nargs="+", default=[1, 1, 1], help="封印に使う組みひも")
     r.add_argument("--qubits", type=int, default=10, help="擬似量子コンピュータの量子ビット数")
+    r.add_argument("--sieve-bits", type=int, default=12, help="コラッツ降下ふるいの法 2^k の k")
     r.add_argument("--seed", type=int, default=0, help="測定の乱数種")
     r.add_argument("--out", help="証明書 JSON の出力先")
     r.set_defaults(fn=cmd_run)
@@ -117,6 +150,10 @@ def main(argv=None):
     g.add_argument("--recompute", action="store_true", help="零点総数 N(T) を再計算して照合")
     g.add_argument("--out", help="タプル台帳 (JSONL, 追記) の出力先")
     g.set_defaults(fn=cmd_guard)
+    i = sub.add_parser("induct", help="Σ f(k) = g(n) を帰納法で判定し、誤っていれば修正")
+    i.add_argument("--f", nargs="+", required=True, help="f の係数 (低次から。例: 0 0 1 は k²)")
+    i.add_argument("--g", nargs="+", required=True, help="g の係数 (低次から。分数可: 1/6)")
+    i.set_defaults(fn=cmd_induct)
     a = p.parse_args(argv)
     return a.fn(a) or 0
 

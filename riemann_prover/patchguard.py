@@ -97,6 +97,15 @@ def invariants(base: dict | None, cert: dict, recompute: bool = False) -> list[d
         elif st != "open":
             out.append(_f("RG10", "critical",
                           f"{name}: 判定が {st!r}。有限範囲の量子探索は予想の証明にならない"))
+    for i, e in enumerate(cert.get("induction", [])):
+        from .induction import recheck
+        try:
+            ok = recheck(e)
+        except Exception:
+            ok = False
+        if not ok:
+            out.append(_f("RG11", "critical",
+                          f"帰納法の項目 #{i} ({e.get('kind')}) の判定 {e.get('status')!r} が再導出と一致しない"))
     if cert.get("soundness") != SOUNDNESS:
         out.append(_f("RG06", "high", "健全性の注記が削除または変更されている"))
     if "seal" not in cert:
