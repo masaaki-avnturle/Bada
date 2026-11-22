@@ -64,7 +64,7 @@ def zeta(s: complex) -> complex:
 
 
 def dirichlet_l(s: complex, chi: list[complex]) -> complex:
-    """L(s,χ) for χ given as [χ(0), χ(1), …, χ(q-1)]."""
+    """L(s,χ) for χ given as [χ(0), χ(1), …, χ(q-1)]  (s != 1)."""
     q = len(chi)
     s = complex(s)
     total = 0j

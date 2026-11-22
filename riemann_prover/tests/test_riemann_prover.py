@@ -16,7 +16,7 @@ class TestZeta(unittest.TestCase):
 
     def test_dirichlet_l(self):
         chi4 = CHARACTERS["chi_-4"]
-        self.assertAlmostEqual(dirichlet_l(1, chi4).real, math.pi / 4, places=12)
+        self.assertAlmostEqual(dirichlet_l(3, chi4).real, math.pi ** 3 / 32, places=12)
         self.assertAlmostEqual(dirichlet_l(2, chi4).real, 0.915965594177219, places=12)  # Catalan
 
     def test_hardy_z_is_modulus(self):
