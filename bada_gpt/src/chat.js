@@ -85,6 +85,15 @@
     return out;
   }
 
+  // 「Σ f(k) = g(n)」という文から f, g を取り出す
+  function parseClaim(text) {
+    var parts = text.replace(/_\s*(\([^)]*\)|\{[^}]*\})/, "").split(/[=＝]/);
+    if (parts.length !== 2) throw new Error("「Σ f(k) = g(n)」の形で書いてください");
+    var lhs = parts[0].replace(/^.*(Σ|∑|σ|sum|総和|帰納法[でに]?)/i, "");
+    var rhs = parts[1].replace(/(を|で|は|の|から|について)?\s*(証明|判定|確認|帰納|論文|ソース|コード|厳密|生成).*$/, "");
+    return { f: E.pParse(lhs), g: E.pParse(rhs) };
+  }
+
   var HELP = [
     "BadaGPT は、数学の予想を「計算で確かめられる範囲」で調べる対話アプリです。話しかけ方の例:",
     "  ・リーマン予想を高さ 1000 まで調べて",
@@ -114,11 +123,7 @@
         lines = lines.concat(drhLines(E.drhEvidence("chi_-4", 1, 1e6)), ["", "【深リーマン予想】 判定: " + SYMBOL.open,
           "収束は遅く単調でもありません。部分積は証拠であって証明ではありません。"]);
       } else if (intent === "induct") {
-        var parts = text.replace(/_\s*(\([^)]*\)|\{[^}]*\})/, "").split(/[=＝]/);
-        if (parts.length !== 2) throw new Error("「Σ f(k) = g(n)」の形で書いてください");
-        var lhs = parts[0].replace(/^.*(Σ|∑|σ|sum|総和|帰納法[でに]?)/i, "");
-        var rhs = parts[1].replace(/(を|で|は|の)?\s*(証明|判定|確認|帰納).*$/, "");
-        var f = E.pParse(lhs), g = E.pParse(rhs);
+        var claim = parseClaim(text), f = claim.f, g = claim.g;
         steps.push("② 実行: 基底 g(0)=0 と 段 g(n+1)−g(n)−f(n+1)≡0 を厳密な有理数演算で検査");
         var res = E.proveSum(f, g);
         lines = inductLines(res);
@@ -178,6 +183,6 @@
     return { intent: intent, steps: steps, lines: lines };
   }
 
-  global.BadaGPTChat = { detect: detect, reply: reply, HELP: HELP, SYMBOL: SYMBOL };
+  global.BadaGPTChat = { detect: detect, reply: reply, parseClaim: parseClaim, HELP: HELP, SYMBOL: SYMBOL };
   if (typeof module !== "undefined" && module.exports) module.exports = global.BadaGPTChat;
 })(typeof window !== "undefined" ? window : globalThis);

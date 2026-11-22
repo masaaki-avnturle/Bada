@@ -727,6 +727,8 @@
     zeroCount: zeroCount, verifyRH: verifyRH, schoenfeld: schoenfeld, CHARACTERS: CHARACTERS, drhEvidence: drhEvidence,
     groverSearch: groverSearch, PROBLEMS: PROBLEMS, isCounterexample: isCounterexample,
     quantumSearch: quantumSearch, quantumSearchAll: quantumSearchAll,
+    poly: { F: F, fStr: fStr, fParse: fParse, make: poly, add: pAdd, mul: pMul, shift: pShift, evalAt: pEval, drift: drift },
+    jonesEncrypt: jonesEncrypt, jonesDecrypt: jonesDecrypt, unhex: unhex, utf8: utf8, stable: stable,
     pParse: pParse, pStr: pStr, proveSum: proveSum, repairSum: repairSum, collatzDescent: collatzDescent,
     inductionReport: inductionReport, recheck: recheck,
     sha256: sha256, hmac: hmac, hex: hex, braidKey: braidKey, jonesStr: jonesStr, fingerprint: fingerprint,

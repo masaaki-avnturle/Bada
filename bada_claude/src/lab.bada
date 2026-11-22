@@ -1,0 +1,205 @@
+
+# ═══════════════════════════════════════════════════════════════════════
+# lab.bada — 証明ラボ: 未知事前エンジンの証明・論文・厳密化コード生成・量子暗号
+#
+# 計算そのものはネイティブ組込み (lab.js) が行い、ここでは Bada が
+#   ・リバイザ (@reviser RIGOR) で「各言語をどう厳密化するか」の規則を宣言し、
+#   ・生成の前に満たすべき義務 (obligation) を検査し、
+#   ・結果を応答にまとめて台帳 Ω に記録する。
+# 規則は台帳に commit され、次の文から新しい文法として使える。
+# ═══════════════════════════════════════════════════════════════════════
+LAB_VERSION := "1.0.0"
+TARGETS := []          # 対象言語
+STRICT := {}           # 言語ごとの厳密化規則
+OBLIGATIONS := []      # 生成の前提となる義務
+LAB := {spec: nil, topic: "", cert: false}
+
+@reviser RIGOR {
+  # target 言語, 表示名, 整数の扱い, 桁あふれの扱い
+  rule target(lang, label, ints, overflow) {
+    TARGETS <- {lang: lang, label: label, ints: ints}
+    STRICT[lang] = {overflow: overflow, selftest: 200, notes: []}
+    Omega >> ["rigor.target", lang, overflow]
+  }
+  # strict 言語, 規則の説明  — 生成されるソースの冒頭に列挙される
+  rule strict(lang, note) {
+    STRICT[lang].notes <- note
+  }
+  # selftest 言語, n  — 自己検査で照合する n の上限
+  rule selftest(lang, n) {
+    STRICT[lang].selftest = n
+  }
+  # obligation ID, 説明, 検査 (仕様 → 真偽)
+  rule obligation(id, title, check) {
+    OBLIGATIONS <- {id: id, title: title, check: check}
+    Omega >> ["rigor.obligation", id, title]
+  }
+}
+
+target "python", "Python", "int (任意精度)", "bigint"
+target "javascript", "JavaScript", "BigInt (任意精度)", "bigint"
+target "ruby", "Ruby", "Integer (任意精度)", "bigint"
+target "java", "Java", "java.math.BigInteger", "bigint"
+target "go", "Go", "math/big.Int", "bigint"
+target "rust", "Rust", "i128 + checked_mul / checked_add", "checked128"
+target "c", "C", "int64_t + __builtin_*_overflow", "checked64"
+target "bada", "Bada", "倍精度 (2^53 未満の範囲に限定)", "bound53"
+
+strict "python", "bool を整数として受け付けない (isinstance 検査)"
+strict "javascript", "Number を受け付けず BigInt だけを受け付ける (2^53 を超えても厳密)"
+strict "ruby", "frozen_string_literal と定数の freeze"
+strict "java", "final クラス・null 検査・例外で失敗を通知"
+strict "go", "失敗は error で返し、panic しない (係数の初期化を除く)"
+strict "rust", "桁あふれは Err(Overflow) で返す。unsafe・unwrap を計算経路で使わない"
+strict "c", "符号付き桁あふれ (未定義動作) に入る前に検出して 0 を返す"
+strict "bada", "中間値が 2^53 を超える n には nil を返す (誤った値を返さない)"
+
+obligation "RS01", "主張が数学的帰納法で証明済みである", |s| s.status == "proved"
+obligation "RS02", "f の係数が整数である (整数演算だけで和を計算できる)", |s| s.f_integer
+obligation "RS03", "生成した Bada 版を実際に実行し、閉形式と定義どおりの和が一致する", |s| lab_selfcheck(s)
+
+fn lab_selfcheck(s) {
+  e := lab_emit(s, "bada", STRICT["bada"])
+  if not e.ok { return false }
+  r := eval_bada(e.code)
+  return r.ok and len(r.out) > 0 and r.out[len(r.out) - 1] == e.expected
+}
+
+fn lab_obligations(s) {
+  out := []
+  for o in OBLIGATIONS { out <- {id: o.id, title: o.title, ok: o.check(s) == true} }
+  return out
+}
+
+LANG_CUES := {
+  python: ["python", "パイソン"], javascript: ["javascript", "js", "node"], ruby: ["ruby", "ルビー"], java: ["java"],
+  go: ["golang", "go言語", " go"], rust: ["rust", "ラスト"], c: ["c言語", " c ", "c で", "cで", "gcc"], bada: ["bada"]
+}
+
+fn lab_langs(text) {
+  low := " " + lower(text) + " "
+  out := []
+  for t in TARGETS {
+    hit := false
+    for c in LANG_CUES[t.lang] { if contains(low, c) { hit = true } }
+    if t.lang == "java" and contains(low, "javascript") and not contains(replace(low, "javascript", ""), "java") { hit = false }
+    if hit { out <- t.lang }
+  }
+  return out
+}
+
+fn lab_topic(text) {
+  low := lower(text)
+  if contains(text, "深リーマン") or contains(low, "drh") { return "drh" }
+  if contains(text, "リーマン") or contains(low, "riemann") { return "rh" }
+  if contains(text, "コラッツ") or contains(low, "collatz") { return "collatz" }
+  if contains(text, "ゴールドバッハ") or contains(low, "goldbach") { return "goldbach" }
+  if contains(text, "ルジャンドル") or contains(low, "legendre") { return "legendre" }
+  return ""
+}
+
+# 文中に「=」があればその主張を、無ければ直前に扱った主張を使う
+fn lab_current_spec(text) {
+  if contains(text, "=") or contains(text, "＝") {
+    s := lab_spec(text)
+    if s.ok { LAB.spec = s; LAB.topic = "" }
+    return s
+  }
+  if LAB.spec != nil { return LAB.spec }
+  return {ok: false, error: "対象の主張がありません。例: `Σ k^2 = n(n+1)(2n+1)/6 の厳密なソースコードを生成して`"}
+}
+
+# ─── 道具: 証明 (未知事前エンジン + 擬似量子コンピュータ) ───
+fn tool_prove(text) {
+  r := lab_prove(text)
+  if r.intent == "help" { return nil }
+  if r.intent == "induct" { lab_current_spec(text) } else { tp := lab_topic(text); if tp != "" { LAB.topic = tp; LAB.spec = nil } }
+  LAB.cert = r.has_cert
+  md := "```\n" + join(r.lines, "\n") + "\n```"
+  if r.intent == "induct" and LAB.spec != nil { md = md + "\n\n続けて `論文を作成して` / `厳密なソースコードを生成して` と送れます。" }
+  Omega >> ["prove", r.intent, len(r.lines)]
+  return {md: md, tool: "prove:" + r.intent, files: []}
+}
+
+# ─── 道具: 証明の論文 ───
+fn tool_paper(text) {
+  tp := lab_topic(text)
+  p := nil
+  if contains(text, "=") or contains(text, "＝") or (tp == "" and LAB.spec != nil) {
+    s := lab_current_spec(text)
+    if not s.ok { return {md: "論文を作成できませんでした: " + s.error, tool: "paper", files: []} }
+    p = lab_paper(s, lab_emit(s, "python", STRICT["python"]))
+  } else {
+    if tp == "" { tp = LAB.topic }
+    p = lab_report(tp)
+  }
+  if not p.ok { return {md: "論文を作成できませんでした: " + p.error, tool: "paper", files: []} }
+  Omega >> ["paper", p.status, p.title, p.seal.sha256]
+  note := "\n\n_判定は機械検査の結果です。LaTeX 版 (`paper.tex`, LuaLaTeX 用) と Markdown 版を下のボタンから保存できます。_"
+  if p.status == "open" { note = "\n\n_これは証明ではなく、計算的証拠の報告です。未解決問題の「証明の論文」は作成しません。_" + note }
+  return {md: p.md + note, tool: "paper:" + p.status, files: [{name: "paper.md", text: p.md}, {name: "paper.tex", text: p.tex}]}
+}
+
+# ─── 道具: リバイザによる厳密化されたソースコードの生成 ───
+fn tool_codegen(text) {
+  s := lab_current_spec(text)
+  if not s.ok { return {md: "コードを生成できませんでした: " + s.error, tool: "codegen", files: []} }
+  obs := lab_obligations(s)
+  failed := filter(obs, |o| not o.ok)
+  md := "**仕様**: `" + s.claim + "`"
+  if s.original_status != "proved" { md = md + "\n\n入力された式は誤りでした (" + s.counterexample + ")。修正後の式で生成します。" }
+  md = md + "\n\n**リバイザの義務 (@reviser RIGOR)**\n\n| ID | 義務 | 結果 |\n|:--|:--|:--|\n"
+  for o in obs { md = md + "| " + o.id + " | " + o.title + " | " + (o.ok and "✓ 成立" or "✗ 不成立") + " |\n" }
+  if len(failed) > 0 {
+    Omega >> ["codegen", "refused", s.claim, map(failed, |o| o.id)]
+    return {md: md + "\n義務を満たさないため、ソースコードは生成しません。", tool: "codegen:refused", files: []}
+  }
+  want := lab_langs(text)
+  files := []
+  rows := ""
+  shown := ""
+  for t in TARGETS {
+    e := lab_emit(s, t.lang, STRICT[t.lang])
+    if e.ok {
+      files <- {name: e.file, text: e.code}
+      rng := "制限なし"
+      if e.nmax != nil { rng = "n ≤ " + str(e.nmax) }
+      rows = rows + "| " + t.label + " | `" + e.file + "` | " + t.ints + " | " + rng + " | `" + e.expected + "` |\n"
+      if index_of(want, t.lang) >= 0 or (len(want) == 0 and t.lang == "python") { shown = shown + "\n\n**" + t.label + "** — `" + e.file + "`\n\n```" + t.lang + "\n" + e.code + "```" }
+    } else {
+      rows = rows + "| " + t.label + " | — | " + t.ints + " | 生成不可: " + e.error + " | — |\n"
+    }
+  }
+  md = md + "\n**生成したファイル** (" + str(len(files)) + " 言語)\n\n| 言語 | ファイル | 整数の扱い | 厳密な範囲 | 実行時の出力 |\n|:--|:--|:--|:--|:--|\n" + rows
+  md = md + shown + "\n\n_各ファイルは実行すると自己検査を行い、上の表の出力を表示します。他の言語は `rust で` のように指定すると表示します。_"
+  Omega >> ["codegen", s.claim, len(files)]
+  return {md: md, tool: "codegen", files: files}
+}
+
+# ─── 道具: Jones 多項式量子暗号 ───
+fn lab_braid(text) {
+  m := match(text, "\\[([\\d\\s,\\-]+)\\]")
+  if m == nil { return [1, 1, 1] }
+  return map(match_all(m[1], "-?\\d+"), |x| num(x))
+}
+
+fn tool_crypto(text) {
+  braid := lab_braid(text)
+  hexm := match(text, "[0-9a-fA-F]{98,}")
+  if hexm != nil {
+    r := jones_decrypt(braid, hexm[0])
+    Omega >> ["crypto", "decrypt", r.ok]
+    if r.ok { return {md: "組みひも `" + str(braid) + "` の Jones 多項式から導いた鍵で復号しました:\n\n> " + r.text, tool: "crypto:decrypt", files: []} }
+    return {md: r.error + "。", tool: "crypto:decrypt", files: []}
+  }
+  body := text
+  cut := match(text, "[:：]\\s*(.+)$")
+  if cut != nil { body = trim(cut[1]) }
+  e := jones_encrypt(braid, body)
+  Omega >> ["crypto", "encrypt", e.fingerprint]
+  md := "組みひも `" + str(e.braid) + "` (Jones V(t) = `" + e.jones + "`, 鍵指紋 `" + e.fingerprint + "`) で暗号化しました:\n\n```\n" + e.hex + "\n```\n\n"
+  md = md + "平文: `" + body + "`\n\n復号するには、同じ組みひもと暗号文を `復号 " + str(e.braid) + " <暗号文>` の形で送ってください。組みひもが違うと認証に失敗します。"
+  return {md: md, tool: "crypto:encrypt", files: []}
+}
+
+Omega >> ["lab.boot", LAB_VERSION, len(TARGETS), len(OBLIGATIONS)]
