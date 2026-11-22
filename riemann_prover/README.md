@@ -15,6 +15,8 @@
 | 量子暗号 `jones_quantum_crypto/` | 検証結果の証明書を、組みひもの Jones 多項式から導出した鍵で封印・改ざん検知 |
 | BadaPatchGuard `bada_patchguard/`（ブランチ `ccr-fd691112-eo2fdo`） | 「基と後を SHA-256 でタプル台帳に置き、差分を不変量で検査して ACCEPT / REVIEW / REJECT」という門を、証明書の書き換え検査として `patchguard.py` に移植（PHP 解析部は使わない） |
 
+| 擬似量子コンピュータ `bada_webos/quantum/shor9.py`（QuantOS `bada_quantos/` のカーネルと同方式の状態ベクトルシミュレータ） | `qsim.py` がこの `StateVector` 上で Grover 探索を回し、未解決問題の反例をさがす |
+
 ## 何を検証するか
 
 1. **高さ T までの RH**（判定: 数値検証完了）
@@ -27,6 +29,24 @@
 3. **深リーマン予想の数値的証拠**（判定: 未解決）
    Dirichlet 指標 χ に対し、臨界線上のオイラー積 `Π_{p≤x}(1 − χ(p)p^{-s})^{-1}` が
    `L(s,χ)`（`s = 1/2` かつ `χ² = 1` のときは `√2·L(s,χ)`）へ近づく様子を表にする。
+
+## 擬似量子コンピュータによる反例探索（`qsim.py`）
+
+「すべての n で P(n)」型の予想について、n を量子レジスタの基底状態に載せ、反例に印を
+付けるオラクルで Grover 探索を行う。測定結果は必ず古典的に再検査する。
+
+| 問題 | 探索する反例 |
+|:--|:--|
+| リーマン予想（Lagarias の同値形） | σ(n) > H_n + exp(H_n)·log(H_n) となる n |
+| ゴールドバッハ予想 | 2 素数の和で書けない偶数 |
+| コラッツ予想 | 1 に到達しない n |
+| ルジャンドル予想 | n² と (n+1)² の間に素数がない n |
+| 対照実験 `n² + n + 41 は常に素数`（偽） | 合成数になる n（n = 40 など。実際に見つかる） |
+
+- 反例が見つかれば、その予想は**反証**される（健全）。
+- 見つからなければ「その範囲に反例なし」が確定するだけで、予想は**未解決**のまま。
+- シミュレーションではオラクルを作るために 2^k 個すべてを古典的に評価しているので、
+  量子的な高速化は得られない。高速化は実機でのみ意味を持つ。
 
 ## 証明書 PatchGuard（書き換えの門）
 
@@ -43,13 +63,14 @@
 | RG07 | 封印がない（中）／封印が内容と不一致（高） | 中 / 高 |
 | RG08 | 検証の高さ・上限の縮小 | 中 |
 | RG09 | DRH の証拠の削除 | 中 |
+| RG10 | 量子探索の結果を「証明」とする／再検査を通らない反例で「反証」とする | 致命的 |
 
 複数回の書き換えは折り畳み、正味の 基 → 最終 で判定する（途中の段だけの指摘は「相殺」として記録）。
 
 ## 使い方
 
 ```bash
-python3 -m riemann_prover.cli run --height 1000 --out certificate.json
+python3 -m riemann_prover.cli run --height 1000 --qubits 12 --out certificate.json
 python3 -m riemann_prover.cli check certificate.json           # 封印の検査
 python3 -m riemann_prover.cli guard certificate.json --recompute   # 単体を門で検査
 python3 -m riemann_prover.cli guard base.json after.json --out tuples.jsonl   # 書き換えを検査 (終了コード 0/1/2)

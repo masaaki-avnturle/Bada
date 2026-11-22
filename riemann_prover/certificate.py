@@ -12,8 +12,9 @@ SOUNDNESS = (
 )
 
 
-def build_certificate(rh: dict, schoenfeld: dict, drh: list[dict]) -> dict:
-    return {
+def build_certificate(rh: dict, schoenfeld: dict, drh: list[dict],
+                      quantum: list[dict] | None = None) -> dict:
+    cert = {
         "engine": "riemann_prover (未知事前エンジン規約: proved / disproved / open)",
         "verdicts": {
             "riemann_hypothesis": "open",
@@ -26,6 +27,9 @@ def build_certificate(rh: dict, schoenfeld: dict, drh: list[dict]) -> dict:
         "drh_evidence": drh,
         "soundness": SOUNDNESS,
     }
+    if quantum is not None:
+        cert["quantum_search"] = quantum
+    return cert
 
 
 def _digest(cert: dict) -> bytes:

@@ -103,5 +103,45 @@ class TestPatchGuard(unittest.TestCase):
         self.assertEqual(check([self.cert, small])["verdict"], "REVIEW")
 
 
+class TestQuantumSearch(unittest.TestCase):
+    def test_grover_finds_single_marked_state(self):
+        from riemann_prover.qsim import grover_search
+        marked = [False] * 256
+        marked[173] = True
+        g = grover_search(marked)
+        self.assertGreater(g["success_probability"], 0.99)
+        self.assertEqual(g["measured"], 173)
+
+    def test_false_statement_is_disproved(self):
+        from riemann_prover.qsim import quantum_search
+        for qubits in (6, 10):          # sparse and dense counterexample sets
+            self.assertEqual(quantum_search("euler_polynomial", qubits)["status"], "disproved")
+        q = quantum_search("euler_polynomial", 6)
+        self.assertFalse(all((q["counterexample"] ** 2 + q["counterexample"] + 41) % d
+                             for d in range(2, 200)))
+
+    def test_open_problems_stay_open(self):
+        from riemann_prover.qsim import quantum_search
+        for name in ("riemann_lagarias", "goldbach", "collatz", "legendre"):
+            q = quantum_search(name, 8)
+            self.assertEqual((q["status"], q["bounded_status"], q["marked"]), ("open", "verified", 0))
+
+    def test_gate_rejects_quantum_proof_claim(self):
+        from riemann_prover.patchguard import check
+        from riemann_prover.qsim import quantum_search_all
+        cert = seal(build_certificate(verify_rh_to_height(50.0), schoenfeld_check(10 ** 4),
+                                      [drh_evidence("chi_-3", 0.0, 10 ** 3)],
+                                      quantum_search_all(6)), [1, 1, 1])
+        self.assertEqual(check([cert])["verdict"], "ACCEPT")
+        forged = copy.deepcopy(cert)
+        forged["quantum_search"][0]["status"] = "proved"
+        fake = copy.deepcopy(cert)
+        fake["quantum_search"][1].update(status="disproved", counterexample=10)
+        for bad in (forged, fake):
+            rep = check([cert, seal(bad, [1, 1, 1])])
+            self.assertEqual(rep["verdict"], "REJECT")
+            self.assertIn("RG10", [f["id"] for f in rep["findings"]])
+
+
 if __name__ == "__main__":
     unittest.main()

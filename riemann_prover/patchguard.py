@@ -88,6 +88,15 @@ def invariants(base: dict | None, cert: dict, recompute: bool = False) -> list[d
         if d.get("status") != "open":
             out.append(_f("RG05", "critical",
                           f"深リーマン予想の証拠 #{i} の判定が {d.get('status')!r}。有限の部分積は証明にならない"))
+    for q in cert.get("quantum_search", []):
+        name, st, cx = q.get("problem"), q.get("status"), q.get("counterexample")
+        if st == "disproved":
+            from .qsim import PROBLEMS, is_counterexample
+            if name not in PROBLEMS or cx is None or not is_counterexample(name, cx):
+                out.append(_f("RG10", "critical", f"{name}: 反証とあるが、反例 {cx!r} が古典的な再検査を通らない"))
+        elif st != "open":
+            out.append(_f("RG10", "critical",
+                          f"{name}: 判定が {st!r}。有限範囲の量子探索は予想の証明にならない"))
     if cert.get("soundness") != SOUNDNESS:
         out.append(_f("RG06", "high", "健全性の注記が削除または変更されている"))
     if "seal" not in cert:
