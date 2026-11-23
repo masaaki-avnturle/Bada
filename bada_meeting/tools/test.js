@@ -151,21 +151,105 @@ ok(r.same && r.decided, "送信が 5 回失われても決定に至る", JSON.st
 r = acousticMeeting(multi, [3, 4, 7, 8, 12, 13], 0.15);
 ok(r.same && r.decided, "別の箇所で 6 回失われても決定に至る", JSON.stringify(r));
 
-console.log("通信 (パケットと主催者の配信)");
+console.log("パケット");
 const raw = N.pack({ t: "msg", m: { text: "こんにちは" } });
 ok(N.unpack(raw).m.text === "こんにちは", "パケットの往復");
 let broken = false; try { N.unpack(raw.replace("こんにちは", "こんばんは")); } catch (e) { broken = true; }
 ok(broken, "書き換えられたパケットを SHA-256 で検出する");
-// 主催者 1 + 参加者 2 を、データチャネルの代わりの配線でつなぐ
-const pipe = () => { const A = { readyState: "open" }, B = { readyState: "open" }; A.send = d => B.onmessage({ data: d }); B.send = d => A.onmessage({ data: d }); return [A, B]; };
-const logs = [[], [], []], hubs = [new N.Hub({ host: true, onMessage: m => logs[0].push(m) }), new N.Hub({ host: false, onMessage: m => logs[1].push(m) }), new N.Hub({ host: false, onMessage: m => logs[2].push(m) })];
-for (const g of [1, 2]) { const [x, y] = pipe(); const hl = { ch: x }, gl = { ch: y }; hubs[0].links.push(hl); hubs[0]._wire(hl); hubs[g].links = [gl]; hubs[g]._wire(gl); }
-hubs[0].send({ role: "host", kind: "agenda", text: "議題" }); hubs[1].send({ role: "engineer", kind: "comment", text: "参加者 1 から" }); hubs[2].send({ role: "planner", kind: "comment", text: "参加者 2 から" });
-ok(logs.every(l => JSON.stringify(l) === JSON.stringify(logs[0])) && logs[0].map(m => m.seq).join() === "0,1,2", "主催者が通し番号を付け、全員の議事録が同じ順序になる");
-hubs[1].links[0].ch.onmessage({ data: "{壊れたデータ" });
-ok(logs[1].length === 3, "壊れたパケットは無視する");
-let noHost = false; try { new N.Hub({ host: false }).send({ kind: "comment", text: "x" }); } catch (e) { noHost = true; }
-ok(noHost, "主催者につながっていなければ送信を断る");
+
+console.log("zone:// ウルトラネットワーク (元の zone-lib.bada との照合)");
+const Zn = require("../src/zone.js"), P2 = require("../src/p2p.js");
+const Bada = require("../../bada_gui_ide/www/bada.js"), zoneLib = fs.readFileSync(path.join(__dirname, "..", "..", "bada_gui_ide", "browser", "zone-lib.bada"), "utf8");
+const zc = Zn.selfCheck(Bada, zoneLib);
+ok(zc.ok, "移植した計算が、元の zone-lib.bada を Bada 処理系で実行した結果と一致 (ID・鍵・担当・経路・封印)", JSON.stringify(zc.checks || zc.error));
+ok(zc.jones.trefoil === 919492 && zc.jones.figure8 === 400638, "Jones 鍵は元のコードで求める: 三葉 919492 / 8 の字 400638", JSON.stringify(zc.jones));
+ok(Zn.peerId("tokyo.zone.jp") === Zn.zoneId("peer:tokyo.zone.jp") && Zn.ringDist(10, 4090) === 16 && Zn.ringDist(100, 300) === 200, "リング上の位置と距離");
+ok(JSON.stringify(Zn.parse("zone://url.or.jp/labs/quantum")) === JSON.stringify({ host: "url.or.jp", path: "/labs/quantum", labels: ["url", "or", "jp"] }) && Zn.parse("https://x") === null, "zone:// の URL を読む");
+const g1 = Zn.seal("複数行\nの本文", zc.jones.trefoil, 9), g2 = JSON.parse(JSON.stringify(g1)); g2[0][0] = (g2[0][0] + 1) % 65536;
+ok(Zn.open(g1, zc.jones.trefoil) === "複数行\nの本文" && Zn.open(g2, zc.jones.trefoil) === null && Zn.open(g1, zc.jones.figure8) === null, "封印: 開ける / 書き換えは拒否 / 結び目が違えば拒否");
+const ring8 = ["tokyo", "osaka", "nagoya", "sapporo", "fukuoka", "naha", "sendai", "kobe"].map(n => ({ name: n, id: Zn.peerId(n) }));
+const hops = ring8.map(p => { const r = Zn.route(ring8, p.name, 3575); return r[r.length - 1] === Zn.nearest(ring8, 3575).name ? r.length - 1 : 99; });
+ok(Math.max(...hops) <= 4, "貪欲な転送は、どこから始めても鍵に最も近い端末に着く (8 台で最大 " + Math.max(...hops) + " ホップ)", hops.join());
+ok(Zn.neighbors(ring8, "tokyo").length === 3 && Zn.neighbors([ring8[0], ring8[1]], "tokyo").join() === "osaka", "隣接は 次・前・2 つ先");
+
+console.log("P2P 網 (模擬の 8 台)");
+function World(room) {
+  const q = [], nodes = {}; let seed = 42; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const W = { nodes, auto: 0, links: [],
+    add(name, role, key) {
+      const nd = { name, role, mt: new M.Meeting() };
+      nd.p = new P2.Node({ name, room: room || "kaigi", key: key || zc.jones.trefoil, random: rnd, minutes: () => nd.mt.msgs.map(m => { const c = Object.assign({}, m); delete c.measure; return c; }),
+        onMeeting: m => { if (nd.mt.add(m)) nd.dirty = true; },
+        validate: d => { if (d.kind === "agenda" || d.kind === "comment") return true; const x = nd.mt.next(d.role); return !!x && x.kind === d.kind && x.text === d.text; },
+        onNeedLink: peer => nd.p.signal(peer, { type: "offer" }),
+        onSignal: (from, b) => { if (b.type === "offer") nd.p.signal(from, { type: "answer" }); else { W.auto++; W.connect(name, from); } } });
+      return nodes[name] = nd;
+    },
+    connect(a, b) {
+      if (!nodes[a] || !nodes[b]) return; const ca = { open: true }, cb = { open: true };
+      ca.send = t => q.push(() => ca.open && nodes[b] && nodes[b].p.receive(cb, t)); cb.send = t => q.push(() => cb.open && nodes[a] && nodes[a].p.receive(ca, t));
+      W.links.push([a, b, ca, cb]); nodes[a].p.attach(ca); nodes[b].p.attach(cb);
+    },
+    remove(name) {                                        // 予告なしに消える (リンクが切れるだけ)
+      W.links.filter(l => l[0] === name || l[1] === name).forEach(l => { l[2].open = l[3].open = false; const other = l[0] === name ? l[1] : l[0], ch = l[0] === name ? l[3] : l[2]; q.push(() => nodes[other] && nodes[other].p.closed(ch)); });
+      W.links = W.links.filter(l => l[0] !== name && l[1] !== name); delete nodes[name];
+    },
+    pump(agents) {
+      for (let g = 0; g < 300000; g++) {
+        if (q.length) { q.shift()(); continue; }
+        if (agents) { let acted = false; for (const nd of Object.values(nodes)) if (nd.dirty) { nd.dirty = false; if (nd.role && !nd.mt.decided()) { const d = nd.mt.next(nd.role); if (d) { nd.p.send(Object.assign({ role: nd.role }, d)); acted = true; break; } } } if (acted) continue; }
+        break;
+      }
+    },
+    same: () => new Set(Object.values(nodes).map(nd => JSON.stringify(nd.mt.msgs.map(m => [m.seq, m.role, m.kind, m.text])))).size === 1,
+    all: f => Object.values(nodes).every(f)
+  };
+  return W;
+}
+const W = World(), n8 = ring8.map(p => p.name);
+n8.forEach(n => W.add(n, { tokyo: "kikaku", naha: "engineer", fukuoka: "planner" }[n]));
+for (let i = 0; i + 1 < n8.length; i++) W.connect(n8[i], n8[i + 1]);      // 手でつなぐのは一列 (7 本) だけ
+W.pump(false);
+ok(W.all(nd => Object.keys(nd.p.members).length === 8), "うわさで全 8 台を知る");
+ok(W.auto > 0 && W.all(nd => Zn.neighbors(ring8, nd.name).every(x => nd.p.links[x])), "リング上の隣接 (次・前・2 つ先) へのリンクが、網を通した合図で自動的に張られる (" + W.auto + " 本)");
+ok(new Set(Object.values(W.nodes).map(nd => nd.p.owner())).size === 1 && W.nodes.tokyo.p.owner() === Zn.nearest(ring8, Zn.zoneId("zone://kaigi.zone.jp/meeting")).name, "全台が同じ担当を選ぶ (部屋の鍵に最も近い端末: " + W.nodes.tokyo.p.owner() + ")");
+W.nodes.sapporo.p.send({ role: "host", kind: "agenda", text: "スマホ向けの予約アプリを\n3か月で作りたい" }); W.pump(true);
+ok(W.same() && W.all(nd => nd.mt.decided()) && W.nodes.osaka.mt.msgs.length === 10, "主催者なしで会議が決定に至り、8 台の議事録が一致する");
+ok(W.all(nd => nd.p.rejects === 0), "同じ結び目どうしでは、封印を開けない電文は無い");
+// 同じ役割が 2 台いても、発言は 1 回だけ採られる
+const W2 = World(); ["a", "b", "c", "d"].forEach((n, i) => W2.add(n, ["kikaku", "kikaku", "engineer", "planner"][i])); W2.connect("a", "b"); W2.connect("b", "c"); W2.connect("c", "d"); W2.pump(false);
+W2.nodes.a.p.send({ role: "host", kind: "agenda", text: "社内の勤怠管理をWebで" }); W2.pump(true);
+ok(W2.same() && W2.all(nd => nd.mt.decided()) && W2.nodes.a.mt.msgs.filter(m => m.kind === "propose").length === 1, "同じ役割の端末が 2 台あっても、担当は続きとして正しい発言を 1 回だけ採る");
+// 担当が予告なしに消える → 次に近い端末が引き継ぐ
+const gone = W.nodes.tokyo.p.owner(); W.remove(gone); W.pump(false);
+const rest8 = n8.filter(n => n !== gone);
+ok(W.all(nd => Object.keys(nd.p.members).length === 7) && new Set(rest8.map(n => W.nodes[n].p.owner())).size === 1 && W.nodes[rest8[0]].p.owner() !== gone, "担当 (" + gone + ") が消えると、残りの全台が次に近い端末 (" + W.nodes[rest8[0]].p.owner() + ") を担当にする");
+W.nodes[rest8[3]].p.send({ role: "host", kind: "agenda", text: "学習アプリを Web で" }); W.pump(true);
+ok(W.same() && W.all(nd => nd.mt.decided()), "引き継いだ後も会議が成り立つ");
+// 遅れて加わった端末は議事録を受け取る
+W.add("late"); W.connect("late", rest8[0]); W.pump(false);
+ok(W.nodes.late.mt.decided() && W.same(), "遅れて加わった端末にも議事録が届く");
+// zone:// レコード
+const zurl = "zone://kaigi.zone.jp/minutes", holder = W.nodes[rest8[1]].p.put(zurl, "議事録\n2 行目"); W.pump(false);
+let got = null; W.nodes[rest8[5]].p.get(zurl, (st, t, pth) => { got = [st, t, pth]; }); W.pump(false);
+ok(got && got[0] === 200 && got[1] === "議事録\n2 行目" && holder === Zn.nearest(W.nodes[rest8[1]].p.memberList(), Zn.zoneId(zurl)).name && !!W.nodes[holder].p.store[zurl], "PUT は URL の鍵に最も近い端末 (" + holder + ") が預かり、別の端末から GET できる", JSON.stringify(got));
+W.nodes[rest8[2]].p.get("zone://kaigi.zone.jp/none", (st, t) => { got = [st, t]; }); W.pump(false);
+ok(got[0] === 404, "無いレコードは 404 zone-not-found");
+W.nodes[holder].p.store[zurl] = Zn.seal(JSON.stringify({ text: "偽物" }), zc.jones.figure8, 5);
+W.nodes[rest8[5]].p.get(zurl, (st, t) => { got = [st, t]; }); W.pump(false);
+ok(got[0] === 409, "別の結び目で封印されたレコードは 409 zone-guard-reject");
+// 結び目 (鍵) が違う端末は網に入れない
+const X = W.add("intruder", null, zc.jones.figure8); W.connect("intruder", rest8[0]); W.pump(false);
+ok(Object.keys(X.p.members).length === 1 && X.mt.msgs.length === 0 && !W.nodes[rest8[0]].p.members.intruder && X.p.rejects > 0, "結び目が違う端末は、つないでも一覧に入らず、議事録も届かない");
+delete W.nodes.intruder;
+// 近づける隣が無いときは広げて届ける (一列だけの網で、端から端へ)
+const W3 = World(); ["p1", "p2", "p3", "p4", "p5"].forEach(n => W3.add(n)); Object.values(W3.nodes).forEach(nd => { nd.p.onNeedLink = () => {}; });
+for (let i = 1; i < 5; i++) W3.connect("p" + i, "p" + (i + 1)); W3.pump(false);
+let sig = null; W3.nodes.p5.p.onSignal = (from, body) => { sig = [from, body.x]; }; W3.nodes.p1.p.signal("p5", { x: 7 }); W3.pump(false);
+ok(sig && sig[0] === "p1" && sig[1] === 7 && W3.nodes.p5.p.lastRoute[0] === "p1" && W3.nodes.p5.p.lastRoute.length >= 3, "直結していない端末へも、中継して届く (経路 " + (W3.nodes.p5.p.lastRoute || []).join(" → ") + ")");
+// 抜けるときは網に知らせる
+W3.nodes.p3.p.leave(); W3.pump(false);
+ok(!W3.nodes.p1.p.members.p3 && !W3.nodes.p5.p.members.p3, "leave() で抜けると、全台の一覧から外れる");
 
 console.log("配布 HTML");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
@@ -175,7 +259,7 @@ const multiMt = M.runLocal("スマホ向けの予約アプリを\n3か月で作�
 ok(multiMt.decided() && /\*\*議題\*\*: スマホ向けの予約アプリを \/ 3か月で作りたい/.test(multiMt.minutes()), "複数行の議題でも会議が成り立ち、議事録に収まる");
 const scripts = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g), m => m[1]);
 const sb = { console, TextEncoder, TextDecoder }; sb.window = sb; vm.createContext(sb);
-try { vm.runInContext(scripts[0], sb); ok(["BadaEntropy", "BadaAgents", "BadaMeeting", "BadaThought", "BadaNet", "BadaTelegraph", "BadaAcoustic"].every(k => sb[k]), "埋め込んだライブラリが読み込める"); }
+try { vm.runInContext(scripts[0], sb); ok(["BadaEntropy", "BadaAgents", "BadaMeeting", "BadaThought", "BadaNet", "BadaTelegraph", "BadaAcoustic", "BadaZone", "BadaP2P", "BadaLang", "BADA_ZONE_LIB"].every(k => sb[k]), "埋め込んだライブラリが読み込める"); }
 catch (e) { ok(false, "埋め込んだライブラリが読み込める", e.message); }
 try { new vm.Script(scripts[1]); ok(true, "画面のスクリプトの構文"); } catch (e) { ok(false, "画面のスクリプトの構文", e.message); }
 

@@ -68,7 +68,7 @@
   </select>
   <label class="ctl"><input type="checkbox" id="auto" checked> 役割が自動で発言</label>
   <button class="ctl" id="acoustic" aria-pressed="false">音響電信 <kbd>F4</kbd></button>
-  <button class="ctl" id="connect">接続コード (WebRTC)</button>
+  <button class="ctl" id="connect">P2P 網 (zone) <kbd>F8</kbd></button>
   <button class="ctl" id="export" disabled>議事録を保存 <kbd>F6</kbd></button>
   <span id="status">1 台で動作中</span>
 </header>
@@ -106,20 +106,31 @@
   </aside>
 </main>
 <dialog id="dlg">
-  <b>コンピュータ同士をつなぐ (サーバーなし)</b>
-  <p class="note">接続コードを相手に渡して (メール・チャット・QR など) つなぎます。既定では同じ LAN の中で接続できます。発言は SHA-256 つきのパケットで送られ、主催者が通し番号を付けて全員に配ります。</p>
-  <div class="row"><label><input type="radio" name="side" value="host" checked> 主催する</label><label><input type="radio" name="side" value="guest"> 参加する</label></div>
-  <div id="hostpane">
-    <div class="row"><button class="ctl" id="mkinvite">① 招待コードを作る</button></div>
-    <h3>招待コード (相手に渡す)</h3><textarea id="invite" readonly></textarea>
-    <h3>② 相手から届いた返信コードを貼る</h3><textarea id="answerin"></textarea>
-    <div class="row"><button class="ctl" id="accept">③ 接続する</button></div>
+  <b>P2P 網 — zone:// ウルトラネットワーク (主催者もサーバーもなし)</b>
+  <p class="note">最初の 1 本だけ、接続コードを相手に渡してつなぎます。あとは網が、リング上の隣どうしを自動でつなぎます。同じ LAN の中で使えます。</p>
+  <div class="row">
+    <label class="note">この端末の名前 <input id="pname" class="ctl" size="10" aria-label="この端末の名前"></label>
+    <label class="note">部屋 zone://<input id="room" class="ctl" size="8" value="kaigi" aria-label="部屋の名前">.zone.jp/meeting</label>
+    <label class="note">結び目 (部屋の鍵) <select id="knot" class="ctl" aria-label="結び目"><option value="trefoil">三葉結び目</option><option value="figure8">8 の字結び目</option></select></label>
+    <button class="ctl" id="apply">この設定で網を作り直す</button>
   </div>
-  <div id="guestpane" hidden>
-    <h3>① 主催者から届いた招待コードを貼る</h3><textarea id="invitein"></textarea>
-    <div class="row"><button class="ctl" id="mkanswer">② 返信コードを作る</button></div>
-    <h3>返信コード (主催者に渡す)</h3><textarea id="answer" readonly></textarea>
+  <h3>つなぐ側: ① 招待コードを作って相手に渡す → ③ 届いた返信コードを貼る</h3>
+  <div class="row"><button class="ctl" id="mkinvite">① 招待コードを作る</button></div>
+  <textarea id="invite" readonly aria-label="招待コード"></textarea>
+  <textarea id="answerin" placeholder="③ 相手から届いた返信コード" aria-label="返信コードを貼る"></textarea>
+  <div class="row"><button class="ctl" id="accept">③ 接続する</button></div>
+  <h3>つながれる側: ② 届いた招待コードを貼って、返信コードを相手に渡す</h3>
+  <textarea id="invitein" placeholder="② 相手から届いた招待コード" aria-label="招待コードを貼る"></textarea>
+  <div class="row"><button class="ctl" id="mkanswer">② 返信コードを作る</button></div>
+  <textarea id="answer" readonly aria-label="返信コード"></textarea>
+  <h3>網の状態</h3>
+  <div id="netinfo" class="note"></div>
+  <h3>zone:// レコード (URL の鍵に最も近い端末が預かる)</h3>
+  <div class="row">
+    <input id="zurl" class="ctl" size="30" aria-label="zone URL">
+    <button class="ctl" id="zput">議事録を公開 (PUT)</button><button class="ctl" id="zget">取得 (GET)</button>
   </div>
+  <pre id="zout" class="note" style="white-space:pre-wrap;max-height:120px;overflow:auto;margin:6px 0"></pre>
   <div class="row"><span id="dlgmsg" class="note"></span><button class="ctl" id="close" style="margin-left:auto">閉じる</button></div>
 </dialog>
 <script>
@@ -130,13 +141,38 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var ROLE_JA = BadaAgents.ROLES, meeting = new BadaMeeting.Meeting(), pending = null, audio = null;
-  var bus = makeHub(true);                 // 発言の送り先: Hub (1 台 / WebRTC) または AcousticLink (音響電信)
-  function makeHub(host) { return new BadaNet.Hub({ host: host, onMessage: onMessage, onPeers: showStatus }); }
+  // zone の計算: 元の zone-lib.bada を Bada 処理系で実行して Jones 鍵を求め、移植した計算と一致するか確かめる
+  var zoneCheck = (function () { try { return BadaZone.selfCheck(BadaLang, BADA_ZONE_LIB); } catch (e) { return { ok: false, error: e.message }; } })();
+  var node = null, dials = {};
+  function plainMinutes() { return meeting.msgs.map(function (m) { var c = Object.assign({}, m); delete c.measure; return c; }); }
+  function makeNode() {
+    var name = $("pname").value.trim() || "peer", knot = $("knot").value;
+    dials = {};
+    return new BadaP2P.Node({ name: name, room: $("room").value.trim() || "kaigi", key: zoneCheck.ok ? zoneCheck.jones[knot] : 1, minutes: plainMinutes, onMeeting: onMessage, onChange: showStatus,
+      // 担当として番号を付ける前に: 役割の発言は、議事録の続きとして自分のエージェントが作るものと一致するか
+      validate: function (d) { if (d.kind === "agenda" || d.kind === "comment") return true; var x = meeting.next(d.role); return !!x && x.kind === d.kind && x.text === d.text; },
+      // リング上の隣へ、網を通した合図の中継で自動的にリンクを張る
+      onNeedLink: function (peer) { var nd = node; BadaNet.Rtc.offer(nd).then(function (o) { dials[peer] = o.pc; nd.signal(peer, { type: "offer", code: o.code }); setTimeout(function () { nd.dialFailed(peer); }, 20000); }).catch(function () { nd.dialFailed(peer); }); },
+      onSignal: function (from, b) {
+        var nd = node;
+        if (b.type === "offer") BadaNet.Rtc.answer(nd, b.code).then(function (a) { nd.signal(from, { type: "answer", code: a.code }); }).catch(function () { });
+        else if (b.type === "answer" && dials[from]) BadaNet.Rtc.accept(dials[from], b.code).catch(function () { });
+      } });
+  }
+  var bus = null;                          // 発言の送り先: P2P の端末 (1 台でも同じ) または AcousticLink (音響電信)
   function acousticOn() { return bus instanceof BadaAcoustic.AcousticLink; }
   function myRoles() { var r = $("role").value; return r === "all" ? BadaMeeting.ORDER : r === "observer" ? [] : [r]; }
   function showStatus() {
-    var n = bus.peers();
-    $("status").textContent = acousticOn() ? "音響電信で動作中" : bus.host ? (n ? "主催中 · 接続 " + n + " 台" : "1 台で動作中") : (n ? "参加中 · 主催者と接続" : "未接続");
+    if (acousticOn()) { $("status").textContent = "音響電信で動作中"; return; }
+    var i = node.info(), n = i.members.length;
+    $("status").textContent = n > 1 ? "P2P 網 " + n + " 台 · 直結 " + node.peers() + " · 担当 " + i.owner : "1 台で動作中";
+    var box = $("netinfo"); box.textContent = "";
+    var line = function (t) { var d = document.createElement("div"); d.textContent = t; box.appendChild(d); };
+    line("zone 自己検査 (移植した計算と、元の zone-lib.bada の実行結果): " + (zoneCheck.ok ? "一致" : "不一致 — P2P の封印は無効です"));
+    line("部屋 " + i.url + " (鍵 " + i.key + ") · 担当 = 鍵に最も近い端末");
+    i.members.forEach(function (m) { line("　" + String(m.id).padStart(4, " ") + "  " + m.name + (m.self ? " (この端末)" : m.direct ? " — 直結" : " — 中継") + (m.owner ? " ★担当" : "")); });
+    if (i.lastRoute.length > 1) line("最後の電文の経路: " + i.lastRoute.join(" → "));
+    if (i.rejects) line("封印を開けられず捨てた電文: " + i.rejects + " 件 (結び目が違う相手)");
   }
 
   /* ── 議事録の表示 ── */
@@ -293,7 +329,7 @@
 
   /* ── 音響電信 (Bada Telegraph の FSK) ── */
   async function toggleAcoustic() {
-    if (acousticOn()) { audio.stop(); bus = makeHub(true); $("acoustic").setAttribute("aria-pressed", "false"); $("acstate").textContent = ""; showStatus(); return; }
+    if (acousticOn()) { audio.stop(); bus = node; $("acoustic").setAttribute("aria-pressed", "false"); $("acstate").textContent = ""; showStatus(); return; }
     audio = new BadaAcoustic.AcousticAudio(function (frame) { link.receive(frame); showStatus(); }, function (t) { $("acstate").textContent = "音響電信: " + t + " — 1000 / 1600 Hz・100 baud"; });
     var link = new BadaAcoustic.AcousticLink({ meeting: function () { return meeting; }, onMessage: onMessage, io: audio });
     bus = link; $("acoustic").setAttribute("aria-pressed", "true"); showStatus();
@@ -301,30 +337,37 @@
   }
   $("acoustic").onclick = toggleAcoustic;
 
-  /* ── 接続コード (WebRTC) ── */
-  var inviteLink = null;
-  $("connect").onclick = function () { $("dlgmsg").textContent = ""; $("dlg").showModal(); };
+  /* ── P2P 網 (zone) ── */
+  var invitePc = null;
+  function openNet() { $("dlgmsg").textContent = ""; showStatus(); $("dlg").showModal(); }
+  $("connect").onclick = openNet;
   $("close").onclick = function () { $("dlg").close(); };
-  Array.from(document.querySelectorAll("input[name=side]")).forEach(function (r) {
-    r.onchange = function () { var g = r.value === "guest" && r.checked; $("guestpane").hidden = !g; $("hostpane").hidden = g; };
-  });
+  $("apply").onclick = function () {
+    node = makeNode(); if (!acousticOn()) bus = node;
+    meeting = new BadaMeeting.Meeting(); $("zurl").value = "zone://" + node.room + ".zone.jp/minutes";
+    render(); refreshCands(); showStatus(); $("dlgmsg").textContent = "網を作り直しました (これまでのリンクは使いません)。";
+  };
   $("mkinvite").onclick = async function () {
-    try {
-      if (acousticOn() || !bus.host) bus = makeHub(true);
-      var inv = await bus.invite(function () { return meeting.msgs.map(function (m) { var c = Object.assign({}, m); delete c.measure; return c; }); });
-      inviteLink = inv.link; $("invite").value = inv.code; $("dlgmsg").textContent = "招待コードを相手に渡してください。";
-    } catch (e) { $("dlgmsg").textContent = "招待コードを作れませんでした: " + e.message; }
+    try { var o = await BadaNet.Rtc.offer(node); invitePc = o.pc; $("invite").value = o.code; $("dlgmsg").textContent = "招待コードを相手に渡してください。"; }
+    catch (e) { $("dlgmsg").textContent = "招待コードを作れませんでした: " + e.message; }
   };
   $("accept").onclick = async function () {
-    try { await bus.accept(inviteLink, $("answerin").value); $("dlgmsg").textContent = "接続を待っています…"; $("answerin").value = ""; }
+    try { await BadaNet.Rtc.accept(invitePc, $("answerin").value); $("dlgmsg").textContent = "接続を待っています…"; $("answerin").value = ""; }
     catch (e) { $("dlgmsg").textContent = "返信コードを読めませんでした。貼り付けた内容を確認してください。"; }
   };
   $("mkanswer").onclick = async function () {
     try {
-      bus = makeHub(false); meeting = new BadaMeeting.Meeting(); render();
-      if ($("role").value === "all") $("role").value = "observer";
-      $("answer").value = await bus.join($("invitein").value); $("dlgmsg").textContent = "返信コードを主催者に渡してください。"; showStatus();
+      if ($("role").value === "all") $("role").value = "observer";       // 網に加わる側は、役割を自分で選ぶまで発言しない
+      var a = await BadaNet.Rtc.answer(node, $("invitein").value); $("answer").value = a.code; $("dlgmsg").textContent = "返信コードを相手に渡してください。";
     } catch (e) { $("dlgmsg").textContent = "招待コードを読めませんでした。貼り付けた内容を確認してください。"; }
+  };
+  $("zput").onclick = function () {
+    try { var o = node.put($("zurl").value.trim(), meeting.minutes()); $("zout").textContent = "PUT → 預け先 " + o + " (封印して保存)"; }
+    catch (e) { $("zout").textContent = e.message; }
+  };
+  $("zget").onclick = function () {
+    $("zout").textContent = "取得中…";
+    node.get($("zurl").value.trim(), function (status, text, path) { $("zout").textContent = status + (path.length > 1 ? "  経路 " + path.join(" → ") : "") + "\n" + text; });
   };
 
   /* ── 保存とキー操作 ── */
@@ -346,11 +389,15 @@
     else if (e.key === "F4") { e.preventDefault(); toggleAcoustic(); }
     else if (e.key === "F6") { e.preventDefault(); exportMinutes(); }
     else if (e.key === "F7") { e.preventDefault(); setPtr(!ptrOn); }
+    else if (e.key === "F8") { e.preventDefault(); if ($("dlg").open) $("dlg").close(); else openNet(); }
     else if (e.altKey && /^Digit[0-9]$/.test(e.code)) { var pick = candList[+e.code.slice(5)]; if (pick) { e.preventDefault(); pick(); refreshCands(); $("compose").focus(); } }
   });
   $("role").onchange = function () { refreshCands(); schedule(); };
   $("auto").onchange = function () { refreshCands(); schedule(); };
-  window.BadaMeetingApp = { meeting: function () { return meeting; }, bus: function () { return bus; }, keyer: keyer };
+  $("pname").value = "peer-" + Math.floor(Math.random() * 46656).toString(36);
+  node = makeNode(); bus = node; $("zurl").value = "zone://" + node.room + ".zone.jp/minutes";
+  window.addEventListener("pagehide", function () { try { node.leave(); } catch (e) { } });      // 閉じるときは網に知らせる
+  window.BadaMeetingApp = { meeting: function () { return meeting; }, bus: function () { return bus; }, node: function () { return node; }, keyer: keyer, zoneCheck: zoneCheck };
   render(); buildPad(); refreshCands(); showStatus(); $("compose").focus();
 })();
 </script>

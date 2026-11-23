@@ -3,7 +3,8 @@
  *   node bada_meeting/tools/e2e-test.js [スクリーンショットの出力先]
  * 1〜3 の操作はすべてキーボードで行う (マウス・タッチを使わない)。4 はポインタだけで行う。
  * 1. 1 台で全役: 複数行の議題 → 決定。電鍵 (Space の長短) と Alt + 数字で入力
- * 2. 3 つの画面を WebRTC でつなぐ (接続の操作もキーボードだけ)
+ * 2. P2P 網 (zone): 4 つの画面を一列につなぎ、自動で網になること・主催者なしの会議・zone:// レコード・
+ *    結び目の違う端末の排除・担当の引き継ぎを確かめる
  * 4. ポインタ (滞留) だけで複数行を入力して発言する
  * 3. 音響電信: 別の端末が鳴らした音 (WAV を偽のマイク入力にする) を復調して、会議に応じる
  */
@@ -91,32 +92,68 @@ const paste = async (p, sel, text) => { await p.focus(sel); await p.keyboard.ins
   if (shots) await ptr.screenshot({ path: path.join(shots, "meeting-pointer.png") });
   await ptr.close();
 
-  console.log("3 台を WebRTC でつなぐ (キーボードだけ)");
-  const host = await open(), g1 = await open(), g2 = await open({ width: 390, height: 800 });
-  await host.focus("#role"); await host.selectOption("#role", "kikaku");
-  for (const [g, role] of [[g1, "engineer"], [g2, "planner"]]) {
-    await press(host, "#connect"); await press(host, "#mkinvite");
-    await host.waitForFunction(() => document.getElementById("invite").value.length > 100);
-    const invite = await host.inputValue("#invite");
-    await press(g, "#connect"); await g.focus("input[name=side][value=guest]"); await g.keyboard.press("Space");
-    await paste(g, "#invitein", invite); await press(g, "#mkanswer");
-    await g.waitForFunction(() => document.getElementById("answer").value.length > 100);
-    await paste(host, "#answerin", await g.inputValue("#answer")); await press(host, "#accept");
-    await g.waitForFunction(() => /主催者と接続/.test(document.getElementById("status").textContent), null, { timeout: 20000 });
-    await host.keyboard.press("Escape"); await g.keyboard.press("Escape");
-    await host.evaluate(() => { document.getElementById("invite").value = ""; });
-    await g.selectOption("#role", role);
+  console.log("P2P 網 (zone): 4 台を一列につなぐ → 網が隣どうしを自動でつなぐ (キーボードだけ)");
+  const names = ["tokyo", "osaka", "nagoya", "sapporo"], pages = {};
+  for (const n of names) {
+    const p = pages[n] = await open(n === "sapporo" ? { width: 390, height: 800 } : undefined);
+    await p.keyboard.press("F8"); await p.focus("#pname"); await p.keyboard.press("Control+a"); await p.keyboard.insertText(n); await press(p, "#apply"); await p.keyboard.press("Escape");
   }
-  ok(/接続 2 台/.test(await host.locator("#status").innerText()), "主催者に 2 台が接続", await host.locator("#status").innerText());
-  await type(host, "AndroidとWindows向け\nチャットアプリを4週間で"); await host.keyboard.press("Control+Enter");
-  await Promise.all([decided(host), decided(g1), decided(g2)]);
-  const [a, b, c] = await Promise.all([host, g1, g2].map(p => p.evaluate(() => JSON.stringify(BadaMeetingApp.meeting().msgs.map(m => [m.seq, m.role, m.kind, m.text])))));
-  ok(a === b && b === c, "3 台の議事録が完全に一致する");
-  await type(g1, "期限を12週間にしましょう"); await g1.keyboard.press("Control+Enter");
-  await host.waitForFunction(() => /期限は 12 週間/.test(BadaMeetingApp.meeting().msgs[0].text) && BadaMeetingApp.meeting().decided(), null, { timeout: 60000 });
-  ok(!/concern/.test(await kinds(host)), "期限を延ばすと懸念なしで決定に至る", await kinds(host));
-  ok(!(await g2.evaluate(() => document.documentElement.scrollWidth > innerWidth)), "スマホ幅でも横スクロールが出ない");
-  if (shots) await g2.screenshot({ path: path.join(shots, "meeting-phone.png") });
+  ok(await pages.tokyo.evaluate(() => BadaMeetingApp.zoneCheck.ok && BadaMeetingApp.zoneCheck.jones.trefoil === 919492), "起動時に元の zone-lib.bada を Bada で実行し、移植した計算と一致 (Jones 鍵 919492)");
+  const link = async (a, b) => {               // a が招待し、b が返信する (手でつなぐのはこの 1 本ずつ)
+    await a.keyboard.press("F8"); await a.evaluate(() => { document.getElementById("invite").value = ""; }); await press(a, "#mkinvite");
+    await a.waitForFunction(() => document.getElementById("invite").value.length > 100);
+    await b.keyboard.press("F8"); await paste(b, "#invitein", await a.inputValue("#invite")); await press(b, "#mkanswer");
+    await b.waitForFunction(() => document.getElementById("answer").value.length > 100);
+    await paste(a, "#answerin", await b.inputValue("#answer")); await press(a, "#accept");
+    await a.keyboard.press("Escape"); await b.keyboard.press("Escape");
+    await b.evaluate(() => { document.getElementById("invitein").value = ""; document.getElementById("answer").value = ""; });
+  };
+  await link(pages.tokyo, pages.osaka); await link(pages.osaka, pages.nagoya); await link(pages.nagoya, pages.sapporo);
+  const all = Object.values(pages);
+  await Promise.all(all.map(p => p.waitForFunction(() => BadaMeetingApp.node().info().members.length === 4 && BadaMeetingApp.node().peers() === 3, null, { timeout: 60000 }))).catch(async e => {
+    for (const n of names) console.log("    状態", n, await pages[n].evaluate(() => JSON.stringify([BadaMeetingApp.node().name, Object.keys(BadaMeetingApp.node().members), Object.keys(BadaMeetingApp.node().links), Object.keys(BadaMeetingApp.node().dialing)])));
+    throw e;
+  });
+  ok(true, "手でつないだのは 3 本。うわさで 4 台を知り、残りのリンクは網が自動で張った (全台が直結 3)");
+  const owners = await Promise.all(all.map(p => p.evaluate(() => BadaMeetingApp.node().owner())));
+  ok(new Set(owners).size === 1, "全台が同じ担当 (部屋の鍵に最も近い端末) を選ぶ: " + owners[0], owners.join());
+  const owner = owners[0], rest = names.filter(n => n !== owner), roleOf = { [rest[0]]: "kikaku", [rest[1]]: "engineer", [rest[2]]: "planner" };
+  for (const n of rest) await pages[n].selectOption("#role", roleOf[n]);      // 担当の端末は役割なし (番号を付けて配るだけ)
+  await type(pages[rest[2]], "AndroidとWindows向け\nチャットアプリを4週間で"); await pages[rest[2]].keyboard.press("Control+Enter");
+  await Promise.all(all.map(decided));
+  const logs = await Promise.all(all.map(p => p.evaluate(() => JSON.stringify(BadaMeetingApp.meeting().msgs.map(m => [m.seq, m.role, m.kind, m.text])))));
+  ok(new Set(logs).size === 1 && /"decide"/.test(logs[0]), "主催者なしで会議が決定に至り、4 台の議事録が完全に一致する");
+  ok(/P2P 網 4 台/.test(await pages.tokyo.locator("#status").innerText()), "状態表示", await pages.tokyo.locator("#status").innerText());
+  // zone:// レコード: 預け先は URL の鍵に最も近い端末
+  const A = pages[rest[0]], B = pages[rest[1]];
+  await A.keyboard.press("F8"); await press(A, "#zput");
+  ok(/PUT → 預け先/.test(await A.locator("#zout").innerText()), "議事録を zone:// に公開: " + (await A.locator("#zout").innerText()));
+  await A.keyboard.press("Escape"); await sleep(500);
+  await B.keyboard.press("F8"); await press(B, "#zget");
+  await B.waitForFunction(() => /^200/.test(document.getElementById("zout").textContent), null, { timeout: 10000 });
+  ok(/# 会議の議事録と計画書/.test(await B.locator("#zout").innerText()), "別の端末から GET して、封印を開いて読める");
+  await B.focus("#zurl"); await B.keyboard.press("Control+a"); await B.keyboard.insertText("zone://kaigi.zone.jp/none"); await press(B, "#zget");
+  await B.waitForFunction(() => /^404/.test(document.getElementById("zout").textContent), null, { timeout: 10000 });
+  ok(true, "無いレコードは 404 zone-not-found"); await B.keyboard.press("Escape");
+  // 結び目 (鍵) が違う端末は網に入れない
+  const X = await open();
+  await X.keyboard.press("F8"); await X.focus("#pname"); await X.keyboard.press("Control+a"); await X.keyboard.insertText("intruder"); await X.selectOption("#knot", "figure8"); await press(X, "#apply"); await X.keyboard.press("Escape");
+  await link(A, X); await sleep(2500);
+  ok((await X.evaluate(() => BadaMeetingApp.node().info().members.length)) === 1 && (await A.evaluate(() => BadaMeetingApp.node().info().members.length)) === 4 && (await X.evaluate(() => BadaMeetingApp.meeting().msgs.length)) === 0, "結び目が違う端末は、つないでも網に入れず、議事録も届かない");
+  await X.close();
+  // 担当の端末が抜ける → 次に近い端末が引き継ぐ
+  await pages[owner].close();
+  const left = rest.map(n => pages[n]);
+  await Promise.all(left.map(p => p.waitForFunction(() => BadaMeetingApp.node().info().members.length === 3, null, { timeout: 30000 })));
+  const owners2 = await Promise.all(left.map(p => p.evaluate(() => BadaMeetingApp.node().owner())));
+  ok(new Set(owners2).size === 1 && owners2[0] !== owner, "担当が抜けると、残りの全台が次に近い端末 (" + owners2[0] + ") を担当にする", owners2.join());
+  await type(pages[rest[1]], "期限を12週間にしましょう"); await pages[rest[1]].keyboard.press("Control+Enter");
+  await Promise.all(left.map(p => p.waitForFunction(() => /期限は 12 週間/.test((BadaMeetingApp.meeting().msgs[0] || {}).text || "") && BadaMeetingApp.meeting().decided(), null, { timeout: 60000 })));
+  const logs2 = await Promise.all(left.map(p => p.evaluate(() => JSON.stringify(BadaMeetingApp.meeting().msgs.map(m => [m.seq, m.role, m.kind, m.text])))));
+  ok(new Set(logs2).size === 1 && !/concern/.test(logs2[0]), "引き継いだ後も会議が進み、期限を延ばすと懸念なしで決定に至る");
+  ok(!(await pages[rest[2]].evaluate(() => document.documentElement.scrollWidth > innerWidth)), "横スクロールが出ない (P2P)");
+  await pages[rest[0]].keyboard.press("F8"); await sleep(300);
+  if (shots) await pages[rest[0]].screenshot({ path: path.join(shots, "meeting-p2p.png") });
   await browser.close();
 
   console.log("音響電信 (別の端末の音を、偽のマイク入力として聞かせる)");
@@ -124,11 +161,12 @@ const paste = async (p, sel, text) => { await p.focus(sel); await p.keyboard.ins
   const sr = 48000, agenda = "スマホ向けの予約アプリを\n3か月で作りたい", ref = M.runLocal(agenda);
   const sil = s => new Float32Array(Math.round(sr * s)), parts = [sil(4)];
   const add = (m, byAgent) => Tg.encodeMessage(m, byAgent, byAgent ? Ac.hash4(m.text) : null).forEach(p => { parts.push(Tg.modulate(p, sr).map(v => v * 0.5), sil(0.4)); });
-  add(ref.msgs[0], false); parts.push(sil(1)); add(ref.msgs[1], true);
+  // 実際の端末は、次の発言が聞こえなければ送り直す。ここでも同じ電文を 2 回ずつ入れておく (重複は受け側が捨てる)
+  add(ref.msgs[0], false); parts.push(sil(1)); add(ref.msgs[1], true); parts.push(sil(1.5)); add(ref.msgs[1], true);
   parts.push(sil(9));                                     // この間に、画面 (エンジニア) が見積りを送信する
-  add(ref.msgs[3], true); parts.push(sil(4));
-  const all = new Float32Array(parts.reduce((s, x) => s + x.length, 0)); let o = 0; parts.forEach(x => { all.set(x, o); o += x.length; });
-  const wavPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "bm-")), "peer.wav"); fs.writeFileSync(wavPath, Tg.wav(all, sr));
+  add(ref.msgs[3], true); parts.push(sil(2)); add(ref.msgs[3], true); parts.push(sil(4));
+  const pcm = new Float32Array(parts.reduce((s, x) => s + x.length, 0)); let o = 0; parts.forEach(x => { pcm.set(x, o); o += x.length; });
+  const wavPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "bm-")), "peer.wav"); fs.writeFileSync(wavPath, Tg.wav(pcm, sr));
   browser = await chromium.launch({ args: NO_THROTTLE.concat(["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--use-file-for-fake-audio-capture=" + wavPath + "%noloop", "--autoplay-policy=no-user-gesture-required"]) });
   const ac = await open();
   await ac.selectOption("#role", "engineer");

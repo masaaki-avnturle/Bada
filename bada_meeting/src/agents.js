@@ -120,8 +120,12 @@
         }
         return { kind: "revise", data: data, text: "企画です。" + over + " 週間の超過、了解しました。" + names(moved) + "を次期に回し、初版は" + names(keep) + "に絞ります。エンジニアさん、再見積りをお願いします。" };
       }
-      if (tail.kind === "schedule" && !msgs.some(function (m) { return m.kind === "agree" && m.role === "kikaku" && m.seq > tail.seq; }))
-        return { kind: "agree", data: {}, text: "企画です。この計画で提供する価値は保てます。合意します。" };
+      // 日程が出たら合意する。エンジニアの合意が先に届いていても同じ (発言の届く順序に依らない)
+      if (tail.kind === "schedule" || (tail.kind === "agree" && tail.role === "engineer")) {
+        var sch = last(msgs, ["schedule"]);
+        if (sch && !msgs.some(function (m) { return m.kind === "agree" && m.role === "kikaku" && m.seq > sch.seq; }))
+          return { kind: "agree", data: {}, text: "企画です。この計画で提供する価値は保てます。合意します。" };
+      }
       return null;
     },
     engineer: function (msgs) {

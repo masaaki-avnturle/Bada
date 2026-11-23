@@ -5,7 +5,10 @@
 const fs = require("fs"), path = require("path");
 const root = path.join(__dirname, "..");
 const rd = f => fs.readFileSync(path.join(root, "src", f), "utf8");
-const libs = [fs.readFileSync(path.join(root, "..", "bada_gpt", "src", "engine.js"), "utf8"), rd("entropy.js"), rd("agents.js"), rd("meeting.js"), rd("thought.js"), rd("net.js"), rd("telegraph.js"), rd("acoustic.js")].join("\n");
+// zone:// ウルトラネットワーク: Bada 処理系 (bada_gui_ide/www/bada.js) と、zone の実行系 (browser/zone-lib.bada) を取り込む
+const ide = f => fs.readFileSync(path.join(root, "..", "bada_gui_ide", f), "utf8");
+const zoneLib = "var BADA_ZONE_LIB = " + JSON.stringify(ide("browser/zone-lib.bada")) + ";";
+const libs = [ide("www/bada.js"), zoneLib, fs.readFileSync(path.join(root, "..", "bada_gpt", "src", "engine.js"), "utf8"), rd("entropy.js"), rd("agents.js"), rd("meeting.js"), rd("thought.js"), rd("net.js"), rd("telegraph.js"), rd("acoustic.js"), rd("zone.js"), rd("p2p.js")].join("\n");
 if (/<\/script/i.test(libs)) throw new Error("libs must not contain </script");
 const html = rd("ui.html").replace("/*__LIBS__*/", () => libs);
 const out = path.join(root, "index.html");
