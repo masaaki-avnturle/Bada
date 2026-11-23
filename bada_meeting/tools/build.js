@@ -5,7 +5,7 @@
 const fs = require("fs"), path = require("path");
 const root = path.join(__dirname, "..");
 const rd = f => fs.readFileSync(path.join(root, "src", f), "utf8");
-const libs = [fs.readFileSync(path.join(root, "..", "bada_gpt", "src", "engine.js"), "utf8"), rd("entropy.js"), rd("agents.js"), rd("meeting.js"), rd("thought.js"), rd("net.js")].join("\n");
+const libs = [fs.readFileSync(path.join(root, "..", "bada_gpt", "src", "engine.js"), "utf8"), rd("entropy.js"), rd("agents.js"), rd("meeting.js"), rd("thought.js"), rd("net.js"), rd("telegraph.js"), rd("acoustic.js")].join("\n");
 if (/<\/script/i.test(libs)) throw new Error("libs must not contain </script");
 const html = rd("ui.html").replace("/*__LIBS__*/", () => libs);
 const out = path.join(root, "index.html");

@@ -11,36 +11,35 @@
   html, body { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif; display: flex; flex-direction: column; }
   button, select, input, textarea { font: inherit; color: var(--fg); }
-  button { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  kbd { font: 11px ui-monospace, Menlo, Consolas, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--mut); }
   header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
   header h1 { font-size: 17px; margin: 0 8px 0 0; }
   .ctl { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  .ctl[aria-pressed=true] { border-color: var(--acc); color: var(--acc); }
   label.ctl { display: inline-flex; gap: 6px; align-items: center; }
   #status { margin-left: auto; font-size: 12px; color: var(--mut); }
-  main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
   #log { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 780px; border: 1px solid var(--line); border-left: 4px solid var(--mut); border-radius: 4px 12px 12px 4px; background: var(--panel); padding: 8px 12px; }
   .msg.kikaku { border-left-color: var(--kikaku); } .msg.planner { border-left-color: var(--planner); } .msg.engineer { border-left-color: var(--engineer); } .msg.host { border-left-color: var(--host); }
   .msg .who { font-size: 12px; color: var(--mut); display: flex; flex-wrap: wrap; gap: 8px; }
   .msg .who b { color: var(--fg); }
   .msg .off { color: var(--ng); }
+  .msg .text { white-space: pre-wrap; word-break: break-word; }
   .msg.decide { background: #16261f; }
   .empty { color: var(--mut); margin: auto; text-align: center; max-width: 460px; }
   aside { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 12px; gap: 10px; }
   aside h2 { font-size: 13px; margin: 0; color: var(--mut); font-weight: 600; }
-  #compose { width: 100%; min-height: 64px; resize: vertical; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
-  .tiles { display: flex; flex-wrap: wrap; gap: 6px; }
-  .tile { position: relative; overflow: hidden; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; text-align: left; max-width: 100%; }
-  .tile > span { position: relative; }
-  .tile::before { content: ""; position: absolute; inset: 0; width: 0; background: rgba(122,176,255,.28); }
-  .tile.dwell::before { width: 100%; transition: width var(--ms, 800ms) linear; }
-  .tile.draft { border-color: var(--acc); }
-  .tile.act { background: var(--acc); color: #071224; font-weight: 600; border: 0; }
-  .tile small { color: var(--mut); margin-left: 6px; }
-  #kana { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; }
-  #kana .col { display: grid; gap: 3px; }
-  #kana .tile { padding: 4px 0; text-align: center; min-height: 28px; }
+  #compose { width: 100%; min-height: 132px; resize: vertical; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; line-height: 1.5; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .act { background: var(--acc); color: #071224; font-weight: 600; border: 0; border-radius: 8px; padding: 6px 12px; }
+  #cands { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; }
+  #cands li { display: flex; gap: 8px; align-items: baseline; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+  #cands li.draft { border-color: var(--acc); }
+  #keystate { font: 13px ui-monospace, Menlo, Consolas, monospace; color: var(--acc); min-height: 1.6em; letter-spacing: 2px; }
+  #touchkey { width: 100%; padding: 14px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); touch-action: none; user-select: none; }
+  #touchkey.down { background: var(--acc); color: #071224; }
   #stats { font-size: 12px; color: var(--mut); border-top: 1px solid var(--line); padding-top: 8px; }
   #stats b { color: var(--fg); font-weight: 600; }
   .note { font-size: 12px; color: var(--mut); }
@@ -48,8 +47,8 @@
   dialog::backdrop { background: rgba(0,0,0,.6); }
   dialog textarea { width: 100%; height: 84px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
   dialog h3 { margin: 12px 0 4px; font-size: 14px; }
-  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; grid-template-rows: minmax(180px, 1fr) auto; } aside { border-left: 0; border-top: 1px solid var(--line); max-height: 58vh; } #kana .tile { font-size: 12px; } }
+  dialog .row { margin: 8px 0; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; grid-template-rows: minmax(160px, 1fr) auto; } aside { border-left: 0; border-top: 1px solid var(--line); max-height: 62vh; } }
 </style>
 </head>
 <body>
@@ -60,23 +59,33 @@
     <option value="engineer">アプリケーションエンジニア</option><option value="observer">参加者 (役割なし)</option>
   </select>
   <label class="ctl"><input type="checkbox" id="auto" checked> 役割が自動で発言</label>
-  <button class="ctl" id="connect">接続</button>
-  <button class="ctl" id="export" disabled>議事録を保存</button>
+  <button class="ctl" id="acoustic" aria-pressed="false">音響電信 <kbd>F4</kbd></button>
+  <button class="ctl" id="connect">接続コード (WebRTC)</button>
+  <button class="ctl" id="export" disabled>議事録を保存 <kbd>F6</kbd></button>
   <span id="status">1 台で動作中</span>
 </header>
 <main>
   <div id="log" aria-live="polite"></div>
   <aside>
-    <h2>思念入力 — 候補の上にポインタを留めると確定します (タップ・クリックでも確定)</h2>
-    <textarea id="compose" placeholder="議題の例: スマホ向けの予約アプリを 3 か月で作りたい" aria-label="発言"></textarea>
-    <div class="tiles" id="acts"></div>
-    <h2>候補</h2>
-    <div class="tiles" id="cands"></div>
-    <h2>かな</h2>
-    <div id="kana"></div>
-    <label class="note">滞留の基準時間 <input type="range" id="base" min="300" max="2000" step="100" value="800"> <span id="basev">0.8</span> 秒</label>
-    <div class="note">思考を読み取る装置ではありません。滞留 (ポインタを留める操作) を入力に使い、次の語句を予測して確定を速くします。</div>
+    <h2>発言 — 複数行で書けます。ポインタは不要です</h2>
+    <textarea id="compose" rows="6" placeholder="議題の例:&#10;スマホ向けの予約アプリを&#10;3 か月で作りたい" aria-label="発言 (複数行)"></textarea>
+    <div class="row">
+      <button class="act" id="say">発言する <kbd>Ctrl+Enter</kbd></button>
+      <button class="ctl" id="agenda">新しい議題として送る <kbd>Ctrl+Shift+Enter</kbd></button>
+    </div>
+    <h2>電鍵 (モールス符号) — キー 1 つの長短で打つ</h2>
+    <div class="row">
+      <button class="ctl" id="keymode" aria-pressed="false">電鍵モード <kbd>F2</kbd></button>
+      <button class="ctl" id="kana">和文 <kbd>F3</kbd></button>
+      <label class="note">1 単位 <input type="range" id="unit" min="60" max="300" step="10" value="120" aria-label="電鍵の 1 単位の長さ"> <span id="unitv">120</span> ms</label>
+    </div>
+    <div id="keystate" aria-live="off">電鍵モードは切です</div>
+    <button id="touchkey" aria-label="電鍵 (タッチ端末用)">電鍵 — タッチ端末はここを押す (短く = ・ / 長く = －)</button>
+    <div class="note">電鍵モードでは、発言欄で <kbd>Space</kbd> を短く押すと「・」、長く押すと「－」。<kbd>Enter</kbd> で改行、<kbd>Backspace</kbd> で 1 文字消す。</div>
+    <h2>候補 — <kbd>Alt</kbd> + 数字で入れる</h2>
+    <ol id="cands"></ol>
     <div id="stats"></div>
+    <div class="note" id="acstate"></div>
   </aside>
 </main>
 <dialog id="dlg">
@@ -1135,7 +1144,7 @@
   // 決定事項を企画書・計画・設計にまとめる (Markdown)
   Meeting.prototype.minutes = function () {
     var ms = this.msgs, ag = ms[0], p = find(ms, ["propose", "revise"]), e = find(ms, ["estimate"]), s = find(ms, ["schedule"]), st = this.stats();
-    var out = ["# 会議の議事録と計画書", "", "**議題**: " + (ag ? ag.text : "(なし)"), "", "**状態**: " + (this.decided() ? "決定済み" : "進行中 (未決定)"), ""];
+    var out = ["# 会議の議事録と計画書", "", "**議題**: " + (ag ? String(ag.text).replace(/\n/g, " / ") : "(なし)"), "", "**状態**: " + (this.decided() ? "決定済み" : "進行中 (未決定)"), ""];
     if (p) out = out.concat(["## 1. 企画", "", "- 分野: " + p.data.domain, "- 対象: " + p.data.target, "- 提供する価値: " + p.data.value, "- 成功の指標: " + p.data.kpi, "- 対応環境: " + p.data.platforms.join("・"), "",
       "| 初版の機能 | 優先度 | 実装工数 (人週) |", "|:--|:--|:--|"].concat(p.data.features.map(function (f) { return "| " + f.name + " | " + f.priority + " | " + f.weeks + " |"; }),
       p.data.later.length ? ["", "次期に回す機能: " + p.data.later.map(function (f) { return f.name; }).join("、")] : [], [""]));
@@ -1144,7 +1153,7 @@
     if (s) out = out.concat(["## 3. 日程", "", "| 工程 | 期間 (週) | 終了 (第 n 週) |", "|:--|:--|:--|"].concat(s.data.milestones.map(function (m) { return "| " + m.phase + " | " + m.weeks + " | " + m.end_week + " |"; }),
       ["", "## 4. リスクと対策", ""], s.data.risks.map(function (r) { return "- " + r[0] + " → " + r[1]; }), [""]));
     out = out.concat(["## 5. 発言の記録", ""], ms.map(function (m) {
-      return "- **" + (Ag.ROLES[m.role] || m.name || "参加者") + "** (" + m.kind + (m.kind !== "agenda" && !m.measure.pass ? "・議題から外れている可能性" : "") + "): " + m.text;
+      return "- **" + (Ag.ROLES[m.role] || m.name || "参加者") + "** (" + m.kind + (m.kind !== "agenda" && !m.measure.pass ? "・議題から外れている可能性" : "") + "): " + String(m.text).replace(/\n/g, "\n  ");
     }), ["", "## 6. 会議の計測 (エントロピー)", "", "- 発言数 " + st.count + " / 全体の情報量 H = " + st.H.toFixed(3) + " nat", "- 議題とのずれの平均 D = " + st.mean_D.toFixed(3) + " / 流れ F = " + st.flow.toFixed(4) + " / 門を通らなかった発言 " + st.off_topic + " 件",
       "", "_見積りと日程は、分野ごとの知識表と決まった計算式によるものです。実際の計画では、担当者による確認が必要です。_"]);
     return out.join("\n");
@@ -1170,20 +1179,82 @@
 })(typeof window !== "undefined" ? window : globalThis);
 
 /*
- * thought.js — 思念入力 (Ω-Telepathy と同じ方式: 滞留で選び、予測で加速する)
+ * thought.js — ポインタを使わない入力: 電鍵 (モールス符号) と、語句の予測
  *
- * 実際に思考を読み取るものではありません。入力は「候補の上にポインタを留める (滞留)」
- * という通常の操作で、次に入れそうな語句を予測して並べ、確からしい候補ほど
- * 短い滞留で確定できるようにします。
- *   候補の確率  p(c) ∝ (文脈での出現回数 + 1) × 1/((r+1) log(r+1))²      … (E3) 順位の事前分布
- *   滞留時間    T(c) = 基準時間 × clamp(−log p(c) / log(候補数), 0.35, 1.6)   … 驚きが小さいほど短い
+ * 電鍵は Bada Telegraph (bada_telegraph) のモールス符号を使う。キー 1 つの「短く押す / 長く押す」
+ * だけで文字を打てる。和文モールスにも対応 (濁点・半濁点は直前のかなに付く)。
+ *   短点 = 押した時間が 2 単位未満 / 長点 = 2 単位以上
+ *   文字の区切り = 2.5 単位の無操作 / 語の区切り (欧文のみ) = 6 単位の無操作
+ * 予測した候補は Alt + 数字で入れる。候補の確率には、レポートの核 1/(x log x)² を
+ * 順位の事前分布として使う (E3)。
  */
 (function (global) {
   "use strict";
   var En = global.BadaEntropy || (typeof require !== "undefined" ? require("./entropy.js") : null);
   var PHRASES = ["賛成です", "反対です", "もう少し詳しくお願いします", "期限を見直しましょう", "範囲を絞りましょう", "見積りをお願いします", "日程をお願いします",
     "リスクを確認しましょう", "次の議題に進みましょう", "決定とします", "確認します", "了解しました", "ありがとうございます"];
-  var KANA = ["あいうえお", "かきくけこ", "さしすせそ", "たちつてと", "なにぬねの", "はひふへほ", "まみむめも", "や ゆ よ", "らりるれろ", "わをんー、", "。？！ 　"];
+
+  // 欧文 (Bada Telegraph の MORSE 表と同じ)
+  var LATIN = { A: ".-", B: "-...", C: "-.-.", D: "-..", E: ".", F: "..-.", G: "--.", H: "....", I: "..", J: ".---", K: "-.-", L: ".-..", M: "--", N: "-.", O: "---", P: ".--.",
+    Q: "--.-", R: ".-.", S: "...", T: "-", U: "..-", V: "...-", W: ".--", X: "-..-", Y: "-.--", Z: "--..",
+    "0": "-----", "1": ".----", "2": "..---", "3": "...--", "4": "....-", "5": ".....", "6": "-....", "7": "--...", "8": "---..", "9": "----.",
+    ".": ".-.-.-", ",": "--..--", "?": "..--..", "!": "-.-.--", "/": "-..-.", "@": ".--.-." };
+  // 和文
+  var KANA = { "い": ".-", "ろ": ".-.-", "は": "-...", "に": "-.-.", "ほ": "-..", "へ": ".", "と": "..-..", "ち": "..-.", "り": "--.", "ぬ": "....", "る": "-.--.", "を": ".---",
+    "わ": "-.-", "か": ".-..", "よ": "--", "た": "-.", "れ": "---", "そ": "---.", "つ": ".--.", "ね": "--.-", "な": ".-.", "ら": "...", "む": "-", "う": "..-", "ゐ": ".-..-",
+    "の": "..--", "お": ".-...", "く": "...-", "や": ".--", "ま": "-..-", "け": "-.--", "ふ": "--..", "こ": "----", "え": "-.---", "て": ".-.--", "あ": "--.--", "さ": "-.-.-",
+    "き": "-.-..", "ゆ": "-..--", "め": "-...-", "み": "..-.-", "し": "--.-.", "ゑ": ".--..", "ひ": "--..-", "も": "-..-.", "せ": ".---.", "す": "---.-", "ん": ".-.-.",
+    "゛": "..", "゜": "..--.", "ー": ".--.-", "、": ".-.-.-", "。": ".-.-..",
+    "0": "-----", "1": ".----", "2": "..---", "3": "...--", "4": "....-", "5": ".....", "6": "-....", "7": "--...", "8": "---..", "9": "----." };
+  var invert = function (t) { var o = {}; Object.keys(t).forEach(function (k) { o[t[k]] = k; }); return o; };
+  var DECODE = { latin: invert(LATIN), kana: invert(KANA) };
+
+  function decodeSymbol(code, mode) { return DECODE[mode === "latin" ? "latin" : "kana"][code] || null; }
+  // 文字を文章の末尾に付ける。濁点・半濁点は直前のかなと合成する (か + ゛ → が)
+  function append(text, ch) {
+    if (ch === "゛" || ch === "゜") {
+      if (!text) return text;
+      var c = (text.slice(-1) + (ch === "゛" ? "゙" : "゚")).normalize("NFC");
+      return c.length === 1 ? text.slice(0, -1) + c : text;      // 濁点の付かない字はそのまま
+    }
+    return text + ch;
+  }
+  function toMorse(text, mode) {
+    var table = mode === "latin" ? LATIN : KANA;
+    return Array.from(String(text).normalize("NFD").toUpperCase()).map(function (ch) {
+      if (ch === "゙") return KANA["゛"]; if (ch === "゚") return KANA["゜"];
+      if (ch === " " || ch === "\n") return "/";
+      var small = "ぁぃぅぇぉっゃゅょゎ".indexOf(ch); if (small >= 0) ch = "あいうえおつやゆよわ"[small];      // 和文モールスに小書きの字は無い
+      return table[ch] || "?";
+    }).join(" ");
+  }
+
+  // 電鍵: down(t) / up(t) / tick(t) を時刻 (ミリ秒) つきで呼ぶ。確定した文字を配列で返す
+  function Keyer(unitMs, mode) { this.unit = unitMs || 120; this.mode = mode || "kana"; this.symbol = ""; this.downAt = null; this.lastUp = null; this.spaced = true; }
+  Keyer.prototype.setMode = function (mode) { this.mode = mode; this.symbol = ""; this.downAt = null; this.lastUp = null; this.spaced = true; };
+  // もう確定待ちの文字も語の区切りも無い (タイマーを止めてよい)
+  Keyer.prototype.idle = function (t) {
+    if (this.downAt !== null || this.symbol) return false;
+    return this.lastUp === null || this.spaced || this.mode !== "latin" || (t - this.lastUp) > 7 * this.unit;
+  };
+  Keyer.prototype.down = function (t) { var out = this.tick(t); if (this.downAt === null) this.downAt = t; return out; };
+  Keyer.prototype.up = function (t) {
+    if (this.downAt === null) return [];
+    this.symbol += (t - this.downAt) < 2 * this.unit ? "." : "-";
+    this.downAt = null; this.lastUp = t; this.spaced = false; return [];
+  };
+  Keyer.prototype.tick = function (t) {
+    var out = [];
+    if (this.downAt !== null || this.lastUp === null) return out;
+    var gap = t - this.lastUp;
+    if (this.symbol && gap >= 2.5 * this.unit) {
+      var ch = decodeSymbol(this.symbol, this.mode);
+      out.push(ch === null ? { unknown: this.symbol } : { char: this.mode === "latin" ? ch.toLowerCase() : ch });
+      this.symbol = "";
+    }
+    if (!this.symbol && !this.spaced && this.mode === "latin" && gap >= 6 * this.unit) { out.push({ char: " " }); this.spaced = true; }
+    return out;
+  };
 
   // 語彙: 定型句 + 議事録に出てきた語句 (出現回数つき)
   function lexicon(msgs) {
@@ -1196,7 +1267,7 @@
     });
     return count;
   }
-  // 入力中の文字列 prefix (最後の区切り以降) に続く候補を、確率の高い順に返す
+  // 入力中の行の末尾 (最後の区切り以降) に続く候補を、確率の高い順に返す
   function predict(prefix, count, k) {
     var tail = String(prefix).split(/[、。\s]/).pop();
     // 入力が空のときは定型句だけを出す (議事録の語句は、頭の文字が入ってから)
@@ -1204,20 +1275,10 @@
     cands.sort(function (a, b) { return count[b] - count[a] || a.length - b.length || (a < b ? -1 : 1); });
     cands = cands.slice(0, k || 8);
     var z = 0, w = cands.map(function (c, i) { var v = (count[c] + 1) * En.kernel(i + 1); z += v; return v; });
-    return cands.map(function (c, i) {
-      var p = w[i] / z;
-      return { text: c, insert: tail ? c.slice(tail.length) : c, p: p, surprisal: -Math.log(p) };
-    });
+    return cands.map(function (c, i) { var p = w[i] / z; return { text: c, insert: tail ? c.slice(tail.length) : c, p: p, surprisal: -Math.log(p) }; });
   }
-  // 候補の滞留時間 (ミリ秒)。候補が 1 つならもっとも短い
-  function dwellMs(cand, n, baseMs) {
-    var ratio = n > 1 ? cand.surprisal / Math.log(n) : 0;
-    return Math.round(baseMs * Math.max(0.35, Math.min(1.6, ratio)));
-  }
-  // 滞留の進み具合: ポインタが載ってから elapsed ミリ秒 → 0〜1。1 で確定
-  function progress(elapsed, ms) { return Math.max(0, Math.min(1, elapsed / ms)); }
 
-  global.BadaThought = { PHRASES: PHRASES, KANA: KANA, lexicon: lexicon, predict: predict, dwellMs: dwellMs, progress: progress };
+  global.BadaThought = { PHRASES: PHRASES, LATIN: LATIN, KANA: KANA, decodeSymbol: decodeSymbol, append: append, toMorse: toMorse, Keyer: Keyer, lexicon: lexicon, predict: predict };
   if (typeof module !== "undefined" && module.exports) module.exports = global.BadaThought;
 })(typeof window !== "undefined" ? window : globalThis);
 
@@ -1304,18 +1365,280 @@
   if (typeof module !== "undefined" && module.exports) module.exports = global.BadaNet;
 })(typeof window !== "undefined" ? window : globalThis);
 
+/*
+ * telegraph.js — Bada Telegraph の音響電信 (FSK モデム) と、会議用の小さなパケット
+ *
+ * 変調方式とフレームは bada_telegraph/www/index.html (BADA グラビトン電信) と同じ:
+ *   space 1000 Hz / mark 1600 Hz・100 baud、各バイトは start(0) + 8 bit (LSB 先頭) + stop(1)、
+ *   フレーム = プリアンブル (mark 12 bit) + SOF 0x7E + 長さ + 本体 + チェックサム (8 bit の和)
+ * 元の実装との違い: 連続した入力を流しながら復調できる / チェックサムを実際に照合する /
+ *   無音や雑音を信号と見なさないよう、2 つの周波数に電力が集まっている区間だけを読む。
+ *
+ * 会議パケット (フレームの本体。全員が同じエージェントを持つので、発言の本文は送らない):
+ *   'B' 'M' 版 種類 通し番号 役割 発言の種類 部分番号 部分数 … 本体 … CRC-16
+ *   種類 1 = 役割の発言: 本体は発言文の SHA-256 の先頭 4 バイト。受け取った側が自分のエージェントで
+ *            同じ発言を作り、ハッシュが合えば議事録に加える
+ *   種類 2 = 文章 (議題や人の発言): 本体は UTF-8。長い文章 (複数行を含む) は部分に分けて送る
+ *   種類 3 = 送り直しの要求: 通し番号の発言を聞き逃した端末が送る。その発言をした端末が送り直す
+ */
+(function (global) {
+  "use strict";
+  var F_SPACE = 1000, F_MARK = 1600, BAUD = 100, SOF = 0x7E, MAX_BODY = 180;
+  var ROLE_IDS = ["host", "kikaku", "planner", "engineer", "guest"];
+  var KIND_IDS = ["agenda", "propose", "estimate", "concern", "revise", "schedule", "agree", "decide", "comment"];
+
+  /* ───── 変調 ───── */
+  function frameBytes(payload) {
+    var body = [SOF, payload.length & 0xFF], sum = 0, i;
+    for (i = 0; i < payload.length; i++) body.push(payload[i]);
+    for (i = 0; i < body.length; i++) sum = (sum + body[i]) & 0xFF;
+    body.push(sum); return body;
+  }
+  function modulate(payload, sr) {
+    if (payload.length > 255) throw new Error("1 フレームは 255 バイトまでです");
+    var bits = [], k, i, spb = Math.round(sr / BAUD);
+    for (k = 0; k < 12; k++) bits.push(1);
+    frameBytes(payload).forEach(function (b) { bits.push(0); for (i = 0; i < 8; i++) bits.push((b >> i) & 1); bits.push(1); });
+    for (k = 0; k < 8; k++) bits.push(1);
+    var out = new Float32Array(bits.length * spb), ph = 0, idx = 0;
+    bits.forEach(function (bit) {
+      var dp = 2 * Math.PI * (bit ? F_MARK : F_SPACE) / sr;
+      for (i = 0; i < spb; i++) { out[idx++] = Math.sin(ph) * 0.9; ph += dp; if (ph > 2 * Math.PI) ph -= 2 * Math.PI; }
+    });
+    return out;
+  }
+  function seconds(payloadLength) { return (12 + 8 + (payloadLength + 3) * 10) / BAUD; }
+
+  /* ───── 復調 (流しながら) ───── */
+  function goertzel(s, start, n, f, sr) {
+    var c = 2 * Math.cos(2 * Math.PI * f / sr), s1 = 0, s2 = 0, s0, i;
+    for (i = 0; i < n; i++) { s0 = s[start + i] + c * s1 - s2; s2 = s1; s1 = s0; }
+    return s1 * s1 + s2 * s2 - c * s1 * s2;
+  }
+  function Demodulator(sr, onFrame) {
+    this.sr = sr; this.spb = Math.round(sr / BAUD); this.hop = Math.max(1, Math.round(this.spb / 8));
+    this.onFrame = onFrame; this.buf = new Float32Array(0); this.tone = false;
+  }
+  // 位置 c (サンプル) を中心とする 1 ビット分の判定: +1 mark / −1 space / 0 信号なし
+  Demodulator.prototype._bit = function (c) {
+    var st = Math.round(c - this.spb / 2), n = this.spb, s = this.buf;
+    if (st < 0 || st + n > s.length) return null;
+    var m = goertzel(s, st, n, F_MARK, this.sr), sp = goertzel(s, st, n, F_SPACE, this.sr), e = 0, i;
+    for (i = 0; i < n; i++) e += s[st + i] * s[st + i];
+    if (e < 1e-7 * n || (m + sp) < 0.3 * e * n / 2) return 0;          // 無音、または 2 つの周波数に電力が集まっていない
+    return m > sp ? 1 : -1;
+  };
+  Demodulator.prototype.feed = function (samples) {
+    var nb = new Float32Array(this.buf.length + samples.length); nb.set(this.buf); nb.set(samples, this.buf.length); this.buf = nb;
+    var spb = this.spb, need = 14 * spb, pos = 0, consumed = 0, guard = 0;
+    while (pos + need < this.buf.length && guard++ < 100000) {
+      // mark が続いたあと space に変わる点 (start bit の頭) を探す
+      var a = this._bit(pos + spb / 2), b = this._bit(pos + spb / 2 + this.hop);
+      if (!(a === 1 && b === -1)) { pos += this.hop; if (a === 0) consumed = pos; continue; }
+      // 境界を 1 サンプル単位に近づける: mark → space の切り替わりを二分探索
+      var lo = pos, hi = pos + this.hop;
+      while (hi - lo > 2) { var mid = (lo + hi) >> 1; if (this._bit(mid + spb / 2) === 1) lo = mid; else hi = mid; }
+      var start = hi + spb / 2;                                          // start bit の頭
+      var bytes = this._bytes(start);
+      if (bytes === null) break;                                          // まだ届ききっていない
+      if (bytes) { this.onFrame(bytes.payload); pos = Math.round(bytes.end); consumed = pos; }
+      else pos += spb;
+    }
+    this.tone = this._bit(Math.max(spb, this.buf.length - spb)) !== 0;    // 搬送波の有無 (送信前の確認に使う)
+    var keep = Math.max(consumed, this.buf.length - Math.round(this.sr * 30));   // 古い分は 30 秒で捨てる
+    if (keep > 0) this.buf = this.buf.slice(Math.min(keep, this.buf.length));
+  };
+  // start から 1 フレーム読む: {payload, end} / false (フレームではない) / null (サンプル不足)
+  Demodulator.prototype._bytes = function (start) {
+    var spb = this.spb, self = this, pos = start, out = [], len = -1;
+    var readByte = function (p) {
+      if (self._bit(p + 0.5 * spb) === null || self._bit(p + 9.5 * spb) === null) return null;
+      if (self._bit(p + 0.5 * spb) !== -1) return false;                  // start bit は space
+      var v = 0, k, bit;
+      for (k = 0; k < 8; k++) { bit = self._bit(p + (k + 1.5) * spb); if (bit === 0) return false; if (bit === 1) v |= 1 << k; }
+      return self._bit(p + 9.5 * spb) === 1 ? v : false;                  // stop bit は mark
+    };
+    for (;;) {
+      var v = readByte(pos);
+      if (v === null) return null;
+      if (v === false) return false;
+      out.push(v); pos += 10 * spb;
+      if (out.length === 1 && v !== SOF) return false;
+      if (out.length === 2) len = v;
+      if (len >= 0 && out.length === len + 3) break;
+    }
+    var sum = 0, i; for (i = 0; i < out.length - 1; i++) sum = (sum + out[i]) & 0xFF;
+    if (sum !== out[out.length - 1]) return false;
+    return { payload: Uint8Array.from(out.slice(2, 2 + len)), end: pos };
+  };
+
+  /* ───── 会議パケット ───── */
+  function crc16(bytes, n) {
+    var crc = 0xFFFF, i, k;
+    for (i = 0; i < n; i++) { crc ^= bytes[i] << 8; for (k = 0; k < 8; k++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF; }
+    return crc;
+  }
+  function packet(type, seq, role, kind, part, parts, body) {
+    var p = [0x42, 0x4D, 1, type, seq & 0xFF, Math.max(0, ROLE_IDS.indexOf(role)), Math.max(0, KIND_IDS.indexOf(kind)), part, parts], i;
+    for (i = 0; i < body.length; i++) p.push(body[i]);
+    var c = crc16(p, p.length); p.push(c >> 8, c & 0xFF);
+    return Uint8Array.from(p);
+  }
+  // 発言 m = {seq, role, kind, text} → フレームの本体の列。hash4 は発言文の SHA-256 の先頭 4 バイト
+  function encodeMessage(m, byAgent, hash4) {
+    if (byAgent) return [packet(1, m.seq, m.role, m.kind, 0, 1, hash4)];
+    var utf = new TextEncoder().encode(m.text), parts = Math.max(1, Math.ceil(utf.length / MAX_BODY)), out = [], i;
+    if (parts > 255) throw new Error("文章が長すぎます");
+    for (i = 0; i < parts; i++) out.push(packet(2, m.seq, m.role, m.kind, i, parts, utf.subarray(i * MAX_BODY, (i + 1) * MAX_BODY)));
+    return out;
+  }
+  function requestPacket(seq) { return packet(3, seq, "guest", "comment", 0, 1, []); }
+  function decodePacket(bytes) {
+    if (bytes.length < 11 || bytes[0] !== 0x42 || bytes[1] !== 0x4D || bytes[2] !== 1) return null;
+    var n = bytes.length - 2; if (crc16(bytes, n) !== ((bytes[n] << 8) | bytes[n + 1])) return null;
+    if (bytes[5] >= ROLE_IDS.length || bytes[6] >= KIND_IDS.length || bytes[7] >= bytes[8]) return null;
+    return { type: bytes[3], seq: bytes[4], role: ROLE_IDS[bytes[5]], kind: KIND_IDS[bytes[6]], part: bytes[7], parts: bytes[8], body: bytes.slice(9, n) };
+  }
+  // 部分に分かれた文章を組み立てる
+  function Assembler() { this.key = ""; this.got = []; }
+  Assembler.prototype.add = function (p) {
+    var key = p.seq + "/" + p.role + "/" + p.kind + "/" + p.parts;
+    if (key !== this.key) { this.key = key; this.got = []; }
+    this.got[p.part] = p.body;
+    for (var i = 0; i < p.parts; i++) if (!this.got[i]) return null;
+    var total = this.got.reduce(function (s, b) { return s + b.length; }, 0), all = new Uint8Array(total), o = 0;
+    this.got.forEach(function (b) { all.set(b, o); o += b.length; });
+    this.key = ""; this.got = [];
+    try { return new TextDecoder("utf-8", { fatal: true }).decode(all); } catch (e) { return null; }
+  };
+  // 検査用: 16 bit PCM の WAV
+  function wav(samples, sr) {
+    var buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf), i;
+    var str = function (o, s) { for (var k = 0; k < s.length; k++) v.setUint8(o + k, s.charCodeAt(k)); };
+    str(0, "RIFF"); v.setUint32(4, 36 + samples.length * 2, true); str(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, samples.length * 2, true);
+    for (i = 0; i < samples.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, samples[i])) * 32767, true);
+    return new Uint8Array(buf);
+  }
+
+  global.BadaTelegraph = { F_SPACE: F_SPACE, F_MARK: F_MARK, BAUD: BAUD, MAX_BODY: MAX_BODY, frameBytes: frameBytes, modulate: modulate, seconds: seconds,
+    Demodulator: Demodulator, crc16: crc16, encodeMessage: encodeMessage, requestPacket: requestPacket, decodePacket: decodePacket, Assembler: Assembler, wav: wav, ROLE_IDS: ROLE_IDS, KIND_IDS: KIND_IDS };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaTelegraph;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/*
+ * acoustic.js — 音響電信で会議の発言をやり取りする (接続の手続きなし。同じ部屋、または通話越し)
+ *
+ * AcousticLink: 送受信の規則 (音声には依存しない。io.transmit にフレーム本体の列を渡す)
+ *   ・発言の通し番号 = 送る時点の議事録の長さ。受け取った側は、自分の議事録の長さと合うものだけ採る
+ *   ・役割の発言は種類 1 のパケット (ハッシュだけ) で送り、受け取った側が自分のエージェントで再現する
+ *   ・議題と人の発言は種類 2 (UTF-8 の文章。複数行可) で送る
+ *   ・次の発言が聞こえなければ送り直す (役割の発言は 3 回まで、文章は 1 回)
+ *   ・先の番号の発言が聞こえたら (= 聞き逃しがある)、足りない番号を要求する。その発言をした端末が送り直す
+ * AcousticAudio: スピーカーで鳴らし、マイクで聞く (ブラウザの WebAudio)
+ */
+(function (global) {
+  "use strict";
+  var req = function (g, f) { return global[g] || (typeof require !== "undefined" ? require(f) : null); };
+  var Tg = req("BadaTelegraph", "./telegraph.js"), E = req("BadaGPTEngine", "../../bada_gpt/src/engine.js");
+  var hash4 = function (text) { return E.sha256(text).slice(0, 4); };
+  var same = function (a, b) { return a.length === b.length && a.every(function (x, i) { return x === b[i]; }); };
+
+  function AcousticLink(opts) {
+    this.meeting = opts.meeting; this.onMessage = opts.onMessage; this.io = opts.io; this.retryMs = opts.retryMs || 6000;
+    this.timers = opts.timers || { set: setTimeout, clear: clearTimeout };
+    this.asm = new Tg.Assembler(); this.last = null; this.timer = null; this.heard = 0; this.sent = {}; this.asked = false;
+  }
+  AcousticLink.prototype.peers = function () { return this.heard ? 1 : 0; };
+  AcousticLink.prototype.send = function (draft) {
+    var mt = this.meeting(), m = Object.assign({}, draft, { seq: draft.kind === "agenda" ? 0 : mt.msgs.length });
+    var byAgent = draft.kind !== "agenda" && draft.kind !== "comment";
+    var packets = Tg.encodeMessage(m, byAgent, byAgent ? hash4(m.text) : null);
+    if (m.kind === "agenda") this.sent = {};
+    this.sent[m.seq] = packets;
+    this.onMessage(m);
+    this.last = { packets: packets, seq: m.seq, left: byAgent ? 3 : 1, text: m.text };
+    this.io.transmit(packets); this._arm();
+  };
+  AcousticLink.prototype._arm = function () {
+    var self = this; this.timers.clear(this.timer);
+    this.timer = this.timers.set(function () {
+      var mt = self.meeting(), l = self.last;
+      if (!l || l.left <= 0 || mt.decided() || mt.msgs.length !== l.seq + 1 || mt.msgs[l.seq].text !== l.text) return;   // 次の発言が来ていれば送り直さない
+      l.left--; self.io.transmit(l.packets); self._arm();
+    }, this.retryMs);
+  };
+  // 復調したフレーム本体を 1 つ受け取る
+  AcousticLink.prototype.receive = function (bytes) {
+    var p = Tg.decodePacket(bytes); if (!p) return;
+    this.heard++;
+    var mt = this.meeting(), self = this;
+    if (p.type === 3) { if (this.sent[p.seq]) this.io.transmit(this.sent[p.seq]); return; }
+    var ahead = (p.seq - mt.msgs.length) & 0xFF;
+    if (ahead >= 1 && ahead <= 127 && !(p.type === 2 && p.kind === "agenda")) {      // 聞き逃しがある: 足りない番号を要求する (3 秒に 1 回まで)
+      if (!this.asked) { this.asked = true; this.timers.set(function () { self.asked = false; }, 3000); this.io.transmit([Tg.requestPacket(mt.msgs.length)]); }
+      return;
+    }
+    if (p.type === 2) {
+      var text = this.asm.add(p); if (text === null) return;
+      if (p.kind === "agenda") { if (!(mt.msgs.length && mt.msgs[0].text === text)) this.onMessage({ seq: 0, role: p.role, kind: "agenda", text: text, data: {} }); }
+      else if (p.seq === (mt.msgs.length & 0xFF)) this.onMessage({ seq: mt.msgs.length, role: p.role, kind: p.kind, text: text, data: {} });
+    } else if (p.type === 1 && p.seq === (mt.msgs.length & 0xFF)) {
+      var d = mt.next(p.role);                                           // 同じ議事録から、同じ発言を自分で作る
+      if (d && d.kind === p.kind && same(Array.from(hash4(d.text)), Array.from(p.body))) this.onMessage(Object.assign({ seq: mt.msgs.length, role: p.role }, d));
+    }
+  };
+
+  function AcousticAudio(onFrame, onState) { this.onFrame = onFrame; this.onState = onState || function () {}; this.ctx = null; this.demod = null; this.muteUntil = 0; this.queue = Promise.resolve(); this.listening = false; }
+  AcousticAudio.prototype.start = async function () {
+    var AC = global.AudioContext || global.webkitAudioContext;
+    this.ctx = this.ctx || new AC(); if (this.ctx.state === "suspended") await this.ctx.resume();
+    this.demod = new Tg.Demodulator(this.ctx.sampleRate, this.onFrame);
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      var self = this, src = this.ctx.createMediaStreamSource(stream), proc = this.ctx.createScriptProcessor(4096, 1, 1), sink = this.ctx.createGain();
+      sink.gain.value = 0;                                                 // マイクの音をスピーカーに戻さない
+      proc.onaudioprocess = function (e) { if (self.ctx.currentTime >= self.muteUntil) self.demod.feed(e.inputBuffer.getChannelData(0)); };   // 自分の送信中は聞かない
+      src.connect(proc); proc.connect(sink); sink.connect(this.ctx.destination);
+      this.stream = stream; this.listening = true; this.onState("受信中 (マイク)");
+    } catch (e) { this.onState("マイクを使えません (送信のみ): " + e.message); }
+  };
+  AcousticAudio.prototype.stop = function () { if (this.stream) this.stream.getTracks().forEach(function (t) { t.stop(); }); this.listening = false; this.onState("停止"); };
+  AcousticAudio.prototype.transmit = function (packets) {
+    var self = this;
+    this.queue = this.queue.then(async function () {
+      if (!self.ctx) return;
+      for (var w = 0; w < 30 && self.listening && self.demod.tone && self.ctx.currentTime >= self.muteUntil; w++) await new Promise(function (r) { setTimeout(r, 100 + Math.random() * 200); });   // ほかの端末が送信中なら待つ
+      for (var i = 0; i < packets.length; i++) {
+        var s = Tg.modulate(packets[i], self.ctx.sampleRate), buf = self.ctx.createBuffer(1, s.length, self.ctx.sampleRate), src = self.ctx.createBufferSource();
+        buf.getChannelData(0).set(s); src.buffer = buf; src.connect(self.ctx.destination);
+        var dur = s.length / self.ctx.sampleRate; self.muteUntil = self.ctx.currentTime + dur + 0.25;
+        self.onState("送信中 (" + dur.toFixed(1) + " 秒)"); src.start();
+        await new Promise(function (r) { src.onended = r; setTimeout(r, dur * 1000 + 500); });
+        await new Promise(function (r) { setTimeout(r, 200); });
+      }
+      self.onState(self.listening ? "受信中 (マイク)" : "送信のみ");
+    });
+    return this.queue;
+  };
+
+  global.BadaAcoustic = { AcousticLink: AcousticLink, AcousticAudio: AcousticAudio, hash4: hash4 };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaAcoustic;
+})(typeof window !== "undefined" ? window : globalThis);
+
 </script>
 <script>
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-  var ROLE_JA = BadaAgents.ROLES, meeting = new BadaMeeting.Meeting(), pending = null;
-  var hub = makeHub(true);
+  var ROLE_JA = BadaAgents.ROLES, meeting = new BadaMeeting.Meeting(), pending = null, audio = null;
+  var bus = makeHub(true);                 // 発言の送り先: Hub (1 台 / WebRTC) または AcousticLink (音響電信)
   function makeHub(host) { return new BadaNet.Hub({ host: host, onMessage: onMessage, onPeers: showStatus }); }
+  function acousticOn() { return bus instanceof BadaAcoustic.AcousticLink; }
   function myRoles() { var r = $("role").value; return r === "all" ? BadaMeeting.ORDER : r === "observer" ? [] : [r]; }
   function showStatus() {
-    var n = hub.peers();
-    $("status").textContent = (hub.host ? (n ? "主催中 · 接続 " + n + " 台" : "1 台で動作中") : (n ? "参加中 · 主催者と接続" : "未接続"));
+    var n = bus.peers();
+    $("status").textContent = acousticOn() ? "音響電信で動作中" : bus.host ? (n ? "主催中 · 接続 " + n + " 台" : "1 台で動作中") : (n ? "参加中 · 主催者と接続" : "未接続");
   }
 
   /* ── 議事録の表示 ── */
@@ -1323,7 +1646,7 @@
     var log = $("log"); log.textContent = "";
     if (!meeting.msgs.length) {
       var e = document.createElement("div"); e.className = "empty";
-      e.textContent = "議題を入力して「議題として送る」を選ぶと、企画・プランナー・アプリケーションエンジニアが会議を始めます。";
+      e.textContent = "議題を書いて Ctrl+Enter を押すと、企画・プランナー・アプリケーションエンジニアが会議を始めます。";
       log.appendChild(e);
     }
     meeting.msgs.forEach(function (m) {
@@ -1331,29 +1654,24 @@
       var who = document.createElement("div"); who.className = "who";
       var b = document.createElement("b"); b.textContent = m.kind === "agenda" ? "議題" : (ROLE_JA[m.role] || m.name || "参加者"); who.appendChild(b);
       if (m.kind !== "agenda") {
-        var s = document.createElement("span");
-        s.textContent = "情報量 H " + m.measure.H.toFixed(2) + " · ずれ D " + m.measure.D.toFixed(2);
-        who.appendChild(s);
+        var s = document.createElement("span"); s.textContent = "情報量 H " + m.measure.H.toFixed(2) + " · ずれ D " + m.measure.D.toFixed(2); who.appendChild(s);
         if (!m.measure.pass) { var o = document.createElement("span"); o.className = "off"; o.textContent = "議題から外れている可能性 (門を通らず)"; who.appendChild(o); }
       }
-      var t = document.createElement("div"); t.textContent = m.text;
+      var t = document.createElement("div"); t.className = "text"; t.textContent = m.text;
       d.appendChild(who); d.appendChild(t); log.appendChild(d);
     });
     log.scrollTop = log.scrollHeight;
-    var st = meeting.stats();
-    $("stats").innerHTML = "";
+    var st = meeting.stats(); $("stats").textContent = "";
     [["発言", st.count], ["全体の情報量 H", st.H.toFixed(2)], ["ずれの平均 D", st.mean_D.toFixed(2)], ["流れ F", st.flow.toFixed(3)], ["門を通らず", st.off_topic]].forEach(function (p) {
       var sp = document.createElement("span"); sp.textContent = p[0] + " "; var bb = document.createElement("b"); bb.textContent = p[1]; sp.appendChild(bb);
       sp.appendChild(document.createTextNode("　")); $("stats").appendChild(sp);
     });
     $("export").disabled = !meeting.msgs.length;
+    $("say").firstChild.textContent = meeting.msgs.length ? "発言する " : "議題として送る ";
   }
 
   /* ── 発言の受信と、役割の自動発言 ── */
-  function onMessage(m) {
-    if (!meeting.add(m)) return;
-    render(); refreshCands(); schedule();
-  }
+  function onMessage(m) { if (!meeting.add(m)) return; render(); refreshCands(); schedule(); showStatus(); }
   function schedule() {
     clearTimeout(pending);
     if (!$("auto").checked || meeting.decided()) return;
@@ -1361,12 +1679,12 @@
       var roles = myRoles();
       for (var i = 0; i < roles.length; i++) {
         var d = meeting.next(roles[i]);
-        if (d) { try { hub.send(Object.assign({ role: roles[i] }, d)); } catch (e) { $("status").textContent = e.message; } return; }
+        if (d) { try { bus.send(Object.assign({ role: roles[i] }, d)); } catch (e) { $("status").textContent = e.message; } return; }
       }
-    }, 600);
+    }, acousticOn() ? 1500 : 600);
   }
   function say(kind) {
-    var text = $("compose").value.trim(); if (!text) return;
+    var text = $("compose").value.replace(/\s+$/, ""); if (!text.trim()) return;
     var role = $("role").value, draft = { role: kind === "agenda" ? "host" : (role === "all" || role === "observer" ? "guest" : role), kind: kind, text: text, data: {} };
     if (kind === "comment") {
       // 役割の案をそのまま送る場合は、案の種類とデータを付ける (他の端末のエージェントが読めるように)
@@ -1378,58 +1696,77 @@
         draft = { role: "host", kind: "agenda", text: base + "、期限は " + dir.deadline_weeks + " 週間", data: {} };
       }
     }
-    try { hub.send(draft); $("compose").value = ""; refreshCands(); } catch (e) { $("status").textContent = e.message; }
+    try { bus.send(draft); $("compose").value = ""; refreshCands(); } catch (e) { $("status").textContent = e.message; }
   }
 
-  /* ── 思念入力: 滞留で確定するタイル ── */
-  var timer = null;
-  function tile(label, ms, onPick, cls, small) {
-    var b = document.createElement("button"); b.type = "button"; b.className = "tile " + (cls || ""); b.style.setProperty("--ms", ms + "ms");
-    var s = document.createElement("span"); s.textContent = label; b.appendChild(s);
-    if (small) { var sm = document.createElement("small"); sm.textContent = small; s.appendChild(sm); }
-    var cancel = function () { clearTimeout(timer); b.classList.remove("dwell"); };
-    b.addEventListener("pointerenter", function (ev) {
-      if (ev.pointerType === "touch") return;            // タッチはタップで確定
-      cancel(); void b.offsetWidth; b.classList.add("dwell");
-      timer = setTimeout(function () { cancel(); onPick(); }, ms);
-    });
-    b.addEventListener("pointerleave", cancel);
-    b.addEventListener("click", function () { cancel(); onPick(); });
-    return b;
-  }
-  function base() { return +$("base").value; }
-  function insert(text) { var c = $("compose"); c.value += text; refreshCands(); }
+  /* ── 候補 (Alt + 数字) ── */
+  var candList = [];
   function refreshCands() {
-    var box = $("cands"); box.textContent = "";
-    var roles = myRoles(), i, d;
-    if (!$("auto").checked) for (i = 0; i < roles.length; i++) {      // 手動のとき: 役割の案を最初の候補に出す
-      d = meeting.next(roles[i]);
-      if (d) { (function (dd, r) { box.appendChild(tile(ROLE_JA[r] + "の案: " + dd.text.slice(0, 46) + "…", Math.round(base() * 0.35), function () { $("compose").value = dd.text; refreshCands(); }, "draft")); })(d, roles[i]); break; }
-    }
-    var cands = BadaThought.predict($("compose").value, BadaThought.lexicon(meeting.msgs), 8);
-    cands.forEach(function (c) {
-      var ms = BadaThought.dwellMs(c, cands.length, base());
-      box.appendChild(tile(c.text, ms, function () { insert(c.insert); }, "", (ms / 1000).toFixed(1) + " 秒"));
-    });
-    var acts = $("acts"); acts.textContent = "";
-    acts.appendChild(tile(meeting.msgs.length ? "発言する" : "議題として送る", base(), function () { say(meeting.msgs.length ? "comment" : "agenda"); }, "act"));
-    if (meeting.msgs.length) acts.appendChild(tile("新しい議題として送る", base(), function () { say("agenda"); }));
-    acts.appendChild(tile("1 文字消す", Math.round(base() * 0.6), function () { var c = $("compose"); c.value = c.value.slice(0, -1); refreshCands(); }));
-    acts.appendChild(tile("全部消す", base(), function () { $("compose").value = ""; refreshCands(); }));
-  }
-  function buildKana() {
-    var k = $("kana"); k.textContent = "";
-    BadaThought.KANA.forEach(function (col) {
-      var c = document.createElement("div"); c.className = "col";
-      Array.from(col).forEach(function (ch) {
-        if (ch === " ") { c.appendChild(document.createElement("span")); return; }
-        c.appendChild(tile(ch === "　" ? "空白" : ch, base(), function () { insert(ch === "　" ? " " : ch); }));
-      });
-      k.appendChild(c);
+    var box = $("cands"); box.textContent = ""; candList = [];
+    var roles = myRoles(), i, d, draft = null;
+    if (!$("auto").checked) for (i = 0; i < roles.length; i++) { d = meeting.next(roles[i]); if (d) { draft = { role: roles[i], d: d }; break; } }
+    var add = function (key, label, cls, pick) {
+      var li = document.createElement("li"); if (cls) li.className = cls;
+      var k = document.createElement("kbd"); k.textContent = "Alt+" + key; li.appendChild(k);
+      li.appendChild(document.createTextNode(label)); box.appendChild(li); candList[key] = pick;
+    };
+    if (draft) add(0, ROLE_JA[draft.role] + "の案: " + draft.d.text.slice(0, 44) + "…", "draft", function () { $("compose").value = draft.d.text; });
+    var line = $("compose").value.split("\n").pop();
+    BadaThought.predict(line, BadaThought.lexicon(meeting.msgs), 8).forEach(function (c, n) {
+      add(n + 1, c.text + "  (" + (c.p * 100).toFixed(0) + "%)", "", function () { $("compose").value += c.insert; });
     });
   }
 
-  /* ── 接続 ── */
+  /* ── 電鍵 (モールス符号) ── */
+  var keyer = new BadaThought.Keyer(120, "kana"), keyOn = false, toneCtx = null, toneOsc = null;
+  function sidetone(on) {
+    try {
+      if (on) {
+        toneCtx = toneCtx || (audio && audio.ctx) || new (window.AudioContext || window.webkitAudioContext)();
+        if (toneOsc) return;
+        var g = toneCtx.createGain(); g.gain.value = 0.08; toneOsc = toneCtx.createOscillator(); toneOsc.frequency.value = 700; toneOsc.connect(g); g.connect(toneCtx.destination); toneOsc.start();
+      } else if (toneOsc) { toneOsc.stop(); toneOsc = null; }
+    } catch (e) { toneOsc = null; }
+  }
+  function keyEvents(evs) {
+    evs.forEach(function (e) {
+      if (e.char) { $("compose").value = BadaThought.append($("compose").value, e.char); $("keystate").textContent = "入力: " + e.char; refreshCands(); }
+      else if (e.unknown) $("keystate").textContent = "符号 " + e.unknown.replace(/\./g, "・").replace(/-/g, "－") + " は" + (keyer.mode === "kana" ? "和文" : "欧文") + "にありません";
+    });
+  }
+  // 打鍵の区切りを見るタイマーは、符号を打っている間だけ動かす
+  var ticker = null;
+  function tickOn() { if (!ticker) ticker = setInterval(function () { keyEvents(keyer.tick(performance.now())); if (keyer.idle(performance.now())) { clearInterval(ticker); ticker = null; } }, 30); }
+  function keyDown() { if (keyer.downAt !== null) return; keyEvents(keyer.down(performance.now())); sidetone(true); $("touchkey").classList.add("down"); tickOn(); }
+  function keyUp() { if (keyer.downAt === null) return; keyer.up(performance.now()); sidetone(false); $("touchkey").classList.remove("down");
+    $("keystate").textContent = keyer.symbol.replace(/\./g, "・").replace(/-/g, "－"); }
+  function setKeyMode(on) {
+    keyOn = on; $("keymode").setAttribute("aria-pressed", String(on));
+    $("keystate").textContent = on ? "電鍵モード: 発言欄で Space を押して打鍵" : "電鍵モードは切です";
+    if (on) $("compose").focus();
+  }
+  function toggleKana() { keyer.setMode(keyer.mode === "kana" ? "latin" : "kana"); $("kana").firstChild.textContent = (keyer.mode === "kana" ? "和文" : "欧文") + " "; }
+  $("keymode").onclick = function () { setKeyMode(!keyOn); };
+  $("kana").onclick = toggleKana;
+  $("unit").oninput = function () { keyer.unit = +$("unit").value; $("unitv").textContent = $("unit").value; };
+  $("compose").addEventListener("keydown", function (e) {
+    if (keyOn && e.code === "Space" && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); if (!e.repeat) keyDown(); }
+  });
+  $("compose").addEventListener("keyup", function (e) { if (keyOn && e.code === "Space") { e.preventDefault(); keyUp(); } });
+  $("touchkey").addEventListener("pointerdown", function (e) { e.preventDefault(); keyDown(); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (n) { $("touchkey").addEventListener(n, keyUp); });
+
+  /* ── 音響電信 (Bada Telegraph の FSK) ── */
+  async function toggleAcoustic() {
+    if (acousticOn()) { audio.stop(); bus = makeHub(true); $("acoustic").setAttribute("aria-pressed", "false"); $("acstate").textContent = ""; showStatus(); return; }
+    audio = new BadaAcoustic.AcousticAudio(function (frame) { link.receive(frame); showStatus(); }, function (t) { $("acstate").textContent = "音響電信: " + t + " — 1000 / 1600 Hz・100 baud"; });
+    var link = new BadaAcoustic.AcousticLink({ meeting: function () { return meeting; }, onMessage: onMessage, io: audio });
+    bus = link; $("acoustic").setAttribute("aria-pressed", "true"); showStatus();
+    await audio.start(); schedule();
+  }
+  $("acoustic").onclick = toggleAcoustic;
+
+  /* ── 接続コード (WebRTC) ── */
   var inviteLink = null;
   $("connect").onclick = function () { $("dlgmsg").textContent = ""; $("dlg").showModal(); };
   $("close").onclick = function () { $("dlg").close(); };
@@ -1438,37 +1775,47 @@
   });
   $("mkinvite").onclick = async function () {
     try {
-      if (!hub.host) { hub = makeHub(true); }
-      var inv = await hub.invite(function () { return meeting.msgs.map(function (m) { var c = Object.assign({}, m); delete c.measure; return c; }); });
+      if (acousticOn() || !bus.host) bus = makeHub(true);
+      var inv = await bus.invite(function () { return meeting.msgs.map(function (m) { var c = Object.assign({}, m); delete c.measure; return c; }); });
       inviteLink = inv.link; $("invite").value = inv.code; $("dlgmsg").textContent = "招待コードを相手に渡してください。";
     } catch (e) { $("dlgmsg").textContent = "招待コードを作れませんでした: " + e.message; }
   };
   $("accept").onclick = async function () {
-    try { await hub.accept(inviteLink, $("answerin").value); $("dlgmsg").textContent = "接続を待っています…"; $("answerin").value = ""; }
+    try { await bus.accept(inviteLink, $("answerin").value); $("dlgmsg").textContent = "接続を待っています…"; $("answerin").value = ""; }
     catch (e) { $("dlgmsg").textContent = "返信コードを読めませんでした。貼り付けた内容を確認してください。"; }
   };
   $("mkanswer").onclick = async function () {
     try {
-      hub = makeHub(false); meeting = new BadaMeeting.Meeting(); render();
+      bus = makeHub(false); meeting = new BadaMeeting.Meeting(); render();
       if ($("role").value === "all") $("role").value = "observer";
-      $("answer").value = await hub.join($("invitein").value); $("dlgmsg").textContent = "返信コードを主催者に渡してください。"; showStatus();
+      $("answer").value = await bus.join($("invitein").value); $("dlgmsg").textContent = "返信コードを主催者に渡してください。"; showStatus();
     } catch (e) { $("dlgmsg").textContent = "招待コードを読めませんでした。貼り付けた内容を確認してください。"; }
   };
 
-  /* ── その他 ── */
-  $("export").onclick = function () {
+  /* ── 保存とキー操作 ── */
+  function exportMinutes() {
+    if (!meeting.msgs.length) return;
     var md = meeting.minutes();
-    if (/; wv\)/.test(navigator.userAgent)) { $("compose").value = md; return; }      // Android WebView: 保存できない場合があるので入力欄に出す
+    if (/; wv\)/.test(navigator.userAgent)) { $("compose").value = md; return; }      // Android WebView: 保存できない場合があるので発言欄に出す
     var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown;charset=utf-8" })); a.download = "meeting-minutes.md";
     document.body.appendChild(a); a.click(); a.remove();
-  };
+  }
+  $("export").onclick = exportMinutes;
+  $("say").onclick = function () { say(meeting.msgs.length ? "comment" : "agenda"); };
+  $("agenda").onclick = function () { say("agenda"); };
   $("compose").addEventListener("input", refreshCands);
-  $("compose").addEventListener("keydown", function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); say(meeting.msgs.length ? "comment" : "agenda"); } });
-  $("base").oninput = function () { $("basev").textContent = (base() / 1000).toFixed(1); buildKana(); refreshCands(); };
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); say(e.shiftKey || !meeting.msgs.length ? "agenda" : "comment"); }
+    else if (e.key === "F2") { e.preventDefault(); setKeyMode(!keyOn); }
+    else if (e.key === "F3") { e.preventDefault(); toggleKana(); }
+    else if (e.key === "F4") { e.preventDefault(); toggleAcoustic(); }
+    else if (e.key === "F6") { e.preventDefault(); exportMinutes(); }
+    else if (e.altKey && /^Digit[0-9]$/.test(e.code)) { var pick = candList[+e.code.slice(5)]; if (pick) { e.preventDefault(); pick(); refreshCands(); $("compose").focus(); } }
+  });
   $("role").onchange = function () { refreshCands(); schedule(); };
   $("auto").onchange = function () { refreshCands(); schedule(); };
-  window.BadaMeetingApp = { meeting: function () { return meeting; }, hub: function () { return hub; } };
-  render(); buildKana(); refreshCands(); showStatus();
+  window.BadaMeetingApp = { meeting: function () { return meeting; }, bus: function () { return bus; }, keyer: keyer };
+  render(); refreshCands(); showStatus(); $("compose").focus();
 })();
 </script>
 </body>
