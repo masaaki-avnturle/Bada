@@ -2197,6 +2197,7 @@
 
 var BADA_ZONE_LIB = "# ============================================================\n# zone-lib.bada -- the zone:// ultra-network runtime as a Bada\n# LIBRARY (functions only, no demo output), so a dedicated\n# browser can drive one navigation at a time.\n#\n# The browser generates, per navigation:\n#     <this library>\n#     NET := zone_boot()\n#     zone_publish(NET, url, content)   # for every page of the site\n#     zone_serve(NET, requested_url)    # emits a machine-parseable block\n#\n# Security is the Jones-polynomial quantum cipher of\n# omega_jones_crypto_pkg (knot -> Kauffman/Jones key -> AEAD) plus a\n# Bell-pair QKD session salt, exactly as in examples/zone.bada.\n# ============================================================\n\nRING := 4096\n\n# ---- L1 sponge: zone:// naming --------------------------------------\ndef str_hash(s) {\n    h := 7\n    i := 0\n    n := len(s)\n    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }\n    return h\n}\ndef zone_id(s) { return str_hash(s) % RING }\n\ndef zone_parse(url) {\n    if (str_find(url, \"zone://\") != 0) { return [] }\n    rest := substr(url, 7, len(url) - 7)\n    cut := str_find(rest, \"/\")\n    if (cut < 0) { return [rest, \"/\", split(rest, \".\")] }\n    host := substr(rest, 0, cut)\n    path := substr(rest, cut, len(rest) - cut)\n    return [host, path, split(host, \".\")]\n}\n\n# ---- L3 key schedule: Jones-polynomial quantum cipher ---------------\ndef ipow(base, e) {\n    if (e < 0) {\n        r := 1.0\n        k := 0\n        m := 0 - e\n        while (k < m) { r := r * base; k := k + 1 }\n        return 1.0 / r\n    }\n    r := 1.0\n    k := 0\n    while (k < e) { r := r * base; k := k + 1 }\n    return r\n}\ndef uf_find(parent, x) {\n    r := x\n    while (parent[r] >= 0) { r := parent[r] }\n    return r\n}\ndef kauffman(cross, A) {\n    n := len(cross)\n    if (n == 0) { return 1.0 }\n    maxlbl := 0\n    i := 0\n    while (i < n) {\n        k := 1\n        while (k <= 4) {\n            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }\n            k := k + 1\n        }\n        i := i + 1\n    }\n    U := maxlbl + 1\n    states := 1\n    p := 0\n    while (p < n) { states := states * 2; p := p + 1 }\n    d := (0 - (A * A)) - (1.0 / (A * A))\n    sum := 0.0\n    bits := []\n    i := 0\n    while (i < n) { bits <- 0; i := i + 1 }\n    st := 0\n    while (st < states) {\n        parent := []\n        q := 0\n        while (q < U) { parent <- (0 - 1); q := q + 1 }\n        a_cnt := 0\n        b_cnt := 0\n        i := 0\n        while (i < n) {\n            e0 := cross[i][1]\n            e1 := cross[i][2]\n            e2 := cross[i][3]\n            e3 := cross[i][4]\n            if (bits[i] == 0) {\n                ra := uf_find(parent, e0)\n                rb := uf_find(parent, e1)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e2)\n                rb := uf_find(parent, e3)\n                if (ra != rb) { parent[ra] = rb }\n                a_cnt := a_cnt + 1\n            } else {\n                ra := uf_find(parent, e1)\n                rb := uf_find(parent, e2)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e3)\n                rb := uf_find(parent, e0)\n                if (ra != rb) { parent[ra] = rb }\n                b_cnt := b_cnt + 1\n            }\n            i := i + 1\n        }\n        seen := []\n        q := 0\n        while (q < U) { seen <- 0; q := q + 1 }\n        loops := 0\n        lbl := 0\n        while (lbl < U) {\n            r := uf_find(parent, lbl)\n            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }\n            lbl := lbl + 1\n        }\n        weight := ipow(A, a_cnt - b_cnt)\n        lf := ipow(d, loops - 1)\n        sum := sum + weight * lf\n        c := 0\n        carry := 1\n        while (c < n && carry == 1) {\n            if (bits[c] == 0) { bits[c] = 1; carry := 0 }\n            else { bits[c] = 0 }\n            c := c + 1\n        }\n        st := st + 1\n    }\n    return sum\n}\ndef jones_key(diagram) {\n    As := [0.8, 1.0, 1.2, 1.5, 2.0]\n    acc := \"jones|\"\n    i := 0\n    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + \"|\"; i := i + 1 }\n    return str_hash(acc)\n}\ndef zone_diagram(host) {\n    if (host == \"bada.or.jp\") {\n        return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,7,8,1], [3,7,8,1,2,1] ]\n    }\n    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]\n}\n\n# ---- keystream AEAD -------------------------------------------------\ndef lcg(state) { return (state * 48271) % 2147483647 }\ndef key_seed(key, salt) {\n    state := (key + salt * 2654435761) % 2147483647\n    if (state <= 0) { state := state + 2147483646 }\n    return state\n}\n# the keystream works on 16-bit code units so any character (incl. CJK)\n# round-trips through encrypt/decrypt.\ndef zone_encrypt(plain, key, salt) {\n    state := key_seed(key, salt)\n    out := []\n    i := 0\n    while (i < len(plain)) {\n        state := lcg(state)\n        out <- (ord(plain, i) + (state % 65536)) % 65536\n        i := i + 1\n    }\n    return out\n}\ndef zone_decrypt(ct, key, salt) {\n    state := key_seed(key, salt)\n    out := \"\"\n    i := 0\n    while (i < len(ct)) {\n        state := lcg(state)\n        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)\n        i := i + 1\n    }\n    return out\n}\ndef zone_tag(ct, key, salt) {\n    h := (key % 999983) + salt + 1\n    i := 0\n    while (i < len(ct)) { h := (h * 31 + ct[i] + 7) % 2147483647; i := i + 1 }\n    return h\n}\ndef zone_seal(plain, key, salt) {\n    ct := zone_encrypt(plain, key, salt)\n    return [ct, salt, zone_tag(ct, key, salt)]\n}\ndef zone_open(sealed, key) {\n    ct := sealed[0]\n    salt := sealed[1]\n    tag := sealed[2]\n    if (zone_tag(ct, key, salt) != tag) { return [] }\n    return [zone_decrypt(ct, key, salt)]\n}\ndef qkd_session() {\n    bell := qubit(2)\n    bell := H(bell, 0)\n    bell := CNOT(bell, 0, 1)\n    outcome := Measure(bell)\n    ok := (outcome[1] == 0) && (outcome[2] == 0)\n    salt := (len(tuplespace) * 131 + 17) % 4096\n    return [ok, salt]\n}\n\n# ---- L2 cream: the P2P ring -----------------------------------------\ndef ring_dist(a, b) {\n    d := a - b\n    if (d < 0) { d := 0 - d }\n    e := RING - d\n    if (e < d) { return e }\n    return d\n}\ndef peer_new(name) { return [name, zone_id(\"peer:\" + name), [], 0] }\ndef net_sort(net) {\n    sorted := []\n    i := 0\n    while (i < len(net)) {\n        p := net[i]\n        pos := len(sorted)\n        found := false\n        j := 0\n        while (j < len(sorted)) {\n            if (!found) { if (p[1] < sorted[j][1]) { pos := j; found := true } }\n            j := j + 1\n        }\n        out := []\n        k := 0\n        while (k < len(sorted)) {\n            if (k == pos) { out <- p }\n            out <- sorted[k]\n            k := k + 1\n        }\n        if (pos == len(sorted)) { out <- p }\n        sorted := out\n        i := i + 1\n    }\n    m := 0\n    while (m < len(sorted)) { sorted[m][3] = m; m := m + 1 }\n    return sorted\n}\ndef peer_neighbors(net, p) {\n    n := len(net)\n    i := p[3]\n    return [ net[(i + 1) % n], net[(i + n - 1) % n], net[(i + 2) % n] ]\n}\ndef dht_nearest(net, key) {\n    best := net[0]\n    bd := ring_dist(best[1], key)\n    i := 1\n    while (i < len(net)) {\n        d := ring_dist(net[i][1], key)\n        if (d < bd) { best := net[i]; bd := d }\n        i := i + 1\n    }\n    return best\n}\ndef zone_route(net, key) {\n    route := []\n    cur := net[0]\n    route <- cur[0]\n    hop := 0\n    moved := true\n    while (moved && hop < 16) {\n        moved := false\n        nb := peer_neighbors(net, cur)\n        best := cur\n        j := 0\n        while (j < 3) {\n            if (ring_dist(nb[j][1], key) < ring_dist(best[1], key)) { best := nb[j] }\n            j := j + 1\n        }\n        if (best[1] != cur[1]) { cur := best; route <- cur[0]; moved := true }\n        hop := hop + 1\n    }\n    return route\n}\ndef store_lookup(store, url) {\n    i := 0\n    while (i < len(store)) {\n        if (store[i][0] == url) { return store[i] }\n        i := i + 1\n    }\n    return []\n}\n\n# ---- boot the ultra network (six peers, no server) ------------------\ndef zone_boot() {\n    raw := []\n    raw <- peer_new(\"tokyo.zone.jp\")\n    raw <- peer_new(\"osaka.zone.jp\")\n    raw <- peer_new(\"nagoya.zone.jp\")\n    raw <- peer_new(\"sapporo.zone.jp\")\n    raw <- peer_new(\"fukuoka.zone.jp\")\n    raw <- peer_new(\"naha.zone.jp\")\n    return net_sort(raw)\n}\n\n# ---- publish (encrypted) --------------------------------------------\ndef zone_publish(net, url, content) {\n    p := zone_parse(url)\n    if (len(p) == 0) { return false }\n    host := p[0]\n    key := zone_id(url)\n    owner := dht_nearest(net, key)\n    jk := jones_key(zone_diagram(host))\n    sess := qkd_session()\n    salt := sess[1]\n    sealed := zone_seal(content, jk, salt)\n    rec := store_lookup(owner[2], url)\n    if (len(rec) == 0) { owner[2] <- [url, sealed[0], sealed[1], sealed[2]] }\n    else { rec[1] = sealed[0]; rec[2] = sealed[1]; rec[3] = sealed[2] }\n    return true\n}\n\n# ---- serve one navigation: emit a machine-parseable block -----------\n# The dedicated browser reads only lines beginning with \"@@\".\ndef zone_serve(net, url) {\n    p := zone_parse(url)\n    if (len(p) == 0) {\n        print(\"@@STATUS 400\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 400 bad-zone\")\n        print(\"not a zone:// URL\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    host := p[0]\n    key := zone_id(url)\n    route := zone_route(net, key)\n    owner := dht_nearest(net, key)\n    print(\"@@HOST\", host)\n    print(\"@@PATH\", p[1])\n    print(\"@@KEY\", key)\n    print(\"@@ROUTE\", route)\n    print(\"@@NODE\", owner[0])\n    sess := qkd_session()\n    if (!sess[0]) {\n        print(\"@@QKD compromised\")\n        print(\"@@STATUS 495\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 495 quantum-channel-compromised\")\n        print(\"the Bell pair lost correlation -- someone is on the wire\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    print(\"@@QKD ok\")\n    rec := store_lookup(owner[2], url)\n    if (len(rec) == 0) {\n        print(\"@@STATUS 404\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 404 zone-not-found\")\n        print(\"no peer on the ring holds \" + url)\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    jk := jones_key(zone_diagram(host))\n    sealed := [ rec[1], rec[2], rec[3] ]\n    opened := zone_open(sealed, jk)\n    if (len(opened) == 0) {\n        print(\"@@STATUS 409\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 409 zone-guard-reject\")\n        print(\"AEAD tag failed: forged/tampered content or wrong knot\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    print(\"@@CIPHER\", rec[1][0], rec[1][1], rec[1][2], len(rec[1]))\n    print(\"@@TAG\", rec[3])\n    print(\"@@JONESKEY\", jk)\n    print(\"@@STATUS 200\")\n    print(\"@@BODY_BEGIN\")\n    print(opened[0])\n    print(\"@@BODY_END\")\n    return opened[0]\n}\n";
 var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: リスク・超過・遅れに触れた発言に印を付け、/risk で一覧、議事録に件数を加える\n#\n# 思念会議のプラグインの見本。Bada 言語の拡張トランザクションで書く。\n# 使えるもの: MINUTES ([役割, 種類, 本文] の配列)、AGENDA、contains(s, sub)、count_of(s, sub)\n\n@reviser : extension bada {\n    fun risk_hit |text| \"\"\"\n        words := [\"リスク\", \"超過\", \"超え\", \"遅れ\", \"懸念\", \"不足\", \"失敗\"]\n        n := 0\n        i := 0\n        while (i < len(words)) {\n            if (contains(text, words[i])) { n := n + 1 }\n            i := i + 1\n        }\n        return n\n    \"\"\"\n    fun risk_total || \"\"\"\n        n := 0\n        i := 0\n        while (i < len(MINUTES)) {\n            if (risk_hit(MINUTES[i][2]) > 0) { n := n + 1 }\n            i := i + 1\n        }\n        return n\n    \"\"\"\n    fun on_message |role, kind, text, seq| \"\"\"\n        if (kind == \"agenda\") { return \"\" }\n        if (risk_hit(text) == 0) { return \"\" }\n        return \"リスクに触れた発言です (これまで \" + (\"\" + risk_total()) + \" 件)\"\n    \"\"\"\n    fun on_command |args| \"\"\"\n        out := \"リスクに触れた発言: \" + (\"\" + risk_total()) + \" 件\"\n        i := 0\n        while (i < len(MINUTES)) {\n            if (risk_hit(MINUTES[i][2]) > 0) { out := out + \"\\n- \" + MINUTES[i][0] + \": \" + substr(MINUTES[i][2], 0, 40) + \"…\" }\n            i := i + 1\n        }\n        return out\n    \"\"\"\n    fun on_minutes |count| \"\"\"\n        return \"- リスク・超過・遅れに触れた発言: \" + (\"\" + risk_total()) + \" 件 / 全 \" + (\"\" + count) + \" 件\"\n    \"\"\"\n}\n","# plugin: tally\n# name: 発言の集計\n# description: 役割ごとの発言数と文字数を /tally と議事録に出す\n\n@reviser : extension bada {\n    fun tally_text || \"\"\"\n        roles := []\n        counts := []\n        chars := []\n        i := 0\n        while (i < len(MINUTES)) {\n            r := MINUTES[i][0]\n            k := 0\n            found := 0 - 1\n            while (k < len(roles)) {\n                if (roles[k] == r) { found := k }\n                k := k + 1\n            }\n            if (found < 0) { roles <- r; counts <- 0; chars <- 0; found := len(roles) - 1 }\n            counts[found] = counts[found] + 1\n            chars[found] = chars[found] + len(MINUTES[i][2])\n            i := i + 1\n        }\n        out := \"\"\n        k := 0\n        while (k < len(roles)) {\n            if (k > 0) { out := out + \"\\n\" }\n            out := out + \"- \" + roles[k] + \": \" + (\"\" + counts[k]) + \" 回、\" + (\"\" + chars[k]) + \" 文字\"\n            k := k + 1\n        }\n        return out\n    \"\"\"\n    fun on_command |args| \"\"\"\n        return tally_text()\n    \"\"\"\n    fun on_minutes |count| \"\"\"\n        return tally_text()\n    \"\"\"\n}\n"];
+var BADA_PREDICT_SEED = ["The global differential manifold entropy invariant is the heart of the Yamaguchi framework.\nThe manifold is a global object and the manifold entropy is the Shannon entropy of a distribution.\nThe zeta function equals the beta function over log x, and the beta function relates the gamma function.\nThe prime numbers are distributed along the critical line of the Riemann zeta function.\nThe unknown prior engine starts from the maximum entropy prior and sharpens it with evidence.\nThe entropy phase cognitive core reweights a softmax distribution by a unit modulus complex factor.\nA confident zero is preserved and cannot be resurrected by any phase step.\nThe reviser commits production rules to the ledger, so the grammar grows like evidence.\nQuantum computation on the phase core makes gates into phase commits and measurement into a ledger commit.\nThe Millennium problems become faces of one framework: Riemann, Poincare, Hodge, Yang Mills, Navier Stokes, Birch Swinnerton Dyer, and P versus NP.\nWord completion and next word prediction help you type faster in English and Japanese.\nNoemaKey is a compact predictive keyboard for programmers and writers.\n","大域的 微分 多様体 の エントロピー 不変量 は ヤマグチ 枠組 の 中心 である。\n多様体 は 大域的 な 対象 であり、多様体 の エントロピー は 分布 の シャノン エントロピー である。\nゼータ 関数 は ベータ 関数 を log x で 割った もの に 等しく、ベータ 関数 は ガンマ 関数 に 関係 する。\n素数 は リーマン ゼータ 関数 の 臨界線 に 沿って 分布 する。\n未知 事前 予知 エンジン は 最大 エントロピー 事前 から 出発 し、証拠 で 鋭化 する。\nエントロピー 位相 認知 コア は ソフトマックス 分布 を 単位 モジュラス 複素 因子 で 再 重み付け する。\n確信 ゼロ は 保存 され、いかなる 位相 ステップ でも 復活 しない。\nリバイザ は 生成 規則 を 台帳 に コミット し、文法 は 証拠 の よう に 成長 する。\n量子 計算 は 位相 コア 上 で ゲート を 位相 コミット に、測定 を 台帳 コミット に する。\nミレニアム 予想 は 一つ の 枠組 の 顔 である。リーマン、ポアンカレ、ホッジ、ヤン ミルズ、ナビエ ストークス、バーチ スウィンナートン ダイアー、そして P 対 NP。\n単語 補完 と 次 単語 予測 は 英語 と 日本語 の 入力 を 速く する。\nNoemaKey は プログラマ と 文筆家 の ため の コンパクト な 予測 キーボード である。\n"];
 /*
  * engine.js — BadaGPT の計算エンジン (依存なし。ブラウザ / Node 共通)
  *
@@ -4091,6 +4092,134 @@ var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: 
 })(typeof window !== "undefined" ? window : globalThis);
 
 /*
+ * badapredict.js — Bada Predict: 単語の補完と、次の単語の先読み
+ *
+ * Bada Precog (bada_apk、ブランチ claude/bada-prediction-engine-in0dfk) の Predictor.kt の移植。
+ *   ・読み込んだ文章から 1-gram / 2-gram / 3-gram の回数を数える (train)
+ *   ・入力中の語の続きを補完する (complete)。区切りのあとでは次の語を先読みする (predictNext)。
+ *     3-gram の証拠を優先し (重み 3)、無ければ 2-gram、それも無ければ頻出語
+ *   ・候補の確率は softmax(log(回数 + 1))。元の実装が掛けるエントロピー位相は確率を変えないので、ここでは省いている
+ *   ・打った語をその場で学ぶ (observe)
+ * 元の実装に足したもの: 日本語の文は語の間に空白が無いので、字種 (漢字・ひらがな・カタカナ・英数字) の
+ * 変わり目で区切ってから数える (segment)。形態素解析ではないので、区切りは粗い。
+ */
+(function (global) {
+  "use strict";
+  var WORD_RE = /[A-Za-z][A-Za-z0-9'\-]*|[぀-ゟ゠-ヿ一-鿿々ー]+/g;
+  var TAIL_RE = /([A-Za-z0-9'\-]+|[぀-ゟ゠-ヿ一-鿿々ー]+)$/;
+  function softmax(z) {
+    if (!z.length) return [];
+    var m = Math.max.apply(null, z), e = z.map(function (v) { return Math.exp(v - m); }), s = e.reduce(function (a, b) { return a + b; }, 0) || 1;
+    return e.map(function (v) { return v / s; });
+  }
+  // 字種の変わり目に空白を入れる (漢字 / ひらがな / カタカナ・長音 / 英数字)
+  function segment(text) {
+    var cls = function (ch) {
+      var c = ch.charCodeAt(0);
+      if ((c >= 0x4E00 && c <= 0x9FFF) || c === 0x3005) return "K";
+      if (c >= 0x3040 && c <= 0x309F) return "H";
+      if ((c >= 0x30A0 && c <= 0x30FF)) return "T";
+      if (/[A-Za-z0-9'\-]/.test(ch)) return "L";
+      return " ";
+    };
+    var out = "", prev = " ";
+    Array.from(String(text)).forEach(function (ch) {
+      var k = cls(ch);
+      if (k !== prev && k !== " " && prev !== " ") out += " ";
+      out += k === " " ? " " : ch; prev = k;
+    });
+    return out.replace(/\s+/g, " ").trim();
+  }
+
+  function Predictor(maxCandidates) { this.max = maxCandidates || 8; this.unigram = new Map(); this.bigram = new Map(); this.trigram = new Map(); this.totalTokens = 0; }
+  var P = Predictor.prototype;
+  P.tokenize = function (text) { return String(text).match(WORD_RE) || []; };
+  var bump = function (map, key, t) { var m = map.get(key); if (!m) { m = new Map(); map.set(key, m); } m.set(t, (m.get(t) || 0) + 1); };
+  P.train = function (text) {
+    var self = this, prev = null, prev2 = null;
+    this.tokenize(text).forEach(function (t) {
+      self.unigram.set(t, (self.unigram.get(t) || 0) + 1); self.totalTokens++;
+      if (prev !== null) { bump(self.bigram, prev, t); if (prev2 !== null) bump(self.trigram, prev2 + " " + prev, t); }
+      prev2 = prev; prev = t;
+    });
+    return this;
+  };
+  P.observe = function (word) { if (String(word).trim()) this.train(word); };
+  P._rank = function (cands, k, kind) {
+    if (!cands.length) return [];
+    var top = cands.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, Math.max(k * 4, k));
+    var p = softmax(top.map(function (c) { return Math.log(c[1] + 1); }));
+    return top.map(function (c, i) { return { word: c[0], probability: p[i], kind: kind }; }).sort(function (a, b) { return b.probability - a.probability; }).slice(0, k);
+  };
+  P.complete = function (prefix, k) {
+    k = k || this.max; if (!prefix) return [];
+    var ascii = prefix.charCodeAt(0) < 128, p = ascii ? prefix.toLowerCase() : prefix, hits = [];
+    this.unigram.forEach(function (c, w) {
+      if (w === prefix) return;
+      var cand = ascii ? w.toLowerCase() : w;
+      if (cand.indexOf(p) === 0 && cand.length > p.length) hits.push([w, c]);
+    });
+    return this._rank(hits, k, "complete");
+  };
+  P.predictNext = function (context, k) {
+    k = k || this.max;
+    var last = context.length ? context[context.length - 1] : null, prev = context.length >= 2 ? context[context.length - 2] : null, counts = new Map(), kind = "unigram";
+    var tri = last !== null && prev !== null ? this.trigram.get(prev + " " + last) : null, bi = last !== null ? this.bigram.get(last) : null;
+    if (tri) { tri.forEach(function (c, w) { counts.set(w, (counts.get(w) || 0) + c * 3); }); kind = "trigram"; }
+    if (bi) { bi.forEach(function (c, w) { counts.set(w, (counts.get(w) || 0) + c); }); if (kind === "unigram") kind = "bigram"; }
+    if (!counts.size) Array.from(this.unigram.entries()).sort(function (a, b) { return b[1] - a[1]; }).slice(0, k * 2).forEach(function (e) { counts.set(e[0], e[1]); });
+    return this._rank(Array.from(counts.entries()), k, kind);
+  };
+  // 入力位置より左の文字列 left から: 語の途中なら補完、区切りのあとなら次の語
+  P.suggest = function (left, k) {
+    k = k || this.max;
+    var m = TAIL_RE.exec(left);
+    if (m) {
+      var partial = m[0], ctx = this.tokenize(left.slice(0, left.length - partial.length)), comp = this.complete(partial, k);
+      return comp.length ? comp : this.predictNext(ctx.concat([partial]), k);
+    }
+    return this.predictNext(this.tokenize(left), k);
+  };
+
+  /* ── 思念会議のプラグイン ── */
+  function makePlugin(seeds) {
+    var pr = new Predictor(8), seen = {};
+    (seeds || []).forEach(function (s) { pr.train(s); });
+    var seedTokens = pr.totalTokens;
+    // 候補: {text 表示, insert 発言欄に足す文字列, p 確率, kind}
+    function suggest(left) {
+      var line = String(left).split("\n").pop(), endsOpen = /[A-Za-z0-9぀-ヿ一-鿿々]$/.test(line), seg = segment(line), parts = seg ? seg.split(" ") : [];
+      var partial = endsOpen && parts.length ? parts[parts.length - 1] : "", list = pr.suggest(seg + (endsOpen ? "" : " "), 8);
+      if (!line.trim() || (list.length && list[0].kind === "unigram")) return [];      // 手掛かりが無いとき (頻出語しか出せないとき) は候補を出さない
+      return list.map(function (s) {
+        var done = s.kind === "complete", latin = /^[A-Za-z]/.test(s.word);
+        var insert = done ? s.word.slice(partial.length) : (latin && line && !/\s$/.test(line) ? " " : "") + s.word;
+        return { text: done ? s.word : "→ " + s.word, insert: insert, p: s.probability, kind: s.kind };
+      }).filter(function (c) { return c.insert; });
+    }
+    return {
+      id: "predict", name: "Bada Predict", kind: "native", predictor: pr, suggest: suggest,
+      description: "単語の補完と次の単語の先読みを入力候補に出す (n-gram。発言を読んでその場で学ぶ)。/predict 文 で候補と確率を表示",
+      onMessage: function (m) {                                   // 発言を 1 度だけ学ぶ (注記は付けない)
+        var key = m.seq + "|" + m.text; if (!seen[key]) { seen[key] = true; pr.train(segment(m.text)); }
+        return null;
+      },
+      onSuggest: function (left) { return suggest(left); },
+      onCommand: function (args) {
+        if (!args.trim()) return "語彙 " + pr.unigram.size + " 語 / 学んだ語 " + pr.totalTokens + " 個 (うち同梱の種 " + seedTokens + " 個)。使い方: /predict 文の途中まで";
+        var list = suggest(args);
+        if (!list.length) return "候補がありません。";
+        var names = { complete: "補完", trigram: "3-gram", bigram: "2-gram", unigram: "頻出語" };
+        return "「" + args + "」の続き (" + names[list[0].kind] + "):\n" + list.map(function (c) { return "- " + c.text.replace(/^→ /, "") + "  " + (c.p * 100).toFixed(1) + "%"; }).join("\n");
+      }
+    };
+  }
+
+  global.BadaPredict = { Predictor: Predictor, segment: segment, softmax: softmax, makePlugin: makePlugin };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaPredict;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/*
  * plugins.js — 思念会議のプラグイン機構 (拡張機能)
  *
  * プラグインには 2 種類ある。
@@ -4104,6 +4233,7 @@ var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: 
  *   on_message |role, kind, text, seq|   発言が議事録に入るたび。返した文字列が、その発言の「注記」になる
  *   on_command |args|                    発言欄で /<id> 引数 と打ったとき。返した文字列をその端末だけに表示する
  *   on_minutes |count|                   議事録を書き出すとき。返した文字列が、議事録の 1 節になる
+ *   on_suggest |left|                    発言欄の内容が変わるたび。入力候補を返す (Bada プラグインは 1 行に 1 候補)
  * Bada プラグインからは、議事録 MINUTES ([役割, 種類, 本文] の配列) と議題 AGENDA、
  * 補助関数 contains(s, sub) / count_of(s, sub) が使える。数値を文字にするには "" + n と書く。
  *
@@ -4123,7 +4253,7 @@ var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: 
     "    while (p >= 0) { n := n + 1; rest := substr(rest, p + len(sub), len(rest) - p - len(sub)); p := str_find(rest, sub) }",
     "    return n",
     "}", ""].join("\n");
-  var HOOKS = ["on_message", "on_command", "on_minutes"], MAX_SOURCE = 20000, MAX_STEPS = 3000000;
+  var HOOKS = ["on_message", "on_command", "on_minutes", "on_suggest"], MAX_SOURCE = 20000, MAX_STEPS = 3000000;
   var lit = function (s) { return JSON.stringify(String(s)); };
 
   function header(src, key) { var m = String(src).match(new RegExp("^\\s*#\\s*" + key + "\\s*:\\s*(.+)$", "m")); return m ? m[1].trim() : ""; }
@@ -4141,13 +4271,17 @@ var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: 
     if (!/@reviser\s*:\s*extension\s+bada\s*\{/.test(src)) return { ok: false, error: "@reviser : extension bada { … } の形で書いてください" };
     if (/@reviser\s*:\s*extension\s+(c|python|java)\b/.test(src)) return { ok: false, error: "このアプリで動くのは bada の拡張だけです" };
     var hooks = HOOKS.filter(function (h) { return new RegExp("fun\\s+" + h + "\\s*\\|").test(src); });
-    if (!hooks.length) return { ok: false, error: "フック (on_message / on_command / on_minutes) が 1 つもありません" };
+    if (!hooks.length) return { ok: false, error: "フック (on_message / on_command / on_minutes / on_suggest) が 1 つもありません" };
     var r = this.Bada.run(PRELUDE + 'MINUTES := []\nAGENDA := ""\n' + src, { maxSteps: MAX_STEPS });
     if (!r.ok) return { ok: false, error: "Bada の実行エラー: " + (r.error || (r.parseErrors || []).join("; ")) };
     var p = { id: id, name: header(src, "name") || id, description: header(src, "description"), kind: "bada", builtin: !!builtin, source: src, hooks: hooks, enabled: true, errors: 0 };
     var call = function (hook, args, ctx) { return self._call(p, hook, args, ctx); };
     if (hooks.indexOf("on_message") >= 0) p.onMessage = function (m, ctx) { return call("on_message", [lit(m.role || ""), lit(m.kind), lit(m.text), String(m.seq | 0)], ctx); };
     if (hooks.indexOf("on_command") >= 0) p.onCommand = function (args, ctx) { return call("on_command", [lit(args)], ctx); };
+    if (hooks.indexOf("on_suggest") >= 0) p.onSuggest = function (left, ctx) {
+      var out = call("on_suggest", [lit(left)], ctx); if (!out) return [];
+      return out.split("\n").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 8).map(function (x) { return { text: x, insert: x, p: 0 }; });
+    };
     if (hooks.indexOf("on_minutes") >= 0) p.onMinutes = function (ctx) { return call("on_minutes", [String(ctx.msgs.length)], ctx); };
     this.plugins = this.plugins.filter(function (x) { return x.id !== id; }); this.plugins.push(p); this.onChange();
     return { ok: true, plugin: p };
@@ -4169,6 +4303,16 @@ var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: 
   H.notes = function (m, ctx) {
     var self = this, out = [];
     this.active().forEach(function (p) { if (p.onMessage) { var t = self._safe(p, function () { return p.onMessage(m, ctx); }); if (t) out.push({ id: p.id, name: p.name, text: t }); } });
+    return out;
+  };
+  // 入力候補: 入になっているプラグインの on_suggest を集める。[{text, insert, p, from}]
+  H.suggest = function (left, ctx) {
+    var out = [];
+    this.active().forEach(function (p) {
+      if (!p.onSuggest) return;
+      try { (p.onSuggest(left, ctx) || []).forEach(function (c) { if (c && c.insert) out.push({ text: String(c.text || c.insert), insert: String(c.insert), p: +c.p || 0, from: p.name }); }); p.errors = 0; }
+      catch (e) { p.errors++; if (p.errors >= 3) p.enabled = false; }
+    });
     return out;
   };
   // "/id 引数" → {name, text}。プラグインの命令でなければ null
@@ -4217,6 +4361,7 @@ var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: 
   var plugReady = false;                  // 起動時の読み込みが済むまでは保存しない (保存してある内容を上書きしないように)
   var plugins = new BadaPlugins.Host(BadaLang, { onChange: function () { noteCache = {}; if (plugReady) { try { localStorage.setItem("badameeting:plugins", plugins.save()); } catch (e) { } } } });
   plugins.addNative(BadaXP.plugin);
+  plugins.addNative(BadaPredict.makePlugin(BADA_PREDICT_SEED));
   BADA_PLUGINS.forEach(function (src) { plugins.addBada(src, true); });
   try { var saved = localStorage.getItem("badameeting:plugins"); if (saved) plugins.load(saved); } catch (e) { }
   noteCache = {}; plugReady = true;
@@ -4342,9 +4487,12 @@ var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: 
       box.appendChild(tile(label, ms, act, cls, "Alt+" + key)); candList[key] = pick;
     };
     if (draft) add(0, ROLE_JA[draft.role] + "の案: " + draft.d.text.slice(0, 44) + "…", "draft", Math.round(base() * 0.35), function () { $("compose").value = draft.d.text; });
-    var line = $("compose").value.split("\n").pop(), cands = BadaThought.predict(line, BadaThought.lexicon(meeting.msgs), 8);
+    // プラグインの候補 (Bada Predict など) を先に 4 つまで、残りを定型句と議事録の語句で埋める
+    var line = $("compose").value.split("\n").pop(), used = {}, cands = [];
+    plugins.suggest($("compose").value, plugCtx()).slice(0, 4).forEach(function (c) { if (!used[c.insert]) { used[c.insert] = true; c.surprisal = -Math.log(Math.max(c.p, 1e-6)); cands.push(c); } });
+    BadaThought.predict(line, BadaThought.lexicon(meeting.msgs), 8).forEach(function (c) { if (!used[c.insert] && cands.length < 8) { used[c.insert] = true; cands.push(c); } });
     cands.forEach(function (c, n) {
-      add(n + 1, c.text + "  (" + (c.p * 100).toFixed(0) + "%)", "", BadaThought.dwellMs(c, cands.length, base()), function () { $("compose").value += c.insert; });
+      add(n + 1, c.text + (c.p ? "  (" + (c.p * 100).toFixed(0) + "%)" : "") + (c.from ? "  — " + c.from : ""), "", BadaThought.dwellMs(c, cands.length, base()), function () { $("compose").value += c.insert; });
     });
   }
 

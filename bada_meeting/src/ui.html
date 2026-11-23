@@ -171,6 +171,7 @@
   var plugReady = false;                  // 起動時の読み込みが済むまでは保存しない (保存してある内容を上書きしないように)
   var plugins = new BadaPlugins.Host(BadaLang, { onChange: function () { noteCache = {}; if (plugReady) { try { localStorage.setItem("badameeting:plugins", plugins.save()); } catch (e) { } } } });
   plugins.addNative(BadaXP.plugin);
+  plugins.addNative(BadaPredict.makePlugin(BADA_PREDICT_SEED));
   BADA_PLUGINS.forEach(function (src) { plugins.addBada(src, true); });
   try { var saved = localStorage.getItem("badameeting:plugins"); if (saved) plugins.load(saved); } catch (e) { }
   noteCache = {}; plugReady = true;
@@ -296,9 +297,12 @@
       box.appendChild(tile(label, ms, act, cls, "Alt+" + key)); candList[key] = pick;
     };
     if (draft) add(0, ROLE_JA[draft.role] + "の案: " + draft.d.text.slice(0, 44) + "…", "draft", Math.round(base() * 0.35), function () { $("compose").value = draft.d.text; });
-    var line = $("compose").value.split("\n").pop(), cands = BadaThought.predict(line, BadaThought.lexicon(meeting.msgs), 8);
+    // プラグインの候補 (Bada Predict など) を先に 4 つまで、残りを定型句と議事録の語句で埋める
+    var line = $("compose").value.split("\n").pop(), used = {}, cands = [];
+    plugins.suggest($("compose").value, plugCtx()).slice(0, 4).forEach(function (c) { if (!used[c.insert]) { used[c.insert] = true; c.surprisal = -Math.log(Math.max(c.p, 1e-6)); cands.push(c); } });
+    BadaThought.predict(line, BadaThought.lexicon(meeting.msgs), 8).forEach(function (c) { if (!used[c.insert] && cands.length < 8) { used[c.insert] = true; cands.push(c); } });
     cands.forEach(function (c, n) {
-      add(n + 1, c.text + "  (" + (c.p * 100).toFixed(0) + "%)", "", BadaThought.dwellMs(c, cands.length, base()), function () { $("compose").value += c.insert; });
+      add(n + 1, c.text + (c.p ? "  (" + (c.p * 100).toFixed(0) + "%)" : "") + (c.from ? "  — " + c.from : ""), "", BadaThought.dwellMs(c, cands.length, base()), function () { $("compose").value += c.insert; });
     });
   }
 

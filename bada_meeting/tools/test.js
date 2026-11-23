@@ -299,6 +299,33 @@ ok(/エラー: .*budget/.test(n1.find(n => n.id === "spin").text) && /止めま�
 ok(n1.some(n => n.id === "xp") && host.notes(plain[4], pctx).every(n => n.id !== "spin"), "ほかのプラグインは影響を受けない");
 ok(changes > 0, "変更は onChange で通知される (保存用)");
 
+console.log("Bada Predict (Bada Precog の Predictor の移植)");
+const BP = require("../src/badapredict.js"), seedDir = path.join(__dirname, "..", "src", "seed"), seedTexts = fs.readdirSync(seedDir).sort().map(f => fs.readFileSync(path.join(seedDir, f), "utf8"));
+const prd = new BP.Predictor(8); seedTexts.forEach(t => prd.train(t));
+ok(prd.complete("man")[0].word === "manifold" && prd.complete("多様")[0].word === "多様体", "補完: man → manifold、多様 → 多様体 (元の説明どおり)");
+ok(prd.complete("MAN")[0].word === "manifold" && prd.complete("").length === 0 && prd.complete("zzz").length === 0, "英字は大文字小文字を区別しない。該当なしは空");
+const nx = prd.predictNext(["ゼータ"]);
+ok(nx[0].word === "関数" && nx[0].kind === "bigram" && near(nx.reduce((a, c) => a + c.probability, 0), 1, 1e-9), "次の語: ゼータ → 関数 (2-gram)。確率の合計は 1");
+ok(prd.predictNext(["リーマン", "ゼータ"])[0].kind === "trigram" && prd.predictNext(["存在しない語"])[0].kind === "unigram", "3-gram を優先し、証拠が無ければ頻出語に戻る");
+const tiny = new BP.Predictor(4); tiny.train("a b a b a c");
+const tn = tiny.predictNext(["a"]);
+ok(tn[0].word === "b" && near(tn[0].probability, 3 / 5) && near(tn[1].probability, 2 / 5), "確率は softmax(log(回数 + 1)) = (回数 + 1) の比", JSON.stringify(tn));
+ok(prd.suggest("the man")[0].word === "manifold" && prd.suggest("ゼータ ")[0].word === "関数", "suggest: 語の途中なら補完、区切りのあとなら次の語");
+const before = prd.predictNext(["予約"]).map(c => c.word).join(); prd.observe("予約 取り消し"); prd.observe("予約 取り消し");
+ok(prd.predictNext(["予約"])[0].word === "取り消し" && before.indexOf("取り消し") < 0, "observe: 打った語をその場で学ぶ");
+ok(BP.segment("スマホ向けの予約アプリを3か月で作りたい。OK?") === "スマホ 向 けの 予約 アプリ を 3 か 月 で 作 りたい OK", "字種の変わり目で区切る (粗い区切り)", BP.segment("スマホ向けの予約アプリを3か月で作りたい。OK?"));
+const predict = BP.makePlugin(seedTexts), host2 = new Pl.Host(Bada); host2.addNative(predict);
+plain.forEach(m => host2.notes(m, pctx)); const learned = predict.predictor.totalTokens; plain.forEach(m => host2.notes(m, pctx));
+ok(learned > 369 && predict.predictor.totalTokens === learned && host2.notes(plain[1], pctx).length === 0, "プラグイン: 発言を 1 度だけ学び、注記は付けない");
+const sg = host2.suggest("期限は13週間です。\n予約と", pctx);
+ok(sg.length > 0 && sg[0].from === "Bada Predict" && sg[0].insert === "取" && sg[0].p > 0.3, "フック on_suggest: 会議で出た語の続きを入力候補に出す (最後の行から)", JSON.stringify(sg.slice(0, 2)));
+ok(host2.suggest("the man", pctx)[0].insert === "ifold" && host2.suggest("", pctx).length === 0 && host2.suggest("こんにちは。", pctx).length === 0, "補完は残りの文字だけを足す。手掛かりが無ければ候補を出さない");
+ok(/「予約」の続き \(補完\):\n- 予約\S+ +\d+\.\d%/.test(host2.command("/predict 予約", pctx).text) && /語彙 \d+ 語/.test(host2.command("/predict", pctx).text), "/predict が候補と確率を表示する", host2.command("/predict 予約", pctx).text);
+const sugBada = '# plugin: quick\n# name: 定型\n@reviser : extension bada {\n    fun on_suggest |left| """\n        if (contains(left, "期限")) { return "を延ばしましょう\\nを守りましょう" }\n        return ""\n    """\n}\n';
+ok(host2.addBada(sugBada, false).ok && host2.suggest("期限", pctx).filter(c => c.from === "定型").map(c => c.insert).join("|") === "を延ばしましょう|を守りましょう" && !host2.suggest("予算", pctx).some(c => c.from === "定型"), "Bada プラグインも on_suggest で入力候補を足せる (1 行に 1 候補)");
+host2.setEnabled("predict", false);
+ok(!host2.suggest("the man", pctx).some(c => c.from === "Bada Predict"), "切にすると候補を出さない");
+
 console.log("配布 HTML");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 ok(!/(src|href)\s*=\s*["']https?:/.test(html) && !/stun:/.test(html), "外部の資源も STUN サーバーも参照しない");
@@ -307,7 +334,7 @@ const multiMt = M.runLocal("スマホ向けの予約アプリを\n3か月で作�
 ok(multiMt.decided() && /\*\*議題\*\*: スマホ向けの予約アプリを \/ 3か月で作りたい/.test(multiMt.minutes()), "複数行の議題でも会議が成り立ち、議事録に収まる");
 const scripts = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g), m => m[1]);
 const sb = { console, TextEncoder, TextDecoder }; sb.window = sb; vm.createContext(sb);
-try { vm.runInContext(scripts[0], sb); ok(["BadaEntropy", "BadaAgents", "BadaMeeting", "BadaThought", "BadaNet", "BadaTelegraph", "BadaAcoustic", "BadaZone", "BadaP2P", "BadaLang", "BADA_ZONE_LIB", "BadaXP", "BadaPlugins", "BADA_PLUGINS"].every(k => sb[k]), "埋め込んだライブラリが読み込める"); }
+try { vm.runInContext(scripts[0], sb); ok(["BadaEntropy", "BadaAgents", "BadaMeeting", "BadaThought", "BadaNet", "BadaTelegraph", "BadaAcoustic", "BadaZone", "BadaP2P", "BadaLang", "BADA_ZONE_LIB", "BadaXP", "BadaPlugins", "BADA_PLUGINS", "BadaPredict", "BADA_PREDICT_SEED"].every(k => sb[k]), "埋め込んだライブラリが読み込める"); }
 catch (e) { ok(false, "埋め込んだライブラリが読み込める", e.message); }
 try { new vm.Script(scripts[1]); ok(true, "画面のスクリプトの構文"); } catch (e) { ok(false, "画面のスクリプトの構文", e.message); }
 

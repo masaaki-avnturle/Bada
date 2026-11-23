@@ -77,13 +77,23 @@ const paste = async (p, sel, text) => { await p.focus(sel); await p.keyboard.ins
   await type(pg, "/xp リーマン予想とは"); await pg.keyboard.press("Control+Enter");
   await pg.waitForFunction(() => document.querySelectorAll(".msg.local").length === 2);
   ok(/Ξ=0\.\d{4}/.test(await pg.locator(".msg.local .text").last().innerText()), "/xp で Bada XP が応答する");
+  // Bada Predict: 会議で出た語の続きが入力候補に出る
+  await type(pg, "予約と");
+  const cand1 = await pg.locator("#cands .tile").first().innerText();
+  ok(/→ 取/.test(cand1) && /Bada Predict/.test(cand1), "Bada Predict の先読みが入力候補の先頭に出る", cand1);
+  await pg.keyboard.press("Alt+1");
+  ok((await pg.inputValue("#compose")) === "予約と取", "Alt+1 で先読みを入れられる", await pg.inputValue("#compose"));
+  await pg.keyboard.press("Control+a"); await pg.keyboard.press("Backspace");
+  await type(pg, "/predict 予約"); await pg.keyboard.press("Control+Enter");
+  await pg.waitForFunction(() => document.querySelectorAll(".msg.local").length === 3);
+  ok(/「予約」の続き/.test(await pg.locator(".msg.local .text").last().innerText()), "/predict で候補と確率を表示する");
   await pg.keyboard.press("F9"); await press(pg, "#plugsample"); await press(pg, "#plugadd");
-  ok(/\/hello \(あいさつ\) を入れました/.test(await pg.locator("#plugmsg").innerText()) && (await pg.locator("#pluglist .p").count()) === 4, "F9 の画面で Bada プラグインを追加できる", await pg.locator("#plugmsg").innerText());
+  ok(/\/hello \(あいさつ\) を入れました/.test(await pg.locator("#plugmsg").innerText()) && (await pg.locator("#pluglist .p").count()) === 5, "F9 の画面で Bada プラグインを追加できる", await pg.locator("#plugmsg").innerText());
   await pg.focus('#pluglist input[data-plugin="xp"]'); await pg.keyboard.press("Space"); await pg.keyboard.press("Escape");
   const after = await pg.locator("#log .plug").allInnerTexts();
   ok(!after.some(t => /^Bada XP/.test(t)) && after.some(t => /^あいさつ\s+決定です/.test(t)) && after.some(t => /^リスク見張り/.test(t)), "Bada XP を切にすると注記が消え、追加したプラグインの注記が出る", after.join(" | ").slice(0, 200));
   await type(pg, "/hello 山口"); await pg.keyboard.press("Control+Enter");
-  await pg.waitForFunction(() => document.querySelectorAll(".msg.local").length === 3);
+  await pg.waitForFunction(() => document.querySelectorAll(".msg.local").length === 4);
   ok((await pg.locator(".msg.local .text").last().innerText()) === "こんにちは、山口 さん。", "追加したプラグインの命令が動く");
   await pg.keyboard.press("Alt+9");
   ok((await pg.inputValue("#compose")) === "こんにちは、山口 さん。", "Alt+9 で直前のプラグインの出力を発言欄に入れられる");
@@ -92,7 +102,7 @@ const paste = async (p, sel, text) => { await p.focus(sel); await p.keyboard.ins
   const saved = fs.readFileSync(await pdl.path(), "utf8");
   ok(/## プラグイン: リスク見張り/.test(saved) && /## プラグイン: 発言の集計/.test(saved) && !/## プラグイン: Bada XP/.test(saved), "保存した議事録に、入になっているプラグインの節が加わる");
   await pg.reload(); await pg.keyboard.press("F9");
-  ok((await pg.locator("#pluglist .p").count()) === 4 && !(await pg.locator('#pluglist input[data-plugin="xp"]').isChecked()) && (await pg.locator('#pluglist input[data-plugin="hello"]').isChecked()), "開き直しても、追加したプラグインと入 / 切が残る");
+  ok((await pg.locator("#pluglist .p").count()) === 5 && !(await pg.locator('#pluglist input[data-plugin="xp"]').isChecked()) && (await pg.locator('#pluglist input[data-plugin="hello"]').isChecked()), "開き直しても、追加したプラグインと入 / 切が残る");
   ok(!(await pg.evaluate(() => document.documentElement.scrollWidth > innerWidth)), "横スクロールが出ない (プラグイン)");
   if (shots) await pg.screenshot({ path: path.join(shots, "meeting-plugins.png") });
   await pg.evaluate(() => localStorage.removeItem("badameeting:plugins")); await pg.close();
@@ -174,7 +184,7 @@ const paste = async (p, sel, text) => { await p.focus(sel); await p.keyboard.ins
   await A.keyboard.press("Escape"); await sleep(500);
   await B.keyboard.press("F9"); await paste(B, "#plugid", "hello"); await press(B, "#plugget");
   await B.waitForFunction(() => /# plugin: hello/.test(document.getElementById("plugsrc").value), null, { timeout: 10000 });
-  ok((await B.locator("#pluglist .p").count()) === 3, "別の端末が取得しても、確かめて「追加」を押すまでは入らない");
+  ok((await B.locator("#pluglist .p").count()) === 4, "別の端末が取得しても、確かめて「追加」を押すまでは入らない");
   await press(B, "#plugadd"); await B.keyboard.press("Escape");
   await type(B, "/hello"); await B.keyboard.press("Control+Enter"); await B.waitForSelector(".msg.local");
   ok(/こんにちは。議事録は 10 件です。/.test(await B.locator(".msg.local .text").last().innerText()), "取得したプラグインが別の端末で動く");

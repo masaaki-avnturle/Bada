@@ -11,7 +11,10 @@ const zoneLib = "var BADA_ZONE_LIB = " + JSON.stringify(ide("browser/zone-lib.ba
 // 同梱する Bada プラグイン (src/plugins/*.bada)
 const plugDir = path.join(root, "src", "plugins");
 const bundled = "var BADA_PLUGINS = " + JSON.stringify(fs.readdirSync(plugDir).filter(f => f.endsWith(".bada")).sort().map(f => fs.readFileSync(path.join(plugDir, f), "utf8"))) + ";";
-const libs = [ide("www/bada.js"), zoneLib, bundled, fs.readFileSync(path.join(root, "..", "bada_gpt", "src", "engine.js"), "utf8"), rd("entropy.js"), rd("agents.js"), rd("meeting.js"), rd("thought.js"), rd("net.js"), rd("telegraph.js"), rd("acoustic.js"), rd("zone.js"), rd("p2p.js"), rd("badaxp.js"), rd("plugins.js")].join("\n");
+// Bada Predict の種 (Bada Precog の seed コーパス)
+const seedDir = path.join(root, "src", "seed");
+const seeds = "var BADA_PREDICT_SEED = " + JSON.stringify(fs.readdirSync(seedDir).sort().map(f => fs.readFileSync(path.join(seedDir, f), "utf8"))) + ";";
+const libs = [ide("www/bada.js"), zoneLib, bundled, seeds, fs.readFileSync(path.join(root, "..", "bada_gpt", "src", "engine.js"), "utf8"), rd("entropy.js"), rd("agents.js"), rd("meeting.js"), rd("thought.js"), rd("net.js"), rd("telegraph.js"), rd("acoustic.js"), rd("zone.js"), rd("p2p.js"), rd("badaxp.js"), rd("badapredict.js"), rd("plugins.js")].join("\n");
 if (/<\/script/i.test(libs)) throw new Error("libs must not contain </script");
 const html = rd("ui.html").replace("/*__LIBS__*/", () => libs);
 const out = path.join(root, "index.html");

@@ -12,6 +12,7 @@
  *   on_message |role, kind, text, seq|   発言が議事録に入るたび。返した文字列が、その発言の「注記」になる
  *   on_command |args|                    発言欄で /<id> 引数 と打ったとき。返した文字列をその端末だけに表示する
  *   on_minutes |count|                   議事録を書き出すとき。返した文字列が、議事録の 1 節になる
+ *   on_suggest |left|                    発言欄の内容が変わるたび。入力候補を返す (Bada プラグインは 1 行に 1 候補)
  * Bada プラグインからは、議事録 MINUTES ([役割, 種類, 本文] の配列) と議題 AGENDA、
  * 補助関数 contains(s, sub) / count_of(s, sub) が使える。数値を文字にするには "" + n と書く。
  *
@@ -31,7 +32,7 @@
     "    while (p >= 0) { n := n + 1; rest := substr(rest, p + len(sub), len(rest) - p - len(sub)); p := str_find(rest, sub) }",
     "    return n",
     "}", ""].join("\n");
-  var HOOKS = ["on_message", "on_command", "on_minutes"], MAX_SOURCE = 20000, MAX_STEPS = 3000000;
+  var HOOKS = ["on_message", "on_command", "on_minutes", "on_suggest"], MAX_SOURCE = 20000, MAX_STEPS = 3000000;
   var lit = function (s) { return JSON.stringify(String(s)); };
 
   function header(src, key) { var m = String(src).match(new RegExp("^\\s*#\\s*" + key + "\\s*:\\s*(.+)$", "m")); return m ? m[1].trim() : ""; }
@@ -49,13 +50,17 @@
     if (!/@reviser\s*:\s*extension\s+bada\s*\{/.test(src)) return { ok: false, error: "@reviser : extension bada { … } の形で書いてください" };
     if (/@reviser\s*:\s*extension\s+(c|python|java)\b/.test(src)) return { ok: false, error: "このアプリで動くのは bada の拡張だけです" };
     var hooks = HOOKS.filter(function (h) { return new RegExp("fun\\s+" + h + "\\s*\\|").test(src); });
-    if (!hooks.length) return { ok: false, error: "フック (on_message / on_command / on_minutes) が 1 つもありません" };
+    if (!hooks.length) return { ok: false, error: "フック (on_message / on_command / on_minutes / on_suggest) が 1 つもありません" };
     var r = this.Bada.run(PRELUDE + 'MINUTES := []\nAGENDA := ""\n' + src, { maxSteps: MAX_STEPS });
     if (!r.ok) return { ok: false, error: "Bada の実行エラー: " + (r.error || (r.parseErrors || []).join("; ")) };
     var p = { id: id, name: header(src, "name") || id, description: header(src, "description"), kind: "bada", builtin: !!builtin, source: src, hooks: hooks, enabled: true, errors: 0 };
     var call = function (hook, args, ctx) { return self._call(p, hook, args, ctx); };
     if (hooks.indexOf("on_message") >= 0) p.onMessage = function (m, ctx) { return call("on_message", [lit(m.role || ""), lit(m.kind), lit(m.text), String(m.seq | 0)], ctx); };
     if (hooks.indexOf("on_command") >= 0) p.onCommand = function (args, ctx) { return call("on_command", [lit(args)], ctx); };
+    if (hooks.indexOf("on_suggest") >= 0) p.onSuggest = function (left, ctx) {
+      var out = call("on_suggest", [lit(left)], ctx); if (!out) return [];
+      return out.split("\n").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 8).map(function (x) { return { text: x, insert: x, p: 0 }; });
+    };
     if (hooks.indexOf("on_minutes") >= 0) p.onMinutes = function (ctx) { return call("on_minutes", [String(ctx.msgs.length)], ctx); };
     this.plugins = this.plugins.filter(function (x) { return x.id !== id; }); this.plugins.push(p); this.onChange();
     return { ok: true, plugin: p };
@@ -77,6 +82,16 @@
   H.notes = function (m, ctx) {
     var self = this, out = [];
     this.active().forEach(function (p) { if (p.onMessage) { var t = self._safe(p, function () { return p.onMessage(m, ctx); }); if (t) out.push({ id: p.id, name: p.name, text: t }); } });
+    return out;
+  };
+  // 入力候補: 入になっているプラグインの on_suggest を集める。[{text, insert, p, from}]
+  H.suggest = function (left, ctx) {
+    var out = [];
+    this.active().forEach(function (p) {
+      if (!p.onSuggest) return;
+      try { (p.onSuggest(left, ctx) || []).forEach(function (c) { if (c && c.insert) out.push({ text: String(c.text || c.insert), insert: String(c.insert), p: +c.p || 0, from: p.name }); }); p.errors = 0; }
+      catch (e) { p.errors++; if (p.errors >= 3) p.enabled = false; }
+    });
     return out;
   };
   // "/id 引数" → {name, text}。プラグインの命令でなければ null
