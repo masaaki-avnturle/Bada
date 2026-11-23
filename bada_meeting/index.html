@@ -1,0 +1,1475 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bada 思念会議</title>
+<style>
+  :root { --bg:#0d1017; --panel:#151a25; --panel2:#1b2231; --line:#263046; --fg:#e7eaf1; --mut:#8d97ab; --acc:#7ab0ff;
+          --kikaku:#f2b866; --planner:#7fd6a8; --engineer:#8fb4ff; --host:#c3a6ff; --ng:#ff8a8a; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif; display: flex; flex-direction: column; }
+  button, select, input, textarea { font: inherit; color: var(--fg); }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0 8px 0 0; }
+  .ctl { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  label.ctl { display: inline-flex; gap: 6px; align-items: center; }
+  #status { margin-left: auto; font-size: 12px; color: var(--mut); }
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+  #log { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 780px; border: 1px solid var(--line); border-left: 4px solid var(--mut); border-radius: 4px 12px 12px 4px; background: var(--panel); padding: 8px 12px; }
+  .msg.kikaku { border-left-color: var(--kikaku); } .msg.planner { border-left-color: var(--planner); } .msg.engineer { border-left-color: var(--engineer); } .msg.host { border-left-color: var(--host); }
+  .msg .who { font-size: 12px; color: var(--mut); display: flex; flex-wrap: wrap; gap: 8px; }
+  .msg .who b { color: var(--fg); }
+  .msg .off { color: var(--ng); }
+  .msg.decide { background: #16261f; }
+  .empty { color: var(--mut); margin: auto; text-align: center; max-width: 460px; }
+  aside { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 12px; gap: 10px; }
+  aside h2 { font-size: 13px; margin: 0; color: var(--mut); font-weight: 600; }
+  #compose { width: 100%; min-height: 64px; resize: vertical; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tile { position: relative; overflow: hidden; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; text-align: left; max-width: 100%; }
+  .tile > span { position: relative; }
+  .tile::before { content: ""; position: absolute; inset: 0; width: 0; background: rgba(122,176,255,.28); }
+  .tile.dwell::before { width: 100%; transition: width var(--ms, 800ms) linear; }
+  .tile.draft { border-color: var(--acc); }
+  .tile.act { background: var(--acc); color: #071224; font-weight: 600; border: 0; }
+  .tile small { color: var(--mut); margin-left: 6px; }
+  #kana { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; }
+  #kana .col { display: grid; gap: 3px; }
+  #kana .tile { padding: 4px 0; text-align: center; min-height: 28px; }
+  #stats { font-size: 12px; color: var(--mut); border-top: 1px solid var(--line); padding-top: 8px; }
+  #stats b { color: var(--fg); font-weight: 600; }
+  .note { font-size: 12px; color: var(--mut); }
+  dialog { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; width: min(620px, calc(100vw - 32px)); padding: 16px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog textarea { width: 100%; height: 84px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
+  dialog h3 { margin: 12px 0 4px; font-size: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; grid-template-rows: minmax(180px, 1fr) auto; } aside { border-left: 0; border-top: 1px solid var(--line); max-height: 58vh; } #kana .tile { font-size: 12px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bada 思念会議</h1>
+  <select id="role" class="ctl" aria-label="この端末の役割">
+    <option value="all">全役を 1 台で</option><option value="kikaku">企画</option><option value="planner">プランナー</option>
+    <option value="engineer">アプリケーションエンジニア</option><option value="observer">参加者 (役割なし)</option>
+  </select>
+  <label class="ctl"><input type="checkbox" id="auto" checked> 役割が自動で発言</label>
+  <button class="ctl" id="connect">接続</button>
+  <button class="ctl" id="export" disabled>議事録を保存</button>
+  <span id="status">1 台で動作中</span>
+</header>
+<main>
+  <div id="log" aria-live="polite"></div>
+  <aside>
+    <h2>思念入力 — 候補の上にポインタを留めると確定します (タップ・クリックでも確定)</h2>
+    <textarea id="compose" placeholder="議題の例: スマホ向けの予約アプリを 3 か月で作りたい" aria-label="発言"></textarea>
+    <div class="tiles" id="acts"></div>
+    <h2>候補</h2>
+    <div class="tiles" id="cands"></div>
+    <h2>かな</h2>
+    <div id="kana"></div>
+    <label class="note">滞留の基準時間 <input type="range" id="base" min="300" max="2000" step="100" value="800"> <span id="basev">0.8</span> 秒</label>
+    <div class="note">思考を読み取る装置ではありません。滞留 (ポインタを留める操作) を入力に使い、次の語句を予測して確定を速くします。</div>
+    <div id="stats"></div>
+  </aside>
+</main>
+<dialog id="dlg">
+  <b>コンピュータ同士をつなぐ (サーバーなし)</b>
+  <p class="note">接続コードを相手に渡して (メール・チャット・QR など) つなぎます。既定では同じ LAN の中で接続できます。発言は SHA-256 つきのパケットで送られ、主催者が通し番号を付けて全員に配ります。</p>
+  <div class="row"><label><input type="radio" name="side" value="host" checked> 主催する</label><label><input type="radio" name="side" value="guest"> 参加する</label></div>
+  <div id="hostpane">
+    <div class="row"><button class="ctl" id="mkinvite">① 招待コードを作る</button></div>
+    <h3>招待コード (相手に渡す)</h3><textarea id="invite" readonly></textarea>
+    <h3>② 相手から届いた返信コードを貼る</h3><textarea id="answerin"></textarea>
+    <div class="row"><button class="ctl" id="accept">③ 接続する</button></div>
+  </div>
+  <div id="guestpane" hidden>
+    <h3>① 主催者から届いた招待コードを貼る</h3><textarea id="invitein"></textarea>
+    <div class="row"><button class="ctl" id="mkanswer">② 返信コードを作る</button></div>
+    <h3>返信コード (主催者に渡す)</h3><textarea id="answer" readonly></textarea>
+  </div>
+  <div class="row"><span id="dlgmsg" class="note"></span><button class="ctl" id="close" style="margin-left:auto">閉じる</button></div>
+</dialog>
+<script>
+/*
+ * engine.js — BadaGPT の計算エンジン (依存なし。ブラウザ / Node 共通)
+ *
+ * riemann_prover/ (Python) の移植:
+ *   ζ・L 関数 / 高さ T までの RH 数値検証 / Schoenfeld 不等式 / 深リーマン予想の証拠 /
+ *   擬似量子コンピュータ上の Grover 反例探索 / 数学的帰納法と証明の修正 /
+ *   コラッツ降下補題 / Jones 多項式暗号による封印 / 証明書 PatchGuard
+ *
+ * 健全性: 未解決の予想そのものは決して「証明済み」と判定しない。
+ */
+(function (global) {
+  "use strict";
+
+  /* ───────────── ζ(s), L(s,χ), θ(t), Z(t) ───────────── */
+  var B2K = [0.08333333333333333, -0.001388888888888889, 3.306878306878307e-05, -8.267195767195768e-07, 2.08767569878681e-08, -5.284190138687493e-10, 1.3382536530684679e-11, -3.3896802963225827e-13, 8.586062056277845e-15, -2.174868698558062e-16, 5.5090028283602295e-18, -1.3954464685812522e-19];
+
+  // ζ(s, a) = Σ (n+a)^(-s)  (Euler–Maclaurin, s = sr + i·si ≠ 1) → [re, im]
+  function hurwitz(sr, si, a) {
+    var N = Math.floor(Math.hypot(sr, si)) + 25, re = 0, im = 0, n, L, m;
+    for (n = 0; n < N; n++) {
+      L = Math.log(n + a); m = Math.exp(-sr * L);
+      re += m * Math.cos(si * L); im -= m * Math.sin(si * L);
+    }
+    var w = N + a, lw = Math.log(w), mw = Math.exp(-sr * lw);
+    var wr = mw * Math.cos(si * lw), wi = -mw * Math.sin(si * lw);       // w^(-s)
+    var dr = sr - 1, di = si, dd = dr * dr + di * di;                    // w^(1-s)/(s-1)
+    re += w * (wr * dr + wi * di) / dd + wr / 2;
+    im += w * (wi * dr - wr * di) / dd + wi / 2;
+    var pr = sr, pi = si, qr = wr / w, qi = wi / w, k, t, ar, ai, br, bi;
+    for (k = 1; k <= B2K.length; k++) {
+      re += B2K[k - 1] * (pr * qr - pi * qi);
+      im += B2K[k - 1] * (pr * qi + pi * qr);
+      ar = sr + 2 * k - 1; ai = si; br = sr + 2 * k; bi = si;            // poch *= (s+2k-1)(s+2k)
+      t = ar * br - ai * bi; ai = ar * bi + ai * br; ar = t;
+      t = pr * ar - pi * ai; pi = pr * ai + pi * ar; pr = t;
+      qr /= w * w; qi /= w * w;
+    }
+    return [re, im];
+  }
+  function zeta(sr, si) { return hurwitz(sr, si || 0, 1); }
+
+  // L(s,χ),  χ = [χ(0), …, χ(q-1)] with entries [re, im]
+  function dirichletL(sr, si, chi) {
+    var q = chi.length, re = 0, im = 0, a, c, h;
+    for (a = 1; a <= q; a++) {
+      c = chi[a % q];
+      if (c[0] === 0 && c[1] === 0) continue;
+      h = hurwitz(sr, si, a / q);
+      re += c[0] * h[0] - c[1] * h[1]; im += c[0] * h[1] + c[1] * h[0];
+    }
+    var lq = Math.log(q), m = Math.exp(-sr * lq), cr = m * Math.cos(si * lq), ci = -m * Math.sin(si * lq);
+    return [re * cr - im * ci, re * ci + im * cr];
+  }
+
+  // Im log Γ(x + iy) on the continuous branch (x > 0)
+  function loggammaIm(x, y) {
+    var shift = 0;
+    while (x < 15) { shift += Math.atan2(y, x); x += 1; }
+    var d = x * x + y * y, ir = x / d, ii = -y / d;                      // 1/z
+    var z2r = ir * ir - ii * ii, z2i = 2 * ir * ii;
+    var c = [1 / 12, -1 / 360, 1 / 1260, -1 / 1680, 1 / 1188], sr = 0, si = 0, pr = ir, pi = ii, k, t;
+    for (k = 0; k < c.length; k++) {
+      sr += c[k] * pr; si += c[k] * pi;
+      t = pr * z2r - pi * z2i; pi = pr * z2i + pi * z2r; pr = t;
+    }
+    var lr = 0.5 * Math.log(d), li = Math.atan2(y, x);                   // log z
+    return (x - 0.5) * li + y * lr - y + si - shift;
+  }
+  function theta(t) { return loggammaIm(0.25, t / 2) - t / 2 * Math.log(Math.PI); }
+  function hardyZ(t) {
+    var th = theta(t), z = zeta(0.5, t);
+    return Math.cos(th) * z[0] - Math.sin(th) * z[1];
+  }
+
+  /* ───────────── 高さ T までの RH ───────────── */
+  function spacing(t) { return 2 * Math.PI / Math.log(Math.max(t, 14) / (2 * Math.PI)); }
+  function scanSignChanges(T, density) {
+    var out = [], a = 1, za = hardyZ(1), b, zb;
+    while (a < T) {
+      b = Math.min(a + spacing(a) / density, T); zb = hardyZ(b);
+      if (za * zb < 0) out.push([a, b]);
+      a = b; za = zb;
+    }
+    return out;
+  }
+  function refineZero(a, b) {
+    var fa = hardyZ(a), i, m, fm;
+    for (i = 0; i < 60; i++) {
+      m = (a + b) / 2; fm = hardyZ(m);
+      if (fa * fm <= 0) b = m; else { a = m; fa = fm; }
+    }
+    return (a + b) / 2;
+  }
+  // arg ζ(1/2+iT) by continuous variation from σ = 4 (where |ζ−1| < 0.083)
+  function argZeta(T) {
+    var sigma = 4, z = zeta(sigma, T), arg = Math.atan2(z[1], z[0]), step = 0.05, nxt, z2, d;
+    while (sigma > 0.5) {
+      nxt = Math.max(sigma - step, 0.5); z2 = zeta(nxt, T);
+      d = Math.atan2(z2[1] * z[0] - z2[0] * z[1], z2[0] * z[0] + z2[1] * z[1]);
+      if (Math.abs(d) > 0.3 && step > 1e-6) { step /= 2; continue; }
+      arg += d; sigma = nxt; z = z2; step = Math.min(step * 1.5, 0.05);
+    }
+    return arg;
+  }
+  function zeroCount(T) {
+    var n = theta(T) / Math.PI + 1 + argZeta(T) / Math.PI;
+    return [Math.round(n), Math.abs(n - Math.round(n))];
+  }
+  function verifyRH(T, listZeros) {
+    T = T || 500; if (listZeros === undefined) listZeros = 10;
+    var zc = zeroCount(T), density = 6, br = [];
+    while (density <= 96) {
+      br = scanSignChanges(T, density);
+      if (br.length >= zc[0]) break;
+      density *= 2;
+    }
+    var ok = br.length === zc[0] && zc[1] < 1e-3;
+    return {
+      claim: "0 < Im ρ < " + T + " の ζ の非自明零点はすべて Re ρ = 1/2 上にあり単純",
+      height: T, zeros_in_strip_argument_principle: zc[0], argument_principle_residual: zc[1],
+      zeros_on_critical_line_sign_changes: br.length, scan_density: density,
+      first_zeros: br.slice(0, listZeros).map(function (p) { return +refineZero(p[0], p[1]).toFixed(9); }),
+      status: ok ? "verified" : "inconclusive"
+    };
+  }
+
+  /* ───────────── Schoenfeld 不等式 (RH と同値) ───────────── */
+  function sieve(n) {
+    var s = new Uint8Array(n + 1).fill(1), p, m;
+    s[0] = 0; if (n >= 1) s[1] = 0;
+    for (p = 2; p * p <= n; p++) if (s[p]) for (m = p * p; m <= n; m += p) s[m] = 0;
+    return s;
+  }
+  function schoenfeld(X) {
+    X = X || 1e6;
+    var s = sieve(X), lam = new Float64Array(X + 1), p, q, lp;
+    for (p = 2; p <= X; p++) if (s[p]) { lp = Math.log(p); for (q = p; q <= X; q *= p) lam[q] = lp; }
+    var psi = 0, worst = 0, worstX = 0, ok = true, c = 1 / (8 * Math.PI), n, ln, r;
+    for (n = 1; n < X; n++) {
+      psi += lam[n];
+      if (n < 74) continue;
+      ln = Math.log(n);
+      r = Math.max(Math.abs(psi - n), Math.abs(psi - (n + 1))) / (c * Math.sqrt(n) * ln * ln);
+      if (r > worst) { worst = r; worstX = n; }
+      if (r >= 1) ok = false;
+    }
+    return { claim: "|ψ(x) − x| < √x·log²x/(8π)  (74 ≤ x ≤ " + X + ")", limit: X,
+             max_ratio: worst, max_ratio_at: worstX, status: ok ? "verified" : "disproved" };
+  }
+
+  /* ───────────── 深リーマン予想の証拠 ───────────── */
+  var CHARACTERS = {
+    "chi_-4": [[0, 0], [1, 0], [0, 0], [-1, 0]],
+    "chi_-3": [[0, 0], [1, 0], [-1, 0]],
+    "chi_5": [[0, 0], [1, 0], [-1, 0], [-1, 0], [1, 0]],
+    "chi_5_complex": [[0, 0], [1, 0], [0, 1], [0, -1], [-1, 0]]
+  };
+  function drhEvidence(name, t, X) {
+    name = name || "chi_-4"; t = t || 0; X = X || 1e6;
+    var chi = CHARACTERS[name], q = chi.length;
+    var isReal = chi.every(function (c) { return c[1] === 0; });
+    var factor = (t === 0 && isReal) ? Math.SQRT2 : 1;
+    var L = dirichletL(0.5, t, chi), target = [L[0] * factor, L[1] * factor];
+    var cps = [], k; for (k = 100; k <= X; k *= 10) cps.push(k);
+    if (!cps.length || cps[cps.length - 1] !== X) cps.push(X);
+    var s = sieve(X), lr = 0, li = 0, p = 2, rows = [];
+    cps.forEach(function (x) {
+      for (; p <= x; p++) {
+        if (!s[p]) continue;
+        var c = chi[p % q]; if (c[0] === 0 && c[1] === 0) continue;
+        var lp = Math.log(p), m = Math.exp(-0.5 * lp), pr = m * Math.cos(t * lp), pi = -m * Math.sin(t * lp);
+        var ur = 1 - (c[0] * pr - c[1] * pi), ui = -(c[0] * pi + c[1] * pr);     // 1 − χ(p)p^(−s)
+        lr -= 0.5 * Math.log(ur * ur + ui * ui); li -= Math.atan2(ui, ur);
+      }
+      var e = Math.exp(lr), prod = [e * Math.cos(li), e * Math.sin(li)];
+      var rel = function (z) { return Math.hypot(prod[0] - z[0], prod[1] - z[1]) / Math.hypot(z[0], z[1]); };
+      rows.push({ x: x, partial_product: prod, rel_error_vs_DRH_limit: rel(target), rel_error_vs_plain_L: rel(L) });
+    });
+    return {
+      claim: "Π_(p≤x)(1−χ(p)p^(−s))^(−1) → " + (factor !== 1 ? "√2·" : "") + "L(s,χ),  χ=" + name + ", s=1/2+" + t + "i",
+      character: name, s: [0.5, t], L: L, sqrt2_factor: factor !== 1, drh_limit: target, table: rows, status: "open"
+    };
+  }
+
+  /* ───────────── 擬似量子コンピュータ (状態ベクトル) + Grover ───────────── */
+  function rng(seed) {                       // mulberry32
+    var a = (seed >>> 0) + 0x6D2B79F5;
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function hadamard(amps, q) {
+    var N = amps.length, mask = 1 << q, r = Math.SQRT1_2, i, j, x0, x1;
+    for (i = 0; i < N; i++) {
+      if (i & mask) continue;
+      j = i | mask; x0 = amps[i]; x1 = amps[j];
+      amps[i] = r * (x0 + x1); amps[j] = r * (x0 - x1);
+    }
+  }
+  function groverSearch(marked, seed, shots) {
+    var N = marked.length, k = Math.round(Math.log2(N)), M = 0, i, q, it;
+    if ((1 << k) !== N) throw new Error("marked.length must be a power of two");
+    for (i = 0; i < N; i++) if (marked[i]) M++;
+    var amps = new Float64Array(N); amps[0] = 1;
+    for (q = 0; q < k; q++) hadamard(amps, q);
+    var iterations = 0;
+    if (M > 0 && M < N) iterations = Math.max(0, Math.round(Math.PI / (4 * Math.asin(Math.sqrt(M / N))) - 0.5));
+    for (it = 0; it < iterations; it++) {
+      for (i = 0; i < N; i++) if (marked[i]) amps[i] = -amps[i];          // oracle
+      for (q = 0; q < k; q++) hadamard(amps, q);                          // diffusion
+      for (i = 1; i < N; i++) amps[i] = -amps[i];
+      for (q = 0; q < k; q++) hadamard(amps, q);
+    }
+    var pm = 0; for (i = 0; i < N; i++) if (marked[i]) pm += amps[i] * amps[i];
+    var rand = rng(seed || 0), samples = [], s, u, acc;
+    for (s = 0; s < (shots || 16); s++) {
+      u = rand(); acc = 0;
+      for (i = 0; i < N; i++) { acc += amps[i] * amps[i]; if (u < acc) break; }
+      samples.push(Math.min(i, N - 1));
+    }
+    return { qubits: k, marked: M, iterations: iterations, success_probability: pm, measured: samples[0], samples: samples };
+  }
+
+  function isPrime(n) {
+    if (n < 2) return false;
+    if (n % 2 === 0) return n === 2;
+    for (var d = 3; d * d <= n; d += 2) if (n % d === 0) return false;
+    return true;
+  }
+  function sigma(n) {
+    var t = 0, d;
+    for (d = 1; d * d <= n; d++) if (n % d === 0) t += d + (d * d !== n ? n / d : 0);
+    return t;
+  }
+  var HARM = [0];
+  function harmonic(n) { while (HARM.length <= n) HARM.push(HARM[HARM.length - 1] + 1 / HARM.length); return HARM[n]; }
+  function reachesOne(n, limit) {
+    for (var i = 0; i < (limit || 100000); i++) {
+      if (n === 1) return true;
+      n = n % 2 === 0 ? n / 2 : 3 * n + 1;
+    }
+    return false;
+  }
+  var PROBLEMS = {
+    riemann_lagarias: { title: "リーマン予想 (Lagarias の同値形)", statement: "すべての n ≥ 1 で σ(n) ≤ H_n + exp(H_n)·log(H_n)",
+      nOf: function (i) { return i + 1; },
+      cx: function (n) { var h = harmonic(n); return sigma(n) > h + Math.exp(h) * Math.log(h) + 1e-9; } },
+    goldbach: { title: "ゴールドバッハ予想", statement: "4 以上のすべての偶数は 2 つの素数の和",
+      nOf: function (i) { return 2 * i + 4; },
+      cx: function (n) { for (var p = 2; p <= n / 2; p++) if (isPrime(p) && isPrime(n - p)) return false; return true; } },
+    collatz: { title: "コラッツ予想", statement: "すべての n ≥ 1 は 3n+1 操作で 1 に到達する",
+      nOf: function (i) { return i + 1; }, cx: function (n) { return !reachesOne(n, 10000); } },
+    legendre: { title: "ルジャンドル予想", statement: "すべての n ≥ 1 で n² と (n+1)² の間に素数がある",
+      nOf: function (i) { return i + 1; },
+      cx: function (n) { for (var m = n * n + 1; m < (n + 1) * (n + 1); m++) if (isPrime(m)) return false; return true; } },
+    euler_polynomial: { title: "（対照実験・偽の命題）n² + n + 41 は常に素数", statement: "すべての n ≥ 0 で n² + n + 41 は素数",
+      nOf: function (i) { return i; }, cx: function (n) { return !isPrime(n * n + n + 41); } }
+  };
+  function isCounterexample(problem, n) { return !!PROBLEMS[problem].cx(n); }
+  function quantumSearch(problem, qubits, seed) {
+    var spec = PROBLEMS[problem], N = 1 << (qubits || 10), ns = [], marked = [], i;
+    for (i = 0; i < N; i++) { ns.push(spec.nOf(i)); marked.push(!!spec.cx(ns[i])); }
+    var g = groverSearch(marked, seed), samples = g.samples, found = false, n = ns[samples[0]], shots = 0;
+    delete g.samples;
+    for (i = 0; i < samples.length; i++) {                 // every measurement is re-checked classically
+      shots++;
+      if (isCounterexample(problem, ns[samples[i]])) { n = ns[samples[i]]; found = true; g.measured = samples[i]; break; }
+    }
+    return {
+      problem: problem, title: spec.title, statement: spec.statement, range: [ns[0], ns[N - 1]],
+      qubits: g.qubits, marked: g.marked, iterations: g.iterations, success_probability: g.success_probability,
+      measured: g.measured, shots: shots, counterexample: found ? n : null, counterexamples_in_range: g.marked,
+      status: found ? "disproved" : "open",
+      bounded_status: found ? "disproved" : (g.marked === 0 ? "verified" : "inconclusive")
+    };
+  }
+  function quantumSearchAll(qubits, seed) {
+    return Object.keys(PROBLEMS).map(function (p) { return quantumSearch(p, qubits, seed); });
+  }
+
+  /* ───────────── 厳密な有理数・多項式 (BigInt) ───────────── */
+  function gcd(a, b) { a = a < 0n ? -a : a; b = b < 0n ? -b : b; while (b) { var t = a % b; a = b; b = t; } return a; }
+  function F(n, d) {
+    n = BigInt(n); d = d === undefined ? 1n : BigInt(d);
+    if (d === 0n) throw new Error("0 で割ることはできません");
+    if (d < 0n) { n = -n; d = -d; }
+    var g = gcd(n, d) || 1n;
+    return { n: n / g, d: d / g };
+  }
+  function fParse(x) {
+    if (typeof x === "object") return x;
+    var m = String(x).trim().match(/^(-?\d+)(?:\/(\d+))?$/);
+    if (!m) throw new Error("分数として読めません: " + x);
+    return F(m[1], m[2] || 1);
+  }
+  function fAdd(a, b) { return F(a.n * b.d + b.n * a.d, a.d * b.d); }
+  function fSub(a, b) { return F(a.n * b.d - b.n * a.d, a.d * b.d); }
+  function fMul(a, b) { return F(a.n * b.n, a.d * b.d); }
+  function fDiv(a, b) { return F(a.n * b.d, a.d * b.n); }
+  function fEq(a, b) { return a.n === b.n && a.d === b.d; }
+  function fStr(a) { return a.d === 1n ? String(a.n) : a.n + "/" + a.d; }
+  var ZERO = F(0), ONE = F(1);
+
+  function poly(c) { var p = c.map(fParse); while (p.length && p[p.length - 1].n === 0n) p.pop(); return p; }
+  function pEval(p, x) { var acc = ZERO; for (var i = p.length - 1; i >= 0; i--) acc = fAdd(fMul(acc, x), p[i]); return acc; }
+  function pAdd(a, b, sign) {
+    var out = [], n = Math.max(a.length, b.length), i;
+    for (i = 0; i < n; i++) out.push((sign === -1 ? fSub : fAdd)(a[i] || ZERO, b[i] || ZERO));
+    return poly(out);
+  }
+  function pMul(a, b) {
+    if (!a.length || !b.length) return [];
+    var out = [], i, j;
+    for (i = 0; i < a.length + b.length - 1; i++) out.push(ZERO);
+    for (i = 0; i < a.length; i++) for (j = 0; j < b.length; j++) out[i + j] = fAdd(out[i + j], fMul(a[i], b[j]));
+    return poly(out);
+  }
+  function pScale(p, c) { return poly(p.map(function (x) { return fMul(x, c); })); }
+  function pShift(p) {                         // p(n) → p(n+1)
+    var out = [], power = [ONE];
+    p.forEach(function (c) { out = pAdd(out, pScale(power, c)); power = pMul(power, [ONE, ONE]); });
+    return out;
+  }
+  function pInterpolate(pts) {
+    var out = [];
+    pts.forEach(function (pi, i) {
+      var term = [ONE], denom = ONE;
+      pts.forEach(function (pj, j) {
+        if (i === j) return;
+        term = pMul(term, [fSub(ZERO, pj[0]), ONE]); denom = fMul(denom, fSub(pi[0], pj[0]));
+      });
+      out = pAdd(out, pScale(term, fDiv(pi[1], denom)));
+    });
+    return out;
+  }
+  function pStr(p) {
+    if (!p.length) return "0";
+    var parts = [];
+    for (var i = p.length - 1; i >= 0; i--)
+      if (p[i].n !== 0n) parts.push("(" + fStr(p[i]) + ")" + (i === 0 ? "" : i === 1 ? "·n" : "·n^" + i));
+    return parts.join(" + ");
+  }
+  // "n(n+1)(2n+1)/6" → 多項式 (変数は n / k / x のいずれか 1 文字)
+  function pParse(src) {
+    var s = String(src).replace(/\s+/g, "").replace(/[×·]/g, "*").replace(/²/g, "^2").replace(/³/g, "^3"), pos = 0;
+    function peek() { return s[pos]; }
+    function expr() {
+      var v = term();
+      while (peek() === "+" || peek() === "-") { var op = s[pos++]; v = pAdd(v, term(), op === "-" ? -1 : 1); }
+      return v;
+    }
+    function term() {
+      var v = factor();
+      for (;;) {
+        var c = peek();
+        if (c === "*") { pos++; v = pMul(v, factor()); }
+        else if (c === "/") {
+          pos++; var d = factor();
+          if (!d.length) throw new Error("0 で割ることはできません");
+          if (d.length !== 1) throw new Error("定数以外では割れません");
+          v = pScale(v, fDiv(ONE, d[0]));
+        } else if (c !== undefined && /[0-9a-zA-Z(]/.test(c)) v = pMul(v, factor());   // 暗黙の積
+        else return v;
+      }
+    }
+    function factor() {
+      var v = atom();
+      if (peek() === "^") {
+        pos++; var m = s.slice(pos).match(/^\d+/);
+        if (!m) throw new Error("指数は非負整数にしてください");
+        pos += m[0].length;
+        var r = [ONE]; for (var i = 0; i < +m[0]; i++) r = pMul(r, v);
+        v = r;
+      }
+      return v;
+    }
+    function atom() {
+      var c = peek();
+      if (c === "-") { pos++; return pScale(factor(), F(-1)); }
+      if (c === "(") { pos++; var v = expr(); if (s[pos++] !== ")") throw new Error("括弧が閉じていません"); return v; }
+      var m = s.slice(pos).match(/^\d+/);
+      if (m) { pos += m[0].length; return poly([F(m[0])]); }
+      if (c !== undefined && /[nkx]/i.test(c)) { pos++; return [ZERO, ONE]; }
+      throw new Error("式を読めません: 「" + s.slice(pos) + "」");
+    }
+    var out = expr();
+    if (pos !== s.length) throw new Error("式を読めません: 「" + s.slice(pos) + "」");
+    return out;
+  }
+
+  /* ───────────── 数学的帰納法・証明の修正 ───────────── */
+  function drift(f, g) { return pAdd(pAdd(pShift(g), g, -1), pShift(f), -1); }
+  function proveSum(f, g) {
+    f = poly(f); g = poly(g);
+    var base = pEval(g, ZERO), d = drift(f, g);
+    var out = { kind: "sum_identity", f: f.map(fStr), g: g.map(fStr),
+                claim: "Σ_(k=1..n) [" + pStr(f) + "] = " + pStr(g), method: "数学的帰納法" };
+    if (base.n === 0n && !d.length) {
+      out.status = "proved";
+      out.steps = ["基底: g(0) = 0 = 空和", "段: g(n+1) − g(n) − f(n+1) は多項式として恒等的に 0",
+                   "ゆえに帰納法によりすべての n ≥ 0 で成立"];
+      return out;
+    }
+    var total = ZERO, n = 0;
+    while (fEq(total, pEval(g, F(n)))) { n++; total = fAdd(total, pEval(f, F(n))); }
+    out.status = "disproved"; out.counterexample = n;
+    out.steps = ["n = " + n + ": 左辺 = " + fStr(total) + ", 右辺 = " + fStr(pEval(g, F(n)))];
+    out.drift = base.n === 0n ? pStr(d) : "基底 g(0) = " + fStr(base) + " ≠ 0";
+    return out;
+  }
+  // 誤った閉形式を、保存量 I(n) = g(n) − Σ f(k) ≡ 0 の等位集合へ射影する
+  function repairSum(f, g) {
+    f = poly(f); g = poly(g);
+    var pts = [[ZERO, ZERO]], total = ZERO, n;
+    for (n = 1; n < f.length + 2; n++) { total = fAdd(total, pEval(f, F(n))); pts.push([F(n), total]); }
+    var fixed = pInterpolate(pts), proof = proveSum(f, fixed);
+    return { kind: "repair", original: proveSum(f, g), repaired: proof,
+             drift_before: pStr(drift(f, g)), drift_after: pStr(drift(f, fixed)), status: proof.status };
+  }
+  // 補題 (証明つき): コラッツ予想の最小反例は 2^bits 以上で、生き残った剰余類に属する
+  function collatzDescent(bits) {
+    bits = bits || 12;
+    var M = Math.pow(2, bits), survivors = [], r, a, b, j, descended, small = true, n;
+    for (r = 0; r < M; r++) {
+      a = M; b = r; descended = false;
+      for (j = 0; j < bits; j++) {
+        if (b % 2) { a = 3 * a / 2; b = (3 * b + 1) / 2; } else { a /= 2; b /= 2; }
+        if (a < M && M - a > b - r) { descended = true; break; }
+      }
+      if (!descended) survivors.push(r);
+    }
+    for (n = 1; n < M; n++) if (!reachesOne(n)) { small = false; break; }
+    return {
+      kind: "collatz_descent", bits: bits, modulus: M,
+      claim: "コラッツ予想の最小反例 n0 は n0 ≥ " + M + " かつ n0 mod " + M + " が " + survivors.length + " 個の剰余類のいずれか",
+      survivor_count: survivors.length, survivors_head: survivors.slice(0, 12),
+      excluded_fraction: 1 - survivors.length / M, small_cases_verified: small,
+      method: "強い帰納法 (降下) + 補集合の剰余類ふるい",
+      status: small ? "proved" : "disproved", conjecture_status: "open"
+    };
+  }
+  var NO_STEP = [
+    { kind: "no_inductive_step", problem: "riemann_hypothesis", status: "open",
+      note: "零点は離散的な添字 n に沿った P(n) ⇒ P(n+1) の形を持たず、既知の帰納の段がない" },
+    { kind: "no_inductive_step", problem: "deep_riemann_hypothesis", status: "open",
+      note: "オイラー積の収束は極限の主張であり、有限段の帰納では到達できない" },
+    { kind: "no_inductive_step", problem: "goldbach", status: "open",
+      note: "2n が素数 2 個の和でも 2n+2 について何も導けない。補集合に既知の降下構造がない" }
+  ];
+  function inductionReport(bits) {
+    return [
+      proveSum([0, 1], [0, "1/2", "1/2"]),
+      proveSum([0, 0, 0, 1], [0, 0, "1/4", "1/2", "1/4"]),
+      repairSum([0, 0, 1], [0, "1/5", "3/5", "2/5"]),
+      collatzDescent(bits)
+    ].concat(JSON.parse(JSON.stringify(NO_STEP)));
+  }
+  function recheck(e) {
+    if (e.kind === "sum_identity") return proveSum(e.f, e.g).status === e.status;
+    if (e.kind === "repair") return recheck(e.repaired) && e.repaired.status === e.status;
+    if (e.kind === "collatz_descent") {
+      var fresh = collatzDescent(+e.bits);
+      return e.conjecture_status === "open" && fresh.status === e.status && fresh.survivor_count === e.survivor_count;
+    }
+    if (e.kind === "no_inductive_step") return e.status === "open";
+    return false;
+  }
+
+  /* ───────────── SHA-256 / HMAC (同期) ───────────── */
+  var K256 = (function () {
+    var k = [], n = 2, i;
+    while (k.length < 64) {
+      for (i = 2; i * i <= n; i++) if (n % i === 0) break;
+      if (i * i > n) k.push(Math.floor((Math.cbrt(n) % 1) * 4294967296) >>> 0);
+      n++;
+    }
+    return k;
+  })();
+  function utf8(s) { return new TextEncoder().encode(s); }
+  function concat() {
+    var len = 0, i, o = 0;
+    for (i = 0; i < arguments.length; i++) len += arguments[i].length;
+    var out = new Uint8Array(len);
+    for (i = 0; i < arguments.length; i++) { out.set(arguments[i], o); o += arguments[i].length; }
+    return out;
+  }
+  function sha256(msg) {
+    if (typeof msg === "string") msg = utf8(msg);
+    var h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    var l = msg.length, total = ((l + 9 + 63) >> 6) << 6, buf = new Uint8Array(total), dv = new DataView(buf.buffer);
+    buf.set(msg); buf[l] = 0x80;
+    dv.setUint32(total - 8, Math.floor(l / 536870912)); dv.setUint32(total - 4, (l * 8) >>> 0);
+    var w = new Uint32Array(64), off, i, a, b, c, d, e, f, g, hh, s0, s1, t1, t2;
+    function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+    for (off = 0; off < total; off += 64) {
+      for (i = 0; i < 16; i++) w[i] = dv.getUint32(off + 4 * i);
+      for (i = 16; i < 64; i++) {
+        s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+      }
+      a = h[0]; b = h[1]; c = h[2]; d = h[3]; e = h[4]; f = h[5]; g = h[6]; hh = h[7];
+      for (i = 0; i < 64; i++) {
+        t1 = (hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + K256[i] + w[i]) >>> 0;
+        t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+        hh = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+      }
+      h[0] = (h[0] + a) >>> 0; h[1] = (h[1] + b) >>> 0; h[2] = (h[2] + c) >>> 0; h[3] = (h[3] + d) >>> 0;
+      h[4] = (h[4] + e) >>> 0; h[5] = (h[5] + f) >>> 0; h[6] = (h[6] + g) >>> 0; h[7] = (h[7] + hh) >>> 0;
+    }
+    var out = new Uint8Array(32), odv = new DataView(out.buffer);
+    for (i = 0; i < 8; i++) odv.setUint32(4 * i, h[i]);
+    return out;
+  }
+  function hmac(key, msg) {
+    if (key.length > 64) key = sha256(key);
+    var ip = new Uint8Array(64).fill(0x36), op = new Uint8Array(64).fill(0x5c), i;
+    for (i = 0; i < key.length; i++) { ip[i] ^= key[i]; op[i] ^= key[i]; }
+    return sha256(concat(op, sha256(concat(ip, msg))));
+  }
+  function hex(b) { return Array.prototype.map.call(b, function (x) { return (x < 16 ? "0" : "") + x.toString(16); }).join(""); }
+  function unhex(s) { var o = new Uint8Array(s.length / 2); for (var i = 0; i < o.length; i++) o[i] = parseInt(s.substr(2 * i, 2), 16); return o; }
+
+  /* ───────────── Jones 多項式 (Kauffman ブラケット) と暗号 ───────────── */
+  function lAdd(a, b) { var o = new Map(a); b.forEach(function (v, e) { o.set(e, (o.get(e) || 0) + v); }); return lClean(o); }
+  function lMul(a, b) {
+    var o = new Map();
+    a.forEach(function (v1, e1) { b.forEach(function (v2, e2) { o.set(e1 + e2, (o.get(e1 + e2) || 0) + v1 * v2); }); });
+    return lClean(o);
+  }
+  function lClean(m) { m.forEach(function (v, e) { if (v === 0) m.delete(e); }); return m; }
+  function normalizedBracket(braid) {
+    var n = Math.max.apply(null, braid.map(Math.abs)) + 1, c = braid.length, total = new Map();
+    var D = new Map([[2, -1], [-2, -1]]);
+    for (var state = 0; state < (1 << c); state++) {
+      var parent = [], fresh = function () { parent.push(parent.length); return parent.length - 1; };
+      var find = function (x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+      var union = function (a, b) { a = find(a); b = find(b); if (a !== b) parent[a] = b; };
+      var bottom = [], cur, aExp = 0, k, i;
+      for (i = 0; i < n; i++) bottom.push(fresh());
+      cur = bottom.slice();
+      for (k = 0; k < c; k++) {
+        var g = braid[k], a = Math.abs(g) - 1, b = a + 1, choice = (state >> k) & 1;
+        aExp += choice === 0 ? 1 : -1;
+        if (g > 0 ? choice === 1 : choice === 0) {
+          union(cur[a], cur[b]);
+          var na = fresh(), nb = fresh(); union(na, nb); cur[a] = na; cur[b] = nb;
+        }
+      }
+      for (i = 0; i < n; i++) union(cur[i], bottom[i]);
+      var roots = new Set(); for (i = 0; i < parent.length; i++) roots.add(find(i));
+      var term = new Map([[aExp, 1]]);
+      for (i = 1; i < roots.size; i++) term = lMul(term, D);
+      total = lAdd(total, term);
+    }
+    var w = braid.reduce(function (s, g) { return s + (g > 0 ? 1 : -1); }, 0);
+    return lMul(new Map([[-3 * w, (((-w) % 2) + 2) % 2 ? -1 : 1]]), total);
+  }
+  function canonical(l) { return Array.from(l.entries()).sort(function (x, y) { return x[0] - y[0]; }); }
+  function jonesStr(braid) {
+    var V = new Map();
+    normalizedBracket(braid).forEach(function (v, e) { V.set(-e / 4, (V.get(-e / 4) || 0) + v); });
+    var ks = Array.from(V.keys()).filter(function (k) { return V.get(k) !== 0; }).sort(function (a, b) { return a - b; });
+    if (!ks.length) return "0";
+    return ks.map(function (e) { return (V.get(e) > 0 ? "+" : "") + V.get(e) + "*t^" + e; }).join(" ");
+  }
+  function braidKey(braid) {
+    return sha256("jones-qkd|" + canonical(normalizedBracket(braid)).map(function (p) { return p[0] + ":" + p[1]; }).join(";"));
+  }
+  function keystream(key, n, nonce) {
+    var out = new Uint8Array(n), off = 0, counter = 0, ctr, block;
+    while (off < n) {
+      ctr = new Uint8Array(8); new DataView(ctr.buffer).setUint32(4, counter++);
+      block = hmac(key, concat(nonce, ctr));
+      out.set(block.subarray(0, Math.min(32, n - off)), off); off += 32;
+    }
+    return out;
+  }
+  function jonesEncrypt(key, plain, nonce) {
+    if (!nonce) {
+      nonce = new Uint8Array(16);
+      if (global.crypto && global.crypto.getRandomValues) global.crypto.getRandomValues(nonce);
+      else for (var i = 0; i < 16; i++) nonce[i] = Math.floor(Math.random() * 256);
+    }
+    var ks = keystream(key, plain.length, nonce), ct = plain.map(function (p, i) { return p ^ ks[i]; });
+    return concat(nonce, hmac(key, concat(utf8("tag|"), nonce, ct)), ct);
+  }
+  function jonesDecrypt(key, blob) {
+    var nonce = blob.subarray(0, 16), tag = blob.subarray(16, 48), ct = blob.subarray(48);
+    if (hex(hmac(key, concat(utf8("tag|"), nonce, ct))) !== hex(tag)) throw new Error("authentication failed (wrong Jones key?)");
+    var ks = keystream(key, ct.length, nonce);
+    return ct.map(function (c, i) { return c ^ ks[i]; });
+  }
+  function fingerprint(key) { return hex(sha256(key)).slice(0, 16); }
+
+  /* ───────────── 証明書・封印 ───────────── */
+  var SOUNDNESS = "本アプリはリーマン予想・深リーマン予想を証明しない。両者は未解決問題である。" +
+    "「verified」は有限範囲の主張を倍精度浮動小数点で数値検証したという意味であり、" +
+    "区間演算による厳密証明でも、予想全体の証明でもない。";
+  function stable(v) {
+    if (Array.isArray(v)) return "[" + v.map(stable).join(",") + "]";
+    if (v && typeof v === "object")
+      return "{" + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(v[k]); }).join(",") + "}";
+    return JSON.stringify(v === undefined ? null : v);
+  }
+  function digest(cert) {
+    var body = {}; Object.keys(cert).forEach(function (k) { if (k !== "seal") body[k] = cert[k]; });
+    return sha256(stable(body));
+  }
+  function buildCertificate(rh, sch, drh, quantum, induction) {
+    var cert = {
+      engine: "BadaGPT (未知事前エンジン規約: proved / disproved / open)",
+      verdicts: { riemann_hypothesis: "open", deep_riemann_hypothesis: "open",
+                  rh_up_to_height: rh.status, schoenfeld_inequality: sch.status },
+      rh_bounded: rh, schoenfeld: sch, drh_evidence: drh, soundness: SOUNDNESS
+    };
+    if (quantum) cert.quantum_search = quantum;
+    if (induction) cert.induction = induction;
+    return cert;
+  }
+  function seal(cert, braid) {
+    braid = braid || [1, 1, 1];
+    var key = braidKey(braid);
+    delete cert.seal;
+    cert.seal = { braid: braid, jones_polynomial: jonesStr(braid), key_fingerprint: fingerprint(key),
+                  sealed_digest: hex(jonesEncrypt(key, digest(cert))) };
+    return cert;
+  }
+  function checkSeal(cert, braid) {
+    try {
+      if (!cert.seal) return false;
+      return hex(jonesDecrypt(braidKey(braid || cert.seal.braid), unhex(cert.seal.sealed_digest))) === hex(digest(cert));
+    } catch (e) { return false; }
+  }
+
+  /* ───────────── 証明書 PatchGuard (書き換えの門) ───────────── */
+  var SEV = { critical: 3, high: 2, medium: 1, low: 0 };
+  function flatten(o, prefix, out) {
+    out = out || {}; prefix = prefix || "";
+    if (o && typeof o === "object") Object.keys(o).forEach(function (k) { flatten(o[k], prefix + "/" + k, out); });
+    else out[prefix] = o;
+    return out;
+  }
+  function diff(base, after) {
+    var a = flatten(base), b = flatten(after), out = {};
+    Object.keys(Object.assign({}, a, b)).sort().forEach(function (p) { if (a[p] !== b[p]) out[p] = [a[p], b[p]]; });
+    return out;
+  }
+  function invariants(base, cert, recompute) {
+    var out = [], f = function (id, sev, why) { out.push({ id: id, severity: sev, why: why }); };
+    var v = cert.verdicts || {};
+    [["riemann_hypothesis", "リーマン予想"], ["deep_riemann_hypothesis", "深リーマン予想"]].forEach(function (p) {
+      if (v[p[0]] !== "open") f("RG01", "critical", p[1] + "の判定が " + JSON.stringify(v[p[0]]) + "。検査可能な証明なしに未解決以外へは書き換えられない");
+    });
+    var rh = cert.rh_bounded || {};
+    if (rh.status === "verified" || v.rh_up_to_height === "verified") {
+      var n = rh.zeros_in_strip_argument_principle, m = rh.zeros_on_critical_line_sign_changes;
+      if (n === undefined || n !== m || !(rh.argument_principle_residual < 1e-3))
+        f("RG02", "critical", "高さ " + rh.height + " まで検証済みとあるが、零点総数 " + n + " と線上の個数 " + m + " が裏付けない");
+      else if (recompute) {
+        var got = zeroCount(+rh.height)[0];
+        if (got !== n) f("RG03", "critical", "再計算した N(" + rh.height + ") = " + got + " が記載の " + n + " と一致しない");
+      }
+    }
+    var sch = cert.schoenfeld || {};
+    if (sch.status === "verified" && !(sch.max_ratio < 1)) f("RG04", "high", "Schoenfeld 不等式が検証済みとあるが最大比 " + sch.max_ratio + " が 1 以上");
+    (cert.drh_evidence || []).forEach(function (d, i) {
+      if (d.status !== "open") f("RG05", "critical", "深リーマン予想の証拠 #" + i + " の判定が " + JSON.stringify(d.status) + "。有限の部分積は証明にならない");
+    });
+    (cert.quantum_search || []).forEach(function (q) {
+      if (q.status === "disproved") {
+        if (!PROBLEMS[q.problem] || q.counterexample == null || !isCounterexample(q.problem, q.counterexample))
+          f("RG10", "critical", q.problem + ": 反証とあるが、反例 " + JSON.stringify(q.counterexample) + " が古典的な再検査を通らない");
+      } else if (q.status !== "open") f("RG10", "critical", q.problem + ": 判定が " + JSON.stringify(q.status) + "。有限範囲の量子探索は予想の証明にならない");
+    });
+    (cert.induction || []).forEach(function (e, i) {
+      var ok; try { ok = recheck(e); } catch (err) { ok = false; }
+      if (!ok) f("RG11", "critical", "帰納法の項目 #" + i + " (" + e.kind + ") の判定 " + JSON.stringify(e.status) + " が再導出と一致しない");
+    });
+    if (cert.soundness !== SOUNDNESS) f("RG06", "high", "健全性の注記が削除または変更されている");
+    if (!cert.seal) f("RG07", "medium", "Jones 暗号による封印がない");
+    else if (!checkSeal(cert)) f("RG07", "high", "封印が内容と一致しない（封印後に書き換えられている）");
+    if (base) {
+      [["零点検証の高さ", "rh_bounded", "height"], ["Schoenfeld 検査の上限", "schoenfeld", "limit"]].forEach(function (p) {
+        var o = (base[p[1]] || {})[p[2]], nw = (cert[p[1]] || {})[p[2]];
+        if (o !== undefined && (nw === undefined || nw < o)) f("RG08", "medium", p[0] + "が " + o + " から " + nw + " へ縮小している");
+      });
+      if ((cert.drh_evidence || []).length < (base.drh_evidence || []).length) f("RG09", "medium", "深リーマン予想の証拠が削除されている");
+    }
+    return out;
+  }
+  function gate(findings) {
+    var worst = -1; findings.forEach(function (x) { worst = Math.max(worst, SEV[x.severity]); });
+    return worst >= 2 ? "REJECT" : worst === 1 ? "REVIEW" : "ACCEPT";
+  }
+  function guard(stages, recompute) {
+    var run = hex(sha256(stable(stages))).slice(0, 12), tuples = [], per = [], k;
+    stages.forEach(function (c, i) { tuples.push(["cert", run, i, hex(sha256(stable(c)))]); });
+    for (k = 1; k < stages.length; k++) {
+      tuples.push(["patch", run, k, hex(sha256(stable(stages[k - 1]))), hex(sha256(stable(stages[k]))), Object.keys(diff(stages[k - 1], stages[k])).length]);
+      per.push(invariants(stages[k - 1], stages[k]));
+    }
+    var base = stages.length > 1 ? stages[0] : null, net = invariants(base, stages[stages.length - 1], recompute);
+    var ids = new Set(net.map(function (x) { return x.id + "|" + x.why; })), cancelled = [];
+    per.slice(0, -1).forEach(function (fs) { fs.forEach(function (x) { if (!ids.has(x.id + "|" + x.why)) cancelled.push(x); }); });
+    net.forEach(function (x) { tuples.push(["finding", run, "net", x.id, x.severity, x.why]); });
+    cancelled.forEach(function (x) { tuples.push(["finding", run, "cancelled", x.id, x.severity, x.why]); });
+    var verdict = gate(net); tuples.push(["gate", run, verdict]);
+    return { run: run, verdict: verdict, findings: net, cancelled: cancelled,
+             net_patch: base ? diff(base, stages[stages.length - 1]) : {}, tuples: tuples };
+  }
+
+  function fullCertificate(opt) {
+    opt = opt || {};
+    var X = opt.limit || 1e6, drh = Object.keys(CHARACTERS).map(function (c) { return drhEvidence(c, 0, X); });
+    drh.push(drhEvidence("chi_-4", 1, X));
+    return seal(buildCertificate(verifyRH(opt.height || 500), schoenfeld(X), drh,
+                                 quantumSearchAll(opt.qubits || 10, opt.seed || 0), inductionReport(opt.sieveBits || 12)),
+                opt.braid || [1, 1, 1]);
+  }
+
+  global.BadaGPTEngine = {
+    hurwitz: hurwitz, zeta: zeta, dirichletL: dirichletL, theta: theta, hardyZ: hardyZ,
+    zeroCount: zeroCount, verifyRH: verifyRH, schoenfeld: schoenfeld, CHARACTERS: CHARACTERS, drhEvidence: drhEvidence,
+    groverSearch: groverSearch, PROBLEMS: PROBLEMS, isCounterexample: isCounterexample,
+    quantumSearch: quantumSearch, quantumSearchAll: quantumSearchAll,
+    poly: { F: F, fStr: fStr, fParse: fParse, make: poly, add: pAdd, mul: pMul, shift: pShift, evalAt: pEval, drift: drift },
+    jonesEncrypt: jonesEncrypt, jonesDecrypt: jonesDecrypt, unhex: unhex, utf8: utf8, stable: stable,
+    pParse: pParse, pStr: pStr, proveSum: proveSum, repairSum: repairSum, collatzDescent: collatzDescent,
+    inductionReport: inductionReport, recheck: recheck,
+    sha256: sha256, hmac: hmac, hex: hex, braidKey: braidKey, jonesStr: jonesStr, fingerprint: fingerprint,
+    SOUNDNESS: SOUNDNESS, buildCertificate: buildCertificate, seal: seal, checkSeal: checkSeal,
+    invariants: invariants, gate: gate, guard: guard, fullCertificate: fullCertificate
+  };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaGPTEngine;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/*
+ * entropy.js — 会議の発言を測るエントロピー方程式群
+ *
+ * レポート "Entropy on manifold and differential of equation" (system_transport.pdf) に
+ * 繰り返し現れる式を、発言 (テキスト) の統計量に対応させる。bada_claude/src/semantic.bada と同じ対応:
+ *   (E1) x log x                            S(p) = −Σ p log p        発言の情報量 H / 議題とのずれ D
+ *   (E2) log(x log x) ≥ 2 (y log y)^{1/2}   x = e^H, y = e^D         議事録に採る発言の門
+ *   (E3) ∫∫ 1/(x log x)² dx                 p0(r) ∝ 1/((r+1)log(r+1))²  入力候補の順位の事前分布
+ *   (E4) F = ∫ (∇f)² e^{−f} dm              f = 発言ごとのずれ       会議の流れの滑らかさ
+ * この対応づけは本アプリの設計上の選択であり、レポートから導かれた定理ではない。
+ */
+(function (global) {
+  "use strict";
+  var STOP = new Set(["の", "は", "が", "を", "に", "で", "と", "て", "た", "し", "も", "な", "か", "です", "ます", "する", "ある", "いる", "こと", "これ", "それ", "ため", "よう", "から", "まで", "へ", "や", "ので", "the", "a", "of", "to", "and", "in", "is"]);
+
+  // 字種の連なりで区切り、漢字の連なりは 2-gram も加える
+  function tokens(text) {
+    var out = [], re = /[A-Za-z][A-Za-z0-9_+#.-]*|[0-9]+(?:\.[0-9]+)?|[一-鿿々]+|[゠-ヿー]+|[぀-ゟ]+/g, m;
+    while ((m = re.exec(String(text))) !== null) {
+      var t = m[0].toLowerCase();
+      if (/^[一-鿿々]+$/.test(t) && t.length > 2) { for (var i = 0; i + 1 < t.length; i++) out.push(t.slice(i, i + 2)); }
+      else if (/^[぀-ゟ]+$/.test(t)) { if (t.length >= 3 && !STOP.has(t)) out.push(t); }
+      else if (!STOP.has(t)) out.push(t);
+    }
+    return out;
+  }
+  function bag(text) {
+    var tf = Object.create(null), n = 0;
+    tokens(text).forEach(function (t) { tf[t] = (tf[t] || 0) + 1; n++; });
+    return { tf: tf, n: n };
+  }
+  function density(x) { return x > 0 ? x * Math.log(x) : 0; }                 // (E1)
+  function entropy(b) {
+    if (!b.n) return 0;
+    var h = 0; for (var t in b.tf) h -= density(b.tf[t] / b.n);
+    return h;
+  }
+  function divergence(a, b) {                                                  // Jensen–Shannon, 0 … log 2
+    if (!a.n || !b.n) return Math.LN2;
+    var hm = 0, t;
+    for (t in a.tf) hm -= density(0.5 * a.tf[t] / a.n + 0.5 * (b.tf[t] || 0) / b.n);
+    for (t in b.tf) if (!(t in a.tf)) hm -= density(0.5 * b.tf[t] / b.n);
+    return Math.max(0, hm - 0.5 * entropy(a) - 0.5 * entropy(b));
+  }
+  function gate(H, D) {                                                        // (E2)
+    var x = Math.exp(H), y = Math.exp(D), xl = density(x);
+    var lhs = xl > 0 ? Math.log(xl) : -Infinity, rhs = 2 * Math.sqrt(density(y));
+    return { x: x, y: y, lhs: lhs, rhs: rhs, margin: lhs - rhs, pass: lhs >= rhs };
+  }
+  function kernel(r) { var d = density(r + 1); return 1 / (d * d); }           // (E3)  r = 1, 2, …
+  // (E4) 発言ごとの値 f_i の勾配二乗を e^{−f_i} で重み付けした平均。小さいほど話題の飛びが少ない
+  function flow(fs) {
+    if (fs.length < 2) return 0;
+    var num = 0, den = 0;
+    for (var i = 0; i + 1 < fs.length; i++) { var w = Math.exp(-fs[i]), g = fs[i + 1] - fs[i]; num += w * g * g; den += w; }
+    return num / den;
+  }
+  function merge(bags) {
+    var tf = Object.create(null), n = 0;
+    bags.forEach(function (b) { for (var t in b.tf) { tf[t] = (tf[t] || 0) + b.tf[t]; } n += b.n; });
+    return { tf: tf, n: n };
+  }
+  // 発言を議題の文脈に照らして測る
+  function measure(text, context) {
+    var b = bag(text), H = entropy(b), D = divergence(b, context), g = gate(H, D);
+    return { tokens: b.n, H: H, D: D, x: g.x, lhs: g.lhs, rhs: g.rhs, pass: g.pass };
+  }
+
+  global.BadaEntropy = { tokens: tokens, bag: bag, density: density, entropy: entropy, divergence: divergence, gate: gate,
+                         kernel: kernel, flow: flow, merge: merge, measure: measure };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaEntropy;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/*
+ * agents.js — 会議の 3 つの役割 (企画 / プランナー / アプリケーションエンジニア) の能力
+ *
+ * 言語モデルではありません。議題のキーワードから分野を判定し、分野ごとの知識表
+ * (機能・工数・構成・リスク) を使って、決まった手順で発言を組み立てます。
+ * 各エージェントは議事録 (それまでの発言の列) だけを見て次の発言を決めるので、
+ * 別々のコンピュータで動いていても同じ会議が成り立ちます。
+ */
+(function (global) {
+  "use strict";
+  var ROLES = { kikaku: "企画", planner: "プランナー", engineer: "アプリケーションエンジニア" };
+
+  // 機能: [名前, 優先度 (1 が最重要), 実装工数 (人週), データ, 使う技術]
+  var DOMAINS = [
+    { key: /チャット|メッセージ|会話|sns|コミュニティ|会議/i, name: "メッセージング", target: "離れた場所にいる仲間と素早くやり取りしたい人", value: "必要な相手に、必要な話題だけを確実に届ける",
+      kpi: "1 日あたりの送信数と 7 日後の継続率",
+      features: [["アカウントとプロフィール", 1, 1.5, "User", "認証"], ["1 対 1 とグループのメッセージ", 1, 3, "Room, Message", "リアルタイム通信"], ["通知", 2, 1.5, "Device", "プッシュ通知"],
+                 ["画像とファイルの共有", 3, 2, "Attachment", "オブジェクトストレージ"], ["検索", 3, 1.5, "SearchIndex", "全文検索"], ["既読と入力中の表示", 4, 1, "Receipt", "リアルタイム通信"]],
+      risks: [["同時接続が増えると遅延する", "接続数の上限を決めて負荷試験を行う"], ["通知が届かない端末がある", "主要 OS の実機で確認する"]] },
+    { key: /ec|ショップ|通販|販売|決済|注文|カート|店舗/i, name: "販売・注文", target: "商品を手軽に探して買いたい人と、それを売りたい店舗", value: "探す・選ぶ・支払うを迷わず終えられる",
+      kpi: "購入完了率と客単価",
+      features: [["商品一覧と詳細", 1, 2, "Product", "一覧表示"], ["カートと注文", 1, 2.5, "Cart, Order", "トランザクション"], ["決済", 1, 3, "Payment", "決済代行サービス"],
+                 ["会員登録と購入履歴", 2, 1.5, "User", "認証"], ["在庫管理", 2, 2, "Stock", "管理画面"], ["レビュー", 4, 1.5, "Review", "投稿"], ["おすすめ表示", 4, 2, "Recommendation", "集計"]],
+      risks: [["決済の審査に時間がかかる", "早い段階で決済代行会社に申請する"], ["在庫と注文がずれる", "注文確定時に在庫を引き当てる"]] },
+    { key: /予約|スケジュール|カレンダー|シフト|来店|受付/i, name: "予約・日程", target: "予約を受ける事業者と、空きを見てすぐ予約したい利用者", value: "電話なしで空き確認から予約確定まで終わる",
+      kpi: "予約完了率と無断キャンセル率",
+      features: [["空き枠の表示", 1, 2, "Slot", "カレンダー"], ["予約と取り消し", 1, 2.5, "Reservation", "排他制御"], ["リマインド通知", 2, 1, "Reminder", "プッシュ通知"],
+                 ["事業者向け管理画面", 2, 2.5, "Staff, Shop", "管理画面"], ["事前決済", 3, 3, "Payment", "決済代行サービス"], ["口コミ", 4, 1.5, "Review", "投稿"]],
+      risks: [["同じ枠に二重予約が入る", "予約確定を排他制御で守る"], ["無断キャンセルが多い", "リマインドと事前決済を検討する"]] },
+    { key: /学習|教育|勉強|教材|クイズ|英語|講座|数学/i, name: "学習", target: "すき間時間で学びを続けたい人", value: "今日やることが分かり、続けた分だけ進みが見える",
+      kpi: "週あたりの学習日数と単元の修了率",
+      features: [["教材の表示", 1, 2, "Lesson", "コンテンツ配信"], ["問題と採点", 1, 2.5, "Question, Answer", "採点"], ["進み具合の記録", 2, 1.5, "Progress", "集計"],
+                 ["復習の出題", 3, 2, "ReviewQueue", "間隔反復"], ["学習リマインド", 3, 1, "Reminder", "プッシュ通知"], ["ランキング", 4, 1.5, "Ranking", "集計"]],
+      risks: [["教材の用意が開発より遅れる", "教材の形式を先に決めて並行して作る"], ["続かない利用者が多い", "最初の 1 週間の体験を重点的に試す"]] },
+    { key: /健康|医療|運動|歩数|食事|睡眠|ヘルス|体調/i, name: "健康記録", target: "日々の体調を手間なく記録して見返したい人", value: "記録が習慣になり、変化に自分で気づける",
+      kpi: "記録日数と 30 日後の継続率",
+      features: [["記録の入力", 1, 2, "Record", "フォーム"], ["グラフ表示", 1, 2, "Summary", "グラフ"], ["目標とリマインド", 2, 1.5, "Goal", "プッシュ通知"],
+                 ["端末のセンサー連携", 3, 2.5, "SensorData", "OS のヘルスケア API"], ["データの書き出し", 3, 1, "Export", "ファイル出力"], ["家族との共有", 4, 2, "Share", "認証"]],
+      risks: [["健康情報の取り扱いに法的な配慮が要る", "個人情報の扱いを専門家に確認する"], ["医療行為と誤解される", "診断ではないことを画面に明記する"]] },
+    { key: /業務|管理|在庫|勤怠|日報|申請|社内|営業|顧客/i, name: "業務管理", target: "紙や表計算で管理している現場の担当者", value: "入力が 1 回で済み、状況がすぐ分かる",
+      kpi: "入力にかかる時間と入力漏れの件数",
+      features: [["データの登録と一覧", 1, 2.5, "Entry", "フォーム"], ["権限と承認の流れ", 1, 2.5, "Role, Approval", "認可"], ["検索と絞り込み", 2, 1.5, "SearchIndex", "検索"],
+                 ["集計とレポート", 2, 2, "Report", "集計"], ["CSV の取り込みと書き出し", 3, 1.5, "Import", "ファイル入出力"], ["通知", 4, 1, "Notice", "通知"]],
+      risks: [["現場の運用と画面が合わない", "早い段階で試作を現場に見せる"], ["既存データの移行に手間がかかる", "移行の手順を先に試す"]] },
+    { key: /ゲーム|パズル|対戦|スコア|遊/i, name: "ゲーム", target: "短い時間で気軽に遊びたい人", value: "すぐ始められて、もう 1 回やりたくなる",
+      kpi: "1 回あたりのプレイ時間と翌日の継続率",
+      features: [["基本の遊び", 1, 4, "Stage", "ゲームループ"], ["スコアと記録", 2, 1, "Score", "保存"], ["ステージ追加", 2, 2.5, "Stage", "データ駆動"],
+                 ["ランキング", 3, 1.5, "Ranking", "集計"], ["効果音と演出", 3, 1.5, "Asset", "音声"], ["対戦", 4, 3.5, "Match", "リアルタイム通信"]],
+      risks: [["面白さが作ってみるまで分からない", "基本の遊びだけを先に作って試す"], ["端末によって動きが重い", "古い端末で早めに確認する"]] }
+  ];
+  var GENERIC = { name: "一般", target: "この課題を日常的に抱えている人", value: "今より少ない手間で目的を果たせる", kpi: "週あたりの利用回数と継続率",
+    features: [["中心となる機能", 1, 3, "Item", "フォーム"], ["アカウント", 2, 1.5, "User", "認証"], ["一覧と検索", 2, 1.5, "SearchIndex", "検索"],
+               ["通知", 3, 1, "Notice", "プッシュ通知"], ["設定", 3, 1, "Setting", "保存"], ["データの書き出し", 4, 1, "Export", "ファイル出力"]],
+    risks: [["求められている機能がまだはっきりしない", "利用者 5 人に試作を見せて確かめる"], ["範囲が広がりやすい", "初版の範囲を議事録で固定する"]] };
+
+  function domainOf(text) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[i].key.test(text)) return DOMAINS[i]; return GENERIC; }
+  function platformsOf(text) {
+    var p = [];
+    if (/android|アンドロイド|apk|スマホ|スマートフォン|モバイル|携帯/i.test(text)) p.push("Android");
+    if (/ios|iphone|アイフォン|スマホ|スマートフォン|モバイル/i.test(text)) p.push("iOS");
+    if (/windows|ウィンドウズ|pc|パソコン|デスクトップ|exe/i.test(text)) p.push("Windows");
+    if (/linux|ubuntu|deb/i.test(text)) p.push("Linux");
+    if (/web|ブラウザ|サイト/i.test(text) || !p.length) p.push("Web");
+    return p;
+  }
+  // 「3か月」「10週間」などの期限 → 週数。指定が無ければ null
+  function deadlineOf(text) {
+    var z = String(text).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xfee0); });
+    var m = z.match(/(\d+(?:\.\d+)?)\s*(週間|週|か月|ヶ月|ヵ月|カ月|ケ月|箇月|月間|日間|日)/);
+    if (!m) return null;
+    var n = +m[1];
+    return m[2].indexOf("週") >= 0 ? n : m[2].indexOf("日") >= 0 ? Math.round(n / 7 * 10) / 10 : Math.round(n * 4.33 * 10) / 10;
+  }
+  var OVERHEAD = { requirements: 0.15, design: 0.15, test: 0.25, release: 0.05 };      // 実装工数に対する比
+  function estimate(features, platforms, team) {
+    var impl = features.reduce(function (s, f) { return s + f.weeks; }, 0) * (1 + 0.35 * (platforms.length - 1));
+    var total = impl * (1 + OVERHEAD.requirements + OVERHEAD.design + OVERHEAD.test + OVERHEAD.release);
+    var r1 = function (x) { return Math.round(x * 10) / 10; };
+    return { impl: r1(impl), person_weeks: r1(total), team: team, calendar_weeks: r1(total / team),
+             phases: [["要件定義", r1(impl * OVERHEAD.requirements / team)], ["設計", r1(impl * OVERHEAD.design / team)], ["実装", r1(impl / team)],
+                      ["試験", r1(impl * OVERHEAD.test / team)], ["公開準備", r1(impl * OVERHEAD.release / team)]] };
+  }
+  function stackOf(platforms) {
+    var mobile = platforms.indexOf("Android") >= 0 || platforms.indexOf("iOS") >= 0, desktop = platforms.indexOf("Windows") >= 0 || platforms.indexOf("Linux") >= 0;
+    var client = platforms.length > 1 ? "画面は Web 技術 (HTML / JavaScript) で 1 つ作り、" + (mobile ? "モバイルは Cordova、" : "") + (desktop ? "デスクトップは Electron、" : "") + "で包む"
+      : platforms[0] === "Web" ? "Web アプリ (HTML / JavaScript)" : platforms[0] + " 向けに Web 技術で作り " + (mobile ? "Cordova" : "Electron") + " で包む";
+    return { client: client.replace(/、で包む$/, " で包む"), server: "HTTP API (認証つき) と、必要な箇所だけリアルタイム通信", db: "リレーショナルデータベース" };
+  }
+
+  var last = function (msgs, kinds) { for (var i = msgs.length - 1; i >= 0; i--) if (kinds.indexOf(msgs[i].kind) >= 0) return msgs[i]; return null; };
+  var names = function (fs) { return fs.map(function (f) { return f.name; }).join("、"); };
+
+  /* ── 各役割: 議事録 msgs を見て、次の発言 {kind, text, data} か null を返す ── */
+  var AGENTS = {
+    kikaku: function (msgs) {
+      var tail = msgs[msgs.length - 1]; if (!tail) return null;
+      if (tail.kind === "agenda") {
+        var text = tail.text, d = domainOf(text), pf = platformsOf(text), dl = deadlineOf(text);
+        var features = d.features.map(function (f) { return { name: f[0], priority: f[1], weeks: f[2], data: f[3], tech: f[4] }; });
+        return { kind: "propose", data: { domain: d.name, target: d.target, value: d.value, kpi: d.kpi, features: features, later: [], platforms: pf, deadline_weeks: dl },
+          text: "企画です。分野は「" + d.name + "」と見ました。対象は" + d.target + "。提供する価値は「" + d.value + "」です。" +
+                "機能は優先度順に、" + names(features) + "を考えています。対応環境は " + pf.join("・") + "、成功の指標は" + d.kpi + "です。" +
+                (dl ? "期限は " + dl + " 週間です。" : "期限の指定は無いので、見積りをもとに決めましょう。") + "エンジニアさん、見積りをお願いします。" };
+      }
+      if (tail.kind === "concern") {
+        var p = last(msgs, ["propose", "revise"]).data, over = tail.data.over_weeks, team = tail.data.team;
+        var keep = p.features.slice(), later = p.later.slice();
+        // 優先度の低い機能から順に次期へ回し、期限に収まるところで止める (優先度 1 は残す)
+        while (keep.length && estimate(keep, p.platforms, team).calendar_weeks > p.deadline_weeks) {
+          var idx = -1; keep.forEach(function (f, i) { if (f.priority > 1 && (idx < 0 || f.priority >= keep[idx].priority)) idx = i; });
+          if (idx < 0) break;
+          later.unshift(keep.splice(idx, 1)[0]);
+        }
+        var moved = later.slice(0, later.length - p.later.length), fits = estimate(keep, p.platforms, team).calendar_weeks <= p.deadline_weeks;
+        var data = Object.assign({}, p, { features: keep, later: later });
+        if (!moved.length || !fits) {
+          data.deadline_weeks = estimate(keep, p.platforms, team).calendar_weeks;
+          return { kind: "revise", data: data, text: "企画です。" + (moved.length ? names(moved) + "を次期に回しますが、" : "") + "最重要の機能 (" + names(keep) + ") はこれ以上削れません。" +
+            "期限を " + data.deadline_weeks + " 週間に延ばす案でお願いします。エンジニアさん、再見積りをお願いします。" };
+        }
+        return { kind: "revise", data: data, text: "企画です。" + over + " 週間の超過、了解しました。" + names(moved) + "を次期に回し、初版は" + names(keep) + "に絞ります。エンジニアさん、再見積りをお願いします。" };
+      }
+      if (tail.kind === "schedule" && !msgs.some(function (m) { return m.kind === "agree" && m.role === "kikaku" && m.seq > tail.seq; }))
+        return { kind: "agree", data: {}, text: "企画です。この計画で提供する価値は保てます。合意します。" };
+      return null;
+    },
+    engineer: function (msgs) {
+      var tail = msgs[msgs.length - 1]; if (!tail) return null;
+      if (tail.kind === "propose" || tail.kind === "revise") {
+        var p = tail.data, team = 2, e = estimate(p.features, p.platforms, team), st = stackOf(p.platforms);
+        var entities = []; p.features.forEach(function (f) { f.data.split(/,\s*/).forEach(function (x) { if (entities.indexOf(x) < 0) entities.push(x); }); });
+        return { kind: "estimate", data: { estimate: e, stack: st, entities: entities, team: team },
+          text: "エンジニアです。構成は、" + st.client + "。サーバーは " + st.server + "、保存は" + st.db + "です。主なデータは " + entities.join("、") + "。" +
+                "工数は機能ごとに " + p.features.map(function (f) { return f.name + " " + f.weeks + " 人週"; }).join("、") + "。" +
+                (p.platforms.length > 1 ? "対応環境が " + p.platforms.length + " つあるので実装を " + Math.round(35 * (p.platforms.length - 1)) + "% 上乗せし、" : "") +
+                "要件定義・設計・試験・公開準備を含めて合計 " + e.person_weeks + " 人週、" + team + " 人で " + e.calendar_weeks + " 週間です。プランナーさん、日程をお願いします。" };
+      }
+      if (tail.kind === "schedule" || (tail.kind === "agree" && tail.role === "kikaku")) {
+        var s = last(msgs, ["schedule"]);
+        if (s && !msgs.some(function (m) { return m.kind === "agree" && m.role === "engineer" && m.seq > s.seq; }))
+          return { kind: "agree", data: {}, text: "エンジニアです。この日程で実装できます。試験は、機能ごとの自動テストと、公開前の実機確認で進めます。合意します。" };
+      }
+      return null;
+    },
+    planner: function (msgs) {
+      var tail = msgs[msgs.length - 1]; if (!tail) return null;
+      if (tail.kind === "estimate") {
+        var p = last(msgs, ["propose", "revise"]).data, e = tail.data.estimate, dl = p.deadline_weeks;
+        if (dl !== null && e.calendar_weeks > dl) {
+          var over = Math.round((e.calendar_weeks - dl) * 10) / 10;
+          return { kind: "concern", data: { over_weeks: over, team: e.team },
+            text: "プランナーです。見積りは " + e.calendar_weeks + " 週間で、期限の " + dl + " 週間を " + over + " 週間超えます。企画さん、初版の範囲を絞るか、期限の見直しをお願いします。" };
+        }
+        var d = domainOf(msgs[0].text), acc = 0, sum = e.phases.reduce(function (t, ph) { return t + ph[1]; }, 0) || 1;
+        // 各工程の終わりは、丸める前の比率から積み上げる (合計が見積りの週数と必ず一致する)
+        var milestones = e.phases.map(function (ph, i) {
+          acc += ph[1];
+          return { phase: ph[0], weeks: ph[1], end_week: i === e.phases.length - 1 ? e.calendar_weeks : Math.round(acc / sum * e.calendar_weeks * 10) / 10 };
+        });
+        var week = e.calendar_weeks;
+        return { kind: "schedule", data: { milestones: milestones, total_weeks: week, deadline_weeks: dl, risks: d.risks, team: e.team },
+          text: "プランナーです。日程を組みました。" + milestones.map(function (m) { return m.phase + " " + m.weeks + " 週間 (第 " + m.end_week + " 週まで)"; }).join("、") + "。全体で " + week + " 週間" +
+                (dl !== null ? "、期限 " + dl + " 週間に対して余裕は " + Math.round((dl - week) * 10) / 10 + " 週間です。" : "です。これを期限とします。") +
+                "リスクは、" + d.risks.map(function (r) { return r[0] + " → " + r[1]; }).join("。") + "。企画さん、エンジニアさん、合意できますか。" };
+      }
+      if (tail.kind === "agree") {
+        var s = last(msgs, ["schedule"]); if (!s) return null;
+        var after = msgs.filter(function (m) { return m.kind === "agree" && m.seq > s.seq; }).map(function (m) { return m.role; });
+        if (after.indexOf("kikaku") >= 0 && after.indexOf("engineer") >= 0 && !msgs.some(function (m) { return m.kind === "decide"; })) {
+          var pp = last(msgs, ["propose", "revise"]).data;
+          return { kind: "decide", data: {}, text: "プランナーです。全員の合意が取れました。決定事項: 初版は" + names(pp.features) + "。" +
+            (pp.later.length ? "次期に回すのは" + names(pp.later) + "。" : "") + "期間は " + s.data.total_weeks + " 週間、体制は " + s.data.team + " 人です。以上で会議を終わります。" };
+        }
+      }
+      return null;
+    }
+  };
+
+  // 人の発言 (comment) に含まれる指示: 「期限を 8 週間に」→ 議題を更新して会議をやり直す
+  function directive(text) {
+    var dl = /(期限|締切|締め切り|納期)/.test(text) ? deadlineOf(text) : null;
+    return dl ? { deadline_weeks: dl } : null;
+  }
+
+  global.BadaAgents = { ROLES: ROLES, AGENTS: AGENTS, domainOf: domainOf, platformsOf: platformsOf, deadlineOf: deadlineOf, estimate: estimate, stackOf: stackOf, directive: directive };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaAgents;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/*
+ * meeting.js — 会議の状態: 議事録・エントロピーによる計測・エージェントの順番・書き出し
+ * (DOM にも通信にも依存しない。どのコンピュータでも同じ議事録から同じ結果になる)
+ */
+(function (global) {
+  "use strict";
+  var req = function (g, f) { return global[g] || (typeof require !== "undefined" ? require(f) : null); };
+  var En = req("BadaEntropy", "./entropy.js"), Ag = req("BadaAgents", "./agents.js");
+  var ORDER = ["kikaku", "engineer", "planner"];
+
+  function Meeting() { this.msgs = []; this.context = En.bag(""); this.fs = []; }
+  // 番号つきの発言を議事録に加える。議題からのずれ D と門 (E2) の結果を付ける
+  Meeting.prototype.add = function (m) {
+    if (m.kind === "agenda") { this.msgs = []; this.fs = []; this.context = En.bag(m.text); }      // 新しい議題は議事録を始め直す
+    else if (this.msgs.some(function (x) { return x.seq === m.seq; })) return null;
+    var rec = Object.assign({}, m);
+    rec.measure = m.kind === "agenda" ? En.measure(m.text, En.bag(m.text)) : En.measure(m.text, this.context);
+    this.msgs.push(rec); this.msgs.sort(function (a, b) { return a.seq - b.seq; });
+    if (m.kind !== "agenda") { this.fs.push(rec.measure.D); if (rec.measure.pass) this.context = En.merge([this.context, En.bag(m.text)]); }
+    return rec;
+  };
+  // 役割 role のエージェントの次の発言 (無ければ null)。人の発言 (comment) は飛ばして考える
+  Meeting.prototype.next = function (role) {
+    var flow = this.msgs.filter(function (m) { return m.kind !== "comment"; });
+    return Ag.AGENTS[role] ? Ag.AGENTS[role](flow) : null;
+  };
+  Meeting.prototype.decided = function () { return this.msgs.some(function (m) { return m.kind === "decide"; }); };
+  Meeting.prototype.stats = function () {
+    var body = this.msgs.filter(function (m) { return m.kind !== "agenda"; });
+    var all = En.merge(body.map(function (m) { return En.bag(m.text); }));
+    return { count: body.length, H: En.entropy(all), flow: En.flow(this.fs), off_topic: body.filter(function (m) { return !m.measure.pass; }).length,
+             mean_D: body.length ? this.fs.reduce(function (a, b) { return a + b; }, 0) / body.length : 0 };
+  };
+  var find = function (msgs, kinds) { for (var i = msgs.length - 1; i >= 0; i--) if (kinds.indexOf(msgs[i].kind) >= 0) return msgs[i]; return null; };
+  // 決定事項を企画書・計画・設計にまとめる (Markdown)
+  Meeting.prototype.minutes = function () {
+    var ms = this.msgs, ag = ms[0], p = find(ms, ["propose", "revise"]), e = find(ms, ["estimate"]), s = find(ms, ["schedule"]), st = this.stats();
+    var out = ["# 会議の議事録と計画書", "", "**議題**: " + (ag ? ag.text : "(なし)"), "", "**状態**: " + (this.decided() ? "決定済み" : "進行中 (未決定)"), ""];
+    if (p) out = out.concat(["## 1. 企画", "", "- 分野: " + p.data.domain, "- 対象: " + p.data.target, "- 提供する価値: " + p.data.value, "- 成功の指標: " + p.data.kpi, "- 対応環境: " + p.data.platforms.join("・"), "",
+      "| 初版の機能 | 優先度 | 実装工数 (人週) |", "|:--|:--|:--|"].concat(p.data.features.map(function (f) { return "| " + f.name + " | " + f.priority + " | " + f.weeks + " |"; }),
+      p.data.later.length ? ["", "次期に回す機能: " + p.data.later.map(function (f) { return f.name; }).join("、")] : [], [""]));
+    if (e) out = out.concat(["## 2. 設計と見積り", "", "- クライアント: " + e.data.stack.client, "- サーバー: " + e.data.stack.server, "- 保存: " + e.data.stack.db, "- 主なデータ: " + e.data.entities.join("、"),
+      "- 合計 " + e.data.estimate.person_weeks + " 人週 / " + e.data.team + " 人で " + e.data.estimate.calendar_weeks + " 週間", ""]);
+    if (s) out = out.concat(["## 3. 日程", "", "| 工程 | 期間 (週) | 終了 (第 n 週) |", "|:--|:--|:--|"].concat(s.data.milestones.map(function (m) { return "| " + m.phase + " | " + m.weeks + " | " + m.end_week + " |"; }),
+      ["", "## 4. リスクと対策", ""], s.data.risks.map(function (r) { return "- " + r[0] + " → " + r[1]; }), [""]));
+    out = out.concat(["## 5. 発言の記録", ""], ms.map(function (m) {
+      return "- **" + (Ag.ROLES[m.role] || m.name || "参加者") + "** (" + m.kind + (m.kind !== "agenda" && !m.measure.pass ? "・議題から外れている可能性" : "") + "): " + m.text;
+    }), ["", "## 6. 会議の計測 (エントロピー)", "", "- 発言数 " + st.count + " / 全体の情報量 H = " + st.H.toFixed(3) + " nat", "- 議題とのずれの平均 D = " + st.mean_D.toFixed(3) + " / 流れ F = " + st.flow.toFixed(4) + " / 門を通らなかった発言 " + st.off_topic + " 件",
+      "", "_見積りと日程は、分野ごとの知識表と決まった計算式によるものです。実際の計画では、担当者による確認が必要です。_"]);
+    return out.join("\n");
+  };
+
+  // 1 台だけで会議を最後まで進める (テストと「自動で進める」用)
+  function runLocal(agenda, limit) {
+    var mt = new Meeting(), seq = 0, i, spoke;
+    mt.add({ seq: seq++, role: "host", kind: "agenda", text: agenda });
+    for (i = 0; i < (limit || 40) && !mt.decided(); i++) {
+      spoke = false;
+      for (var k = 0; k < ORDER.length; k++) {
+        var m = mt.next(ORDER[k]);
+        if (m) { mt.add(Object.assign({ seq: seq++, role: ORDER[k] }, m)); spoke = true; break; }
+      }
+      if (!spoke) break;
+    }
+    return mt;
+  }
+
+  global.BadaMeeting = { Meeting: Meeting, runLocal: runLocal, ORDER: ORDER };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaMeeting;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/*
+ * thought.js — 思念入力 (Ω-Telepathy と同じ方式: 滞留で選び、予測で加速する)
+ *
+ * 実際に思考を読み取るものではありません。入力は「候補の上にポインタを留める (滞留)」
+ * という通常の操作で、次に入れそうな語句を予測して並べ、確からしい候補ほど
+ * 短い滞留で確定できるようにします。
+ *   候補の確率  p(c) ∝ (文脈での出現回数 + 1) × 1/((r+1) log(r+1))²      … (E3) 順位の事前分布
+ *   滞留時間    T(c) = 基準時間 × clamp(−log p(c) / log(候補数), 0.35, 1.6)   … 驚きが小さいほど短い
+ */
+(function (global) {
+  "use strict";
+  var En = global.BadaEntropy || (typeof require !== "undefined" ? require("./entropy.js") : null);
+  var PHRASES = ["賛成です", "反対です", "もう少し詳しくお願いします", "期限を見直しましょう", "範囲を絞りましょう", "見積りをお願いします", "日程をお願いします",
+    "リスクを確認しましょう", "次の議題に進みましょう", "決定とします", "確認します", "了解しました", "ありがとうございます"];
+  var KANA = ["あいうえお", "かきくけこ", "さしすせそ", "たちつてと", "なにぬねの", "はひふへほ", "まみむめも", "や ゆ よ", "らりるれろ", "わをんー、", "。？！ 　"];
+
+  // 語彙: 定型句 + 議事録に出てきた語句 (出現回数つき)
+  function lexicon(msgs) {
+    var count = Object.create(null);
+    PHRASES.forEach(function (p) { count[p] = 1; });
+    (msgs || []).forEach(function (m) {
+      String(m.text).split(/[、。・\s()「」→:：,]+/).forEach(function (w) {
+        w = w.trim(); if (w.length >= 2 && w.length <= 18 && !/^[0-9.]+$/.test(w)) count[w] = (count[w] || 0) + 1;
+      });
+    });
+    return count;
+  }
+  // 入力中の文字列 prefix (最後の区切り以降) に続く候補を、確率の高い順に返す
+  function predict(prefix, count, k) {
+    var tail = String(prefix).split(/[、。\s]/).pop();
+    // 入力が空のときは定型句だけを出す (議事録の語句は、頭の文字が入ってから)
+    var cands = tail ? Object.keys(count).filter(function (w) { return w.indexOf(tail) === 0 && w !== tail; }) : PHRASES.slice();
+    cands.sort(function (a, b) { return count[b] - count[a] || a.length - b.length || (a < b ? -1 : 1); });
+    cands = cands.slice(0, k || 8);
+    var z = 0, w = cands.map(function (c, i) { var v = (count[c] + 1) * En.kernel(i + 1); z += v; return v; });
+    return cands.map(function (c, i) {
+      var p = w[i] / z;
+      return { text: c, insert: tail ? c.slice(tail.length) : c, p: p, surprisal: -Math.log(p) };
+    });
+  }
+  // 候補の滞留時間 (ミリ秒)。候補が 1 つならもっとも短い
+  function dwellMs(cand, n, baseMs) {
+    var ratio = n > 1 ? cand.surprisal / Math.log(n) : 0;
+    return Math.round(baseMs * Math.max(0.35, Math.min(1.6, ratio)));
+  }
+  // 滞留の進み具合: ポインタが載ってから elapsed ミリ秒 → 0〜1。1 で確定
+  function progress(elapsed, ms) { return Math.max(0, Math.min(1, elapsed / ms)); }
+
+  global.BadaThought = { PHRASES: PHRASES, KANA: KANA, lexicon: lexicon, predict: predict, dwellMs: dwellMs, progress: progress };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaThought;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/*
+ * net.js — コンピュータ同士のやり取り (サーバーなし)
+ *
+ * 発言は「パケット」(JSON テキスト + SHA-256) にして送ります。経路は 2 つ:
+ *   ・1 台の中だけ (ループバック)
+ *   ・WebRTC データチャネル。接続は「接続コード」を相手に渡して行います
+ *     (主催者がコードを作る → 参加者が貼り付けて返信コードを作る → 主催者が貼り付ける)。
+ *     既定では STUN サーバーを使わないので、同じ LAN の中で接続できます。
+ * 主催者が発言に通し番号を付けて全員に配るので、全員の議事録が同じ順序になります。
+ */
+(function (global) {
+  "use strict";
+  var E = global.BadaGPTEngine || (typeof require !== "undefined" ? require("../../bada_gpt/src/engine.js") : null);
+
+  function pack(body) { var text = JSON.stringify(body); return JSON.stringify({ v: 1, body: text, sha256: E.hex(E.sha256(text)) }); }
+  function unpack(raw) {
+    var o = JSON.parse(raw);
+    if (!o || o.v !== 1 || typeof o.body !== "string" || E.hex(E.sha256(o.body)) !== o.sha256) throw new Error("パケットが壊れています");
+    return JSON.parse(o.body);
+  }
+  var b64 = {
+    enc: function (s) { return btoa(unescape(encodeURIComponent(s))); },
+    dec: function (s) { return decodeURIComponent(escape(atob(String(s).trim()))); }
+  };
+
+  // Hub: 主催者 (通し番号を付けて配る) または参加者 (主催者へ送る)
+  function Hub(opts) {
+    this.host = !!opts.host; this.onMessage = opts.onMessage || function () {}; this.onPeers = opts.onPeers || function () {};
+    this.seq = 0; this.links = []; this.iceServers = opts.iceServers || [];
+  }
+  Hub.prototype.send = function (draft) {             // draft = {role, name, kind, text, data}
+    if (this.host) this._stamp(draft);
+    else if (this.links[0] && this.links[0].ch && this.links[0].ch.readyState === "open") this.links[0].ch.send(pack({ t: "draft", m: draft }));
+    else throw new Error("主催者につながっていません");
+  };
+  Hub.prototype._stamp = function (draft) {
+    if (draft.kind === "agenda") this.seq = 0;
+    var m = Object.assign({}, draft, { seq: this.seq++ }), raw = pack({ t: "msg", m: m });
+    this.links.forEach(function (l) { if (l.ch && l.ch.readyState === "open") l.ch.send(raw); });
+    this.onMessage(m);
+  };
+  Hub.prototype._receive = function (raw) {
+    var p; try { p = unpack(raw); } catch (e) { return; }      // 壊れたパケットは捨てる
+    if (this.host && p.t === "draft") this._stamp(p.m);
+    else if (!this.host && p.t === "msg") this.onMessage(p.m);
+    else if (!this.host && p.t === "sync") p.msgs.forEach(this.onMessage);
+  };
+  Hub.prototype.peers = function () { return this.links.filter(function (l) { return l.ch && l.ch.readyState === "open"; }).length; };
+  Hub.prototype._wire = function (link, history) {
+    var self = this;
+    link.ch.onopen = function () { if (self.host && history) link.ch.send(pack({ t: "sync", msgs: history() })); self.onPeers(self.peers()); };
+    link.ch.onclose = function () { self.onPeers(self.peers()); };
+    link.ch.onmessage = function (ev) { self._receive(ev.data); };
+  };
+  function gathered(pc) {
+    return new Promise(function (resolve) {
+      if (pc.iceGatheringState === "complete") return resolve();
+      var done = function () { if (pc.iceGatheringState === "complete") { pc.removeEventListener("icegatheringstatechange", done); resolve(); } };
+      pc.addEventListener("icegatheringstatechange", done); setTimeout(resolve, 4000);
+    });
+  }
+  // 主催者: 招待コードを作る。history() は参加時に送る、それまでの議事録
+  Hub.prototype.invite = async function (history) {
+    var pc = new RTCPeerConnection({ iceServers: this.iceServers }), link = { pc: pc, ch: pc.createDataChannel("meeting") };
+    this.links.push(link); this._wire(link, history);
+    await pc.setLocalDescription(await pc.createOffer()); await gathered(pc);
+    return { link: link, code: b64.enc(JSON.stringify(pc.localDescription)) };
+  };
+  Hub.prototype.accept = async function (link, answerCode) { await link.pc.setRemoteDescription(JSON.parse(b64.dec(answerCode))); };
+  // 参加者: 招待コードから返信コードを作る
+  Hub.prototype.join = async function (inviteCode) {
+    var self = this, pc = new RTCPeerConnection({ iceServers: this.iceServers }), link = { pc: pc, ch: null };
+    this.links = [link];
+    pc.ondatachannel = function (ev) { link.ch = ev.channel; self._wire(link); };
+    await pc.setRemoteDescription(JSON.parse(b64.dec(inviteCode)));
+    await pc.setLocalDescription(await pc.createAnswer()); await gathered(pc);
+    return b64.enc(JSON.stringify(pc.localDescription));
+  };
+
+  global.BadaNet = { Hub: Hub, pack: pack, unpack: unpack, b64: b64 };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaNet;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var ROLE_JA = BadaAgents.ROLES, meeting = new BadaMeeting.Meeting(), pending = null;
+  var hub = makeHub(true);
+  function makeHub(host) { return new BadaNet.Hub({ host: host, onMessage: onMessage, onPeers: showStatus }); }
+  function myRoles() { var r = $("role").value; return r === "all" ? BadaMeeting.ORDER : r === "observer" ? [] : [r]; }
+  function showStatus() {
+    var n = hub.peers();
+    $("status").textContent = (hub.host ? (n ? "主催中 · 接続 " + n + " 台" : "1 台で動作中") : (n ? "参加中 · 主催者と接続" : "未接続"));
+  }
+
+  /* ── 議事録の表示 ── */
+  function render() {
+    var log = $("log"); log.textContent = "";
+    if (!meeting.msgs.length) {
+      var e = document.createElement("div"); e.className = "empty";
+      e.textContent = "議題を入力して「議題として送る」を選ぶと、企画・プランナー・アプリケーションエンジニアが会議を始めます。";
+      log.appendChild(e);
+    }
+    meeting.msgs.forEach(function (m) {
+      var d = document.createElement("div"); d.className = "msg " + (m.role || "") + " " + m.kind;
+      var who = document.createElement("div"); who.className = "who";
+      var b = document.createElement("b"); b.textContent = m.kind === "agenda" ? "議題" : (ROLE_JA[m.role] || m.name || "参加者"); who.appendChild(b);
+      if (m.kind !== "agenda") {
+        var s = document.createElement("span");
+        s.textContent = "情報量 H " + m.measure.H.toFixed(2) + " · ずれ D " + m.measure.D.toFixed(2);
+        who.appendChild(s);
+        if (!m.measure.pass) { var o = document.createElement("span"); o.className = "off"; o.textContent = "議題から外れている可能性 (門を通らず)"; who.appendChild(o); }
+      }
+      var t = document.createElement("div"); t.textContent = m.text;
+      d.appendChild(who); d.appendChild(t); log.appendChild(d);
+    });
+    log.scrollTop = log.scrollHeight;
+    var st = meeting.stats();
+    $("stats").innerHTML = "";
+    [["発言", st.count], ["全体の情報量 H", st.H.toFixed(2)], ["ずれの平均 D", st.mean_D.toFixed(2)], ["流れ F", st.flow.toFixed(3)], ["門を通らず", st.off_topic]].forEach(function (p) {
+      var sp = document.createElement("span"); sp.textContent = p[0] + " "; var bb = document.createElement("b"); bb.textContent = p[1]; sp.appendChild(bb);
+      sp.appendChild(document.createTextNode("　")); $("stats").appendChild(sp);
+    });
+    $("export").disabled = !meeting.msgs.length;
+  }
+
+  /* ── 発言の受信と、役割の自動発言 ── */
+  function onMessage(m) {
+    if (!meeting.add(m)) return;
+    render(); refreshCands(); schedule();
+  }
+  function schedule() {
+    clearTimeout(pending);
+    if (!$("auto").checked || meeting.decided()) return;
+    pending = setTimeout(function () {
+      var roles = myRoles();
+      for (var i = 0; i < roles.length; i++) {
+        var d = meeting.next(roles[i]);
+        if (d) { try { hub.send(Object.assign({ role: roles[i] }, d)); } catch (e) { $("status").textContent = e.message; } return; }
+      }
+    }, 600);
+  }
+  function say(kind) {
+    var text = $("compose").value.trim(); if (!text) return;
+    var role = $("role").value, draft = { role: kind === "agenda" ? "host" : (role === "all" || role === "observer" ? "guest" : role), kind: kind, text: text, data: {} };
+    if (kind === "comment") {
+      // 役割の案をそのまま送る場合は、案の種類とデータを付ける (他の端末のエージェントが読めるように)
+      var roles = myRoles();
+      for (var i = 0; i < roles.length; i++) { var d = meeting.next(roles[i]); if (d && d.text === text) { draft = Object.assign({ role: roles[i] }, d); break; } }
+      var dir = BadaAgents.directive(text);
+      if (dir && meeting.msgs.length && draft.kind === "comment") {       // 「期限を 8 週間に」→ 議題を更新して話し合い直す
+        var base = meeting.msgs[0].text.replace(/[、。]?\s*期限は\s*[\d.]+\s*週間$/, "").replace(/[0-9０-９.]+\s*(週間|週|か月|ヶ月|ヵ月|カ月|ケ月|箇月|月間|日間|日)(で|以内に|までに)?/, "");
+        draft = { role: "host", kind: "agenda", text: base + "、期限は " + dir.deadline_weeks + " 週間", data: {} };
+      }
+    }
+    try { hub.send(draft); $("compose").value = ""; refreshCands(); } catch (e) { $("status").textContent = e.message; }
+  }
+
+  /* ── 思念入力: 滞留で確定するタイル ── */
+  var timer = null;
+  function tile(label, ms, onPick, cls, small) {
+    var b = document.createElement("button"); b.type = "button"; b.className = "tile " + (cls || ""); b.style.setProperty("--ms", ms + "ms");
+    var s = document.createElement("span"); s.textContent = label; b.appendChild(s);
+    if (small) { var sm = document.createElement("small"); sm.textContent = small; s.appendChild(sm); }
+    var cancel = function () { clearTimeout(timer); b.classList.remove("dwell"); };
+    b.addEventListener("pointerenter", function (ev) {
+      if (ev.pointerType === "touch") return;            // タッチはタップで確定
+      cancel(); void b.offsetWidth; b.classList.add("dwell");
+      timer = setTimeout(function () { cancel(); onPick(); }, ms);
+    });
+    b.addEventListener("pointerleave", cancel);
+    b.addEventListener("click", function () { cancel(); onPick(); });
+    return b;
+  }
+  function base() { return +$("base").value; }
+  function insert(text) { var c = $("compose"); c.value += text; refreshCands(); }
+  function refreshCands() {
+    var box = $("cands"); box.textContent = "";
+    var roles = myRoles(), i, d;
+    if (!$("auto").checked) for (i = 0; i < roles.length; i++) {      // 手動のとき: 役割の案を最初の候補に出す
+      d = meeting.next(roles[i]);
+      if (d) { (function (dd, r) { box.appendChild(tile(ROLE_JA[r] + "の案: " + dd.text.slice(0, 46) + "…", Math.round(base() * 0.35), function () { $("compose").value = dd.text; refreshCands(); }, "draft")); })(d, roles[i]); break; }
+    }
+    var cands = BadaThought.predict($("compose").value, BadaThought.lexicon(meeting.msgs), 8);
+    cands.forEach(function (c) {
+      var ms = BadaThought.dwellMs(c, cands.length, base());
+      box.appendChild(tile(c.text, ms, function () { insert(c.insert); }, "", (ms / 1000).toFixed(1) + " 秒"));
+    });
+    var acts = $("acts"); acts.textContent = "";
+    acts.appendChild(tile(meeting.msgs.length ? "発言する" : "議題として送る", base(), function () { say(meeting.msgs.length ? "comment" : "agenda"); }, "act"));
+    if (meeting.msgs.length) acts.appendChild(tile("新しい議題として送る", base(), function () { say("agenda"); }));
+    acts.appendChild(tile("1 文字消す", Math.round(base() * 0.6), function () { var c = $("compose"); c.value = c.value.slice(0, -1); refreshCands(); }));
+    acts.appendChild(tile("全部消す", base(), function () { $("compose").value = ""; refreshCands(); }));
+  }
+  function buildKana() {
+    var k = $("kana"); k.textContent = "";
+    BadaThought.KANA.forEach(function (col) {
+      var c = document.createElement("div"); c.className = "col";
+      Array.from(col).forEach(function (ch) {
+        if (ch === " ") { c.appendChild(document.createElement("span")); return; }
+        c.appendChild(tile(ch === "　" ? "空白" : ch, base(), function () { insert(ch === "　" ? " " : ch); }));
+      });
+      k.appendChild(c);
+    });
+  }
+
+  /* ── 接続 ── */
+  var inviteLink = null;
+  $("connect").onclick = function () { $("dlgmsg").textContent = ""; $("dlg").showModal(); };
+  $("close").onclick = function () { $("dlg").close(); };
+  Array.from(document.querySelectorAll("input[name=side]")).forEach(function (r) {
+    r.onchange = function () { var g = r.value === "guest" && r.checked; $("guestpane").hidden = !g; $("hostpane").hidden = g; };
+  });
+  $("mkinvite").onclick = async function () {
+    try {
+      if (!hub.host) { hub = makeHub(true); }
+      var inv = await hub.invite(function () { return meeting.msgs.map(function (m) { var c = Object.assign({}, m); delete c.measure; return c; }); });
+      inviteLink = inv.link; $("invite").value = inv.code; $("dlgmsg").textContent = "招待コードを相手に渡してください。";
+    } catch (e) { $("dlgmsg").textContent = "招待コードを作れませんでした: " + e.message; }
+  };
+  $("accept").onclick = async function () {
+    try { await hub.accept(inviteLink, $("answerin").value); $("dlgmsg").textContent = "接続を待っています…"; $("answerin").value = ""; }
+    catch (e) { $("dlgmsg").textContent = "返信コードを読めませんでした。貼り付けた内容を確認してください。"; }
+  };
+  $("mkanswer").onclick = async function () {
+    try {
+      hub = makeHub(false); meeting = new BadaMeeting.Meeting(); render();
+      if ($("role").value === "all") $("role").value = "observer";
+      $("answer").value = await hub.join($("invitein").value); $("dlgmsg").textContent = "返信コードを主催者に渡してください。"; showStatus();
+    } catch (e) { $("dlgmsg").textContent = "招待コードを読めませんでした。貼り付けた内容を確認してください。"; }
+  };
+
+  /* ── その他 ── */
+  $("export").onclick = function () {
+    var md = meeting.minutes();
+    if (/; wv\)/.test(navigator.userAgent)) { $("compose").value = md; return; }      // Android WebView: 保存できない場合があるので入力欄に出す
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown;charset=utf-8" })); a.download = "meeting-minutes.md";
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  $("compose").addEventListener("input", refreshCands);
+  $("compose").addEventListener("keydown", function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); say(meeting.msgs.length ? "comment" : "agenda"); } });
+  $("base").oninput = function () { $("basev").textContent = (base() / 1000).toFixed(1); buildKana(); refreshCands(); };
+  $("role").onchange = function () { refreshCands(); schedule(); };
+  $("auto").onchange = function () { refreshCands(); schedule(); };
+  window.BadaMeetingApp = { meeting: function () { return meeting; }, hub: function () { return hub; } };
+  render(); buildKana(); refreshCands(); showStatus();
+})();
+</script>
+</body>
+</html>

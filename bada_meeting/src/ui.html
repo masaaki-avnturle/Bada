@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bada 思念会議</title>
+<style>
+  :root { --bg:#0d1017; --panel:#151a25; --panel2:#1b2231; --line:#263046; --fg:#e7eaf1; --mut:#8d97ab; --acc:#7ab0ff;
+          --kikaku:#f2b866; --planner:#7fd6a8; --engineer:#8fb4ff; --host:#c3a6ff; --ng:#ff8a8a; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif; display: flex; flex-direction: column; }
+  button, select, input, textarea { font: inherit; color: var(--fg); }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0 8px 0 0; }
+  .ctl { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  label.ctl { display: inline-flex; gap: 6px; align-items: center; }
+  #status { margin-left: auto; font-size: 12px; color: var(--mut); }
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+  #log { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 780px; border: 1px solid var(--line); border-left: 4px solid var(--mut); border-radius: 4px 12px 12px 4px; background: var(--panel); padding: 8px 12px; }
+  .msg.kikaku { border-left-color: var(--kikaku); } .msg.planner { border-left-color: var(--planner); } .msg.engineer { border-left-color: var(--engineer); } .msg.host { border-left-color: var(--host); }
+  .msg .who { font-size: 12px; color: var(--mut); display: flex; flex-wrap: wrap; gap: 8px; }
+  .msg .who b { color: var(--fg); }
+  .msg .off { color: var(--ng); }
+  .msg.decide { background: #16261f; }
+  .empty { color: var(--mut); margin: auto; text-align: center; max-width: 460px; }
+  aside { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 12px; gap: 10px; }
+  aside h2 { font-size: 13px; margin: 0; color: var(--mut); font-weight: 600; }
+  #compose { width: 100%; min-height: 64px; resize: vertical; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tile { position: relative; overflow: hidden; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; text-align: left; max-width: 100%; }
+  .tile > span { position: relative; }
+  .tile::before { content: ""; position: absolute; inset: 0; width: 0; background: rgba(122,176,255,.28); }
+  .tile.dwell::before { width: 100%; transition: width var(--ms, 800ms) linear; }
+  .tile.draft { border-color: var(--acc); }
+  .tile.act { background: var(--acc); color: #071224; font-weight: 600; border: 0; }
+  .tile small { color: var(--mut); margin-left: 6px; }
+  #kana { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; }
+  #kana .col { display: grid; gap: 3px; }
+  #kana .tile { padding: 4px 0; text-align: center; min-height: 28px; }
+  #stats { font-size: 12px; color: var(--mut); border-top: 1px solid var(--line); padding-top: 8px; }
+  #stats b { color: var(--fg); font-weight: 600; }
+  .note { font-size: 12px; color: var(--mut); }
+  dialog { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; width: min(620px, calc(100vw - 32px)); padding: 16px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog textarea { width: 100%; height: 84px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
+  dialog h3 { margin: 12px 0 4px; font-size: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; grid-template-rows: minmax(180px, 1fr) auto; } aside { border-left: 0; border-top: 1px solid var(--line); max-height: 58vh; } #kana .tile { font-size: 12px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bada 思念会議</h1>
+  <select id="role" class="ctl" aria-label="この端末の役割">
+    <option value="all">全役を 1 台で</option><option value="kikaku">企画</option><option value="planner">プランナー</option>
+    <option value="engineer">アプリケーションエンジニア</option><option value="observer">参加者 (役割なし)</option>
+  </select>
+  <label class="ctl"><input type="checkbox" id="auto" checked> 役割が自動で発言</label>
+  <button class="ctl" id="connect">接続</button>
+  <button class="ctl" id="export" disabled>議事録を保存</button>
+  <span id="status">1 台で動作中</span>
+</header>
+<main>
+  <div id="log" aria-live="polite"></div>
+  <aside>
+    <h2>思念入力 — 候補の上にポインタを留めると確定します (タップ・クリックでも確定)</h2>
+    <textarea id="compose" placeholder="議題の例: スマホ向けの予約アプリを 3 か月で作りたい" aria-label="発言"></textarea>
+    <div class="tiles" id="acts"></div>
+    <h2>候補</h2>
+    <div class="tiles" id="cands"></div>
+    <h2>かな</h2>
+    <div id="kana"></div>
+    <label class="note">滞留の基準時間 <input type="range" id="base" min="300" max="2000" step="100" value="800"> <span id="basev">0.8</span> 秒</label>
+    <div class="note">思考を読み取る装置ではありません。滞留 (ポインタを留める操作) を入力に使い、次の語句を予測して確定を速くします。</div>
+    <div id="stats"></div>
+  </aside>
+</main>
+<dialog id="dlg">
+  <b>コンピュータ同士をつなぐ (サーバーなし)</b>
+  <p class="note">接続コードを相手に渡して (メール・チャット・QR など) つなぎます。既定では同じ LAN の中で接続できます。発言は SHA-256 つきのパケットで送られ、主催者が通し番号を付けて全員に配ります。</p>
+  <div class="row"><label><input type="radio" name="side" value="host" checked> 主催する</label><label><input type="radio" name="side" value="guest"> 参加する</label></div>
+  <div id="hostpane">
+    <div class="row"><button class="ctl" id="mkinvite">① 招待コードを作る</button></div>
+    <h3>招待コード (相手に渡す)</h3><textarea id="invite" readonly></textarea>
+    <h3>② 相手から届いた返信コードを貼る</h3><textarea id="answerin"></textarea>
+    <div class="row"><button class="ctl" id="accept">③ 接続する</button></div>
+  </div>
+  <div id="guestpane" hidden>
+    <h3>① 主催者から届いた招待コードを貼る</h3><textarea id="invitein"></textarea>
+    <div class="row"><button class="ctl" id="mkanswer">② 返信コードを作る</button></div>
+    <h3>返信コード (主催者に渡す)</h3><textarea id="answer" readonly></textarea>
+  </div>
+  <div class="row"><span id="dlgmsg" class="note"></span><button class="ctl" id="close" style="margin-left:auto">閉じる</button></div>
+</dialog>
+<script>
+/*__LIBS__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var ROLE_JA = BadaAgents.ROLES, meeting = new BadaMeeting.Meeting(), pending = null;
+  var hub = makeHub(true);
+  function makeHub(host) { return new BadaNet.Hub({ host: host, onMessage: onMessage, onPeers: showStatus }); }
+  function myRoles() { var r = $("role").value; return r === "all" ? BadaMeeting.ORDER : r === "observer" ? [] : [r]; }
+  function showStatus() {
+    var n = hub.peers();
+    $("status").textContent = (hub.host ? (n ? "主催中 · 接続 " + n + " 台" : "1 台で動作中") : (n ? "参加中 · 主催者と接続" : "未接続"));
+  }
+
+  /* ── 議事録の表示 ── */
+  function render() {
+    var log = $("log"); log.textContent = "";
+    if (!meeting.msgs.length) {
+      var e = document.createElement("div"); e.className = "empty";
+      e.textContent = "議題を入力して「議題として送る」を選ぶと、企画・プランナー・アプリケーションエンジニアが会議を始めます。";
+      log.appendChild(e);
+    }
+    meeting.msgs.forEach(function (m) {
+      var d = document.createElement("div"); d.className = "msg " + (m.role || "") + " " + m.kind;
+      var who = document.createElement("div"); who.className = "who";
+      var b = document.createElement("b"); b.textContent = m.kind === "agenda" ? "議題" : (ROLE_JA[m.role] || m.name || "参加者"); who.appendChild(b);
+      if (m.kind !== "agenda") {
+        var s = document.createElement("span");
+        s.textContent = "情報量 H " + m.measure.H.toFixed(2) + " · ずれ D " + m.measure.D.toFixed(2);
+        who.appendChild(s);
+        if (!m.measure.pass) { var o = document.createElement("span"); o.className = "off"; o.textContent = "議題から外れている可能性 (門を通らず)"; who.appendChild(o); }
+      }
+      var t = document.createElement("div"); t.textContent = m.text;
+      d.appendChild(who); d.appendChild(t); log.appendChild(d);
+    });
+    log.scrollTop = log.scrollHeight;
+    var st = meeting.stats();
+    $("stats").innerHTML = "";
+    [["発言", st.count], ["全体の情報量 H", st.H.toFixed(2)], ["ずれの平均 D", st.mean_D.toFixed(2)], ["流れ F", st.flow.toFixed(3)], ["門を通らず", st.off_topic]].forEach(function (p) {
+      var sp = document.createElement("span"); sp.textContent = p[0] + " "; var bb = document.createElement("b"); bb.textContent = p[1]; sp.appendChild(bb);
+      sp.appendChild(document.createTextNode("　")); $("stats").appendChild(sp);
+    });
+    $("export").disabled = !meeting.msgs.length;
+  }
+
+  /* ── 発言の受信と、役割の自動発言 ── */
+  function onMessage(m) {
+    if (!meeting.add(m)) return;
+    render(); refreshCands(); schedule();
+  }
+  function schedule() {
+    clearTimeout(pending);
+    if (!$("auto").checked || meeting.decided()) return;
+    pending = setTimeout(function () {
+      var roles = myRoles();
+      for (var i = 0; i < roles.length; i++) {
+        var d = meeting.next(roles[i]);
+        if (d) { try { hub.send(Object.assign({ role: roles[i] }, d)); } catch (e) { $("status").textContent = e.message; } return; }
+      }
+    }, 600);
+  }
+  function say(kind) {
+    var text = $("compose").value.trim(); if (!text) return;
+    var role = $("role").value, draft = { role: kind === "agenda" ? "host" : (role === "all" || role === "observer" ? "guest" : role), kind: kind, text: text, data: {} };
+    if (kind === "comment") {
+      // 役割の案をそのまま送る場合は、案の種類とデータを付ける (他の端末のエージェントが読めるように)
+      var roles = myRoles();
+      for (var i = 0; i < roles.length; i++) { var d = meeting.next(roles[i]); if (d && d.text === text) { draft = Object.assign({ role: roles[i] }, d); break; } }
+      var dir = BadaAgents.directive(text);
+      if (dir && meeting.msgs.length && draft.kind === "comment") {       // 「期限を 8 週間に」→ 議題を更新して話し合い直す
+        var base = meeting.msgs[0].text.replace(/[、。]?\s*期限は\s*[\d.]+\s*週間$/, "").replace(/[0-9０-９.]+\s*(週間|週|か月|ヶ月|ヵ月|カ月|ケ月|箇月|月間|日間|日)(で|以内に|までに)?/, "");
+        draft = { role: "host", kind: "agenda", text: base + "、期限は " + dir.deadline_weeks + " 週間", data: {} };
+      }
+    }
+    try { hub.send(draft); $("compose").value = ""; refreshCands(); } catch (e) { $("status").textContent = e.message; }
+  }
+
+  /* ── 思念入力: 滞留で確定するタイル ── */
+  var timer = null;
+  function tile(label, ms, onPick, cls, small) {
+    var b = document.createElement("button"); b.type = "button"; b.className = "tile " + (cls || ""); b.style.setProperty("--ms", ms + "ms");
+    var s = document.createElement("span"); s.textContent = label; b.appendChild(s);
+    if (small) { var sm = document.createElement("small"); sm.textContent = small; s.appendChild(sm); }
+    var cancel = function () { clearTimeout(timer); b.classList.remove("dwell"); };
+    b.addEventListener("pointerenter", function (ev) {
+      if (ev.pointerType === "touch") return;            // タッチはタップで確定
+      cancel(); void b.offsetWidth; b.classList.add("dwell");
+      timer = setTimeout(function () { cancel(); onPick(); }, ms);
+    });
+    b.addEventListener("pointerleave", cancel);
+    b.addEventListener("click", function () { cancel(); onPick(); });
+    return b;
+  }
+  function base() { return +$("base").value; }
+  function insert(text) { var c = $("compose"); c.value += text; refreshCands(); }
+  function refreshCands() {
+    var box = $("cands"); box.textContent = "";
+    var roles = myRoles(), i, d;
+    if (!$("auto").checked) for (i = 0; i < roles.length; i++) {      // 手動のとき: 役割の案を最初の候補に出す
+      d = meeting.next(roles[i]);
+      if (d) { (function (dd, r) { box.appendChild(tile(ROLE_JA[r] + "の案: " + dd.text.slice(0, 46) + "…", Math.round(base() * 0.35), function () { $("compose").value = dd.text; refreshCands(); }, "draft")); })(d, roles[i]); break; }
+    }
+    var cands = BadaThought.predict($("compose").value, BadaThought.lexicon(meeting.msgs), 8);
+    cands.forEach(function (c) {
+      var ms = BadaThought.dwellMs(c, cands.length, base());
+      box.appendChild(tile(c.text, ms, function () { insert(c.insert); }, "", (ms / 1000).toFixed(1) + " 秒"));
+    });
+    var acts = $("acts"); acts.textContent = "";
+    acts.appendChild(tile(meeting.msgs.length ? "発言する" : "議題として送る", base(), function () { say(meeting.msgs.length ? "comment" : "agenda"); }, "act"));
+    if (meeting.msgs.length) acts.appendChild(tile("新しい議題として送る", base(), function () { say("agenda"); }));
+    acts.appendChild(tile("1 文字消す", Math.round(base() * 0.6), function () { var c = $("compose"); c.value = c.value.slice(0, -1); refreshCands(); }));
+    acts.appendChild(tile("全部消す", base(), function () { $("compose").value = ""; refreshCands(); }));
+  }
+  function buildKana() {
+    var k = $("kana"); k.textContent = "";
+    BadaThought.KANA.forEach(function (col) {
+      var c = document.createElement("div"); c.className = "col";
+      Array.from(col).forEach(function (ch) {
+        if (ch === " ") { c.appendChild(document.createElement("span")); return; }
+        c.appendChild(tile(ch === "　" ? "空白" : ch, base(), function () { insert(ch === "　" ? " " : ch); }));
+      });
+      k.appendChild(c);
+    });
+  }
+
+  /* ── 接続 ── */
+  var inviteLink = null;
+  $("connect").onclick = function () { $("dlgmsg").textContent = ""; $("dlg").showModal(); };
+  $("close").onclick = function () { $("dlg").close(); };
+  Array.from(document.querySelectorAll("input[name=side]")).forEach(function (r) {
+    r.onchange = function () { var g = r.value === "guest" && r.checked; $("guestpane").hidden = !g; $("hostpane").hidden = g; };
+  });
+  $("mkinvite").onclick = async function () {
+    try {
+      if (!hub.host) { hub = makeHub(true); }
+      var inv = await hub.invite(function () { return meeting.msgs.map(function (m) { var c = Object.assign({}, m); delete c.measure; return c; }); });
+      inviteLink = inv.link; $("invite").value = inv.code; $("dlgmsg").textContent = "招待コードを相手に渡してください。";
+    } catch (e) { $("dlgmsg").textContent = "招待コードを作れませんでした: " + e.message; }
+  };
+  $("accept").onclick = async function () {
+    try { await hub.accept(inviteLink, $("answerin").value); $("dlgmsg").textContent = "接続を待っています…"; $("answerin").value = ""; }
+    catch (e) { $("dlgmsg").textContent = "返信コードを読めませんでした。貼り付けた内容を確認してください。"; }
+  };
+  $("mkanswer").onclick = async function () {
+    try {
+      hub = makeHub(false); meeting = new BadaMeeting.Meeting(); render();
+      if ($("role").value === "all") $("role").value = "observer";
+      $("answer").value = await hub.join($("invitein").value); $("dlgmsg").textContent = "返信コードを主催者に渡してください。"; showStatus();
+    } catch (e) { $("dlgmsg").textContent = "招待コードを読めませんでした。貼り付けた内容を確認してください。"; }
+  };
+
+  /* ── その他 ── */
+  $("export").onclick = function () {
+    var md = meeting.minutes();
+    if (/; wv\)/.test(navigator.userAgent)) { $("compose").value = md; return; }      // Android WebView: 保存できない場合があるので入力欄に出す
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown;charset=utf-8" })); a.download = "meeting-minutes.md";
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  $("compose").addEventListener("input", refreshCands);
+  $("compose").addEventListener("keydown", function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); say(meeting.msgs.length ? "comment" : "agenda"); } });
+  $("base").oninput = function () { $("basev").textContent = (base() / 1000).toFixed(1); buildKana(); refreshCands(); };
+  $("role").onchange = function () { refreshCands(); schedule(); };
+  $("auto").onchange = function () { refreshCands(); schedule(); };
+  window.BadaMeetingApp = { meeting: function () { return meeting; }, hub: function () { return hub; } };
+  render(); buildKana(); refreshCands(); showStatus();
+})();
+</script>
+</body>
+</html>
