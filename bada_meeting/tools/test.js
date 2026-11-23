@@ -48,7 +48,7 @@ ok(off.next("kikaku").kind === "propose", "人の発言が挟まっても役割�
 const md = a.minutes();
 ok(/## 1\. 企画/.test(md) && /## 3\. 日程/.test(md) && /決定済み/.test(md) && /次期に回す機能: 口コミ/.test(md) && /担当者による確認が必要/.test(md), "議事録と計画書");
 
-console.log("ポインタを使わない入力 (電鍵と候補)");
+console.log("入力 (電鍵・候補・ポインタ)");
 const lex = T.lexicon(a.msgs), p0 = T.predict("", lex, 8), p1 = T.predict("見", lex, 5);
 ok(p0.length === 8 && p0.every(x => T.PHRASES.includes(x.text)) && near(p0.reduce((s, x) => s + x.p, 0), 1), "入力が空のときは定型句。確率の合計は 1");
 ok(p1.length > 0 && p1.every(x => x.text.startsWith("見") && "見" + x.insert === x.text), "頭の文字から続きを予測する", JSON.stringify(p1));
@@ -82,6 +82,9 @@ const kk = new T.Keyer(100, "kana"); kk.down(0); kk.up(50); kk.down(140); kk.up(
 ok(kk.tick(1100)[0].unknown === "......" && kk.idle(1200), "表にない符号は文字にせず知らせる");
 const km = new T.Keyer(100, "kana"); km.down(0); km.up(50); km.tick(400); km.setMode("latin");
 ok(km.tick(5000).length === 0 && km.idle(5000), "和文 / 欧文を切り替えた直後に余分な空白が入らない");
+
+ok(T.dwellMs(p0[0], 8, 800) < T.dwellMs(p0[7], 8, 800) && T.dwellMs(p0[0], 8, 800) >= 280 && T.dwellMs(p0[7], 8, 800) <= 1280 && T.dwellMs(p1[0], 1, 800) === 280, "ポインタの滞留: 確からしい候補ほど短い (基準の 0.35〜1.6 倍)");
+ok(T.GRID.length === 11 && T.GRID.join("").includes("↵") && T.GRID.join("").includes("゛"), "かな盤に改行と濁点がある");
 
 console.log("音響電信 (Bada Telegraph の FSK モデム)");
 const Tg = require("../src/telegraph.js"), Ac = require("../src/acoustic.js");
@@ -167,7 +170,7 @@ ok(noHost, "主催者につながっていなければ送信を断る");
 console.log("配布 HTML");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 ok(!/(src|href)\s*=\s*["']https?:/.test(html) && !/stun:/.test(html), "外部の資源も STUN サーバーも参照しない");
-ok(!/pointerenter|dwell/.test(html) && /rows="6"/.test(html), "滞留 (ポインタ) による入力は無く、発言欄は複数行");
+ok(/pointerenter/.test(html) && /id="ptrmode"/.test(html) && /rows="6"/.test(html), "ポインタ (滞留) 入力があり、発言欄は複数行");
 const multiMt = M.runLocal("スマホ向けの予約アプリを\n3か月で作りたい");
 ok(multiMt.decided() && /\*\*議題\*\*: スマホ向けの予約アプリを \/ 3か月で作りたい/.test(multiMt.minutes()), "複数行の議題でも会議が成り立ち、議事録に収まる");
 const scripts = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g), m => m[1]);

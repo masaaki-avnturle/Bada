@@ -1,11 +1,13 @@
 /*
- * thought.js — ポインタを使わない入力: 電鍵 (モールス符号) と、語句の予測
+ * thought.js — 入力の 3 つの方法: キーボード / 電鍵 (モールス符号) / ポインタの滞留、と語句の予測
  *
  * 電鍵は Bada Telegraph (bada_telegraph) のモールス符号を使う。キー 1 つの「短く押す / 長く押す」
  * だけで文字を打てる。和文モールスにも対応 (濁点・半濁点は直前のかなに付く)。
  *   短点 = 押した時間が 2 単位未満 / 長点 = 2 単位以上
  *   文字の区切り = 2.5 単位の無操作 / 語の区切り (欧文のみ) = 6 単位の無操作
- * 予測した候補は Alt + 数字で入れる。候補の確率には、レポートの核 1/(x log x)² を
+ * ポインタの滞留: 候補やかなの上にポインタを留めると確定する (Ω-Telepathy と同じ方式)。
+ *   滞留時間 T(c) = 基準時間 × clamp(−log p(c) / log(候補数), 0.35, 1.6)   … 確からしい候補ほど短い
+ * 予測した候補は Alt + 数字でも入れられる。候補の確率には、レポートの核 1/(x log x)² を
  * 順位の事前分布として使う (E3)。
  */
 (function (global) {
@@ -98,6 +100,14 @@
     return cands.map(function (c, i) { var p = w[i] / z; return { text: c, insert: tail ? c.slice(tail.length) : c, p: p, surprisal: -Math.log(p) }; });
   }
 
-  global.BadaThought = { PHRASES: PHRASES, LATIN: LATIN, KANA: KANA, decodeSymbol: decodeSymbol, append: append, toMorse: toMorse, Keyer: Keyer, lexicon: lexicon, predict: predict };
+  // ポインタ用のかな盤 (列ごと)。"↵" は改行
+  var GRID = ["あいうえお", "かきくけこ", "さしすせそ", "たちつてと", "なにぬねの", "はひふへほ", "まみむめも", "や ゆ よ", "らりるれろ", "わをんー゛", "、。？゜↵"];
+  // 候補の滞留時間 (ミリ秒)。候補が 1 つならもっとも短い
+  function dwellMs(cand, n, baseMs) {
+    var ratio = n > 1 ? cand.surprisal / Math.log(n) : 0;
+    return Math.round(baseMs * Math.max(0.35, Math.min(1.6, ratio)));
+  }
+
+  global.BadaThought = { GRID: GRID, dwellMs: dwellMs, PHRASES: PHRASES, LATIN: LATIN, KANA: KANA, decodeSymbol: decodeSymbol, append: append, toMorse: toMorse, Keyer: Keyer, lexicon: lexicon, predict: predict };
   if (typeof module !== "undefined" && module.exports) module.exports = global.BadaThought;
 })(typeof window !== "undefined" ? window : globalThis);

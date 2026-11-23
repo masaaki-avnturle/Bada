@@ -34,9 +34,17 @@
   #compose { width: 100%; min-height: 132px; resize: vertical; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; line-height: 1.5; }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .act { background: var(--acc); color: #071224; font-weight: 600; border: 0; border-radius: 8px; padding: 6px 12px; }
-  #cands { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; }
-  #cands li { display: flex; gap: 8px; align-items: baseline; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
-  #cands li.draft { border-color: var(--acc); }
+  #cands { display: grid; gap: 4px; font-size: 13px; }
+  .tile { position: relative; overflow: hidden; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; text-align: left; font-size: 13px; }
+  .tile > span { position: relative; display: flex; gap: 8px; align-items: baseline; }
+  .tile::before { content: ""; position: absolute; inset: 0; width: 0; background: rgba(122,176,255,.28); }
+  .tile.dwell::before { width: 100%; transition: width var(--ms, 800ms) linear; }
+  .tile.draft { border-color: var(--acc); }
+  #padacts { display: flex; flex-wrap: wrap; gap: 6px; }
+  #grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; }
+  #grid .col { display: grid; gap: 3px; }
+  #grid .tile { padding: 4px 0; min-height: 28px; }
+  #grid .tile > span { justify-content: center; }
   #keystate { font: 13px ui-monospace, Menlo, Consolas, monospace; color: var(--acc); min-height: 1.6em; letter-spacing: 2px; }
   #touchkey { width: 100%; padding: 14px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); touch-action: none; user-select: none; }
   #touchkey.down { background: var(--acc); color: #071224; }
@@ -67,7 +75,7 @@
 <main>
   <div id="log" aria-live="polite"></div>
   <aside>
-    <h2>発言 — 複数行で書けます。ポインタは不要です</h2>
+    <h2>発言 — 複数行。キーボード・電鍵・ポインタのどれでも入力できます</h2>
     <textarea id="compose" rows="6" placeholder="議題の例:&#10;スマホ向けの予約アプリを&#10;3 か月で作りたい" aria-label="発言 (複数行)"></textarea>
     <div class="row">
       <button class="act" id="say">発言する <kbd>Ctrl+Enter</kbd></button>
@@ -82,8 +90,17 @@
     <div id="keystate" aria-live="off">電鍵モードは切です</div>
     <button id="touchkey" aria-label="電鍵 (タッチ端末用)">電鍵 — タッチ端末はここを押す (短く = ・ / 長く = －)</button>
     <div class="note">電鍵モードでは、発言欄で <kbd>Space</kbd> を短く押すと「・」、長く押すと「－」。<kbd>Enter</kbd> で改行、<kbd>Backspace</kbd> で 1 文字消す。</div>
-    <h2>候補 — <kbd>Alt</kbd> + 数字で入れる</h2>
-    <ol id="cands"></ol>
+    <h2>候補 — <kbd>Alt</kbd> + 数字、またはポインタを留めて入れる</h2>
+    <div id="cands"></div>
+    <h2>ポインタ (滞留) 入力 — 上にポインタを留めると確定</h2>
+    <div class="row">
+      <button class="ctl" id="ptrmode" aria-pressed="true">ポインタ入力 <kbd>F7</kbd></button>
+      <label class="note">基準 <input type="range" id="base" min="300" max="2000" step="100" value="800" aria-label="滞留の基準時間"> <span id="basev">0.8</span> 秒</label>
+    </div>
+    <div id="pad">
+      <div id="padacts"></div>
+      <div id="grid" style="margin-top:6px"></div>
+    </div>
     <div id="stats"></div>
     <div class="note" id="acstate"></div>
   </aside>
@@ -186,17 +203,54 @@
     var box = $("cands"); box.textContent = ""; candList = [];
     var roles = myRoles(), i, d, draft = null;
     if (!$("auto").checked) for (i = 0; i < roles.length; i++) { d = meeting.next(roles[i]); if (d) { draft = { role: roles[i], d: d }; break; } }
-    var add = function (key, label, cls, pick) {
-      var li = document.createElement("li"); if (cls) li.className = cls;
-      var k = document.createElement("kbd"); k.textContent = "Alt+" + key; li.appendChild(k);
-      li.appendChild(document.createTextNode(label)); box.appendChild(li); candList[key] = pick;
+    var add = function (key, label, cls, ms, pick) {
+      var act = function () { pick(); refreshCands(); };
+      box.appendChild(tile(label, ms, act, cls, "Alt+" + key)); candList[key] = pick;
     };
-    if (draft) add(0, ROLE_JA[draft.role] + "の案: " + draft.d.text.slice(0, 44) + "…", "draft", function () { $("compose").value = draft.d.text; });
-    var line = $("compose").value.split("\n").pop();
-    BadaThought.predict(line, BadaThought.lexicon(meeting.msgs), 8).forEach(function (c, n) {
-      add(n + 1, c.text + "  (" + (c.p * 100).toFixed(0) + "%)", "", function () { $("compose").value += c.insert; });
+    if (draft) add(0, ROLE_JA[draft.role] + "の案: " + draft.d.text.slice(0, 44) + "…", "draft", Math.round(base() * 0.35), function () { $("compose").value = draft.d.text; });
+    var line = $("compose").value.split("\n").pop(), cands = BadaThought.predict(line, BadaThought.lexicon(meeting.msgs), 8);
+    cands.forEach(function (c, n) {
+      add(n + 1, c.text + "  (" + (c.p * 100).toFixed(0) + "%)", "", BadaThought.dwellMs(c, cands.length, base()), function () { $("compose").value += c.insert; });
     });
   }
+
+  /* ── ポインタ (滞留) 入力: 上にポインタを留めると確定する。クリック・タップでも確定 ── */
+  var ptrOn = true, dwellTimer = null;
+  function base() { return +$("base").value; }
+  function tile(label, ms, onPick, cls, key) {
+    var b = document.createElement("button"); b.type = "button"; b.className = "tile " + (cls || ""); b.style.setProperty("--ms", ms + "ms");
+    var s = document.createElement("span");
+    if (key) { var k = document.createElement("kbd"); k.textContent = key; s.appendChild(k); }
+    s.appendChild(document.createTextNode(label)); b.appendChild(s);
+    var cancel = function () { clearTimeout(dwellTimer); b.classList.remove("dwell"); };
+    b.addEventListener("pointerenter", function (ev) {
+      if (!ptrOn || ev.pointerType === "touch") return;            // タッチはタップで確定
+      cancel(); void b.offsetWidth; b.classList.add("dwell");
+      dwellTimer = setTimeout(function () { cancel(); onPick(); }, ms);
+    });
+    b.addEventListener("pointerleave", cancel);
+    b.addEventListener("click", function () { cancel(); onPick(); });
+    return b;
+  }
+  function typeChar(ch) { var c = $("compose"); c.value = ch === "↵" ? c.value + "\n" : BadaThought.append(c.value, ch); refreshCands(); }
+  function buildPad() {
+    var acts = $("padacts"), g = $("grid"); acts.textContent = ""; g.textContent = "";
+    acts.appendChild(tile("発言する", base(), function () { say(meeting.msgs.length ? "comment" : "agenda"); }));
+    acts.appendChild(tile("改行", Math.round(base() * 0.6), function () { typeChar("↵"); }));
+    acts.appendChild(tile("1 文字消す", Math.round(base() * 0.6), function () { var c = $("compose"); c.value = c.value.slice(0, -1); refreshCands(); }));
+    acts.appendChild(tile("全部消す", base(), function () { $("compose").value = ""; refreshCands(); }));
+    BadaThought.GRID.forEach(function (col) {
+      var c = document.createElement("div"); c.className = "col";
+      Array.from(col).forEach(function (ch) {
+        if (ch === " ") { c.appendChild(document.createElement("span")); return; }
+        c.appendChild(tile(ch, base(), function () { typeChar(ch); }));
+      });
+      g.appendChild(c);
+    });
+  }
+  function setPtr(on) { ptrOn = on; $("ptrmode").setAttribute("aria-pressed", String(on)); $("pad").hidden = !on; clearTimeout(dwellTimer); }
+  $("ptrmode").onclick = function () { setPtr(!ptrOn); };
+  $("base").oninput = function () { $("basev").textContent = (base() / 1000).toFixed(1); buildPad(); refreshCands(); };
 
   /* ── 電鍵 (モールス符号) ── */
   var keyer = new BadaThought.Keyer(120, "kana"), keyOn = false, toneCtx = null, toneOsc = null;
@@ -291,12 +345,13 @@
     else if (e.key === "F3") { e.preventDefault(); toggleKana(); }
     else if (e.key === "F4") { e.preventDefault(); toggleAcoustic(); }
     else if (e.key === "F6") { e.preventDefault(); exportMinutes(); }
+    else if (e.key === "F7") { e.preventDefault(); setPtr(!ptrOn); }
     else if (e.altKey && /^Digit[0-9]$/.test(e.code)) { var pick = candList[+e.code.slice(5)]; if (pick) { e.preventDefault(); pick(); refreshCands(); $("compose").focus(); } }
   });
   $("role").onchange = function () { refreshCands(); schedule(); };
   $("auto").onchange = function () { refreshCands(); schedule(); };
   window.BadaMeetingApp = { meeting: function () { return meeting; }, bus: function () { return bus; }, keyer: keyer };
-  render(); refreshCands(); showStatus(); $("compose").focus();
+  render(); buildPad(); refreshCands(); showStatus(); $("compose").focus();
 })();
 </script>
 </body>

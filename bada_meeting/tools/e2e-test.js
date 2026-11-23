@@ -1,9 +1,10 @@
 /*
  * e2e-test.js — 実際のブラウザで確かめる (Playwright と Chromium が必要。CI では実行しない)
  *   node bada_meeting/tools/e2e-test.js [スクリーンショットの出力先]
- * 操作はすべてキーボードで行う (マウス・タッチを使わない)。
+ * 1〜3 の操作はすべてキーボードで行う (マウス・タッチを使わない)。4 はポインタだけで行う。
  * 1. 1 台で全役: 複数行の議題 → 決定。電鍵 (Space の長短) と Alt + 数字で入力
  * 2. 3 つの画面を WebRTC でつなぐ (接続の操作もキーボードだけ)
+ * 4. ポインタ (滞留) だけで複数行を入力して発言する
  * 3. 音響電信: 別の端末が鳴らした音 (WAV を偽のマイク入力にする) を復調して、会議に応じる
  */
 "use strict";
@@ -62,6 +63,33 @@ const paste = async (p, sel, text) => { await p.focus(sel); await p.keyboard.ins
   ok(dl.suggestedFilename() === "meeting-minutes.md", "F6 で議事録を保存できる");
   ok(!(await solo.evaluate(() => document.documentElement.scrollWidth > innerWidth)), "横スクロールが出ない");
   if (shots) await solo.screenshot({ path: path.join(shots, "meeting-solo.png") });
+
+  console.log("ポインタ (滞留) だけで入力する");
+  const ptr = await open();
+  const hover = async (loc, want) => { await loc.hover(); await ptr.waitForFunction(v => document.getElementById("compose").value === v, want, { timeout: 5000 }); await ptr.mouse.move(2, 2); };
+  await hover(ptr.locator("#grid .tile", { hasText: "よ" }), "よ");
+  await hover(ptr.locator("#grid .tile", { hasText: "か" }), "よか");
+  await hover(ptr.locator("#grid .tile", { hasText: "゛" }), "よが");
+  await hover(ptr.locator("#padacts .tile", { hasText: "改行" }), "よが\n");
+  await hover(ptr.locator("#grid .tile", { hasText: "も" }), "よが\nも");
+  ok(true, "かな盤にポインタを留めるだけで、濁点つき・複数行を入力できる");
+  await hover(ptr.locator("#padacts .tile", { hasText: "全部消す" }), "");
+  const firstCand = ptr.locator("#cands .tile").first(), label = (await firstCand.innerText()).replace(/^Alt\+\d\s*/, "").replace(/\s*\(\d+%\)$/, "").trim();
+  await hover(firstCand, label);
+  ok(true, "候補もポインタを留めて入れられる: " + label);
+  await ptr.keyboard.press("F7"); await ptr.keyboard.press("Control+a"); await ptr.keyboard.press("Backspace");
+  ok(await ptr.locator("#pad").isHidden(), "F7 でポインタ入力を切ると、かな盤が隠れる");
+  await ptr.locator("#cands .tile").first().hover(); await sleep(2200);
+  ok((await ptr.inputValue("#compose")) === "", "切のときは、留めても入力されない");
+  await ptr.mouse.move(2, 2); await ptr.keyboard.press("F7");
+  for (const ch of "よやく") await hover(ptr.locator("#grid .tile", { hasText: ch }), (await ptr.inputValue("#compose")) + ch);
+  await ptr.locator("#padacts .tile", { hasText: "発言する" }).hover();
+  await ptr.waitForFunction(() => BadaMeetingApp.meeting().msgs.length > 0, null, { timeout: 5000 }); await ptr.mouse.move(2, 2);
+  await decided(ptr);
+  ok((await ptr.evaluate(() => BadaMeetingApp.meeting().msgs[0].text)) === "よやく", "ポインタだけで議題を送り、会議が決定まで進む");
+  ok(!(await ptr.evaluate(() => document.documentElement.scrollWidth > innerWidth)), "横スクロールが出ない (ポインタ入力あり)");
+  if (shots) await ptr.screenshot({ path: path.join(shots, "meeting-pointer.png") });
+  await ptr.close();
 
   console.log("3 台を WebRTC でつなぐ (キーボードだけ)");
   const host = await open(), g1 = await open(), g2 = await open({ width: 390, height: 800 });
