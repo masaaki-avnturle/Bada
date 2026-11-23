@@ -1,0 +1,45 @@
+# plugin: risk
+# name: リスク見張り
+# description: リスク・超過・遅れに触れた発言に印を付け、/risk で一覧、議事録に件数を加える
+#
+# 思念会議のプラグインの見本。Bada 言語の拡張トランザクションで書く。
+# 使えるもの: MINUTES ([役割, 種類, 本文] の配列)、AGENDA、contains(s, sub)、count_of(s, sub)
+
+@reviser : extension bada {
+    fun risk_hit |text| """
+        words := ["リスク", "超過", "超え", "遅れ", "懸念", "不足", "失敗"]
+        n := 0
+        i := 0
+        while (i < len(words)) {
+            if (contains(text, words[i])) { n := n + 1 }
+            i := i + 1
+        }
+        return n
+    """
+    fun risk_total || """
+        n := 0
+        i := 0
+        while (i < len(MINUTES)) {
+            if (risk_hit(MINUTES[i][2]) > 0) { n := n + 1 }
+            i := i + 1
+        }
+        return n
+    """
+    fun on_message |role, kind, text, seq| """
+        if (kind == "agenda") { return "" }
+        if (risk_hit(text) == 0) { return "" }
+        return "リスクに触れた発言です (これまで " + ("" + risk_total()) + " 件)"
+    """
+    fun on_command |args| """
+        out := "リスクに触れた発言: " + ("" + risk_total()) + " 件"
+        i := 0
+        while (i < len(MINUTES)) {
+            if (risk_hit(MINUTES[i][2]) > 0) { out := out + "\n- " + MINUTES[i][0] + ": " + substr(MINUTES[i][2], 0, 40) + "…" }
+            i := i + 1
+        }
+        return out
+    """
+    fun on_minutes |count| """
+        return "- リスク・超過・遅れに触れた発言: " + ("" + risk_total()) + " 件 / 全 " + ("" + count) + " 件"
+    """
+}

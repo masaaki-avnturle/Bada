@@ -251,6 +251,54 @@ ok(sig && sig[0] === "p1" && sig[1] === 7 && W3.nodes.p5.p.lastRoute[0] === "p1"
 W3.nodes.p3.p.leave(); W3.pump(false);
 ok(!W3.nodes.p1.p.members.p3 && !W3.nodes.p5.p.members.p3, "leave() で抜けると、全台の一覧から外れる");
 
+console.log("Bada XP (元の bada_ruby/mobile/www/index.html との照合)");
+const XP = require("../src/badaxp.js"), Pl = require("../src/plugins.js");
+const xpHtml = fs.readFileSync(path.join(__dirname, "..", "..", "bada_ruby", "mobile", "www", "index.html"), "utf8");
+const xpSrc = xpHtml.slice(xpHtml.indexOf("const LANCZOS_G"), xpHtml.indexOf("function capabilities("));
+const xpBox = {}; vm.createContext(xpBox);
+vm.runInContext(xpSrc.slice(0, xpSrc.indexOf("function classifyReq(")) + xpSrc.slice(xpSrc.indexOf("function splitSentences(")) + "\nthis.O = { xi, shannon, tokenize, localReply, localEquation, summarize, keywords, gamma, beta };", xpBox);
+const samples = ["リーマン予想とは", "スマホ向けの予約アプリを\n3か月で作りたい", "Hello world 123", "企画です。分野は「予約・日程」と見ました。対象は予約を受ける事業者。機能は優先度順に考えています。期限は 13 週間です。"];
+ok(samples.every(t => near(XP.xi(t), xpBox.O.xi(t), 1e-12) && near(XP.shannon(XP.tokenize(t)), xpBox.O.shannon(xpBox.O.tokenize(t)), 1e-12)), "不変量 Ξ とエントロピー H が元のコードと一致");
+ok(samples.every(t => XP.localReply(t) === xpBox.O.localReply(t) && XP.localEquation(t) === xpBox.O.localEquation(t)), "理論文と式の選び方が元のコードと一致");
+ok(samples.every(t => XP.summarize(t, 2) === xpBox.O.summarize(t, 2) && JSON.stringify(XP.keywords(t, 5)) === JSON.stringify(xpBox.O.keywords(t, 5))) && near(XP.gamma(5), 24, 1e-9) && near(XP.beta(2, 3), 1 / 12, 1e-12), "抜粋・頻出語・Γ・β が元のコードと一致");
+
+console.log("プラグイン (拡張機能)");
+const plugDir = path.join(__dirname, "..", "src", "plugins"), bundledSrc = fs.readdirSync(plugDir).filter(f => f.endsWith(".bada")).sort().map(f => fs.readFileSync(path.join(plugDir, f), "utf8"));
+let changes = 0; const host = new Pl.Host(Bada, { onChange: () => changes++ });
+host.addNative(XP.plugin);
+ok(bundledSrc.length === 2 && bundledSrc.every(src => host.addBada(src, true).ok), "同梱の Bada プラグイン (risk / tally) が入る");
+const pm = M.runLocal("スマホ向けの予約アプリを\n3か月で作りたい"), plain = pm.msgs.map(m => { const c = Object.assign({}, m); delete c.measure; return c; }), pctx = { msgs: plain };
+const notesAt = k => host.notes(plain[k], { msgs: plain.slice(0, k + 1) });
+ok(notesAt(0).length === 0 && notesAt(1).some(n => n.id === "xp" && /^Ξ = 0\.\d{4} · H = /.test(n.text)), "フック on_message: Bada XP が発言に Ξ の注記を付ける (議題には付けない)");
+const concern = plain.findIndex(m => m.kind === "concern");
+ok(notesAt(concern).some(n => n.id === "risk" && /これまで 1 件/.test(n.text)) && !notesAt(1).some(n => n.id === "risk"), "Bada プラグイン risk: リスクに触れた発言だけに注記し、MINUTES から件数を数える", JSON.stringify(notesAt(concern)));
+ok(/リスクに触れた発言: 3 件/.test(host.command("/risk", pctx).text) && /- planner: /.test(host.command("/risk", pctx).text), "フック on_command: /risk が一覧を返す", host.command("/risk", pctx).text);
+ok(/- kikaku: 3 回、\d+ 文字/.test(host.command("/tally", pctx).text) && /- engineer: 3 回/.test(host.command("/tally", pctx).text), "/tally が役割ごとの発言数を数える", host.command("/tally", pctx).text);
+ok(host.command("/xp リーマン予想とは", pctx).text.indexOf(XP.localReply("リーマン予想とは")) === 0 && /使い方/.test(host.command("/xp", pctx).text), "/xp が Bada XP の理論文を返す");
+ok(/● \/xp/.test(host.command("/plugins", pctx).text) && /\/nope というプラグインはありません/.test(host.command("/nope", pctx).text) && host.command("ふつうの発言", pctx) === null, "/plugins は一覧。知らない命令は断る。命令でない発言は通す");
+const sect = host.minutes(pctx);
+ok(/## プラグイン: Bada XP/.test(sect) && /## プラグイン: リスク見張り\n\n- リスク・超過・遅れに触れた発言: 3 件 \/ 全 10 件/.test(sect) && /## プラグイン: 発言の集計/.test(sect), "フック on_minutes: 議事録に各プラグインの節が加わる");
+// 利用者が追加する
+const hello = '# plugin: hello\n# name: あいさつ\n# description: 見本\n@reviser : extension bada {\n    fun on_command |args| """\n        return "こんにちは、" + args + " さん。議事録は " + len(MINUTES) + " 件。"\n    """\n}\n';
+const added = host.addBada(hello, false);
+ok(added.ok && added.plugin.name === "あいさつ" && added.plugin.hooks.join() === "on_command" && host.command("/hello 山口", pctx).text === "こんにちは、山口 さん。議事録は 10 件。", "プラグインを追加して、すぐ命令として使える", host.command("/hello 山口", pctx).text);
+ok(host.command('/hello "引用" と\n改行 \\ 記号', pctx).text.indexOf('こんにちは、"引用" と\n改行 \\ 記号 さん') === 0, "引数の引用符・改行・記号はそのまま渡る (コードとして解釈されない)");
+host.setEnabled("hello", false);
+ok(/止めてあります/.test(host.command("/hello x", pctx).text) && !host.active().some(p => p.id === "hello"), "切にしたプラグインは動かない");
+const restored = new Pl.Host(Bada); restored.addNative(XP.plugin); bundledSrc.forEach(src => restored.addBada(src, true)); restored.load(host.save());
+ok(restored.find("hello") && !restored.find("hello").enabled && restored.find("risk").enabled, "追加したプラグインと入 / 切は保存して復元できる");
+ok(host.remove("hello") && !host.find("hello") && !host.remove("xp") && !host.remove("risk"), "追加したものは削除できる。組み込みと同梱は削除できない");
+// 入れられないもの
+const tryAdd = src => host.addBada(src, false);
+ok(!tryAdd("# name: x\n@reviser : extension bada { fun on_command |a| \"\"\" return 1 \"\"\" }").ok && !tryAdd("# plugin: xp\n@reviser : extension bada { fun on_command |a| \"\"\" return 1 \"\"\" }").ok && !tryAdd("# plugin: plugins\n@reviser : extension bada { fun on_command |a| \"\"\" return 1 \"\"\" }").ok, "見出しの無いもの・組み込みと同じ名前は入れない");
+ok(!tryAdd("# plugin: nohook\n@reviser : extension bada { fun other |a| \"\"\" return 1 \"\"\" }").ok && !tryAdd("# plugin: cplug\n@reviser : extension c { fun on_command |a| \"\"\" return 1; \"\"\" }").ok && !tryAdd("# plugin: big\n" + "#".repeat(21000)).ok, "フックの無いもの・bada 以外の拡張・大きすぎるものは入れない");
+// 暴走するプラグインは止まる
+ok(tryAdd('# plugin: spin\n@reviser : extension bada {\n fun on_message |r, k, t, s| """\n while (true) { x := 1 }\n """\n}').ok, "無限ループを含むプラグインも入れることはできる (呼ぶまで分からない)");
+const t0 = Date.now(), n1 = host.notes(plain[1], pctx), n2 = host.notes(plain[2], pctx), n3 = host.notes(plain[3], pctx);
+ok(/エラー: .*budget/.test(n1.find(n => n.id === "spin").text) && /止めました/.test(n3.find(n => n.id === "spin").text) && !host.find("spin").enabled && Date.now() - t0 < 20000, "無限ループは実行ステップの上限で打ち切り、3 回続いたら自動で止める (" + (Date.now() - t0) + " ms)");
+ok(n1.some(n => n.id === "xp") && host.notes(plain[4], pctx).every(n => n.id !== "spin"), "ほかのプラグインは影響を受けない");
+ok(changes > 0, "変更は onChange で通知される (保存用)");
+
 console.log("配布 HTML");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 ok(!/(src|href)\s*=\s*["']https?:/.test(html) && !/stun:/.test(html), "外部の資源も STUN サーバーも参照しない");
@@ -259,7 +307,7 @@ const multiMt = M.runLocal("スマホ向けの予約アプリを\n3か月で作�
 ok(multiMt.decided() && /\*\*議題\*\*: スマホ向けの予約アプリを \/ 3か月で作りたい/.test(multiMt.minutes()), "複数行の議題でも会議が成り立ち、議事録に収まる");
 const scripts = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g), m => m[1]);
 const sb = { console, TextEncoder, TextDecoder }; sb.window = sb; vm.createContext(sb);
-try { vm.runInContext(scripts[0], sb); ok(["BadaEntropy", "BadaAgents", "BadaMeeting", "BadaThought", "BadaNet", "BadaTelegraph", "BadaAcoustic", "BadaZone", "BadaP2P", "BadaLang", "BADA_ZONE_LIB"].every(k => sb[k]), "埋め込んだライブラリが読み込める"); }
+try { vm.runInContext(scripts[0], sb); ok(["BadaEntropy", "BadaAgents", "BadaMeeting", "BadaThought", "BadaNet", "BadaTelegraph", "BadaAcoustic", "BadaZone", "BadaP2P", "BadaLang", "BADA_ZONE_LIB", "BadaXP", "BadaPlugins", "BADA_PLUGINS"].every(k => sb[k]), "埋め込んだライブラリが読み込める"); }
 catch (e) { ok(false, "埋め込んだライブラリが読み込める", e.message); }
 try { new vm.Script(scripts[1]); ok(true, "画面のスクリプトの構文"); } catch (e) { ok(false, "画面のスクリプトの構文", e.message); }
 

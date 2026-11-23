@@ -28,6 +28,13 @@
   .msg .off { color: var(--ng); }
   .msg .text { white-space: pre-wrap; word-break: break-word; }
   .msg.decide { background: #16261f; }
+  .msg .plug { font-size: 12px; color: var(--mut); margin-top: 4px; white-space: pre-wrap; }
+  .msg .plug b { color: var(--acc); font-weight: 600; }
+  .msg.local { border-left-color: var(--acc); border-style: dashed; }
+  #pluglist { display: grid; gap: 6px; margin: 8px 0; }
+  #pluglist .p { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+  #pluglist .p .d { flex: 1 1 220px; color: var(--mut); font-size: 12px; }
+  #plugsrc { height: 150px !important; }
   .empty { color: var(--mut); margin: auto; text-align: center; max-width: 460px; }
   aside { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 12px; gap: 10px; }
   aside h2 { font-size: 13px; margin: 0; color: var(--mut); font-weight: 600; }
@@ -69,6 +76,7 @@
   <label class="ctl"><input type="checkbox" id="auto" checked> 役割が自動で発言</label>
   <button class="ctl" id="acoustic" aria-pressed="false">音響電信 <kbd>F4</kbd></button>
   <button class="ctl" id="connect">P2P 網 (zone) <kbd>F8</kbd></button>
+  <button class="ctl" id="plugbtn">プラグイン <kbd>F9</kbd></button>
   <button class="ctl" id="export" disabled>議事録を保存 <kbd>F6</kbd></button>
   <span id="status">1 台で動作中</span>
 </header>
@@ -133,6 +141,20 @@
   <pre id="zout" class="note" style="white-space:pre-wrap;max-height:120px;overflow:auto;margin:6px 0"></pre>
   <div class="row"><span id="dlgmsg" class="note"></span><button class="ctl" id="close" style="margin-left:auto">閉じる</button></div>
 </dialog>
+<dialog id="plug">
+  <b>プラグイン (拡張機能)</b>
+  <p class="note">プラグインは、発言への注記・命令 (<kbd>/名前</kbd>)・議事録の節を追加します。Bada プラグインは Bada 言語の <code>@reviser : extension bada</code> で書き、同梱の Bada 処理系の中だけで動きます (画面・通信・保存領域には触れられません)。</p>
+  <div id="pluglist"></div>
+  <h3>Bada プラグインを追加 / 更新</h3>
+  <textarea id="plugsrc" spellcheck="false" aria-label="Bada プラグインのソース" placeholder="# plugin: 名前&#10;# name: 表示名&#10;# description: 説明&#10;@reviser : extension bada {&#10;    fun on_message |role, kind, text, seq| &quot;&quot;&quot;&#10;        return &quot;&quot;&#10;    &quot;&quot;&quot;&#10;}"></textarea>
+  <div class="row">
+    <button class="ctl" id="plugadd">追加 / 更新</button>
+    <button class="ctl" id="plugsample">見本を入れる</button>
+    <label class="note">zone から取得: <input id="plugid" class="ctl" size="10" placeholder="名前" aria-label="取得するプラグインの名前"></label>
+    <button class="ctl" id="plugget">取得して上に表示</button>
+  </div>
+  <div class="row"><span id="plugmsg" class="note"></span><button class="ctl" id="plugclose" style="margin-left:auto">閉じる</button></div>
+</dialog>
 <script>
 /*__LIBS__*/
 </script>
@@ -144,6 +166,17 @@
   // zone の計算: 元の zone-lib.bada を Bada 処理系で実行して Jones 鍵を求め、移植した計算と一致するか確かめる
   var zoneCheck = (function () { try { return BadaZone.selfCheck(BadaLang, BADA_ZONE_LIB); } catch (e) { return { ok: false, error: e.message }; } })();
   var node = null, dials = {};
+  /* ── プラグイン (拡張機能) ── */
+  var noteCache = {}, localLog = [], lastPlugText = "";
+  var plugReady = false;                  // 起動時の読み込みが済むまでは保存しない (保存してある内容を上書きしないように)
+  var plugins = new BadaPlugins.Host(BadaLang, { onChange: function () { noteCache = {}; if (plugReady) { try { localStorage.setItem("badameeting:plugins", plugins.save()); } catch (e) { } } } });
+  plugins.addNative(BadaXP.plugin);
+  BADA_PLUGINS.forEach(function (src) { plugins.addBada(src, true); });
+  try { var saved = localStorage.getItem("badameeting:plugins"); if (saved) plugins.load(saved); } catch (e) { }
+  noteCache = {}; plugReady = true;
+  function plugCtx(upto) { return { msgs: plainMinutes().slice(0, upto === undefined ? undefined : upto + 1) }; }
+  function notesOf(m) { var k = m.seq + "|" + m.text; if (!noteCache[k]) noteCache[k] = plugins.notes(m, plugCtx(m.seq)); return noteCache[k]; }
+  function fullMinutes() { var extra = plugins.minutes(plugCtx()); return meeting.minutes() + (extra ? "\n\n" + extra : ""); }
   function plainMinutes() { return meeting.msgs.map(function (m) { var c = Object.assign({}, m); delete c.measure; return c; }); }
   function makeNode() {
     var name = $("pname").value.trim() || "peer", knot = $("knot").value;
@@ -178,7 +211,7 @@
   /* ── 議事録の表示 ── */
   function render() {
     var log = $("log"); log.textContent = "";
-    if (!meeting.msgs.length) {
+    if (!meeting.msgs.length && !localLog.length) {
       var e = document.createElement("div"); e.className = "empty";
       e.textContent = "議題を書いて Ctrl+Enter を押すと、企画・プランナー・アプリケーションエンジニアが会議を始めます。";
       log.appendChild(e);
@@ -192,7 +225,18 @@
         if (!m.measure.pass) { var o = document.createElement("span"); o.className = "off"; o.textContent = "議題から外れている可能性 (門を通らず)"; who.appendChild(o); }
       }
       var t = document.createElement("div"); t.className = "text"; t.textContent = m.text;
-      d.appendChild(who); d.appendChild(t); log.appendChild(d);
+      d.appendChild(who); d.appendChild(t);
+      notesOf(m).forEach(function (n) {                       // プラグインの注記 (この端末だけに表示)
+        var pn = document.createElement("div"); pn.className = "plug"; var nb = document.createElement("b"); nb.textContent = n.name + " "; pn.appendChild(nb);
+        pn.appendChild(document.createTextNode(n.text)); d.appendChild(pn);
+      });
+      log.appendChild(d);
+    });
+    localLog.forEach(function (l) {                           // 命令への返答 (この端末だけに表示。会議には送らない)
+      var d = document.createElement("div"); d.className = "msg local";
+      var who = document.createElement("div"); who.className = "who"; var b = document.createElement("b"); b.textContent = "🔌 " + l.name; who.appendChild(b);
+      var sp = document.createElement("span"); sp.textContent = l.cmd + " — この端末だけに表示"; who.appendChild(sp);
+      var t = document.createElement("div"); t.className = "text"; t.textContent = l.text; d.appendChild(who); d.appendChild(t); log.appendChild(d);
     });
     log.scrollTop = log.scrollHeight;
     var st = meeting.stats(); $("stats").textContent = "";
@@ -205,7 +249,11 @@
   }
 
   /* ── 発言の受信と、役割の自動発言 ── */
-  function onMessage(m) { if (!meeting.add(m)) return; render(); refreshCands(); schedule(); showStatus(); }
+  function onMessage(m) {
+    var rec = meeting.add(m); if (!rec) return;
+    var ns = notesOf(rec); if (ns.length) lastPlugText = ns[ns.length - 1].text;       // Alt+9 で発言欄に入れられる
+    render(); refreshCands(); schedule(); showStatus();
+  }
   function schedule() {
     clearTimeout(pending);
     if (!$("auto").checked || meeting.decided()) return;
@@ -219,6 +267,10 @@
   }
   function say(kind) {
     var text = $("compose").value.replace(/\s+$/, ""); if (!text.trim()) return;
+    if (text.charAt(0) === "/") {                              // プラグインの命令: 会議には送らず、この端末で実行する
+      var res = plugins.command(text, plugCtx());
+      if (res) { localLog.push({ name: res.name, cmd: text.split(/\s/)[0], text: res.text }); lastPlugText = res.text; $("compose").value = ""; render(); refreshCands(); return; }
+    }
     var role = $("role").value, draft = { role: kind === "agenda" ? "host" : (role === "all" || role === "observer" ? "guest" : role), kind: kind, text: text, data: {} };
     if (kind === "comment") {
       // 役割の案をそのまま送る場合は、案の種類とデータを付ける (他の端末のエージェントが読めるように)
@@ -362,7 +414,7 @@
     } catch (e) { $("dlgmsg").textContent = "招待コードを読めませんでした。貼り付けた内容を確認してください。"; }
   };
   $("zput").onclick = function () {
-    try { var o = node.put($("zurl").value.trim(), meeting.minutes()); $("zout").textContent = "PUT → 預け先 " + o + " (封印して保存)"; }
+    try { var o = node.put($("zurl").value.trim(), fullMinutes()); $("zout").textContent = "PUT → 預け先 " + o + " (封印して保存)"; }
     catch (e) { $("zout").textContent = e.message; }
   };
   $("zget").onclick = function () {
@@ -370,10 +422,54 @@
     node.get($("zurl").value.trim(), function (status, text, path) { $("zout").textContent = status + (path.length > 1 ? "  経路 " + path.join(" → ") : "") + "\n" + text; });
   };
 
+  /* ── プラグインの管理 (F9) ── */
+  function renderPlugins() {
+    var box = $("pluglist"); box.textContent = "";
+    plugins.plugins.forEach(function (p) {
+      var row = document.createElement("div"); row.className = "p";
+      var lab = document.createElement("label"), cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = p.enabled; cb.setAttribute("data-plugin", p.id);
+      cb.onchange = function () { plugins.setEnabled(p.id, cb.checked); render(); };
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(" " + p.name + "  /" + p.id)); row.appendChild(lab);
+      var d = document.createElement("span"); d.className = "d";
+      d.textContent = (p.kind === "native" ? "組み込み" : p.builtin ? "同梱 (Bada)" : "追加 (Bada)") + " · " + (p.description || "") + (p.hooks ? " · フック: " + p.hooks.join(", ") : "");
+      row.appendChild(d);
+      if (p.kind === "bada") {
+        var show = document.createElement("button"); show.className = "ctl"; show.textContent = "ソースを表示"; show.onclick = function () { $("plugsrc").value = p.source; $("plugmsg").textContent = "/" + p.id + " のソースを表示しました。"; }; row.appendChild(show);
+        var pub = document.createElement("button"); pub.className = "ctl"; pub.textContent = "zone に公開";
+        pub.onclick = function () { try { var o = node.put("zone://" + node.room + ".zone.jp/plugins/" + p.id, p.source); $("plugmsg").textContent = "zone://" + node.room + ".zone.jp/plugins/" + p.id + " に公開しました (預け先 " + o + ")。"; } catch (e) { $("plugmsg").textContent = e.message; } };
+        row.appendChild(pub);
+        if (!p.builtin) { var del = document.createElement("button"); del.className = "ctl"; del.textContent = "削除"; del.onclick = function () { plugins.remove(p.id); renderPlugins(); render(); }; row.appendChild(del); }
+      }
+      box.appendChild(row);
+    });
+  }
+  function openPlugins() { $("plugmsg").textContent = ""; renderPlugins(); $("plug").showModal(); }
+  $("plugbtn").onclick = openPlugins;
+  $("plugclose").onclick = function () { $("plug").close(); };
+  $("plugadd").onclick = function () {
+    var r = plugins.addBada($("plugsrc").value, false);
+    $("plugmsg").textContent = r.ok ? "/" + r.plugin.id + " (" + r.plugin.name + ") を入れました。フック: " + r.plugin.hooks.join(", ") : "入れられませんでした: " + r.error;
+    if (r.ok) { renderPlugins(); render(); }
+  };
+  $("plugsample").onclick = function () {
+    $("plugsrc").value = ["# plugin: hello", "# name: あいさつ", "# description: /hello 名前 であいさつを返し、決定の発言に注記を付ける", "", "@reviser : extension bada {",
+      "    fun on_command |args| \"\"\"", "        if (len(args) == 0) { return \"こんにちは。議事録は \" + len(MINUTES) + \" 件です。\" }", "        return \"こんにちは、\" + args + \" さん。\"", "    \"\"\"",
+      "    fun on_message |role, kind, text, seq| \"\"\"", "        if (kind == \"decide\") { return \"決定です。おつかれさまでした。\" }", "        return \"\"", "    \"\"\"", "}", ""].join("\n");
+    $("plugmsg").textContent = "見本を入れました。「追加 / 更新」で使えるようになります。";
+  };
+  $("plugget").onclick = function () {
+    var id = $("plugid").value.trim(); if (!id) return;
+    $("plugmsg").textContent = "取得中…";
+    node.get("zone://" + node.room + ".zone.jp/plugins/" + id, function (status, text) {
+      if (status === 200) { $("plugsrc").value = text; $("plugmsg").textContent = "取得しました。内容を確かめてから「追加 / 更新」を押してください。"; }
+      else $("plugmsg").textContent = status + " " + text;
+    });
+  };
+
   /* ── 保存とキー操作 ── */
   function exportMinutes() {
     if (!meeting.msgs.length) return;
-    var md = meeting.minutes();
+    var md = fullMinutes();
     if (/; wv\)/.test(navigator.userAgent)) { $("compose").value = md; return; }      // Android WebView: 保存できない場合があるので発言欄に出す
     var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown;charset=utf-8" })); a.download = "meeting-minutes.md";
     document.body.appendChild(a); a.click(); a.remove();
@@ -389,15 +485,17 @@
     else if (e.key === "F4") { e.preventDefault(); toggleAcoustic(); }
     else if (e.key === "F6") { e.preventDefault(); exportMinutes(); }
     else if (e.key === "F7") { e.preventDefault(); setPtr(!ptrOn); }
+    else if (e.key === "F9") { e.preventDefault(); if ($("plug").open) $("plug").close(); else openPlugins(); }
+    else if (e.altKey && e.code === "Digit9" && lastPlugText) { e.preventDefault(); $("compose").value += lastPlugText; refreshCands(); $("compose").focus(); }
     else if (e.key === "F8") { e.preventDefault(); if ($("dlg").open) $("dlg").close(); else openNet(); }
-    else if (e.altKey && /^Digit[0-9]$/.test(e.code)) { var pick = candList[+e.code.slice(5)]; if (pick) { e.preventDefault(); pick(); refreshCands(); $("compose").focus(); } }
+    else if (e.altKey && /^Digit[0-8]$/.test(e.code)) { var pick = candList[+e.code.slice(5)]; if (pick) { e.preventDefault(); pick(); refreshCands(); $("compose").focus(); } }
   });
   $("role").onchange = function () { refreshCands(); schedule(); };
   $("auto").onchange = function () { refreshCands(); schedule(); };
   $("pname").value = "peer-" + Math.floor(Math.random() * 46656).toString(36);
   node = makeNode(); bus = node; $("zurl").value = "zone://" + node.room + ".zone.jp/minutes";
   window.addEventListener("pagehide", function () { try { node.leave(); } catch (e) { } });      // 閉じるときは網に知らせる
-  window.BadaMeetingApp = { meeting: function () { return meeting; }, bus: function () { return bus; }, node: function () { return node; }, keyer: keyer, zoneCheck: zoneCheck };
+  window.BadaMeetingApp = { meeting: function () { return meeting; }, bus: function () { return bus; }, node: function () { return node; }, keyer: keyer, zoneCheck: zoneCheck, plugins: plugins, minutes: fullMinutes };
   render(); buildPad(); refreshCands(); showStatus(); $("compose").focus();
 })();
 </script>

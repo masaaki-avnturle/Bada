@@ -28,6 +28,13 @@
   .msg .off { color: var(--ng); }
   .msg .text { white-space: pre-wrap; word-break: break-word; }
   .msg.decide { background: #16261f; }
+  .msg .plug { font-size: 12px; color: var(--mut); margin-top: 4px; white-space: pre-wrap; }
+  .msg .plug b { color: var(--acc); font-weight: 600; }
+  .msg.local { border-left-color: var(--acc); border-style: dashed; }
+  #pluglist { display: grid; gap: 6px; margin: 8px 0; }
+  #pluglist .p { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+  #pluglist .p .d { flex: 1 1 220px; color: var(--mut); font-size: 12px; }
+  #plugsrc { height: 150px !important; }
   .empty { color: var(--mut); margin: auto; text-align: center; max-width: 460px; }
   aside { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 12px; gap: 10px; }
   aside h2 { font-size: 13px; margin: 0; color: var(--mut); font-weight: 600; }
@@ -69,6 +76,7 @@
   <label class="ctl"><input type="checkbox" id="auto" checked> 役割が自動で発言</label>
   <button class="ctl" id="acoustic" aria-pressed="false">音響電信 <kbd>F4</kbd></button>
   <button class="ctl" id="connect">P2P 網 (zone) <kbd>F8</kbd></button>
+  <button class="ctl" id="plugbtn">プラグイン <kbd>F9</kbd></button>
   <button class="ctl" id="export" disabled>議事録を保存 <kbd>F6</kbd></button>
   <span id="status">1 台で動作中</span>
 </header>
@@ -132,6 +140,20 @@
   </div>
   <pre id="zout" class="note" style="white-space:pre-wrap;max-height:120px;overflow:auto;margin:6px 0"></pre>
   <div class="row"><span id="dlgmsg" class="note"></span><button class="ctl" id="close" style="margin-left:auto">閉じる</button></div>
+</dialog>
+<dialog id="plug">
+  <b>プラグイン (拡張機能)</b>
+  <p class="note">プラグインは、発言への注記・命令 (<kbd>/名前</kbd>)・議事録の節を追加します。Bada プラグインは Bada 言語の <code>@reviser : extension bada</code> で書き、同梱の Bada 処理系の中だけで動きます (画面・通信・保存領域には触れられません)。</p>
+  <div id="pluglist"></div>
+  <h3>Bada プラグインを追加 / 更新</h3>
+  <textarea id="plugsrc" spellcheck="false" aria-label="Bada プラグインのソース" placeholder="# plugin: 名前&#10;# name: 表示名&#10;# description: 説明&#10;@reviser : extension bada {&#10;    fun on_message |role, kind, text, seq| &quot;&quot;&quot;&#10;        return &quot;&quot;&#10;    &quot;&quot;&quot;&#10;}"></textarea>
+  <div class="row">
+    <button class="ctl" id="plugadd">追加 / 更新</button>
+    <button class="ctl" id="plugsample">見本を入れる</button>
+    <label class="note">zone から取得: <input id="plugid" class="ctl" size="10" placeholder="名前" aria-label="取得するプラグインの名前"></label>
+    <button class="ctl" id="plugget">取得して上に表示</button>
+  </div>
+  <div class="row"><span id="plugmsg" class="note"></span><button class="ctl" id="plugclose" style="margin-left:auto">閉じる</button></div>
 </dialog>
 <script>
 /* ============================================================================
@@ -2174,6 +2196,7 @@
 });
 
 var BADA_ZONE_LIB = "# ============================================================\n# zone-lib.bada -- the zone:// ultra-network runtime as a Bada\n# LIBRARY (functions only, no demo output), so a dedicated\n# browser can drive one navigation at a time.\n#\n# The browser generates, per navigation:\n#     <this library>\n#     NET := zone_boot()\n#     zone_publish(NET, url, content)   # for every page of the site\n#     zone_serve(NET, requested_url)    # emits a machine-parseable block\n#\n# Security is the Jones-polynomial quantum cipher of\n# omega_jones_crypto_pkg (knot -> Kauffman/Jones key -> AEAD) plus a\n# Bell-pair QKD session salt, exactly as in examples/zone.bada.\n# ============================================================\n\nRING := 4096\n\n# ---- L1 sponge: zone:// naming --------------------------------------\ndef str_hash(s) {\n    h := 7\n    i := 0\n    n := len(s)\n    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }\n    return h\n}\ndef zone_id(s) { return str_hash(s) % RING }\n\ndef zone_parse(url) {\n    if (str_find(url, \"zone://\") != 0) { return [] }\n    rest := substr(url, 7, len(url) - 7)\n    cut := str_find(rest, \"/\")\n    if (cut < 0) { return [rest, \"/\", split(rest, \".\")] }\n    host := substr(rest, 0, cut)\n    path := substr(rest, cut, len(rest) - cut)\n    return [host, path, split(host, \".\")]\n}\n\n# ---- L3 key schedule: Jones-polynomial quantum cipher ---------------\ndef ipow(base, e) {\n    if (e < 0) {\n        r := 1.0\n        k := 0\n        m := 0 - e\n        while (k < m) { r := r * base; k := k + 1 }\n        return 1.0 / r\n    }\n    r := 1.0\n    k := 0\n    while (k < e) { r := r * base; k := k + 1 }\n    return r\n}\ndef uf_find(parent, x) {\n    r := x\n    while (parent[r] >= 0) { r := parent[r] }\n    return r\n}\ndef kauffman(cross, A) {\n    n := len(cross)\n    if (n == 0) { return 1.0 }\n    maxlbl := 0\n    i := 0\n    while (i < n) {\n        k := 1\n        while (k <= 4) {\n            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }\n            k := k + 1\n        }\n        i := i + 1\n    }\n    U := maxlbl + 1\n    states := 1\n    p := 0\n    while (p < n) { states := states * 2; p := p + 1 }\n    d := (0 - (A * A)) - (1.0 / (A * A))\n    sum := 0.0\n    bits := []\n    i := 0\n    while (i < n) { bits <- 0; i := i + 1 }\n    st := 0\n    while (st < states) {\n        parent := []\n        q := 0\n        while (q < U) { parent <- (0 - 1); q := q + 1 }\n        a_cnt := 0\n        b_cnt := 0\n        i := 0\n        while (i < n) {\n            e0 := cross[i][1]\n            e1 := cross[i][2]\n            e2 := cross[i][3]\n            e3 := cross[i][4]\n            if (bits[i] == 0) {\n                ra := uf_find(parent, e0)\n                rb := uf_find(parent, e1)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e2)\n                rb := uf_find(parent, e3)\n                if (ra != rb) { parent[ra] = rb }\n                a_cnt := a_cnt + 1\n            } else {\n                ra := uf_find(parent, e1)\n                rb := uf_find(parent, e2)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e3)\n                rb := uf_find(parent, e0)\n                if (ra != rb) { parent[ra] = rb }\n                b_cnt := b_cnt + 1\n            }\n            i := i + 1\n        }\n        seen := []\n        q := 0\n        while (q < U) { seen <- 0; q := q + 1 }\n        loops := 0\n        lbl := 0\n        while (lbl < U) {\n            r := uf_find(parent, lbl)\n            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }\n            lbl := lbl + 1\n        }\n        weight := ipow(A, a_cnt - b_cnt)\n        lf := ipow(d, loops - 1)\n        sum := sum + weight * lf\n        c := 0\n        carry := 1\n        while (c < n && carry == 1) {\n            if (bits[c] == 0) { bits[c] = 1; carry := 0 }\n            else { bits[c] = 0 }\n            c := c + 1\n        }\n        st := st + 1\n    }\n    return sum\n}\ndef jones_key(diagram) {\n    As := [0.8, 1.0, 1.2, 1.5, 2.0]\n    acc := \"jones|\"\n    i := 0\n    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + \"|\"; i := i + 1 }\n    return str_hash(acc)\n}\ndef zone_diagram(host) {\n    if (host == \"bada.or.jp\") {\n        return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,7,8,1], [3,7,8,1,2,1] ]\n    }\n    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]\n}\n\n# ---- keystream AEAD -------------------------------------------------\ndef lcg(state) { return (state * 48271) % 2147483647 }\ndef key_seed(key, salt) {\n    state := (key + salt * 2654435761) % 2147483647\n    if (state <= 0) { state := state + 2147483646 }\n    return state\n}\n# the keystream works on 16-bit code units so any character (incl. CJK)\n# round-trips through encrypt/decrypt.\ndef zone_encrypt(plain, key, salt) {\n    state := key_seed(key, salt)\n    out := []\n    i := 0\n    while (i < len(plain)) {\n        state := lcg(state)\n        out <- (ord(plain, i) + (state % 65536)) % 65536\n        i := i + 1\n    }\n    return out\n}\ndef zone_decrypt(ct, key, salt) {\n    state := key_seed(key, salt)\n    out := \"\"\n    i := 0\n    while (i < len(ct)) {\n        state := lcg(state)\n        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)\n        i := i + 1\n    }\n    return out\n}\ndef zone_tag(ct, key, salt) {\n    h := (key % 999983) + salt + 1\n    i := 0\n    while (i < len(ct)) { h := (h * 31 + ct[i] + 7) % 2147483647; i := i + 1 }\n    return h\n}\ndef zone_seal(plain, key, salt) {\n    ct := zone_encrypt(plain, key, salt)\n    return [ct, salt, zone_tag(ct, key, salt)]\n}\ndef zone_open(sealed, key) {\n    ct := sealed[0]\n    salt := sealed[1]\n    tag := sealed[2]\n    if (zone_tag(ct, key, salt) != tag) { return [] }\n    return [zone_decrypt(ct, key, salt)]\n}\ndef qkd_session() {\n    bell := qubit(2)\n    bell := H(bell, 0)\n    bell := CNOT(bell, 0, 1)\n    outcome := Measure(bell)\n    ok := (outcome[1] == 0) && (outcome[2] == 0)\n    salt := (len(tuplespace) * 131 + 17) % 4096\n    return [ok, salt]\n}\n\n# ---- L2 cream: the P2P ring -----------------------------------------\ndef ring_dist(a, b) {\n    d := a - b\n    if (d < 0) { d := 0 - d }\n    e := RING - d\n    if (e < d) { return e }\n    return d\n}\ndef peer_new(name) { return [name, zone_id(\"peer:\" + name), [], 0] }\ndef net_sort(net) {\n    sorted := []\n    i := 0\n    while (i < len(net)) {\n        p := net[i]\n        pos := len(sorted)\n        found := false\n        j := 0\n        while (j < len(sorted)) {\n            if (!found) { if (p[1] < sorted[j][1]) { pos := j; found := true } }\n            j := j + 1\n        }\n        out := []\n        k := 0\n        while (k < len(sorted)) {\n            if (k == pos) { out <- p }\n            out <- sorted[k]\n            k := k + 1\n        }\n        if (pos == len(sorted)) { out <- p }\n        sorted := out\n        i := i + 1\n    }\n    m := 0\n    while (m < len(sorted)) { sorted[m][3] = m; m := m + 1 }\n    return sorted\n}\ndef peer_neighbors(net, p) {\n    n := len(net)\n    i := p[3]\n    return [ net[(i + 1) % n], net[(i + n - 1) % n], net[(i + 2) % n] ]\n}\ndef dht_nearest(net, key) {\n    best := net[0]\n    bd := ring_dist(best[1], key)\n    i := 1\n    while (i < len(net)) {\n        d := ring_dist(net[i][1], key)\n        if (d < bd) { best := net[i]; bd := d }\n        i := i + 1\n    }\n    return best\n}\ndef zone_route(net, key) {\n    route := []\n    cur := net[0]\n    route <- cur[0]\n    hop := 0\n    moved := true\n    while (moved && hop < 16) {\n        moved := false\n        nb := peer_neighbors(net, cur)\n        best := cur\n        j := 0\n        while (j < 3) {\n            if (ring_dist(nb[j][1], key) < ring_dist(best[1], key)) { best := nb[j] }\n            j := j + 1\n        }\n        if (best[1] != cur[1]) { cur := best; route <- cur[0]; moved := true }\n        hop := hop + 1\n    }\n    return route\n}\ndef store_lookup(store, url) {\n    i := 0\n    while (i < len(store)) {\n        if (store[i][0] == url) { return store[i] }\n        i := i + 1\n    }\n    return []\n}\n\n# ---- boot the ultra network (six peers, no server) ------------------\ndef zone_boot() {\n    raw := []\n    raw <- peer_new(\"tokyo.zone.jp\")\n    raw <- peer_new(\"osaka.zone.jp\")\n    raw <- peer_new(\"nagoya.zone.jp\")\n    raw <- peer_new(\"sapporo.zone.jp\")\n    raw <- peer_new(\"fukuoka.zone.jp\")\n    raw <- peer_new(\"naha.zone.jp\")\n    return net_sort(raw)\n}\n\n# ---- publish (encrypted) --------------------------------------------\ndef zone_publish(net, url, content) {\n    p := zone_parse(url)\n    if (len(p) == 0) { return false }\n    host := p[0]\n    key := zone_id(url)\n    owner := dht_nearest(net, key)\n    jk := jones_key(zone_diagram(host))\n    sess := qkd_session()\n    salt := sess[1]\n    sealed := zone_seal(content, jk, salt)\n    rec := store_lookup(owner[2], url)\n    if (len(rec) == 0) { owner[2] <- [url, sealed[0], sealed[1], sealed[2]] }\n    else { rec[1] = sealed[0]; rec[2] = sealed[1]; rec[3] = sealed[2] }\n    return true\n}\n\n# ---- serve one navigation: emit a machine-parseable block -----------\n# The dedicated browser reads only lines beginning with \"@@\".\ndef zone_serve(net, url) {\n    p := zone_parse(url)\n    if (len(p) == 0) {\n        print(\"@@STATUS 400\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 400 bad-zone\")\n        print(\"not a zone:// URL\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    host := p[0]\n    key := zone_id(url)\n    route := zone_route(net, key)\n    owner := dht_nearest(net, key)\n    print(\"@@HOST\", host)\n    print(\"@@PATH\", p[1])\n    print(\"@@KEY\", key)\n    print(\"@@ROUTE\", route)\n    print(\"@@NODE\", owner[0])\n    sess := qkd_session()\n    if (!sess[0]) {\n        print(\"@@QKD compromised\")\n        print(\"@@STATUS 495\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 495 quantum-channel-compromised\")\n        print(\"the Bell pair lost correlation -- someone is on the wire\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    print(\"@@QKD ok\")\n    rec := store_lookup(owner[2], url)\n    if (len(rec) == 0) {\n        print(\"@@STATUS 404\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 404 zone-not-found\")\n        print(\"no peer on the ring holds \" + url)\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    jk := jones_key(zone_diagram(host))\n    sealed := [ rec[1], rec[2], rec[3] ]\n    opened := zone_open(sealed, jk)\n    if (len(opened) == 0) {\n        print(\"@@STATUS 409\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 409 zone-guard-reject\")\n        print(\"AEAD tag failed: forged/tampered content or wrong knot\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    print(\"@@CIPHER\", rec[1][0], rec[1][1], rec[1][2], len(rec[1]))\n    print(\"@@TAG\", rec[3])\n    print(\"@@JONESKEY\", jk)\n    print(\"@@STATUS 200\")\n    print(\"@@BODY_BEGIN\")\n    print(opened[0])\n    print(\"@@BODY_END\")\n    return opened[0]\n}\n";
+var BADA_PLUGINS = ["# plugin: risk\n# name: リスク見張り\n# description: リスク・超過・遅れに触れた発言に印を付け、/risk で一覧、議事録に件数を加える\n#\n# 思念会議のプラグインの見本。Bada 言語の拡張トランザクションで書く。\n# 使えるもの: MINUTES ([役割, 種類, 本文] の配列)、AGENDA、contains(s, sub)、count_of(s, sub)\n\n@reviser : extension bada {\n    fun risk_hit |text| \"\"\"\n        words := [\"リスク\", \"超過\", \"超え\", \"遅れ\", \"懸念\", \"不足\", \"失敗\"]\n        n := 0\n        i := 0\n        while (i < len(words)) {\n            if (contains(text, words[i])) { n := n + 1 }\n            i := i + 1\n        }\n        return n\n    \"\"\"\n    fun risk_total || \"\"\"\n        n := 0\n        i := 0\n        while (i < len(MINUTES)) {\n            if (risk_hit(MINUTES[i][2]) > 0) { n := n + 1 }\n            i := i + 1\n        }\n        return n\n    \"\"\"\n    fun on_message |role, kind, text, seq| \"\"\"\n        if (kind == \"agenda\") { return \"\" }\n        if (risk_hit(text) == 0) { return \"\" }\n        return \"リスクに触れた発言です (これまで \" + (\"\" + risk_total()) + \" 件)\"\n    \"\"\"\n    fun on_command |args| \"\"\"\n        out := \"リスクに触れた発言: \" + (\"\" + risk_total()) + \" 件\"\n        i := 0\n        while (i < len(MINUTES)) {\n            if (risk_hit(MINUTES[i][2]) > 0) { out := out + \"\\n- \" + MINUTES[i][0] + \": \" + substr(MINUTES[i][2], 0, 40) + \"…\" }\n            i := i + 1\n        }\n        return out\n    \"\"\"\n    fun on_minutes |count| \"\"\"\n        return \"- リスク・超過・遅れに触れた発言: \" + (\"\" + risk_total()) + \" 件 / 全 \" + (\"\" + count) + \" 件\"\n    \"\"\"\n}\n","# plugin: tally\n# name: 発言の集計\n# description: 役割ごとの発言数と文字数を /tally と議事録に出す\n\n@reviser : extension bada {\n    fun tally_text || \"\"\"\n        roles := []\n        counts := []\n        chars := []\n        i := 0\n        while (i < len(MINUTES)) {\n            r := MINUTES[i][0]\n            k := 0\n            found := 0 - 1\n            while (k < len(roles)) {\n                if (roles[k] == r) { found := k }\n                k := k + 1\n            }\n            if (found < 0) { roles <- r; counts <- 0; chars <- 0; found := len(roles) - 1 }\n            counts[found] = counts[found] + 1\n            chars[found] = chars[found] + len(MINUTES[i][2])\n            i := i + 1\n        }\n        out := \"\"\n        k := 0\n        while (k < len(roles)) {\n            if (k > 0) { out := out + \"\\n\" }\n            out := out + \"- \" + roles[k] + \": \" + (\"\" + counts[k]) + \" 回、\" + (\"\" + chars[k]) + \" 文字\"\n            k := k + 1\n        }\n        return out\n    \"\"\"\n    fun on_command |args| \"\"\"\n        return tally_text()\n    \"\"\"\n    fun on_minutes |count| \"\"\"\n        return tally_text()\n    \"\"\"\n}\n"];
 /*
  * engine.js — BadaGPT の計算エンジン (依存なし。ブラウザ / Node 共通)
  *
@@ -3970,6 +3993,216 @@ var BADA_ZONE_LIB = "# =========================================================
   if (typeof module !== "undefined" && module.exports) module.exports = global.BadaP2P;
 })(typeof window !== "undefined" ? window : globalThis);
 
+/*
+ * badaxp.js — Bada XP のローカル分派の中核 (bada_ruby/mobile/www/index.html の移植)
+ *
+ *   Ξ = β(H+1, M+1) / log(N+1)      H = シャノンのエントロピー (bit)、M = 多様体線素 1/(x log x)² で重み付けした積分、N = トークン数
+ *   localReply     質問のエントロピーに近い理論文を 3 つ選ぶ
+ *   localEquation  質問のエントロピーに最も近い式を 1 つ選ぶ
+ *   summarize / keywords   頻度にもとづく抜粋と頻出語
+ * 理論文と式の選び方は「エントロピーの値が近いもの」であり、質問の意味を理解して答えるものではない。
+ * Bada XP 本体にある言語モデルへの接続は、ここには含めていない。
+ */
+(function (global) {
+  "use strict";
+  var LANCZOS_G = 7, LANCZOS_C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  function gamma(x) {
+    if (x === 0) return Infinity;
+    if (x < 0.5) return Math.PI / (Math.sin(Math.PI * x) * gamma(1 - x));
+    x -= 1; var a = LANCZOS_C[0], t = x + LANCZOS_G + 0.5;
+    for (var i = 1; i < LANCZOS_G + 2; i++) a += LANCZOS_C[i] / (x + i);
+    return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
+  }
+  var logGamma = function (x) { return Math.log(Math.abs(gamma(x))); };
+  var beta = function (p, q) { return Math.exp(logGamma(p) + logGamma(q) - logGamma(p + q)); };
+  function zetaGauge(p, q, x) { var lx = Math.log(x); return Math.abs(lx) < 1e-15 ? Infinity : beta(p, q) / lx; }
+  function xLogX(x) { return x <= 0 ? 0 : x * Math.log(x); }
+  var TOKEN_RE = /[A-Za-z0-9_]+|[一-鿿぀-ゟ゠-ヿ]/g;
+  var tokenize = function (s) { return String(s).match(TOKEN_RE) || []; };
+  function shannon(tokens) {
+    if (!tokens.length) return 0;
+    var f = {}, n = tokens.length, h = 0, k; tokens.forEach(function (t) { f[t] = (f[t] || 0) + 1; });
+    for (k in f) { var p = f[k] / n; h -= p * Math.log2(p); }
+    return h;
+  }
+  function distribution(tokens) {
+    var f = {}, n = tokens.length; tokens.forEach(function (t) { f[t] = (f[t] || 0) + 1; });
+    return Object.keys(f).map(function (t) { return [t, f[t] / n]; }).sort(function (a, b) { return b[1] - a[1]; });
+  }
+  function manifoldElement(x) { if (x <= 1) return 1; var xl = xLogX(x); return Math.abs(xl) < 1e-9 ? 1 : 1 / (xl * xl); }
+  function integral(dist) { return dist.reduce(function (s, e, i) { return s + e[1] * manifoldElement(i + 2); }, 0); }
+  function xi(text) { var tk = tokenize(text); return zetaGauge(shannon(tk) + 1, integral(distribution(tk)) + 1, tk.length + 1); }
+  var ofEntropy = function (s) { return shannon(tokenize(s)); };
+
+  var THEORY = [
+    "大域的部分積分多様体 M 上で、エントロピー不変量 Ξ は複素回転体 e^{iθ} の下で保存される。",
+    "ガンマ関数 Γ(γ) の部分積分により β(p,q) が現れ、これが ζ(s)=x·log x のゲージを与える。",
+    "シャノンのエントロピー H を多様体線素 1/(x·log x)² で重み付け積分すると不変量 Ξ を得る。",
+    "特殊相対性理論のコマ幾何の可積分系がエラーを修正し、Ξ を閉軌道 ∮ 上で安定化させる。",
+    "未知エンジンは質問のエントロピー値 H_q を多様体不変量 Ξ_q に写し、近傍の知識を生成する。"
+  ];
+  var EQUATIONS = [
+    "ζ(s) = β(p,q)/log x = x·log x", "β(p,q) = Γ(p)Γ(q)/Γ(p+q)",
+    "∬ 1/(x·log x)² dx_m = π(χ,x)∇ d∇", "□ = 2(sin(ix·log x) + cos(ix·log x))",
+    "∮ e^{-□} d□ = π e,  e^π ≅ π^e", "H = -Σ p·log₂ p,  Ξ = β(H+1, M+1)/log(N+1)",
+    "⊕(iℏ∇)^⊕L = e^{-x·log x}", "Γ′(γ) dx_m = T,  ζ(s) e^{-f} dV = β(p,q)/log x"
+  ];
+  var nearest = function (list, target) { return list.slice().sort(function (a, b) { return Math.abs(ofEntropy(a) - target) - Math.abs(ofEntropy(b) - target); }); };
+  function localReply(question) { return nearest(THEORY, ofEntropy(question)).slice(0, 3).join(" ") + " (Ξ=" + xi(question).toFixed(4) + ")"; }
+  function localEquation(question) { return nearest(EQUATIONS, ofEntropy(question))[0]; }
+  function splitSentences(t) { return t.split(/[。．.!?！？\n]+/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 1; }); }
+  function summarize(text, k) {
+    k = k || 3;
+    var sents = splitSentences(text); if (sents.length <= k) return text.trim();
+    var freq = {}; tokenize(text).forEach(function (w) { freq[w] = (freq[w] || 0) + 1; });
+    var scored = sents.map(function (sen, idx) { var tk = tokenize(sen); return { sen: sen, idx: idx, sc: tk.reduce(function (a, w) { return a + (freq[w] || 0); }, 0) / (tk.length || 1) }; });
+    return scored.slice().sort(function (a, b) { return b.sc - a.sc; }).slice(0, k).sort(function (a, b) { return a.idx - b.idx; }).map(function (x) { return x.sen; }).join("。 ") + "。";
+  }
+  var STOP = new Set("の に は を が と で て た し も へ や か な this that the a an of to and is in for on at it です ます する いる ある こと これ それ".split(" "));
+  function keywords(text, k) {
+    k = k || 8; var freq = {};
+    tokenize(text).forEach(function (w) { if (!STOP.has(w)) freq[w] = (freq[w] || 0) + 1; });
+    return Object.keys(freq).map(function (w) { return [w, freq[w]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, k);
+  }
+
+  // 思念会議のプラグインとしての Bada XP
+  var plugin = {
+    id: "xp", name: "Bada XP", kind: "native", description: "各発言の不変量 Ξ とエントロピーに近い式を注記。/xp 質問 で理論文を返し、議事録に所見を加える",
+    onMessage: function (m) {
+      if (m.kind === "agenda" || m.kind === "agree") return null;
+      return "Ξ = " + xi(m.text).toFixed(4) + " · H = " + ofEntropy(m.text).toFixed(2) + " bit · 近い式: " + localEquation(m.text);
+    },
+    onCommand: function (args) {
+      if (!args.trim()) return "使い方: /xp 質問 — 質問のエントロピーに近い理論文と式を返します (意味を理解して答えるものではありません)。";
+      return localReply(args) + "\n式: " + localEquation(args);
+    },
+    onMinutes: function (ctx) {
+      var text = ctx.msgs.map(function (m) { return m.text; }).join("\n"); if (!text.trim()) return null;
+      var agenda = ctx.msgs.length ? ctx.msgs[0].text : "";
+      return ["- 議事録全体の不変量 Ξ = " + xi(text).toFixed(4) + " (H = " + ofEntropy(text).toFixed(3) + " bit、トークン " + tokenize(text).length + " 個)",
+              "- 議題の不変量 Ξ = " + xi(agenda).toFixed(4) + "、エントロピーの近い式: " + localEquation(agenda),
+              "", "_Ξ = β(H+1, M+1)/log(N+1)。文字の頻度の統計であり、内容の評価ではありません。式は、エントロピーの値が近いものを選んでいるだけです。_"].join("\n");
+    }
+  };
+
+  global.BadaXP = { gamma: gamma, beta: beta, tokenize: tokenize, shannon: shannon, xi: xi, ofEntropy: ofEntropy, localReply: localReply, localEquation: localEquation,
+                    summarize: summarize, keywords: keywords, THEORY: THEORY, EQUATIONS: EQUATIONS, plugin: plugin };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaXP;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/*
+ * plugins.js — 思念会議のプラグイン機構 (拡張機能)
+ *
+ * プラグインには 2 種類ある。
+ *   ・組み込み (JavaScript): Bada XP など、アプリに同梱したもの
+ *   ・Bada プラグイン: Bada 言語の拡張トランザクション
+ *         @reviser : extension bada { fun 名前 |引数| """コード""" }
+ *     で書いたもの。利用者があとから追加でき、同梱の Bada 処理系の中だけで動く
+ *     (画面・通信・保存領域には触れられない。実行ステップ数に上限がある)。
+ *
+ * 拡張点 (フック):
+ *   on_message |role, kind, text, seq|   発言が議事録に入るたび。返した文字列が、その発言の「注記」になる
+ *   on_command |args|                    発言欄で /<id> 引数 と打ったとき。返した文字列をその端末だけに表示する
+ *   on_minutes |count|                   議事録を書き出すとき。返した文字列が、議事録の 1 節になる
+ * Bada プラグインからは、議事録 MINUTES ([役割, 種類, 本文] の配列) と議題 AGENDA、
+ * 補助関数 contains(s, sub) / count_of(s, sub) が使える。数値を文字にするには "" + n と書く。
+ *
+ * Bada プラグインの冒頭には、次の見出しを書く:
+ *   # plugin: risk          (/risk の名前になる。英小文字で始まる 2〜20 文字)
+ *   # name: リスク見張り
+ *   # description: 何をするか
+ */
+(function (global) {
+  "use strict";
+  var PRELUDE = [
+    "def contains(s, sub) { return str_find(s, sub) >= 0 }",
+    "def count_of(s, sub) {",
+    "    n := 0",
+    "    rest := s",
+    "    p := str_find(rest, sub)",
+    "    while (p >= 0) { n := n + 1; rest := substr(rest, p + len(sub), len(rest) - p - len(sub)); p := str_find(rest, sub) }",
+    "    return n",
+    "}", ""].join("\n");
+  var HOOKS = ["on_message", "on_command", "on_minutes"], MAX_SOURCE = 20000, MAX_STEPS = 3000000;
+  var lit = function (s) { return JSON.stringify(String(s)); };
+
+  function header(src, key) { var m = String(src).match(new RegExp("^\\s*#\\s*" + key + "\\s*:\\s*(.+)$", "m")); return m ? m[1].trim() : ""; }
+  function Host(Bada, opts) { this.Bada = Bada; this.plugins = []; this.onChange = (opts && opts.onChange) || function () {}; }
+  var H = Host.prototype;
+  H.find = function (id) { return this.plugins.filter(function (p) { return p.id === id; })[0] || null; };
+  H.addNative = function (p) { this.plugins.push(Object.assign({ enabled: true, errors: 0 }, p, { kind: "native" })); };
+  // Bada プラグインを調べて追加する。{ok, plugin} / {ok:false, error}
+  H.addBada = function (src, builtin) {
+    src = String(src);
+    if (src.length > MAX_SOURCE) return { ok: false, error: "プラグインが大きすぎます (" + MAX_SOURCE + " 文字まで)" };
+    var id = header(src, "plugin"), self = this;
+    if (!/^[a-z][a-z0-9_]{1,19}$/.test(id)) return { ok: false, error: "冒頭に「# plugin: 名前」が必要です (英小文字で始まる 2〜20 文字の英数字)" };
+    if (id === "plugins" || (this.find(id) && this.find(id).kind === "native")) return { ok: false, error: "「" + id + "」という名前は使えません" };
+    if (!/@reviser\s*:\s*extension\s+bada\s*\{/.test(src)) return { ok: false, error: "@reviser : extension bada { … } の形で書いてください" };
+    if (/@reviser\s*:\s*extension\s+(c|python|java)\b/.test(src)) return { ok: false, error: "このアプリで動くのは bada の拡張だけです" };
+    var hooks = HOOKS.filter(function (h) { return new RegExp("fun\\s+" + h + "\\s*\\|").test(src); });
+    if (!hooks.length) return { ok: false, error: "フック (on_message / on_command / on_minutes) が 1 つもありません" };
+    var r = this.Bada.run(PRELUDE + 'MINUTES := []\nAGENDA := ""\n' + src, { maxSteps: MAX_STEPS });
+    if (!r.ok) return { ok: false, error: "Bada の実行エラー: " + (r.error || (r.parseErrors || []).join("; ")) };
+    var p = { id: id, name: header(src, "name") || id, description: header(src, "description"), kind: "bada", builtin: !!builtin, source: src, hooks: hooks, enabled: true, errors: 0 };
+    var call = function (hook, args, ctx) { return self._call(p, hook, args, ctx); };
+    if (hooks.indexOf("on_message") >= 0) p.onMessage = function (m, ctx) { return call("on_message", [lit(m.role || ""), lit(m.kind), lit(m.text), String(m.seq | 0)], ctx); };
+    if (hooks.indexOf("on_command") >= 0) p.onCommand = function (args, ctx) { return call("on_command", [lit(args)], ctx); };
+    if (hooks.indexOf("on_minutes") >= 0) p.onMinutes = function (ctx) { return call("on_minutes", [String(ctx.msgs.length)], ctx); };
+    this.plugins = this.plugins.filter(function (x) { return x.id !== id; }); this.plugins.push(p); this.onChange();
+    return { ok: true, plugin: p };
+  };
+  H._call = function (p, hook, args, ctx) {
+    var data = "MINUTES := [" + ctx.msgs.map(function (m) { return "[" + lit(m.role || "") + ", " + lit(m.kind) + ", " + lit(m.text) + "]"; }).join(", ") + "]\nAGENDA := " + lit(ctx.msgs.length ? ctx.msgs[0].text : "") + "\n";
+    var r = this.Bada.run(PRELUDE + data + p.source + '\nprint("@@BEGIN")\nprint(' + hook + "(" + args.join(", ") + '))\nprint("@@END")\n', { maxSteps: MAX_STEPS });
+    if (!r.ok) throw new Error(r.error || (r.parseErrors || []).join("; "));
+    var out = r.output.split("@@BEGIN\n")[1]; if (out === undefined) return null;
+    out = out.split("\n@@END")[0].trim();
+    return out === "" || out === "nil" || out === "0" || out === "false" ? null : out;
+  };
+  // 1 つのプラグインのフックを安全に呼ぶ。3 回続けて失敗したプラグインは止める
+  H._safe = function (p, fn) {
+    try { var v = fn(); p.errors = 0; return v == null || v === "" ? null : String(v); }
+    catch (e) { p.errors++; if (p.errors >= 3) { p.enabled = false; this.onChange(); } return "(エラー: " + e.message + (p.enabled ? "" : " — 3 回続いたので止めました") + ")"; }
+  };
+  H.active = function () { return this.plugins.filter(function (p) { return p.enabled; }); };
+  H.notes = function (m, ctx) {
+    var self = this, out = [];
+    this.active().forEach(function (p) { if (p.onMessage) { var t = self._safe(p, function () { return p.onMessage(m, ctx); }); if (t) out.push({ id: p.id, name: p.name, text: t }); } });
+    return out;
+  };
+  // "/id 引数" → {name, text}。プラグインの命令でなければ null
+  H.command = function (line, ctx) {
+    var m = String(line).match(/^\/([a-z][a-z0-9_]*)\s*([\s\S]*)$/); if (!m) return null;
+    if (m[1] === "plugins") return { name: "プラグイン", text: this.plugins.map(function (p) { return (p.enabled ? "● " : "○ ") + "/" + p.id + " — " + p.name + (p.description ? ": " + p.description : ""); }).join("\n") || "(なし)" };
+    var p = this.find(m[1]);
+    if (!p) return { name: "プラグイン", text: "/" + m[1] + " というプラグインはありません。/plugins で一覧を表示します。" };
+    if (!p.enabled) return { name: p.name, text: "このプラグインは止めてあります (F9 で入れられます)。" };
+    if (!p.onCommand) return { name: p.name, text: "このプラグインに命令はありません。" };
+    return { name: p.name, text: this._safe(p, function () { return p.onCommand(m[2], ctx); }) || "(返答なし)" };
+  };
+  H.minutes = function (ctx) {
+    var self = this, out = [];
+    this.active().forEach(function (p) { if (p.onMinutes) { var t = self._safe(p, function () { return p.onMinutes(ctx); }); if (t) out.push("## プラグイン: " + p.name + "\n\n" + t); } });
+    return out.join("\n\n");
+  };
+  H.setEnabled = function (id, on) { var p = this.find(id); if (p) { p.enabled = !!on; p.errors = 0; this.onChange(); } };
+  H.remove = function (id) { var p = this.find(id); if (!p || p.kind === "native" || p.builtin) return false; this.plugins = this.plugins.filter(function (x) { return x !== p; }); this.onChange(); return true; };
+  // 保存用: 利用者が追加したプラグインの本文と、入 / 切
+  H.save = function () {
+    return JSON.stringify({ user: this.plugins.filter(function (p) { return p.kind === "bada" && !p.builtin; }).map(function (p) { return p.source; }),
+                            off: this.plugins.filter(function (p) { return !p.enabled; }).map(function (p) { return p.id; }) });
+  };
+  H.load = function (json) {
+    var self = this, d; try { d = JSON.parse(json); } catch (e) { return; }
+    (d.user || []).forEach(function (src) { self.addBada(src, false); });
+    (d.off || []).forEach(function (id) { var p = self.find(id); if (p) p.enabled = false; });
+  };
+
+  global.BadaPlugins = { Host: Host, PRELUDE: PRELUDE, HOOKS: HOOKS, header: header };
+  if (typeof module !== "undefined" && module.exports) module.exports = global.BadaPlugins;
+})(typeof window !== "undefined" ? window : globalThis);
+
 </script>
 <script>
 (function () {
@@ -3979,6 +4212,17 @@ var BADA_ZONE_LIB = "# =========================================================
   // zone の計算: 元の zone-lib.bada を Bada 処理系で実行して Jones 鍵を求め、移植した計算と一致するか確かめる
   var zoneCheck = (function () { try { return BadaZone.selfCheck(BadaLang, BADA_ZONE_LIB); } catch (e) { return { ok: false, error: e.message }; } })();
   var node = null, dials = {};
+  /* ── プラグイン (拡張機能) ── */
+  var noteCache = {}, localLog = [], lastPlugText = "";
+  var plugReady = false;                  // 起動時の読み込みが済むまでは保存しない (保存してある内容を上書きしないように)
+  var plugins = new BadaPlugins.Host(BadaLang, { onChange: function () { noteCache = {}; if (plugReady) { try { localStorage.setItem("badameeting:plugins", plugins.save()); } catch (e) { } } } });
+  plugins.addNative(BadaXP.plugin);
+  BADA_PLUGINS.forEach(function (src) { plugins.addBada(src, true); });
+  try { var saved = localStorage.getItem("badameeting:plugins"); if (saved) plugins.load(saved); } catch (e) { }
+  noteCache = {}; plugReady = true;
+  function plugCtx(upto) { return { msgs: plainMinutes().slice(0, upto === undefined ? undefined : upto + 1) }; }
+  function notesOf(m) { var k = m.seq + "|" + m.text; if (!noteCache[k]) noteCache[k] = plugins.notes(m, plugCtx(m.seq)); return noteCache[k]; }
+  function fullMinutes() { var extra = plugins.minutes(plugCtx()); return meeting.minutes() + (extra ? "\n\n" + extra : ""); }
   function plainMinutes() { return meeting.msgs.map(function (m) { var c = Object.assign({}, m); delete c.measure; return c; }); }
   function makeNode() {
     var name = $("pname").value.trim() || "peer", knot = $("knot").value;
@@ -4013,7 +4257,7 @@ var BADA_ZONE_LIB = "# =========================================================
   /* ── 議事録の表示 ── */
   function render() {
     var log = $("log"); log.textContent = "";
-    if (!meeting.msgs.length) {
+    if (!meeting.msgs.length && !localLog.length) {
       var e = document.createElement("div"); e.className = "empty";
       e.textContent = "議題を書いて Ctrl+Enter を押すと、企画・プランナー・アプリケーションエンジニアが会議を始めます。";
       log.appendChild(e);
@@ -4027,7 +4271,18 @@ var BADA_ZONE_LIB = "# =========================================================
         if (!m.measure.pass) { var o = document.createElement("span"); o.className = "off"; o.textContent = "議題から外れている可能性 (門を通らず)"; who.appendChild(o); }
       }
       var t = document.createElement("div"); t.className = "text"; t.textContent = m.text;
-      d.appendChild(who); d.appendChild(t); log.appendChild(d);
+      d.appendChild(who); d.appendChild(t);
+      notesOf(m).forEach(function (n) {                       // プラグインの注記 (この端末だけに表示)
+        var pn = document.createElement("div"); pn.className = "plug"; var nb = document.createElement("b"); nb.textContent = n.name + " "; pn.appendChild(nb);
+        pn.appendChild(document.createTextNode(n.text)); d.appendChild(pn);
+      });
+      log.appendChild(d);
+    });
+    localLog.forEach(function (l) {                           // 命令への返答 (この端末だけに表示。会議には送らない)
+      var d = document.createElement("div"); d.className = "msg local";
+      var who = document.createElement("div"); who.className = "who"; var b = document.createElement("b"); b.textContent = "🔌 " + l.name; who.appendChild(b);
+      var sp = document.createElement("span"); sp.textContent = l.cmd + " — この端末だけに表示"; who.appendChild(sp);
+      var t = document.createElement("div"); t.className = "text"; t.textContent = l.text; d.appendChild(who); d.appendChild(t); log.appendChild(d);
     });
     log.scrollTop = log.scrollHeight;
     var st = meeting.stats(); $("stats").textContent = "";
@@ -4040,7 +4295,11 @@ var BADA_ZONE_LIB = "# =========================================================
   }
 
   /* ── 発言の受信と、役割の自動発言 ── */
-  function onMessage(m) { if (!meeting.add(m)) return; render(); refreshCands(); schedule(); showStatus(); }
+  function onMessage(m) {
+    var rec = meeting.add(m); if (!rec) return;
+    var ns = notesOf(rec); if (ns.length) lastPlugText = ns[ns.length - 1].text;       // Alt+9 で発言欄に入れられる
+    render(); refreshCands(); schedule(); showStatus();
+  }
   function schedule() {
     clearTimeout(pending);
     if (!$("auto").checked || meeting.decided()) return;
@@ -4054,6 +4313,10 @@ var BADA_ZONE_LIB = "# =========================================================
   }
   function say(kind) {
     var text = $("compose").value.replace(/\s+$/, ""); if (!text.trim()) return;
+    if (text.charAt(0) === "/") {                              // プラグインの命令: 会議には送らず、この端末で実行する
+      var res = plugins.command(text, plugCtx());
+      if (res) { localLog.push({ name: res.name, cmd: text.split(/\s/)[0], text: res.text }); lastPlugText = res.text; $("compose").value = ""; render(); refreshCands(); return; }
+    }
     var role = $("role").value, draft = { role: kind === "agenda" ? "host" : (role === "all" || role === "observer" ? "guest" : role), kind: kind, text: text, data: {} };
     if (kind === "comment") {
       // 役割の案をそのまま送る場合は、案の種類とデータを付ける (他の端末のエージェントが読めるように)
@@ -4197,7 +4460,7 @@ var BADA_ZONE_LIB = "# =========================================================
     } catch (e) { $("dlgmsg").textContent = "招待コードを読めませんでした。貼り付けた内容を確認してください。"; }
   };
   $("zput").onclick = function () {
-    try { var o = node.put($("zurl").value.trim(), meeting.minutes()); $("zout").textContent = "PUT → 預け先 " + o + " (封印して保存)"; }
+    try { var o = node.put($("zurl").value.trim(), fullMinutes()); $("zout").textContent = "PUT → 預け先 " + o + " (封印して保存)"; }
     catch (e) { $("zout").textContent = e.message; }
   };
   $("zget").onclick = function () {
@@ -4205,10 +4468,54 @@ var BADA_ZONE_LIB = "# =========================================================
     node.get($("zurl").value.trim(), function (status, text, path) { $("zout").textContent = status + (path.length > 1 ? "  経路 " + path.join(" → ") : "") + "\n" + text; });
   };
 
+  /* ── プラグインの管理 (F9) ── */
+  function renderPlugins() {
+    var box = $("pluglist"); box.textContent = "";
+    plugins.plugins.forEach(function (p) {
+      var row = document.createElement("div"); row.className = "p";
+      var lab = document.createElement("label"), cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = p.enabled; cb.setAttribute("data-plugin", p.id);
+      cb.onchange = function () { plugins.setEnabled(p.id, cb.checked); render(); };
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(" " + p.name + "  /" + p.id)); row.appendChild(lab);
+      var d = document.createElement("span"); d.className = "d";
+      d.textContent = (p.kind === "native" ? "組み込み" : p.builtin ? "同梱 (Bada)" : "追加 (Bada)") + " · " + (p.description || "") + (p.hooks ? " · フック: " + p.hooks.join(", ") : "");
+      row.appendChild(d);
+      if (p.kind === "bada") {
+        var show = document.createElement("button"); show.className = "ctl"; show.textContent = "ソースを表示"; show.onclick = function () { $("plugsrc").value = p.source; $("plugmsg").textContent = "/" + p.id + " のソースを表示しました。"; }; row.appendChild(show);
+        var pub = document.createElement("button"); pub.className = "ctl"; pub.textContent = "zone に公開";
+        pub.onclick = function () { try { var o = node.put("zone://" + node.room + ".zone.jp/plugins/" + p.id, p.source); $("plugmsg").textContent = "zone://" + node.room + ".zone.jp/plugins/" + p.id + " に公開しました (預け先 " + o + ")。"; } catch (e) { $("plugmsg").textContent = e.message; } };
+        row.appendChild(pub);
+        if (!p.builtin) { var del = document.createElement("button"); del.className = "ctl"; del.textContent = "削除"; del.onclick = function () { plugins.remove(p.id); renderPlugins(); render(); }; row.appendChild(del); }
+      }
+      box.appendChild(row);
+    });
+  }
+  function openPlugins() { $("plugmsg").textContent = ""; renderPlugins(); $("plug").showModal(); }
+  $("plugbtn").onclick = openPlugins;
+  $("plugclose").onclick = function () { $("plug").close(); };
+  $("plugadd").onclick = function () {
+    var r = plugins.addBada($("plugsrc").value, false);
+    $("plugmsg").textContent = r.ok ? "/" + r.plugin.id + " (" + r.plugin.name + ") を入れました。フック: " + r.plugin.hooks.join(", ") : "入れられませんでした: " + r.error;
+    if (r.ok) { renderPlugins(); render(); }
+  };
+  $("plugsample").onclick = function () {
+    $("plugsrc").value = ["# plugin: hello", "# name: あいさつ", "# description: /hello 名前 であいさつを返し、決定の発言に注記を付ける", "", "@reviser : extension bada {",
+      "    fun on_command |args| \"\"\"", "        if (len(args) == 0) { return \"こんにちは。議事録は \" + len(MINUTES) + \" 件です。\" }", "        return \"こんにちは、\" + args + \" さん。\"", "    \"\"\"",
+      "    fun on_message |role, kind, text, seq| \"\"\"", "        if (kind == \"decide\") { return \"決定です。おつかれさまでした。\" }", "        return \"\"", "    \"\"\"", "}", ""].join("\n");
+    $("plugmsg").textContent = "見本を入れました。「追加 / 更新」で使えるようになります。";
+  };
+  $("plugget").onclick = function () {
+    var id = $("plugid").value.trim(); if (!id) return;
+    $("plugmsg").textContent = "取得中…";
+    node.get("zone://" + node.room + ".zone.jp/plugins/" + id, function (status, text) {
+      if (status === 200) { $("plugsrc").value = text; $("plugmsg").textContent = "取得しました。内容を確かめてから「追加 / 更新」を押してください。"; }
+      else $("plugmsg").textContent = status + " " + text;
+    });
+  };
+
   /* ── 保存とキー操作 ── */
   function exportMinutes() {
     if (!meeting.msgs.length) return;
-    var md = meeting.minutes();
+    var md = fullMinutes();
     if (/; wv\)/.test(navigator.userAgent)) { $("compose").value = md; return; }      // Android WebView: 保存できない場合があるので発言欄に出す
     var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown;charset=utf-8" })); a.download = "meeting-minutes.md";
     document.body.appendChild(a); a.click(); a.remove();
@@ -4224,15 +4531,17 @@ var BADA_ZONE_LIB = "# =========================================================
     else if (e.key === "F4") { e.preventDefault(); toggleAcoustic(); }
     else if (e.key === "F6") { e.preventDefault(); exportMinutes(); }
     else if (e.key === "F7") { e.preventDefault(); setPtr(!ptrOn); }
+    else if (e.key === "F9") { e.preventDefault(); if ($("plug").open) $("plug").close(); else openPlugins(); }
+    else if (e.altKey && e.code === "Digit9" && lastPlugText) { e.preventDefault(); $("compose").value += lastPlugText; refreshCands(); $("compose").focus(); }
     else if (e.key === "F8") { e.preventDefault(); if ($("dlg").open) $("dlg").close(); else openNet(); }
-    else if (e.altKey && /^Digit[0-9]$/.test(e.code)) { var pick = candList[+e.code.slice(5)]; if (pick) { e.preventDefault(); pick(); refreshCands(); $("compose").focus(); } }
+    else if (e.altKey && /^Digit[0-8]$/.test(e.code)) { var pick = candList[+e.code.slice(5)]; if (pick) { e.preventDefault(); pick(); refreshCands(); $("compose").focus(); } }
   });
   $("role").onchange = function () { refreshCands(); schedule(); };
   $("auto").onchange = function () { refreshCands(); schedule(); };
   $("pname").value = "peer-" + Math.floor(Math.random() * 46656).toString(36);
   node = makeNode(); bus = node; $("zurl").value = "zone://" + node.room + ".zone.jp/minutes";
   window.addEventListener("pagehide", function () { try { node.leave(); } catch (e) { } });      // 閉じるときは網に知らせる
-  window.BadaMeetingApp = { meeting: function () { return meeting; }, bus: function () { return bus; }, node: function () { return node; }, keyer: keyer, zoneCheck: zoneCheck };
+  window.BadaMeetingApp = { meeting: function () { return meeting; }, bus: function () { return bus; }, node: function () { return node; }, keyer: keyer, zoneCheck: zoneCheck, plugins: plugins, minutes: fullMinutes };
   render(); buildPad(); refreshCands(); showStatus(); $("compose").focus();
 })();
 </script>

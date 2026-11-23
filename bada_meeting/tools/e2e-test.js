@@ -6,6 +6,7 @@
  * 2. P2P 網 (zone): 4 つの画面を一列につなぎ、自動で網になること・主催者なしの会議・zone:// レコード・
  *    結び目の違う端末の排除・担当の引き継ぎを確かめる
  * 4. ポインタ (滞留) だけで複数行を入力して発言する
+ * 5. プラグイン: 注記・命令・追加・入 / 切・議事録の節・保存・zone:// での配布
  * 3. 音響電信: 別の端末が鳴らした音 (WAV を偽のマイク入力にする) を復調して、会議に応じる
  */
 "use strict";
@@ -64,6 +65,37 @@ const paste = async (p, sel, text) => { await p.focus(sel); await p.keyboard.ins
   ok(dl.suggestedFilename() === "meeting-minutes.md", "F6 で議事録を保存できる");
   ok(!(await solo.evaluate(() => document.documentElement.scrollWidth > innerWidth)), "横スクロールが出ない");
   if (shots) await solo.screenshot({ path: path.join(shots, "meeting-solo.png") });
+
+  console.log("プラグイン (拡張機能) — キーボードだけ");
+  const pg = await open();
+  await type(pg, "スマホ向けの予約アプリを\n3か月で作りたい"); await pg.keyboard.press("Control+Enter"); await decided(pg);
+  const plugText = await pg.locator("#log .plug").allInnerTexts();
+  ok(plugText.some(t => /^Bada XP\s+Ξ = 0\.\d{4}/.test(t)) && plugText.some(t => /^リスク見張り\s+リスクに触れた発言です \(これまで 1 件\)/.test(t)), "発言に Bada XP と Bada プラグインの注記が付く", plugText.slice(0, 3).join(" | "));
+  await type(pg, "/risk"); await pg.keyboard.press("Control+Enter");
+  await pg.waitForSelector(".msg.local");
+  ok(/リスクに触れた発言: 3 件/.test(await pg.locator(".msg.local .text").last().innerText()) && (await pg.evaluate(() => BadaMeetingApp.meeting().msgs.length)) === 10, "/risk の返答はこの端末だけに表示され、会議には送られない");
+  await type(pg, "/xp リーマン予想とは"); await pg.keyboard.press("Control+Enter");
+  await pg.waitForFunction(() => document.querySelectorAll(".msg.local").length === 2);
+  ok(/Ξ=0\.\d{4}/.test(await pg.locator(".msg.local .text").last().innerText()), "/xp で Bada XP が応答する");
+  await pg.keyboard.press("F9"); await press(pg, "#plugsample"); await press(pg, "#plugadd");
+  ok(/\/hello \(あいさつ\) を入れました/.test(await pg.locator("#plugmsg").innerText()) && (await pg.locator("#pluglist .p").count()) === 4, "F9 の画面で Bada プラグインを追加できる", await pg.locator("#plugmsg").innerText());
+  await pg.focus('#pluglist input[data-plugin="xp"]'); await pg.keyboard.press("Space"); await pg.keyboard.press("Escape");
+  const after = await pg.locator("#log .plug").allInnerTexts();
+  ok(!after.some(t => /^Bada XP/.test(t)) && after.some(t => /^あいさつ\s+決定です/.test(t)) && after.some(t => /^リスク見張り/.test(t)), "Bada XP を切にすると注記が消え、追加したプラグインの注記が出る", after.join(" | ").slice(0, 200));
+  await type(pg, "/hello 山口"); await pg.keyboard.press("Control+Enter");
+  await pg.waitForFunction(() => document.querySelectorAll(".msg.local").length === 3);
+  ok((await pg.locator(".msg.local .text").last().innerText()) === "こんにちは、山口 さん。", "追加したプラグインの命令が動く");
+  await pg.keyboard.press("Alt+9");
+  ok((await pg.inputValue("#compose")) === "こんにちは、山口 さん。", "Alt+9 で直前のプラグインの出力を発言欄に入れられる");
+  await pg.keyboard.press("Control+a"); await pg.keyboard.press("Backspace");
+  const [pdl] = await Promise.all([pg.waitForEvent("download"), pg.keyboard.press("F6")]);
+  const saved = fs.readFileSync(await pdl.path(), "utf8");
+  ok(/## プラグイン: リスク見張り/.test(saved) && /## プラグイン: 発言の集計/.test(saved) && !/## プラグイン: Bada XP/.test(saved), "保存した議事録に、入になっているプラグインの節が加わる");
+  await pg.reload(); await pg.keyboard.press("F9");
+  ok((await pg.locator("#pluglist .p").count()) === 4 && !(await pg.locator('#pluglist input[data-plugin="xp"]').isChecked()) && (await pg.locator('#pluglist input[data-plugin="hello"]').isChecked()), "開き直しても、追加したプラグインと入 / 切が残る");
+  ok(!(await pg.evaluate(() => document.documentElement.scrollWidth > innerWidth)), "横スクロールが出ない (プラグイン)");
+  if (shots) await pg.screenshot({ path: path.join(shots, "meeting-plugins.png") });
+  await pg.evaluate(() => localStorage.removeItem("badameeting:plugins")); await pg.close();
 
   console.log("ポインタ (滞留) だけで入力する");
   const ptr = await open();
@@ -135,6 +167,18 @@ const paste = async (p, sel, text) => { await p.focus(sel); await p.keyboard.ins
   await B.focus("#zurl"); await B.keyboard.press("Control+a"); await B.keyboard.insertText("zone://kaigi.zone.jp/none"); await press(B, "#zget");
   await B.waitForFunction(() => /^404/.test(document.getElementById("zout").textContent), null, { timeout: 10000 });
   ok(true, "無いレコードは 404 zone-not-found"); await B.keyboard.press("Escape");
+  // プラグインを zone:// で配る: A が公開し、B が取得して中身を確かめてから入れる
+  await A.keyboard.press("F9"); await press(A, "#plugsample"); await press(A, "#plugadd");
+  await A.locator('#pluglist .p', { hasText: "/hello" }).locator("button", { hasText: "zone に公開" }).focus(); await A.keyboard.press("Enter");
+  ok(/zone:\/\/kaigi\.zone\.jp\/plugins\/hello に公開しました/.test(await A.locator("#plugmsg").innerText()), "プラグインを zone:// に公開: " + (await A.locator("#plugmsg").innerText()));
+  await A.keyboard.press("Escape"); await sleep(500);
+  await B.keyboard.press("F9"); await paste(B, "#plugid", "hello"); await press(B, "#plugget");
+  await B.waitForFunction(() => /# plugin: hello/.test(document.getElementById("plugsrc").value), null, { timeout: 10000 });
+  ok((await B.locator("#pluglist .p").count()) === 3, "別の端末が取得しても、確かめて「追加」を押すまでは入らない");
+  await press(B, "#plugadd"); await B.keyboard.press("Escape");
+  await type(B, "/hello"); await B.keyboard.press("Control+Enter"); await B.waitForSelector(".msg.local");
+  ok(/こんにちは。議事録は 10 件です。/.test(await B.locator(".msg.local .text").last().innerText()), "取得したプラグインが別の端末で動く");
+  for (const p of [A, B]) await p.evaluate(() => localStorage.removeItem("badameeting:plugins"));
   // 結び目 (鍵) が違う端末は網に入れない
   const X = await open();
   await X.keyboard.press("F8"); await X.focus("#pname"); await X.keyboard.press("Control+a"); await X.keyboard.insertText("intruder"); await X.selectOption("#knot", "figure8"); await press(X, "#apply"); await X.keyboard.press("Escape");

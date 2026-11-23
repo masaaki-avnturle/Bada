@@ -1,0 +1,39 @@
+# plugin: tally
+# name: 発言の集計
+# description: 役割ごとの発言数と文字数を /tally と議事録に出す
+
+@reviser : extension bada {
+    fun tally_text || """
+        roles := []
+        counts := []
+        chars := []
+        i := 0
+        while (i < len(MINUTES)) {
+            r := MINUTES[i][0]
+            k := 0
+            found := 0 - 1
+            while (k < len(roles)) {
+                if (roles[k] == r) { found := k }
+                k := k + 1
+            }
+            if (found < 0) { roles <- r; counts <- 0; chars <- 0; found := len(roles) - 1 }
+            counts[found] = counts[found] + 1
+            chars[found] = chars[found] + len(MINUTES[i][2])
+            i := i + 1
+        }
+        out := ""
+        k := 0
+        while (k < len(roles)) {
+            if (k > 0) { out := out + "\n" }
+            out := out + "- " + roles[k] + ": " + ("" + counts[k]) + " 回、" + ("" + chars[k]) + " 文字"
+            k := k + 1
+        }
+        return out
+    """
+    fun on_command |args| """
+        return tally_text()
+    """
+    fun on_minutes |count| """
+        return tally_text()
+    """
+}
